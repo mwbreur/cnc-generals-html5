@@ -644,3 +644,397 @@
 
         // =========================================================================
         
+        // =========================================================================
+        // CINEMATIC ANIMATED SUPERWEAPONS (PARTICLE CANNON, NUKE SILO, SCUD STORM)
+        // =========================================================================
+
+        function animateParticleCannonStrike(targetPos, duration = 240) {
+            playAudio('orbital_beam');
+
+            const group = new THREE.Group();
+            group.position.copy(targetPos);
+
+            // 1. Searing orbital column
+            const beamGeo = new THREE.CylinderGeometry(0.8, 1.4, 90, 16);
+            const beamMat = new THREE.MeshBasicMaterial({ color: 0x00d2d3, transparent: true, opacity: 0.95 });
+            const beam = new THREE.Mesh(beamGeo, beamMat);
+            beam.position.y = 45;
+            group.add(beam);
+
+            // 2. Rotating orbital energy vortex rings
+            const rings = [];
+            for (let i = 0; i < 4; i++) {
+                const rGeo = new THREE.RingGeometry(1.6 + i * 0.6, 2.0 + i * 0.6, 24);
+                rGeo.rotateX(-Math.PI / 2);
+                const rMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+                const r = new THREE.Mesh(rGeo, rMat);
+                r.position.y = 6 + i * 14;
+                group.add(r);
+                rings.push(r);
+            }
+
+            scene.add(group);
+
+            let life = duration;
+            let sweepAngle = 0;
+            const originCenter = targetPos.clone();
+
+            activeFX.push({
+                life: duration,
+                update() {
+                    life--;
+                    sweepAngle += 0.08;
+                    const sweepRadius = Math.sin((duration - life) * 0.02) * 12.0;
+                    group.position.x = originCenter.x + Math.cos(sweepAngle) * sweepRadius;
+                    group.position.z = originCenter.z + Math.sin(sweepAngle) * sweepRadius;
+                    group.position.y = getTerrainHeight(group.position.x, group.position.z);
+
+                    rings.forEach((r, idx) => {
+                        r.rotation.y += 0.15 * (idx % 2 === 0 ? 1 : -1);
+                        r.scale.setScalar(1 + Math.sin(Date.now() * 0.02 + idx) * 0.2);
+                    });
+
+                    // Ground electrical sizzle & sparks
+                    if (Math.random() < 0.8) {
+                        spawnSparks(group.position, 0x00d2d3, 8);
+                        spawnSmokePuff(group.position, 0x222f3e, 0.6);
+                    }
+
+                    // Continuous damage tick to hostile units & structures in beam path
+                    if (life % 10 === 0) {
+                        const beamPos = group.position;
+                        enemyUnits.forEach(enemy => {
+                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(beamPos) <= 9.0) {
+                                enemy.health -= 35;
+                            }
+                        });
+                        enemyStructures.forEach(struct => {
+                            if (struct.health > 0 && struct.position && struct.position.distanceTo(beamPos) <= 12.0) {
+                                struct.health -= 50;
+                            }
+                        });
+                        if (Math.random() < 0.2) {
+                            spawnCraterDecal(beamPos, 2.5, 300);
+                        }
+                    }
+
+                    if (life <= 0) {
+                        scene.remove(group);
+                        group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+                        spawnEnhancedExplosion(group.position, 0x00d2d3, 2.8, true);
+                        spawnCraterDecal(group.position, 4.0, 480);
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+
+        function animateNukeStrike(siloPos, targetPos) {
+            playAudio('superweapon_siren');
+
+            // 1. Ascending ICBM from Silo
+            const missileGroup = new THREE.Group();
+            missileGroup.position.copy(siloPos || targetPos);
+            const mGeo = new THREE.CylinderGeometry(0.4, 0.45, 4.2, 8);
+            const mMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, metalness: 0.8, roughness: 0.2 });
+            const missileBody = new THREE.Mesh(mGeo, mMat);
+            missileGroup.add(missileBody);
+
+            const noseGeo = new THREE.ConeGeometry(0.4, 1.2, 8);
+            const noseMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
+            const nose = new THREE.Mesh(noseGeo, noseMat);
+            nose.position.y = 2.7;
+            missileGroup.add(nose);
+
+            scene.add(missileGroup);
+
+            let phase = 'ascent';
+            let frame = 0;
+
+            activeFX.push({
+                life: 200,
+                update() {
+                    frame++;
+                    if (phase === 'ascent') {
+                        missileGroup.position.y += 1.8;
+                        spawnSmokePuff(missileGroup.position, 0xff793f, 0.8);
+                        if (missileGroup.position.y > 90) {
+                            phase = 'descent';
+                            missileGroup.position.set(targetPos.x, 100, targetPos.z);
+                            missileGroup.rotation.x = Math.PI; // point down
+                        }
+                    } else if (phase === 'descent') {
+                        missileGroup.position.y -= 3.2;
+                        spawnSmokePuff(missileGroup.position, 0xff5252, 0.9);
+                        const groundY = getTerrainHeight(targetPos.x, targetPos.z);
+                        if (missileGroup.position.y <= groundY + 1.0) {
+                            scene.remove(missileGroup);
+                            missileGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+
+                            // Detonation!
+                            playAudio('nuke_detonation');
+                            spawnMushroomCloud(targetPos);
+
+                            // Apocalyptic damage: 750 to enemies within 25 units
+                            enemyUnits.forEach(enemy => {
+                                if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(targetPos) <= 25.0) {
+                                    enemy.health -= 750;
+                                }
+                            });
+                            enemyStructures.forEach(struct => {
+                                if (struct.health > 0 && struct.position && struct.position.distanceTo(targetPos) <= 28.0) {
+                                    struct.health -= 750;
+                                }
+                            });
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            });
+        }
+
+        function spawnMushroomCloud(pos) {
+            const groundY = getTerrainHeight(pos.x, pos.z);
+
+            // 1. Colossal expanding cap
+            const capGeo = new THREE.SphereGeometry(3.5, 16, 16);
+            const capMat = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.95 });
+            const cap = new THREE.Mesh(capGeo, capMat);
+            cap.position.set(pos.x, groundY + 4, pos.z);
+            scene.add(cap);
+
+            // 2. Vertical rising stem
+            const stemGeo = new THREE.CylinderGeometry(1.2, 2.2, 14, 12);
+            const stemMat = new THREE.MeshBasicMaterial({ color: 0x2f3542, transparent: true, opacity: 0.85 });
+            const stem = new THREE.Mesh(stemGeo, stemMat);
+            stem.position.set(pos.x, groundY + 7, pos.z);
+            scene.add(stem);
+
+            // 3. Supersonic shockwave ring
+            const ringGeo = new THREE.RingGeometry(1.5, 4.5, 32);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+            const shockwave = new THREE.Mesh(ringGeo, ringMat);
+            shockwave.position.set(pos.x, groundY + 0.2, pos.z);
+            scene.add(shockwave);
+
+            // 4. Crater and lingering fallout
+            spawnCraterDecal(pos, 7.5, 800);
+            spawnLingeringToxinCloud(pos);
+
+            let life = 60;
+            activeFX.push({
+                life: 60,
+                update() {
+                    life--;
+                    const progress = 1 - (life / 60);
+
+                    // Cap expands and billows upward
+                    cap.position.y = groundY + 4 + progress * 16;
+                    cap.scale.set(1 + progress * 3.5, 1 + progress * 2.2, 1 + progress * 3.5);
+                    cap.material.opacity = Math.max(0, 0.95 - progress * 0.85);
+
+                    // Stem stretches
+                    stem.position.y = groundY + (4 + progress * 16) / 2;
+                    stem.scale.set(1 + progress * 1.5, 1 + progress * 2.0, 1 + progress * 1.5);
+                    stem.material.opacity = Math.max(0, 0.85 - progress * 0.8);
+
+                    // Shockwave expands to 28 units
+                    const rScale = 1 + progress * 6.5;
+                    shockwave.scale.set(rScale, rScale, 1);
+                    shockwave.material.opacity = Math.max(0, 0.95 - progress * 1.0);
+
+                    if (life <= 0) {
+                        scene.remove(cap); cap.geometry.dispose(); cap.material.dispose();
+                        scene.remove(stem); stem.geometry.dispose(); stem.material.dispose();
+                        scene.remove(shockwave); shockwave.geometry.dispose(); shockwave.material.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+
+        function animateScudStormStrike(stormPos, targetPos) {
+            playAudio('superweapon_siren');
+            playAudio('scud_storm_volley');
+
+            // 9-rocket ripple salvo
+            for (let i = 0; i < 9; i++) {
+                setTimeout(() => {
+                    const offset = new THREE.Vector3((Math.random() - 0.5) * 24, 0, (Math.random() - 0.5) * 24);
+                    const subTarget = targetPos.clone().add(offset);
+                    const launchOrigin = stormPos ? stormPos.clone() : targetPos.clone().add(new THREE.Vector3(-40, 0, -40));
+                    launchOrigin.y += 2.0;
+
+                    spawnRocketProjectile(launchOrigin, subTarget, true, true);
+
+                    setTimeout(() => {
+                        enemyUnits.forEach(enemy => {
+                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(subTarget) <= 10.0) {
+                                enemy.health -= 120;
+                            }
+                        });
+                        enemyStructures.forEach(struct => {
+                            if (struct.health > 0 && struct.position && struct.position.distanceTo(subTarget) <= 12.0) {
+                                struct.health -= 140;
+                            }
+                        });
+                        spawnLingeringToxinCloud(subTarget);
+                        spawnCraterDecal(subTarget, 3.2, 450);
+                    }, 1400);
+                }, i * 160);
+            }
+        }
+
+        // =========================================================================
+        // USA VEHICLE DRONE ATTACHMENTS (BATTLE, SCOUT, HELLFIRE)
+        // =========================================================================
+
+        function createDroneMesh(droneType) {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: droneType === 'scout' ? 0x747d8c : droneType === 'hellfire' ? 0x2f3542 : 0x576574,
+                metalness: 0.8,
+                roughness: 0.3
+            });
+
+            // Aerodynamic pod body
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.16, 0.52), bodyMat);
+            group.add(body);
+
+            // Glowing sensor lens
+            const eyeColor = droneType === 'scout' ? 0x2ed573 : droneType === 'hellfire' ? 0xff4757 : 0x00d2d3;
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), new THREE.MeshBasicMaterial({ color: eyeColor }));
+            eye.position.set(0, -0.04, 0.28);
+            group.add(eye);
+
+            // Twin micro-rotors
+            const rotors = new THREE.Group();
+            const bladeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+            const bladeL = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.02, 0.08), bladeMat);
+            bladeL.position.x = -0.22; rotors.add(bladeL);
+            const bladeR = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.02, 0.08), bladeMat);
+            bladeR.position.x = 0.22; rotors.add(bladeR);
+            rotors.position.y = 0.12;
+            group.add(rotors);
+
+            group.userData.rotors = rotors;
+            group.userData.droneType = droneType;
+            return group;
+        }
+
+        function attachVehicleDrone(vehicle, droneType) {
+            if (vehicle.drone && vehicle.drone.mesh) {
+                scene.remove(vehicle.drone.mesh);
+                vehicle.drone.mesh.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+            }
+
+            const mesh = createDroneMesh(droneType);
+            mesh.position.copy(vehicle.mesh.position);
+            mesh.position.y += droneType === 'scout' ? 4.2 : 2.2;
+            scene.add(mesh);
+
+            vehicle.drone = {
+                type: droneType,
+                mesh: mesh,
+                timer: 0,
+                cooldown: 0
+            };
+
+            // Scout drone boosts vision
+            if (droneType === 'scout') {
+                vehicle.scanRange = Math.round(vehicle.scanRange * 1.5);
+            }
+
+            playAudio('radio_chirp');
+            showNotification(`${vehicle.type.toUpperCase()} deployed ${droneType.toUpperCase()} DRONE!`, 'success');
+        }
+
+        // =========================================================================
+        // CHINA OVERLORD TANK SUPERSTRUCTURE UPGRADES (BUNKER, GATLING, PROPAGANDA)
+        // =========================================================================
+
+        function attachOverlordUpgrade(tank, upgradeType) {
+            if (tank.overlordUpgradeMesh) {
+                tank.mesh.remove(tank.overlordUpgradeMesh);
+                tank.overlordUpgradeMesh.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+            }
+
+            const group = new THREE.Group();
+            group.name = "overlordUpgrade";
+            group.position.set(0, 1.8, -0.4);
+
+            if (upgradeType === 'bunker') {
+                // Fortified hexagonal pillbox with sandbags
+                const bGeo = new THREE.CylinderGeometry(0.9, 1.05, 0.65, 6);
+                const bMat = new THREE.MeshStandardMaterial({ color: 0x535c68, roughness: 0.8 });
+                const b = new THREE.Mesh(bGeo, bMat);
+                group.add(b);
+
+                // Mini infantry helmets inside bunker
+                const hMat = new THREE.MeshStandardMaterial({ color: 0x222f3e });
+                [-0.35, 0.35].forEach(x => {
+                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), hMat);
+                    h.position.set(x, 0.42, 0);
+                    group.add(h);
+                });
+            } else if (upgradeType === 'gatling') {
+                // Dual 20mm rotary Gatling turret
+                const baseGeo = new THREE.CylinderGeometry(0.7, 0.8, 0.4, 8);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, metalness: 0.7 });
+                const base = new THREE.Mesh(baseGeo, baseMat);
+                group.add(base);
+
+                const bGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 6);
+                bGeo.rotateX(Math.PI / 2);
+                const bMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 });
+                const bL = new THREE.Mesh(bGeo, bMat); bL.position.set(-0.2, 0.25, 0.6); group.add(bL);
+                const bR = new THREE.Mesh(bGeo, bMat); bR.position.set(0.2, 0.25, 0.6); group.add(bR);
+            } else if (upgradeType === 'propaganda') {
+                // Miniature Speaker Tower with 4 loud megaphones
+                const mastGeo = new THREE.CylinderGeometry(0.12, 0.16, 1.4, 6);
+                const mastMat = new THREE.MeshStandardMaterial({ color: 0xb71540 });
+                const mast = new THREE.Mesh(mastGeo, mastMat);
+                mast.position.y = 0.7; group.add(mast);
+
+                for (let a = 0; a < 4; a++) {
+                    const hornGeo = new THREE.ConeGeometry(0.24, 0.5, 8);
+                    hornGeo.rotateX(Math.PI / 2);
+                    const hornMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f });
+                    const horn = new THREE.Mesh(hornGeo, hornMat);
+                    horn.position.set(Math.cos(a * Math.PI / 2) * 0.4, 1.2, Math.sin(a * Math.PI / 2) * 0.4);
+                    horn.lookAt(new THREE.Vector3(horn.position.x * 2, 1.2, horn.position.z * 2));
+                    group.add(horn);
+                }
+            }
+
+            tank.mesh.add(group);
+            tank.overlordUpgradeMesh = group;
+            tank.overlordUpgrade = upgradeType;
+
+            playAudio('construction', {}, 'china');
+            showNotification(`OVERLORD upgraded with ${upgradeType.toUpperCase()}!`, 'success');
+        }
+
+        // =========================================================================
+        // CHINA NUKE CANNON OUTRIGGER SIEGE DEPLOYMENT
+        // =========================================================================
+
+        function deployNukeCannonOutriggers(cannon) {
+            if (cannon.isDeployed) return;
+            cannon.isDeployed = true;
+            playAudio('construction', {}, 'china');
+
+            const chassis = cannon.mesh;
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.8 });
+            [-1.4, 1.4].forEach(x => {
+                [-1.6, 1.6].forEach(z => {
+                    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.8, 6), legMat);
+                    leg.position.set(x, 0.3, z);
+                    chassis.add(leg);
+                });
+            });
+        }

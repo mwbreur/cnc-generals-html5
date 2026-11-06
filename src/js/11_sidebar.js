@@ -120,6 +120,76 @@
                     <span>RESOURCE OPERATIONS</span>
                 </div>
                 <div class="cmd-grid">
+                ${(() => {
+                    if (selectedUnits.length !== 1) return '';
+                    const u = selectedUnits[0];
+                    let upgHtml = '';
+
+                    // Veterancy Rank Badge
+                    const rankNames = ['ROOKIE', '★ VETERAN', '★★ ELITE', '★★★ HEROIC'];
+                    const rankColors = ['#ced6e0', '#f1c40f', '#e67e22', '#ff4757'];
+                    upgHtml += `
+                        <div style="grid-column: span 2; padding: 6px; background: rgba(0,0,0,0.4); border-left: 3px solid ${rankColors[u.veterancy || 0]}; margin-bottom: 4px;">
+                            <span style="font-size: 11px; font-weight: bold; color: ${rankColors[u.veterancy || 0]};">${rankNames[u.veterancy || 0]}</span>
+                            <span style="font-size: 10px; color: #a4b0be; margin-left: 6px;">(${u.kills || 0} Confirmed Kills${u.veterancy === 3 ? ' - Regenerating HP' : ''})</span>
+                        </div>
+                    `;
+
+                    // USA Drones for Crusader, Paladin, Humvee
+                    if (['crusader', 'paladin', 'humvee'].includes(u.type)) {
+                        upgHtml += `
+                            <button class="cmd-btn" onclick="purchaseVehicleDrone('battle', 300)">
+                                <div class="cmd-btn-name" style="color: #00d2d3;">+ BATTLE DRONE</div>
+                                <div class="cmd-btn-desc">Repairs hull (+2 HP/s) & shoots infantry</div>
+                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$300</span></div>
+                            </button>
+                            <button class="cmd-btn" onclick="purchaseVehicleDrone('scout', 100)">
+                                <div class="cmd-btn-name" style="color: #2ed573;">+ SCOUT DRONE</div>
+                                <div class="cmd-btn-desc">+50% Sight range & stealth detection</div>
+                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$100</span></div>
+                            </button>
+                            <button class="cmd-btn" onclick="purchaseVehicleDrone('hellfire', 500)">
+                                <div class="cmd-btn-name" style="color: #ff4757;">+ HELLFIRE DRONE</div>
+                                <div class="cmd-btn-desc">Launches guided anti-tank rockets</div>
+                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$500</span></div>
+                            </button>
+                        `;
+                    }
+
+                    // China Overlord Mounts
+                    if (u.type === 'overlord') {
+                        upgHtml += `
+                            <button class="cmd-btn" onclick="purchaseOverlordUpgrade('bunker', 500)">
+                                <div class="cmd-btn-name" style="color: #eccc68;">+ BUNKER TOWER</div>
+                                <div class="cmd-btn-desc">2 troops fire 360° while moving</div>
+                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$500</span></div>
+                            </button>
+                            <button class="cmd-btn" onclick="purchaseOverlordUpgrade('gatling', 1200)">
+                                <div class="cmd-btn-name" style="color: #ff7f50;">+ GATLING TOWER</div>
+                                <div class="cmd-btn-desc">Twin 20mm rotary anti-air/infantry</div>
+                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$1200</span></div>
+                            </button>
+                            <button class="cmd-btn" onclick="purchaseOverlordUpgrade('propaganda', 500)">
+                                <div class="cmd-btn-name" style="color: #ff4757;">+ PROPAGANDA TOWER</div>
+                                <div class="cmd-btn-desc">Heals (+3 HP/s) & buffs fire rate +25%</div>
+                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$500</span></div>
+                            </button>
+                        `;
+                    }
+
+                    // China Nuke Cannon Neutron Shells
+                    if (u.type === 'nukecannon' && !u.neutronShells) {
+                        upgHtml += `
+                            <button class="cmd-btn" style="grid-column: span 2;" onclick="purchaseNukeCannonUpgrade(1000)">
+                                <div class="cmd-btn-name" style="color: #2ed573;">☢ NEUTRON SHELLS</div>
+                                <div class="cmd-btn-desc">Eradicates vehicle crews leaving capturable hulks</div>
+                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$1000</span></div>
+                            </button>
+                        `;
+                    }
+
+                    return upgHtml;
+                })()}
                     <button class="cmd-btn" style="grid-column: span 2;" onclick="orderAllHarvestersToTargetSupply()">
                         <div class="cmd-btn-name">⛏ HARVEST FROM THIS FIELD</div>
                         <div class="cmd-btn-desc">Orders all friendly trucks and workers to gather supplies here</div>

@@ -107,6 +107,7 @@ function processCombatScanning() {
                 spawnMuzzleFlash(muzzleR, 0xffa502, 0.9);
                 spawnBulletTracer(muzzleL, targetPos, 0xff4757, 4);
                 spawnBulletTracer(muzzleR, targetPos, 0xff4757, 4);
+                playAudio('china_cannon', {}, 'china');
                 const ovDmg = (units.includes(attacker) && researchedTechs.has('uraniumShells')) ? 119 : 95;
                 target.health -= ovDmg;
             } else if (attacker.type === 'dragon') {
@@ -150,6 +151,44 @@ function processCombatScanning() {
                 spawnBulletTracer(muzzlePos, targetPos, 0x10ac84, 6);
                 setTimeout(() => spawnMiniNukeMushroom(targetPos), 280);
                 target.health -= 140;
+            } else if (['battlemaster', 'overlord'].includes(attacker.type)) {
+                // China 152mm Smoothbore Twin Cannon
+                spawnMuzzleFlash(muzzlePos, 0xff793f, 1.1);
+                spawnBulletTracer(muzzlePos, targetPos, 0xf39c12, 3.8);
+                playAudio('china_cannon', {}, 'china');
+                target.health -= (attacker.type === 'overlord' ? 95 : 45);
+            } else if (['gatlingTank', 'gatlingCannon'].includes(attacker.type)) {
+                // China Twin 20mm Rotary Gatling Cannon
+                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.45);
+                spawnBulletTracer(muzzlePos, targetPos, 0xf1c40f, 4.5);
+                playAudio('gatling_fire', {}, 'china');
+                target.health -= 25;
+            } else if (attacker.type === 'dragonTank') {
+                // China Dragon Tank Flamethrower
+                spawnFlamethrowerBurst(muzzlePos, targetPos);
+                playAudio('flamethrower', {}, 'china');
+                target.health -= 40;
+            } else if (attacker.type === 'nukecannon') {
+                // China Nuke Cannon Nuclear Artillery Shell
+                deployNukeCannonOutriggers(attacker);
+                spawnMuzzleFlash(muzzlePos, 0x2ed573, 1.5);
+                playAudio('nuke_artillery', {}, 'china');
+                setTimeout(() => {
+                    spawnMiniNukeMushroom(targetPos);
+                    target.health -= (attacker.neutronShells ? 180 : 140);
+                }, 800);
+            } else if (['rebel', 'technical'].includes(attacker.type)) {
+                // GLA Kalashnikov AK-47 & Technical Heavy MG
+                spawnMuzzleFlash(muzzlePos, 0xf1c40f, 0.4);
+                spawnBulletTracer(muzzlePos, targetPos, 0xe67e22, 3.0);
+                playAudio('ak47', {}, 'gla');
+                target.health -= (attacker.type === 'technical' ? 24 : 16);
+            } else if (attacker.type === 'scud') {
+                // GLA SCUD Launcher Chemical Warhead
+                spawnMuzzleFlash(muzzlePos, 0x2ed573, 1.2);
+                spawnRocketProjectile(muzzlePos, targetPos, true, true);
+                playAudio('scud_launch', {}, 'gla');
+                target.health -= 130;
             } else if (attacker.type === 'raptor') {
                 // USA Raptor Air-Superiority Fighter: Dual AMRAAM Guided Missiles!
                 const mPosL = getMuzzleWorldPosition(attacker, -0.65);
@@ -260,6 +299,27 @@ function processCombatScanning() {
                     remainingHealth: Math.max(0, target.health)
                 });
             }
+
+            // Veterancy promotion check on kill
+            if (target && target.health <= 0 && attacker && attacker.kills !== undefined) {
+                attacker.kills++;
+                if (attacker.kills === 2 && attacker.veterancy < 1) {
+                    attacker.veterancy = 1; // Veteran (+20% HP)
+                    attacker.maxHealth = Math.floor(attacker.maxHealth * 1.2);
+                    attacker.health = attacker.maxHealth;
+                    showNotification(`★ ${attacker.type.toUpperCase()} promoted to VETERAN!`, 'info');
+                } else if (attacker.kills === 5 && attacker.veterancy < 2) {
+                    attacker.veterancy = 2; // Elite (+40% HP)
+                    attacker.maxHealth = Math.floor(attacker.maxHealth * 1.2);
+                    attacker.health = attacker.maxHealth;
+                    showNotification(`★★ ${attacker.type.toUpperCase()} promoted to ELITE!`, 'info');
+                } else if (attacker.kills === 10 && attacker.veterancy < 3) {
+                    attacker.veterancy = 3; // Heroic (Self-healing & Gold muzzle flash)
+                    attacker.maxHealth = Math.floor(attacker.maxHealth * 1.4);
+                    attacker.health = attacker.maxHealth;
+                    showNotification(`★★★ ${attacker.type.toUpperCase()} achieved HEROIC rank! (Auto-Regeneration Active)`, 'success');
+                }
+            }
         }
 
         function activateBlueprint(type) {
@@ -330,4 +390,3 @@ function processCombatScanning() {
             blueprintMesh.material.color.setHex(isBlueprintValid ? 0x00ffcc : 0xff4757);
         }
 let aiProductionTick = 0;
-

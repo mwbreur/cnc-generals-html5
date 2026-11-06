@@ -9,7 +9,103 @@ function animate() {
             const animTime = nowTime * 0.003;
 
             // Update Weapon Effects & Particle System
+            
             updateFXEngine();
+
+            // =========================================================
+            // ACTIVE DRONES, OVERLORD UPGRADES & HEROIC VETERANCY REGENERATION
+            // =========================================================
+            units.forEach(unit => {
+                if (unit.health <= 0) return;
+
+                // 1. Heroic Self-Healing
+                if (unit.veterancy === 3 && buildingTick % 30 === 0 && unit.health < unit.maxHealth) {
+                    unit.health = Math.min(unit.maxHealth, unit.health + 3);
+                }
+
+                // 2. USA Vehicle Drones
+                if (unit.drone && unit.drone.mesh) {
+                    const drone = unit.drone;
+                    const dMesh = drone.mesh;
+
+                    // Hover position tracking above vehicle
+                    const targetDroneY = unit.mesh.position.y + (drone.type === 'scout' ? 4.2 : 2.2) + Math.sin(Date.now() * 0.006) * 0.25;
+                    dMesh.position.x += (unit.mesh.position.x - dMesh.position.x) * 0.18;
+                    dMesh.position.z += (unit.mesh.position.z - dMesh.position.z) * 0.18;
+                    dMesh.position.y += (targetDroneY - dMesh.position.y) * 0.18;
+                    dMesh.rotation.y = unit.mesh.rotation.y;
+
+                    if (dMesh.userData && dMesh.userData.rotors) {
+                        dMesh.userData.rotors.rotation.y += 0.45;
+                    }
+
+                    drone.timer = (drone.timer || 0) + 1;
+
+                    // Battle Drone: Repairs vehicle + fires micro-gun at hostile infantry
+                    if (drone.type === 'battle') {
+                        if (drone.timer % 60 === 0 && unit.health < unit.maxHealth) {
+                            unit.health = Math.min(unit.maxHealth, unit.health + 3);
+                        }
+                        if (drone.timer % 40 === 0) {
+                            const enemyInf = enemyUnits.find(e => e.health > 0 && !e.isAir && e.mesh.position.distanceTo(dMesh.position) <= 16.0);
+                            if (enemyInf) {
+                                spawnBulletTracer(dMesh.position, enemyInf.mesh.position, 0x00d2d3, 1.5);
+                                playAudio('machine_gun');
+                                enemyInf.health -= 12;
+                            }
+                        }
+                    }
+
+                    // Hellfire Drone: Launches mini-Hellfire rockets at hostile armor
+                    if (drone.type === 'hellfire') {
+                        if (drone.timer % 90 === 0) {
+                            const enemyArmor = enemyUnits.find(e => e.health > 0 && !e.isAir && e.mesh.position.distanceTo(dMesh.position) <= 22.0);
+                            if (enemyArmor) {
+                                spawnRocketProjectile(dMesh.position, enemyArmor.mesh.position, false, false);
+                                playAudio('missile_launch');
+                                enemyArmor.health -= 35;
+                            }
+                        }
+                    }
+                }
+
+                // 3. China Overlord Upgrades Active Logic
+                if (unit.type === 'overlord' && unit.overlordUpgrade) {
+                    unit.upgTimer = (unit.upgTimer || 0) + 1;
+
+                    // Overlord Bunker: 2 troops shoot 360 degrees
+                    if (unit.overlordUpgrade === 'bunker' && unit.upgTimer % 45 === 0) {
+                        const target = enemyUnits.find(e => e.health > 0 && e.mesh.position.distanceTo(unit.mesh.position) <= 18.0);
+                        if (target) {
+                            spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf39c12, 2.5);
+                            playAudio('china_cannon', {}, 'china');
+                            target.health -= 22;
+                        }
+                    }
+
+                    // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret
+                    if (unit.overlordUpgrade === 'gatling' && unit.upgTimer % 12 === 0) {
+                        const target = enemyUnits.find(e => e.health > 0 && e.mesh.position.distanceTo(unit.mesh.position) <= 20.0);
+                        if (target) {
+                            spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
+                            spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
+                            playAudio('gatling_fire', {}, 'china');
+                            target.health -= 18;
+                        }
+                    }
+
+                    // Overlord Propaganda Tower: Heals nearby allies (+3 HP/s) and pulses soundwaves
+                    if (unit.overlordUpgrade === 'propaganda' && unit.upgTimer % 60 === 0) {
+                        units.forEach(ally => {
+                            if (ally.health > 0 && ally.mesh.position.distanceTo(unit.mesh.position) <= 18.0) {
+                                ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                            }
+                        });
+                        playAudio('propaganda_drone', {}, 'china');
+                    }
+                }
+            });
+
 
             // Water surface ripple animation
             if (waterMesh) {

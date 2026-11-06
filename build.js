@@ -1,24 +1,16 @@
 /**
  * Build script for Command & Conquer: Generals HTML5 Edition
- * Assembles modular source files from src/ into a single standalone HTML game.
- *
- * Usage:
- *   node build.js
- *   node build.js --output D:/C&C/C&Cv0.0024.html
+ * Assembles modular source files from src/ into standalone playable HTML games:
+ *  1. D:/C&C/C&Cv0.0024.html (Versioned release)
+ *  2. D:/C&C/index.html      (GitHub Pages root deployment)
  */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 const srcDir = path.join(__dirname, 'src');
-const defaultOutput = path.join(__dirname, 'C&Cv0.0024.html');
-
-// Read command line args for custom output if provided
-let outputPath = defaultOutput;
-const outArgIdx = process.argv.indexOf('--output');
-if (outArgIdx !== -1 && process.argv[outArgIdx + 1]) {
-    outputPath = process.argv[outArgIdx + 1];
-}
+const versionedOutput = path.join(__dirname, 'C&Cv0.0024.html');
+const pagesOutput = path.join(__dirname, 'index.html');
 
 console.log('=== Building C&C Generals HTML5 ===');
 const startTime = Date.now();
@@ -58,10 +50,12 @@ try {
     process.exit(1);
 }
 
-// 5. Write Output
-fs.writeFileSync(outputPath, finalHtml, 'utf8');
+// 5. Write Outputs
+fs.writeFileSync(versionedOutput, finalHtml, 'utf8');
+fs.writeFileSync(pagesOutput, finalHtml, 'utf8');
 const duration = Date.now() - startTime;
 const sizeKB = (finalHtml.length / 1024).toFixed(1);
 
-console.log(`✓ SUCCESS: Built ${outputPath}`);
+console.log(`✓ SUCCESS: Built ${versionedOutput}`);
+console.log(`✓ SUCCESS: Built ${pagesOutput} (Ready for GitHub Pages!)`);
 console.log(`  Total size: ${sizeKB} KB | Build time: ${duration}ms`);
