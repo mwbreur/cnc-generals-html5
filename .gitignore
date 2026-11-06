@@ -1,0 +1,6 @@
+# Build outputs & backups
+*.bak*
+*.backup*
+node_modules/
+.DS_Store
+Thumbs.db

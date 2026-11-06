@@ -1,0 +1,363 @@
+<div id="start-menu">
+        <div id="start-card">
+            <h1>Command Setup</h1>
+
+            <!-- Game Mode Switcher Tabs (Single Player, Multiplayer, Map Editor) -->
+            <div class="game-mode-tabs" role="tablist">
+                <button id="tab-mode-sp" class="mode-tab-btn active" onclick="switchGameModeTab('single')">🤖 SINGLE PLAYER</button>
+                <button id="tab-mode-mp" class="mode-tab-btn" onclick="switchGameModeTab('multiplayer')">🌐 MULTIPLAYER (PEER.JS)</button>
+                <button id="tab-mode-editor" class="mode-tab-btn" onclick="switchGameModeTab('editor')">🗺️ MAP EDITOR</button>
+            </div>
+
+            <!-- Faction Selection -->
+            <p style="margin: 6px 0 4px 0; font-size: 12px; color: #a8b8aa;">Select your command faction:</p>
+            <div class="faction-grid" role="group" aria-label="Choose faction">
+                <button class="rts-btn faction-card active" data-faction="usa" onclick="selectFaction('usa', this)"><strong>USA</strong>High-tech, drones & air power.</button>
+                <button class="rts-btn faction-card" data-faction="china" onclick="selectFaction('china', this)"><strong>China</strong>Heavy armor, mass firepower & propaganda.</button>
+                <button class="rts-btn faction-card" data-faction="gla" onclick="selectFaction('gla', this)"><strong>GLA</strong>Guerrilla, scrap salvage & toxin weapons.</button>
+            </div>
+            <div id="faction-overview">USA forces — Infantry: Ranger, Missile Defender, Pathfinder, Colonel Burton. Vehicles & aircraft: Humvee, Ambulance, Crusader Tank, Paladin Tank, Tomahawk, Chinook, Comanche, Raptor, Stealth Fighter, Aurora Bomber. Support: Construction Dozer, Pilot (unbuildable), Scout Drone (attachment), Battle Drone (attachment).</div>
+
+            <!-- ============================================================== -->
+            <!-- 1. SINGLE PLAYER SETUP PANEL                                   -->
+            <!-- ============================================================== -->
+            <div id="sp-controls-panel">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;">
+                    <div class="start-option" style="margin:0;">
+                        <label for="starting-units" style="font-size:10px;">Starting Units</label>
+                        <select id="starting-units" class="slot-select">
+                            <option value="small" selected>Small force</option>
+                            <option value="large">Reinforced force</option>
+                            <option value="dozer">Builder only</option>
+                        </select>
+                    </div>
+                    <div class="start-option" style="margin:0;">
+                        <label for="starting-money" style="font-size:10px;">Starting Money</label>
+                        <select id="starting-money" class="slot-select">
+                            <option value="1200">$1,200</option>
+                            <option value="2000">$2,000</option>
+                            <option value="5000">$5,000</option>
+                            <option value="10000" selected>$10,000</option>
+                        </select>
+                    </div>
+                    <div class="start-option" style="margin:0;">
+                        <label for="map-environment" style="font-size:10px;">Theater of War</label>
+                        <select id="map-environment" class="slot-select" onchange="onMapSelectionChange('single')">
+                            <option value="desert" selected>Desert Canyon (Middle East)</option>
+                            <option value="jungle">Tropical Jungle (Mekong Basin)</option>
+                            <option value="snow">Frozen Mountain (Siberian Tundra)</option>
+                            <option value="city">Small City Grid (Urban Warfare)</option>
+                            <option value="random">Procedural Warzone - Random Hills & River</option>
+                        </select>
+                    </div>
+                    <div class="start-option" style="margin:0;">
+                        <label for="map-size" style="font-size:10px;">Battlefield Size</label>
+                        <select id="map-size" class="slot-select" onchange="onMapSizeChange('single')">
+                            <option value="500">Small (500x500 - 4 Spawns)</option>
+                            <option value="800" selected>Medium (800x800 - 6 Spawns)</option>
+                            <option value="1200">Large (1200x1200 - 8 Spawns)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Skirmish Map Preview & Slots Grid -->
+                <div class="setup-columns-grid">
+                    <!-- Left: Interactive Map Preview Canvas -->
+                    <div class="map-preview-container">
+                        <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px;">🗺️ TACTICAL MAP PREVIEW</div>
+                        <canvas id="sp-map-preview" class="map-preview-canvas" width="260" height="260" onclick="handleMapPreviewClick(event, 'single')"></canvas>
+                        <div style="font-size: 10px; color: #8f9e91; margin-top: 6px;">
+                            💡 Click any numbered marker on the map to assign that spawn location to your selected slot!
+                        </div>
+                    </div>
+
+                    <!-- Right: Player & AI Slots List -->
+                    <div class="slots-container">
+                        <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                            <span>COMMAND SLOTS & TEAMS</span>
+                            <span id="sp-slots-count" style="color: #c5b98e;">4 Spawns Available</span>
+                        </div>
+                        <div id="sp-slots-list">
+                            <!-- Populated dynamically by initLobbySlots() -->
+                        </div>
+                    </div>
+                </div>
+
+                <button id="start-game" class="rts-btn" style="margin-top: 14px; width: 100%;" onclick="startGame()">Start Single Player Skirmish</button>
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- 2. MULTIPLAYER SETUP PANEL                                     -->
+            <!-- ============================================================== -->
+            <div id="mp-controls-panel" style="display: none;">
+                <div class="mp-sub-tabs">
+                    <button id="sub-tab-host" class="mp-sub-btn active" onclick="switchMpSubTab('host')">👑 HOST BATTLE</button>
+                    <button id="sub-tab-join" class="mp-sub-btn" onclick="switchMpSubTab('join')">🚀 JOIN BATTLE</button>
+                </div>
+
+                <!-- HOST SECTION -->
+                <div id="mp-host-section" class="mp-box">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;">
+                        <div class="start-option" style="margin:0;">
+                            <label for="mp-starting-units" style="font-size:10px;">Starting Units (Host)</label>
+                            <select id="mp-starting-units" class="slot-select" onchange="syncMpLobbyToPeer()">
+                                <option value="small" selected>Small force</option>
+                                <option value="large">Reinforced force</option>
+                                <option value="dozer">Builder only</option>
+                            </select>
+                        </div>
+                        <div class="start-option" style="margin:0;">
+                            <label for="mp-starting-money" style="font-size:10px;">Starting Money (Host)</label>
+                            <select id="mp-starting-money" class="slot-select" onchange="syncMpLobbyToPeer()">
+                                <option value="1200">$1,200</option>
+                                <option value="2000">$2,000</option>
+                                <option value="5000">$5,000</option>
+                                <option value="10000" selected>$10,000</option>
+                            </select>
+                        </div>
+                        <div class="start-option" style="margin:0;">
+                            <label for="mp-map-env" style="font-size:10px;">Theater of War (Host)</label>
+                            <select id="mp-map-env" class="slot-select" onchange="onMapSelectionChange('multiplayer')">
+                                <option value="desert" selected>Desert Canyon (Middle East)</option>
+                                <option value="jungle">Tropical Jungle (Mekong Basin)</option>
+                                <option value="snow">Frozen Mountain (Siberian Tundra)</option>
+                                <option value="city">Small City Grid (Urban Warfare)</option>
+                                <option value="random">Procedural Warzone - Random Hills & River</option>
+                            </select>
+                        </div>
+                        <div class="start-option" style="margin:0;">
+                            <label for="mp-map-size" style="font-size:10px;">Battlefield Size (Host)</label>
+                            <select id="mp-map-size" class="slot-select" onchange="onMapSizeChange('multiplayer')">
+                                <option value="500">Small (500x500 - 4 Spawns)</option>
+                                <option value="800" selected>Medium (800x800 - 6 Spawns)</option>
+                                <option value="1200">Large (1200x1200 - 8 Spawns)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Room Code Sharing Bar -->
+                    <div style="margin-bottom: 10px;">
+                        <label style="display:block; font-size:11px; color:#55efc4; margin-bottom:4px; font-weight:bold;">YOUR ROOM CODE (Share with opponent):</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input id="mp-host-room-code" type="text" readonly value="GENERATING..." style="flex: 1; background: #161c17; border: 1px solid #55efc4; color: #55efc4; font-family: monospace; font-size: 16px; font-weight: bold; padding: 6px 12px; letter-spacing: 2px;">
+                            <button class="rts-btn" style="background: #2a382b; border-color: #55efc4; color: #55efc4; padding: 6px 14px;" onclick="copyHostRoomCode()">📋 COPY</button>
+                        </div>
+                    </div>
+
+                    <!-- Multiplayer Map Preview & Teams Layout -->
+                    <div class="setup-columns-grid">
+                        <!-- Left: Multiplayer Map Preview -->
+                        <div class="map-preview-container">
+                            <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px;">🌐 MULTIPLAYER MAP PREVIEW</div>
+                            <canvas id="mp-map-preview" class="map-preview-canvas" width="260" height="260" onclick="handleMapPreviewClick(event, 'multiplayer')"></canvas>
+                            <div style="font-size: 10px; color: #8f9e91; margin-top: 6px;">
+                                💡 Host can click spawn markers or assign slots below to set exact player and AI positions!
+                            </div>
+                        </div>
+
+                        <!-- Right: Multiplayer Slots Table (Host, Challenger, AI Teams) -->
+                        <div class="slots-container">
+                            <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                                <span>MULTIPLAYER TEAMS & OPPONENTS</span>
+                                <span id="mp-slots-count" style="color: #c5b98e;">4 Spawns Available</span>
+                            </div>
+                            <div id="mp-slots-list">
+                                <!-- Populated dynamically by initLobbySlots() -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="mp-host-status" class="mp-status-indicator" style="margin-top: 10px;">
+                        Connecting to PeerJS Broker...
+                    </div>
+
+                    <button id="mp-launch-btn" class="rts-btn" style="margin-top: 12px; width: 100%; opacity: 0.5; cursor: not-allowed;" disabled onclick="hostLaunchBattle()">LAUNCH MULTIPLAYER BATTLE</button>
+                </div>
+
+                <!-- JOIN SECTION -->
+                <div id="mp-join-section" class="mp-box" style="display: none;">
+                    <p style="margin: 0 0 10px 0; font-size: 12px; color: #c5b98e;">Enter the Room Code provided by the host to connect directly over WebRTC:</p>
+                    <div style="display: flex; gap: 8px;">
+                        <input id="mp-join-input" type="text" placeholder="e.g. CNC-7821" style="flex: 1; background: #161c17; border: 1px solid #55efc4; color: #55efc4; font-family: monospace; font-size: 16px; font-weight: bold; padding: 8px 12px; letter-spacing: 2px; text-transform: uppercase;">
+                        <button class="rts-btn" style="background: #2a382b; border-color: #55efc4; color: #55efc4; padding: 8px 16px;" onclick="joinConnectToHost()">CONNECT</button>
+                    </div>
+                    <div id="mp-join-status" class="mp-status-indicator">Paste host code and click "CONNECT".</div>
+
+                    <!-- Client's Live Synchronized View -->
+                    <div id="mp-client-view" style="display: none; margin-top: 14px;">
+                        <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 8px;">HOST'S BATTLEFIELD DEPLOYMENT:</div>
+                        <div class="setup-columns-grid">
+                            <div class="map-preview-container">
+                                <canvas id="mp-client-map-preview" class="map-preview-canvas" width="260" height="260"></canvas>
+                            </div>
+                            <div class="slots-container" id="mp-client-slots-list">
+                                <!-- Live synced from host -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- 3. MAP EDITOR PANEL                                            -->
+            <!-- ============================================================== -->
+            <div id="editor-controls-panel" style="display: none;">
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                    <div class="start-option" style="margin:0;">
+                        <label for="me-map-name" style="font-size:10px;">Custom Map Name</label>
+                        <input id="me-map-name" type="text" value="Custom Warzone" class="slot-select" style="font-weight:bold;">
+                    </div>
+                    <div class="start-option" style="margin:0;">
+                        <label for="me-map-theme" style="font-size:10px;">Theme</label>
+                        <select id="me-map-theme" class="slot-select" onchange="onEditorThemeChange()">
+                            <option value="desert" selected>Desert Canyon</option>
+                            <option value="jungle">Tropical Jungle</option>
+                            <option value="snow">Frozen Tundra</option>
+                            <option value="city">Small City Grid</option>
+                        </select>
+                    </div>
+                    <div class="start-option" style="margin:0;">
+                        <label for="me-map-size" style="font-size:10px;">Battlefield Size</label>
+                        <select id="me-map-size" class="slot-select" onchange="onEditorSizeChange()">
+                            <option value="500">Small (500x500 - 4 Spawns)</option>
+                            <option value="800" selected>Medium (800x800 - 6 Spawns)</option>
+                            <option value="1200">Large (1200x1200 - 8 Spawns)</option>
+                        </select>
+                    </div>
+                    <div class="start-option" style="margin:0;">
+                        <label for="me-water-level" style="font-size:10px;">Water Depth</label>
+                        <input id="me-water-level" type="range" min="-3" max="3" step="0.5" value="0" style="width:100%;margin-top:6px;" onchange="renderEditorCanvas()">
+                    </div>
+                </div>
+
+                <div class="editor-container">
+                    <!-- Left: 400x400 Drawing Canvas -->
+                    <div class="editor-canvas-box">
+                        <canvas id="editor-canvas" class="editor-canvas" width="400" height="400"></canvas>
+                        <div style="font-size: 10px; color: #8f9e91; margin-top: 6px;">
+                            Left Click & Drag: Paint active feature • Right Click: Lower / Erase
+                        </div>
+                    </div>
+
+                    <!-- Right: Tool Palette & Saved Maps -->
+                    <div>
+                        <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px;">TOOL PALETTE:</div>
+                        <div class="editor-tools-grid">
+                            <button id="tool-hill" class="editor-tool-btn active" onclick="setEditorTool('hill')">🏔️ Raise Hill</button>
+                            <button id="tool-plateau" class="editor-tool-btn" onclick="setEditorTool('plateau')">⛰️ Flat Mesa</button>
+                            <button id="tool-water" class="editor-tool-btn" onclick="setEditorTool('water')">💧 Dig Water</button>
+                            <button id="tool-bridge" class="editor-tool-btn" onclick="setEditorTool('bridge')">🌉 Bridge</button>
+                            <button id="tool-supply" class="editor-tool-btn" onclick="setEditorTool('supply')">📦 Supply Dock</button>
+                            <button id="tool-spawn" class="editor-tool-btn" onclick="setEditorTool('spawn')">🚩 Move Spawn</button>
+                            <button id="tool-prop" class="editor-tool-btn" onclick="setEditorTool('prop')">🌲 Props</button>
+                            <button id="tool-random" class="editor-tool-btn" onclick="generateRandomEditorTerrain()">🎲 Randomize</button>
+                            <button id="tool-clear" class="editor-tool-btn" onclick="clearEditorCanvas()">🧹 Flatten</button>
+                        </div>
+
+                        <!-- Actions Bar -->
+                        <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                            <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px;" onclick="saveCustomMap()">💾 SAVE MAP</button>
+                            <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#f1c40f; color:#f1c40f;" onclick="exportCustomMapJSON()">📁 EXPORT</button>
+                            <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#3498db; color:#3498db;" onclick="importCustomMapJSON()">📥 IMPORT</button>
+                            <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#00ffcc; color:#00ffcc;" onclick="playCustomMapNow()">🎮 PLAY NOW</button>
+                        </div>
+
+                        <!-- Saved Maps Library -->
+                        <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px;">SAVED CUSTOM MAPS:</div>
+                        <div id="saved-maps-list" style="max-height: 140px; overflow-y: auto; background: rgba(12,18,14,0.6); border: 1px solid #2e3d31; border-radius: 4px; padding: 6px;">
+                            <!-- Populated dynamically by loadSavedMapsList() -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- In-Game Multiplayer Tactical Chat -->
+    <div id="mp-chat-container" style="display: none; position: absolute; bottom: 85px; left: 20px; width: 360px; max-height: 240px; background: rgba(10, 15, 12, 0.88); border: 1px solid #55efc4; border-radius: 4px; z-index: 1000; font-family: 'Consolas', monospace; color: #fff; padding: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.8); pointer-events: auto;">
+        <div style="font-size: 11px; font-weight: bold; color: #55efc4; border-bottom: 1px solid rgba(85,239,196,0.3); padding-bottom: 4px; margin-bottom: 6px; display: flex; justify-content: space-between;">
+            <span>📻 TACTICAL RADIO (PEER P2P)</span>
+            <span style="color: #8f8a70; font-size: 10px;">[ENTER] to Chat</span>
+        </div>
+        <div id="mp-chat-messages" style="height: 130px; overflow-y: auto; font-size: 12px; display: flex; flex-direction: column; gap: 4px; padding-right: 4px;"></div>
+        <input id="mp-chat-input" type="text" placeholder="Type tactical message & press Enter..." maxlength="120" style="width: 100%; box-sizing: border-box; margin-top: 6px; background: #0c120e; border: 1px solid #55efc4; color: #55efc4; padding: 5px 8px; font-family: 'Consolas', monospace; font-size: 12px; border-radius: 2px;" onkeydown="handleChatInputKeyDown(event)">
+    </div>
+    <div id="selection-box"></div>
+    <div id="canvas-container"></div>
+    <div id="deployment-hint">Choose a clear location on the map for your Command Center. Right-click to cancel deployment.</div>
+    
+    <div id="build-progress" class="build-progress-container">
+        <div id="build-progress-fill" class="build-progress-bar"></div>
+    </div>
+    <div id="health-bars" aria-hidden="true"></div>
+
+    <!-- Tactical Status Bar at Bottom -->
+    <div id="hud">
+        <div id="mp-status-badge" style="display: none; background: rgba(12, 28, 18, 0.9); border: 1px solid #55efc4; color: #55efc4; padding: 4px 12px; border-radius: 4px; font-family: monospace; font-size: 12px; font-weight: bold; letter-spacing: 1px; margin-bottom: 6px; box-shadow: 0 0 10px rgba(85,239,196,0.3);">
+            🟢 P2P WEBRTC ONLINE | ROOM: CNC-XXXX
+        </div>
+        <div id="tactical-ticker" style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: #00ffcc; font-weight: bold;">[STRATEGIC COMMAND]</span>
+            <span id="tactical-message">Command Center Online. Awaiting tactical orders.</span>
+        </div>
+        <div style="color: #8f8a70; font-size: 11px;">
+            WASD: Pan · Scroll: Zoom · MMB: Rotate · R-Click: Move / Attack / Harvest
+        </div>
+    </div>
+
+    <!-- Floating Tactical Briefing Tooltip -->
+    <div id="tactical-tooltip" class="tactical-tooltip" style="display: none;"></div>
+
+    <!-- C&C Generals Construction Sidebar -->
+    <div id="cnc-sidebar">
+        <!-- Top Faction & Resources Header -->
+        <div class="sidebar-header">
+            <div class="sidebar-faction-title">
+                <span id="sidebar-faction-badge">USA STRATEGIC COMMAND</span>
+                <span style="color: #6d664c; font-size: 9px;">DEFCON 1</span>
+            </div>
+            <div class="sidebar-resources">
+                <div class="res-box">
+                    <span class="res-label">SUPPLY FUNDS</span>
+                    <span id="resource-display" class="res-val">$1,200</span>
+                </div>
+                <div class="res-box" style="text-align: right;">
+                    <span class="res-label">GENERALS RANK</span>
+                    <span id="generals-rank" style="font-size: 13px; font-weight: bold; color: #dbc46d;">★★★☆☆</span>
+                </div>
+            </div>
+            <!-- Power Output Meter -->
+            <div class="power-meter" id="power-meter-container">
+                <span style="font-weight: bold; color: #a9a389;" id="power-status-text">⚡ POWER: NORMAL</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <div class="power-bar-bg">
+                        <div id="power-bar-fill" class="power-bar-fill" style="width: 100%;"></div>
+                    </div>
+                    <span id="power-nums" style="font-weight: bold; color: #e5e0ce;">10 / 5</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Navigation Tabs -->
+        <div class="sidebar-tabs">
+            <button id="tab-btn-production" class="sidebar-tab active" onclick="setSidebarTab('production')">COMMAND &amp; PROD</button>
+            <button id="tab-btn-structures" class="sidebar-tab" onclick="setSidebarTab('structures')">BUILDINGS</button>
+            <button id="tab-btn-defenses" class="sidebar-tab" onclick="setSidebarTab('defenses')">DEFENSES</button>
+        </div>
+
+        <!-- Scrollable Sidebar Body Content -->
+        <div id="sidebar-body" class="sidebar-body">
+            <!-- Dynamic Content Injected Here by updateSidebar() -->
+        </div>
+
+        <!-- Sidebar Quick Controls Footer -->
+        <div class="sidebar-footer">
+            <div style="display: flex; gap: 6px;">
+                <button class="rts-btn" style="flex: 1;" onclick="spawnEnemyUnit('tank')">Spawn Enemy Tank</button>
+                <button class="rts-btn" style="flex: 1;" onclick="recenterBase()">Recenter Base</button>
+            </div>
+            <div style="font-size: 9.5px; color: #7f7a65; text-align: center; margin-top: 2px;">
+                C&amp;C Generals Tactical Command Engine
+            </div>
+        </div>
+    </div>

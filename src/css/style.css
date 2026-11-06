@@ -1,0 +1,587 @@
+body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        #canvas-container {
+            width: 100vw; height: 100vh;
+            position: absolute; top: 0; left: 0; z-index: 1;
+        }
+        #selection-box {
+            border: 1px dashed #e0c46e;
+            background-color: rgba(224, 196, 110, 0.16);
+            position: absolute; z-index: 10;
+            pointer-events: none; display: none;
+        }
+        #start-menu {
+            position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+            background: rgba(3, 7, 11, 0.92); color: #e0e6ed;
+        }
+        #start-card {
+            box-sizing: border-box; width: min(940px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto;
+            padding: 24px 28px; background: #101820; border: 1px solid #00a98a;
+            box-shadow: 0 0 35px rgba(0,255,204,0.18); border-radius: 6px;
+        }
+        /* Skirmish & Multiplayer 2-Column Grid Layout */
+        .setup-columns-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 16px;
+            margin-top: 10px;
+        }
+        @media (max-width: 800px) {
+            .setup-columns-grid { grid-template-columns: 1fr; }
+        }
+        .map-preview-container {
+            background: rgba(12, 18, 14, 0.85);
+            border: 1px solid #2e3d31;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+        }
+        .map-preview-canvas {
+            display: block;
+            margin: 0 auto;
+            background: #000;
+            border: 1px solid #55efc4;
+            border-radius: 3px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.6);
+        }
+        /* Slots Table Styling */
+        .slots-container {
+            background: rgba(12, 18, 14, 0.7);
+            border: 1px solid #2e3d31;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 380px;
+            overflow-y: auto;
+        }
+        .slot-row {
+            display: grid;
+            grid-template-columns: 90px 1fr 100px 95px 105px;
+            gap: 6px;
+            align-items: center;
+            background: rgba(20, 28, 22, 0.6);
+            border: 1px solid #253327;
+            padding: 6px 8px;
+            border-radius: 3px;
+            margin-bottom: 6px;
+            font-size: 11px;
+        }
+        .slot-row.active-slot {
+            border-color: #55efc4;
+            background: rgba(25, 45, 32, 0.8);
+        }
+        .slot-badge {
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+        .team-pill {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 10px;
+            text-align: center;
+        }
+        .team-1 { background: #0984e3; color: #fff; }
+        .team-2 { background: #d63031; color: #fff; }
+        .team-3 { background: #00b894; color: #fff; }
+        .team-4 { background: #e17055; color: #fff; }
+        .slot-select {
+            background: #141b16;
+            border: 1px solid #3d4a3e;
+            color: #55efc4;
+            font-size: 11px;
+            padding: 3px 6px;
+            border-radius: 2px;
+            width: 100%;
+            cursor: pointer;
+        }
+        .slot-select:focus {
+            outline: none;
+            border-color: #55efc4;
+            box-shadow: 0 0 6px rgba(85, 239, 196, 0.4);
+        }
+        .slot-select option {
+            background-color: #141b16;
+            color: #55efc4;
+            padding: 4px 6px;
+        }
+        /* Map Editor Overlay Styles */
+        .editor-container {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 16px;
+            margin-top: 10px;
+        }
+        @media (max-width: 860px) {
+            .editor-container { grid-template-columns: 1fr; }
+        }
+        .editor-canvas-box {
+            background: #090e0b;
+            border: 1px solid #55efc4;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .editor-canvas {
+            display: block;
+            margin: 0 auto;
+            background: #1a150e;
+            cursor: crosshair;
+            box-shadow: 0 0 15px rgba(85,239,196,0.15);
+        }
+        .editor-tools-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .editor-tool-btn {
+            background: #141b16;
+            border: 1px solid #3d4a3e;
+            color: #c5b98e;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 7px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .editor-tool-btn:hover {
+            border-color: #55efc4;
+            color: #55efc4;
+        }
+        .editor-tool-btn.active {
+            background: #1c3b29;
+            border-color: #55efc4;
+            color: #55efc4;
+            box-shadow: 0 0 8px rgba(85,239,196,0.3);
+        }
+        .saved-map-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(20, 28, 22, 0.7);
+            border: 1px solid #2e3d31;
+            padding: 6px 10px;
+            border-radius: 3px;
+            margin-bottom: 6px;
+            font-size: 11px;
+        }
+        .faction-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 8px 0;
+        }
+        .faction-card {
+            box-sizing: border-box;
+            height: 76px;
+            min-height: 76px;
+            max-height: 76px;
+            padding: 10px 14px;
+            text-align: left;
+            white-space: normal;
+            text-transform: none;
+            line-height: 1.35;
+        }
+        .faction-card strong { display: block; margin-bottom: 4px; color: #e0c46e; font-size: 14px; text-transform: uppercase; }
+        .faction-card.active { border-color: #e0c46e; box-shadow: inset 0 0 14px rgba(224,196,110,.18); }
+        #faction-overview {
+            box-sizing: border-box;
+            height: 62px;
+            min-height: 62px;
+            max-height: 62px;
+            overflow-y: auto;
+            padding: 7px 12px;
+            background: rgba(12, 18, 14, 0.75);
+            border: 1px solid #2e3d31;
+            border-radius: 4px;
+            color: #c5b98e;
+            line-height: 1.4;
+            margin: 6px 0 10px 0;
+            font-size: 11.5px;
+        }
+        #faction-overview::-webkit-scrollbar {
+            width: 4px;
+        }
+        #faction-overview::-webkit-scrollbar-thumb {
+            background: #3d4a3e;
+            border-radius: 2px;
+        }
+        #deployment-hint { position: fixed; z-index: 25; top: 18px; left: 50%; transform: translateX(-50%); display: none;
+            padding: 12px 20px; color: #f2e6bd; background: rgba(24,32,27,.94); border: 1px solid #b6aa7a; text-align: center; }
+        @media(max-width: 650px) { .faction-grid { grid-template-columns: 1fr; } }
+        #start-card h1 { margin: 0 0 8px; color: #00ffcc; font-size: 24px; }
+        #start-card p { color: #9aabb8; margin: 0 0 22px; }
+        .start-option { display: flex; justify-content: space-between; align-items: center; margin: 16px 0; gap: 14px; }
+        .start-option label { font-weight: 600; }
+        .start-option select { background: #152230; color: white; border: 1px solid #304d6d; padding: 8px; border-radius: 3px; }
+        #start-game { width: 100%; margin-top: 12px; padding: 12px; font-size: 14px; }
+        #structure-menu { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #304d6d; }
+        #structure-menu .hud-title { margin-bottom: 6px; }
+        #hud {
+            position: absolute; bottom: 0; left: 0;
+            width: calc(100vw - 330px); height: 140px;
+            background: linear-gradient(180deg, rgba(16,20,30,0.95) 0%, rgba(5,8,12,0.98) 100%);
+            border-top: 2px solid #203545;
+            border-right: 1px solid #304d6d;
+            z-index: 5;
+            display: flex; box-sizing: border-box; padding: 15px; color: #e0e6ed;
+        }
+        /* Floating combat health bars */
+        #health-bars {
+            position: absolute; inset: 0; z-index: 18; pointer-events: none;
+        }
+        .health-bar-container {
+            position: absolute; width: 38px; height: 6px; box-sizing: border-box;
+            transform: translate(-50%, -50%); background: rgba(80, 12, 12, 0.9);
+            border: 1px solid #111; border-radius: 2px; overflow: hidden;
+        }
+        .health-bar-fill {
+            width: 100%; height: 100%; background-color: #42e66b;
+            transition: width 0.12s linear;
+        }
+        .hud-panel {
+            display: flex; flex-direction: column; justify-content: center; margin-right: 30px;
+        }
+        .hud-title {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #88a0b0; margin-bottom: 5px;
+        }
+        .hud-value {
+            font-size: 24px; font-weight: bold; color: #00ffcc; text-shadow: 0 0 10px rgba(0,255,204,0.3);
+        }
+        .btn-container { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .rts-btn {
+            background: #152230; border: 1px solid #304d6d; color: #fff;
+            padding: 8px 12px; font-size: 11px; font-weight: bold; cursor: pointer;
+            border-radius: 3px; transition: all 0.2s ease; text-transform: uppercase;
+        }
+        .rts-btn:hover {
+            background: #20354d; border-color: #00ffcc; color: #00ffcc; box-shadow: 0 0 8px rgba(0,255,204,0.2);
+        }
+        #selection-status { font-size: 13px; color: #ffffff; min-width: 230px; line-height: 1.3; }
+        
+        .build-progress-container {
+            position: absolute; z-index: 20; background: rgba(10, 15, 20, 0.85);
+            border: 1px solid #203545; padding: 4px; border-radius: 3px;
+            width: 80px; transform: translate(-50%, -50%); pointer-events: none; display: none;
+        }
+        .build-progress-bar {
+            width: 0%; height: 6px; background-color: #00ffcc;
+            box-shadow: 0 0 6px rgba(0, 255, 204, 0.6); transition: width 0.1s linear;
+        }
+
+        /* Military command interface styling */
+        :root { --steel: #18201b; --steel-light: #303a30; --sand: #c5b98e; --lime: #d4b45e; }
+        body { background: #171b17; color: #e5e0ce; }
+        #start-menu { background: radial-gradient(ellipse at center, rgba(45,52,39,.9), rgba(9,12,10,.98)); }
+        #start-card {
+            background: linear-gradient(145deg, #33392d, #151b17 70%); border: 1px solid #9b8954;
+            box-shadow: 0 14px 50px #000, inset 0 1px rgba(255,255,255,.08); border-radius: 2px;
+        }
+        #start-card h1 { color: #e0c46e; text-transform: uppercase; letter-spacing: 2px; }
+        #start-card h1::before { content: 'STRATEGIC COMMAND  /  '; display: block; margin-bottom: 9px; color: #9a9b7c; font-size: 10px; letter-spacing: 2px; }
+        #start-card p { color: #b4b29f; }
+        .start-option select { background: #202820; border-color: #746b48; }
+        #hud {
+            height: 156px; padding: 12px 16px; gap: 14px;
+            background: linear-gradient(180deg, rgba(51,57,45,.98), rgba(19,24,20,.99));
+            border-top: 3px solid #8f804f; box-shadow: 0 -8px 24px rgba(0,0,0,.45);
+        }
+        .hud-panel { margin-right: 0; padding: 7px 12px; border-left: 1px solid rgba(197,185,142,.2); }
+        .hud-title { color: #b6aa7a; letter-spacing: 1.8px; }
+        .hud-value { color: #e0c46e; text-shadow: 0 0 10px rgba(224,196,110,.22); }
+        #resource-display::before { content: 'SUPPLY  '; font-size: 10px; color: #a8a38d; letter-spacing: 1px; }
+        #selection-status { min-width: 210px; color: #e5e0ce; }
+        .rts-btn {
+            background: linear-gradient(#41483a, #252c24); border: 1px solid #77734e; color: #e5e0ce;
+            border-radius: 1px; padding: 8px 10px; letter-spacing: .4px;
+        }
+        .rts-btn:hover { background: linear-gradient(#676044, #353a2b); border-color: #dbc46d; color: #ffe99a; box-shadow: 0 0 8px rgba(219,196,109,.2); }
+        #structure-menu { border-color: #766f4e; }
+        .health-bar-container { border-radius: 0; border-color: #171a14; }
+        .build-progress-container { border-color: #8f804f; border-radius: 0; }
+        .build-progress-bar { background-color: #dbc46d; box-shadow: 0 0 6px rgba(219,196,109,.5); }
+        #structure-build-buttons { max-height: 76px; overflow-y: auto; align-content: flex-start; }
+        @media (max-width: 900px) {
+            #hud { height: auto; min-height: 156px; flex-wrap: wrap; overflow-y: auto; }
+            .hud-panel { padding: 4px 8px; }
+            #selection-status { min-width: 140px; }
+            .rts-btn { padding: 6px 8px; font-size: 10px; }
+        }
+    
+        /* Tactical Status Bar at Bottom */
+        #hud {
+            position: fixed; bottom: 0; left: 0; right: 330px;
+            height: 36px;
+            background: linear-gradient(180deg, rgba(28,34,26,0.95) 0%, rgba(12,16,13,0.98) 100%);
+            border-top: 2px solid #6b6342;
+            z-index: 20;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 16px; box-sizing: border-box;
+            font-size: 11.5px; color: #c5b98e;
+            pointer-events: none;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.4);
+        }
+        #hud > * { pointer-events: auto; }
+
+        /* C&C Generals Construction Sidebar */
+        #cnc-sidebar {
+            position: fixed; top: 0; right: 0; width: 330px; height: 100vh;
+            background: linear-gradient(180deg, #1d251f 0%, #121814 45%, #0a0e0c 100%);
+            border-left: 2px solid #8f804f;
+            box-shadow: -6px 0 25px rgba(0,0,0,0.65);
+            z-index: 25;
+            display: flex; flex-direction: column;
+            color: #e5e0ce;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        .sidebar-header {
+            padding: 12px 14px;
+            background: linear-gradient(180deg, #2b3528 0%, #1a221b 100%);
+            border-bottom: 2px solid #776e48;
+        }
+        .sidebar-faction-title {
+            font-size: 11px; font-weight: 800; letter-spacing: 2px;
+            color: #dbc46d; text-transform: uppercase; margin-bottom: 8px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .sidebar-resources {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.35); padding: 8px 10px; border: 1px solid #4a4530;
+            border-radius: 2px;
+        }
+        .res-box { display: flex; flex-direction: column; }
+        .res-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #8e8870; }
+        .res-val { font-size: 20px; font-weight: bold; color: #ffe685; text-shadow: 0 0 10px rgba(255,230,133,0.3); }
+
+        .power-meter {
+            margin-top: 6px; padding: 4px 8px; background: rgba(0,0,0,0.35);
+            border: 1px solid #4a4530; display: flex; align-items: center; justify-content: space-between;
+            font-size: 10px;
+        }
+        .power-bar-bg { width: 90px; height: 8px; background: #201515; border: 1px solid #555; overflow: hidden; border-radius: 1px; }
+        .power-bar-fill { height: 100%; width: 100%; background: #42e66b; transition: width 0.3s; }
+        .power-bar-fill.low { background: #e74c3c; }
+
+        .sidebar-tabs {
+            display: flex; background: #141a16; border-bottom: 1px solid #544d32;
+        }
+        .sidebar-tab {
+            flex: 1; padding: 9px 4px; font-size: 10px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.8px; text-align: center;
+            background: transparent; color: #9c9780; border: none; cursor: pointer;
+            border-bottom: 2px solid transparent; transition: all 0.15s ease;
+        }
+        .sidebar-tab:hover { color: #fff; background: rgba(255,255,255,0.04); }
+        .sidebar-tab.active {
+            color: #ffd86b; background: rgba(224, 196, 110, 0.08);
+            border-bottom: 2px solid #dbc46d;
+        }
+
+        .sidebar-body {
+            flex: 1; overflow-y: auto; padding: 12px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .sidebar-body::-webkit-scrollbar { width: 5px; }
+        .sidebar-body::-webkit-scrollbar-track { background: #101412; }
+        .sidebar-body::-webkit-scrollbar-thumb { background: #4a442e; border-radius: 2px; }
+
+        .info-card {
+            background: linear-gradient(145deg, #242c23, #151b16);
+            border: 1px solid #5c5538; padding: 10px; border-radius: 2px;
+            box-shadow: inset 0 1px rgba(255,255,255,0.06);
+        }
+        .info-card-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .info-card-title {
+            font-size: 13px; font-weight: bold; color: #ffe685; letter-spacing: 0.5px;
+        }
+        .info-card-status {
+            font-size: 9.5px; font-weight: bold; padding: 2px 6px; border-radius: 2px;
+            background: rgba(66,230,107,0.15); color: #42e66b; border: 1px solid #42e66b;
+        }
+        .info-card-status.building {
+            background: rgba(230,170,66,0.15); color: #e6aa42; border-color: #e6aa42;
+        }
+        .info-card-status.offline {
+            background: rgba(230,66,66,0.15); color: #e64242; border-color: #e64242;
+        }
+
+        .hp-wrapper { margin: 6px 0 10px 0; }
+        .hp-labels { display: flex; justify-content: space-between; font-size: 10px; color: #a9a389; margin-bottom: 3px; }
+        .hp-bar-track { height: 7px; background: #201515; border: 1px solid #452525; overflow: hidden; }
+        .hp-bar-fill { height: 100%; width: 100%; background: #42e66b; transition: width 0.15s; }
+
+        .util-btn-row { display: flex; gap: 6px; margin-top: 8px; }
+        .util-btn {
+            flex: 1; padding: 6px; font-size: 10px; font-weight: bold;
+            background: #202720; border: 1px solid #5c5538; color: #e5e0ce;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
+            transition: all 0.15s; text-align: center; border-radius: 1px;
+        }
+        .util-btn:hover { background: #333c32; color: #fff; border-color: #dbc46d; }
+        .util-btn.sell:hover { border-color: #e74c3c; color: #ff7675; }
+
+        .section-header {
+            font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px;
+            color: #b6aa7a; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .cmd-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+        }
+        .cmd-btn {
+            display: flex; flex-direction: column; justify-content: space-between;
+            min-height: 52px; padding: 7px 8px;
+            background: linear-gradient(180deg, #2b3327 0%, #192019 100%);
+            border: 1px solid #5a5438; border-radius: 2px;
+            color: #e5e0ce; cursor: pointer; text-align: left;
+            transition: all 0.15s ease; box-shadow: inset 0 1px rgba(255,255,255,0.06);
+        }
+        .cmd-btn:hover:not(:disabled) {
+            background: linear-gradient(180deg, #444f3b 0%, #293328 100%);
+            border-color: #dbc46d; color: #fff; box-shadow: 0 0 10px rgba(219,196,109,0.25);
+            transform: translateY(-1px);
+        }
+        .cmd-btn-name { font-size: 10.5px; font-weight: bold; letter-spacing: 0.3px; line-height: 1.2; }
+        .cmd-btn-desc { font-size: 8.5px; color: #9c9780; margin-top: 2px; }
+        .cmd-btn-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+        .cmd-btn-cost { font-size: 10.5px; font-weight: bold; color: #ffe685; }
+        .cmd-btn-badge {
+            font-size: 8px; text-transform: uppercase; font-weight: bold;
+            padding: 1px 4px; border-radius: 1px;
+        }
+        .badge-locked { background: rgba(220,53,69,0.25); color: #ff7675; border: 1px solid #d63031; }
+        .badge-funds { background: rgba(253,203,110,0.2); color: #ffeaa7; border: 1px solid #fdcb6e; }
+        .badge-ready { color: #55efc4; }
+
+        .cmd-btn:disabled {
+            opacity: 0.45; cursor: not-allowed;
+            background: #181d18; border-color: #383424; color: #7f7a68;
+            filter: grayscale(40%);
+        }
+        .cmd-btn.locked-tech {
+            opacity: 0.7; cursor: not-allowed;
+            border-color: #8c3b3b; background: linear-gradient(180deg, #2d1e1e 0%, #1a1414 100%);
+        }
+
+        .sidebar-footer {
+            padding: 10px 12px; background: #101511; border-top: 1px solid #4a4530;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+
+    
+        /* Floating Tactical Briefing Tooltip */
+        .tactical-tooltip {
+            position: fixed; z-index: 100; pointer-events: none; display: none;
+            width: 260px; padding: 10px 12px;
+            background: linear-gradient(145deg, rgba(22,30,24,0.98), rgba(10,14,11,0.99));
+            border: 1px solid #dbc46d; box-shadow: 0 8px 30px rgba(0,0,0,0.85), inset 0 1px rgba(255,255,255,0.1);
+            color: #e5e0ce; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            border-radius: 2px;
+        }
+        .tooltip-title { font-size: 13px; font-weight: bold; color: #ffe685; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .tooltip-role { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #8e8870; margin-bottom: 6px; }
+        .tooltip-cost { font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px; }
+        .tooltip-desc { font-size: 10.5px; line-height: 1.4; color: #c5b98e; margin-bottom: 6px; }
+        .tooltip-req { font-size: 9px; font-weight: bold; color: #ff7675; border-top: 1px solid #3d3725; padding-top: 5px; }
+        .tooltip-unlock { font-size: 9px; font-weight: bold; color: #55efc4; border-top: 1px solid #3d3725; padding-top: 5px; }
+
+/* --- MULTIPLAYER LOBBY & TACTICAL CHAT STYLES --- */
+.game-mode-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(85, 239, 196, 0.3);
+    padding-bottom: 8px;
+}
+.mode-tab-btn {
+    flex: 1;
+    background: #151a17;
+    border: 1px solid #3d4a3e;
+    color: #8f9e91;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+.mode-tab-btn:hover {
+    background: #1e2621;
+    color: #55efc4;
+    border-color: #55efc4;
+}
+.mode-tab-btn.active {
+    background: #1c3b29;
+    color: #55efc4;
+    border-color: #55efc4;
+    box-shadow: 0 0 10px rgba(85, 239, 196, 0.25);
+}
+.mp-sub-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.mp-sub-btn {
+    flex: 1;
+    background: #111813;
+    border: 1px solid #2e3d31;
+    color: #a8b8aa;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.mp-sub-btn.active {
+    background: #254d35;
+    color: #55efc4;
+    border-color: #55efc4;
+}
+.mp-box {
+    background: rgba(12, 18, 14, 0.7);
+    border: 1px solid #2e3d31;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+.mp-status-indicator {
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px dashed #3d4a3e;
+    color: #e0d8b0;
+    font-size: 11px;
+    line-height: 1.4;
+    margin-top: 8px;
+    border-radius: 3px;
+}
+.mp-chat-msg {
+    line-height: 1.35;
+    word-break: break-word;
+}
+.mp-chat-msg.host {
+    color: #55efc4;
+}
+.mp-chat-msg.challenger {
+    color: #f1c40f;
+}
+.mp-chat-msg.system {
+    color: #74b9ff;
+    font-style: italic;
+}
