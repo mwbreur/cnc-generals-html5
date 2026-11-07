@@ -34,6 +34,9 @@
         }
 
         function getTerrainHeight(x, z) {
+            if (currentMapType === 'tournament_desert' && typeof getTournamentDesertHeight === 'function') {
+                return getTournamentDesertHeight(x, z);
+            }
             if (activeCustomMap && activeCustomMap.heightGrid) {
                 return getCustomMapHeight(x, z);
             }
@@ -303,6 +306,9 @@
 
         // Procedural Texture Generator per Environment
         function createTerrainTextureForMap(mapType) {
+            if (mapType === 'tournament_desert' && typeof createTournamentDesertTexture === 'function') {
+                return createTournamentDesertTexture();
+            }
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = 512;
             const ctx = canvas.getContext('2d');
@@ -415,7 +421,7 @@
 
             const effectiveTheme = (activeCustomMap && activeCustomMap.theme)
                 ? activeCustomMap.theme
-                : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city'].includes(mapType) ? mapType : 'desert'));
+                : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city', 'tournament_desert'].includes(mapType) ? mapType : 'desert'));
 
             // Clear previous terrain, water, props, and supply points
             if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh = null; }
@@ -429,7 +435,7 @@
             scene.add(mapPropsGroup);
 
             // 1. Atmosphere Lighting & Fog
-            if (effectiveTheme === 'desert') {
+            if (effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert') {
                 scene.background.setHex(0x1a150e);
                 scene.fog = new THREE.FogExp2(0x1a150e, 0.0025);
             } else if (effectiveTheme === 'jungle') {
@@ -817,6 +823,9 @@
                     spawnBridge(mapSize * 0.05, 1.0, mapSize * 0.24, Math.PI / 2, 20, 56);
                 } else if (currentMapType === 'snow') {
                     spawnBridge(0, 1.0, 0, 0, 20, 64);
+                } else if (currentMapType === 'tournament_desert') {
+                    spawnBridge(-140, -5.5, 0, 0, 22, 68);
+                    spawnBridge(140, -5.5, 0, 0, 22, 68);
                 } else if (currentMapType === 'desert') {
                     spawnBridge(mapSize * 0.20, 1.0, mapSize * 0.20, Math.PI / 4, 18, 56);
                 } else if (currentMapType === 'random') {

@@ -562,19 +562,18 @@
 
         function getStructureFootprint(type) {
             const sizes = {
-                center: [12, 8, 11], power: [8, 6, 8], barracks: [8, 5.5, 7], factory: [12, 5, 9],
-                supplyCenter: [11, 5, 9], supplyDrop: [10, 7, 10], airfield: [14, 4, 12], strategyCenter: [11, 7, 10],
-                detentionCamp: [8, 5, 7], patriot: [6, 5, 6], particleCannon: [12, 9, 12], nuclearReactor: [8, 7, 8],
-                internetCenter: [9, 5, 8], propagandaCenter: [10, 6, 9], bunker: [7, 4, 7], gatlingCannon: [5, 7, 5],
-                speakerTower: [5, 9, 5], nukeSilo: [12, 9, 12], supplyStash: [9, 5, 8], blackMarket: [10, 5, 9],
-                tunnel: [8, 4, 8], stingerSite: [6, 6, 6], demoTrap: [4, 1.5, 4], palace: [12, 7, 10],
-                fakeBarracks: [8, 5.5, 7], fakeArmsDealer: [12, 5, 9], scudStorm: [12, 9, 12]
+                center: [26, 12, 24], power: [16, 8, 14], barracks: [18, 9, 18], factory: [26, 10, 22],
+                supplyCenter: [22, 9, 20], supplyDrop: [20, 10, 20], airfield: [28, 8, 24], strategyCenter: [24, 12, 22],
+                detentionCamp: [18, 9, 16], patriot: [12, 9, 12], particleCannon: [26, 14, 26], nuclearReactor: [16, 10, 16],
+                internetCenter: [20, 9, 18], propagandaCenter: [22, 10, 20], bunker: [14, 8, 14], gatlingCannon: [12, 9, 12],
+                speakerTower: [10, 12, 10], nukeSilo: [24, 14, 24], supplyStash: [18, 9, 18], blackMarket: [20, 9, 18],
+                tunnel: [16, 8, 16], stingerSite: [12, 9, 12], demoTrap: [6, 2, 6], palace: [26, 12, 22],
+                fakeBarracks: [18, 9, 18], fakeArmsDealer: [26, 10, 22], scudStorm: [26, 14, 26]
             };
-            const [baseW, baseH, baseD] = sizes[type] || [8, 5, 8];
-            const scale = 1.35;
-            const width = baseW * scale;
-            const height = baseH * scale;
-            const depth = baseD * scale;
+            const [baseW, baseH, baseD] = sizes[type] || [16, 8, 16];
+            const width = baseW;
+            const height = baseH;
+            const depth = baseD;
             return { width, height, depth, radius: Math.max(width, depth) * 0.55 };
         }
 
@@ -990,6 +989,15 @@
         function getSpawnPointsForMap(mapSize, mapType, customMap) {
             if (customMap && customMap.spawnPoints && customMap.spawnPoints.length > 0) {
                 return customMap.spawnPoints;
+            }
+
+            if (mapType === 'tournament_desert') {
+                return [
+                    { id: 1, name: 'Spawn 1 (South Plateau)', x: 0, z: -580 },
+                    { id: 2, name: 'Spawn 2 (North Plateau)', x: 0, z: 580 },
+                    { id: 3, name: 'Spawn 3 (West Flank)', x: -380, z: 0 },
+                    { id: 4, name: 'Spawn 4 (East Flank)', x: 380, z: 0 }
+                ];
             }
 
             const spawns = [];

@@ -44,74 +44,106 @@ const VEHICLE_CONFIG = {
     'radarvan':       { file: 'UVRadarVan.W3D',   tex: 'uvradarvan.dds',   scale: 0.085, faction: 'gla' }
 };
 
-// Buildings: scaled between 0.14 and 0.16 so Command Center is ~20 units (6-8x larger than tanks)
+// Buildings: calibrated scale (0.26-0.27) so Command Centers are ~34 units, War Factories ~32 units, Power Plants ~16.5 units
 const BUILDING_CONFIG = {
     // USA
-    'usa_commandCenter':    { file: 'ABBtCmdHQ.W3D',   scale: 0.160, faction: 'usa' },
-    'usa_power':            { file: 'ABPWRPLANT.W3D',  tex: 'abpwrplant.dds', scale: 0.140, faction: 'usa' },
-    'usa_barracks':         { file: 'ABBARRACKS.W3D',  scale: 0.145, faction: 'usa' },
-    'usa_factory':          { file: 'ABWarFact.W3D',   scale: 0.150, faction: 'usa' },
-    'usa_supplyCenter':     { file: 'ABSUPPLYCT.W3D',  scale: 0.150, faction: 'usa' },
-    'usa_supplyDrop':       { file: 'ABSupDrop.W3D',   scale: 0.150, faction: 'usa' },
-    'usa_airfield':         { file: 'ABArFrcCmd.W3D',  scale: 0.150, faction: 'usa' },
-    'usa_strategyCenter':   { file: 'ABStrategy.W3D',  tex: 'abstratcnt.dds', scale: 0.150, faction: 'usa' },
-    'usa_patriot':          { file: 'ABPATRIOT.W3D',   tex: 'abpatriot.dds', scale: 0.130, faction: 'usa' },
-    'usa_particleCannon':   { file: 'ABSDILink.W3D',   scale: 0.160, faction: 'usa' },
-    'usa_detentionCamp':    { file: 'ABPrison.W3D',    scale: 0.145, faction: 'usa' },
+    'usa_commandCenter':    { file: 'ABBtCmdHQ.W3D',   scale: 0.270, faction: 'usa' },
+    'usa_power':            { file: 'ABPWRPLANT.W3D',  tex: 'abpwrplant.dds', scale: 0.260, faction: 'usa' },
+    'usa_barracks':         { file: 'ABBARRACKS.W3D',  scale: 0.260, faction: 'usa' },
+    'usa_factory':          { file: 'ABWarFact.W3D',   scale: 0.260, faction: 'usa' },
+    'usa_supplyCenter':     { file: 'ABSUPPLYCT.W3D',  scale: 0.260, faction: 'usa' },
+    'usa_supplyDrop':       { file: 'ABSupDrop.W3D',   scale: 0.260, faction: 'usa' },
+    'usa_airfield':         { file: 'ABArFrcCmd.W3D',  tex: 'abarfrccmd.dds', scale: 0.260, faction: 'usa' },
+    'usa_strategyCenter':   { file: 'ABStrategy.W3D',  tex: 'abstratcnt.dds', scale: 0.260, faction: 'usa' },
+    'usa_patriot':          { file: 'ABPATRIOT.W3D',   tex: 'abpatriot.dds', scale: 0.200, faction: 'usa' },
+    'usa_particleCannon':   { file: 'ABSDILink.W3D',   scale: 0.270, faction: 'usa' },
+    'usa_detentionCamp':    { file: 'ABPrison.W3D',    scale: 0.250, faction: 'usa' },
 
     // China
-    'china_commandCenter':  { file: 'NBConYard.W3D',   tex: 'nbconyard.dds', scale: 0.160, faction: 'china' },
-    'china_power':          { file: 'NBPwrPlant.W3D',  scale: 0.140, faction: 'china' },
-    'china_barracks':       { file: 'NBBarracks.W3D',  scale: 0.145, faction: 'china' },
-    'china_factory':        { file: 'NBWarFact.W3D',   tex: 'nbwarfact.dds', scale: 0.150, faction: 'china' },
-    'china_supplyCenter':   { file: 'NBSupCent.W3D',   scale: 0.150, faction: 'china' },
-    'china_airfield':       { file: 'NBAirfield.W3D',  tex: 'nbairfield.dds', scale: 0.150, faction: 'china' },
-    'china_gatlingCannon':  { file: 'NBGattling.W3D',  scale: 0.130, faction: 'china' },
-    'china_bunker':         { file: 'NBBunker.W3D',    scale: 0.135, faction: 'china' },
-    'china_speakerTower':   { file: 'NBPTower.W3D',    tex: 'nbptower.dds', scale: 0.130, faction: 'china' },
-    'china_propagandaCenter':{ file: 'NBPCenter.W3D',  scale: 0.150, faction: 'china' },
-    'china_nukeSilo':       { file: 'NBNMissle.W3D',   scale: 0.160, faction: 'china' },
-    'china_internetCenter': { file: 'NBConYard.W3D',   tex: 'nbconyard.dds', scale: 0.160, faction: 'china' },
+    'china_commandCenter':  { file: 'NBConYard.W3D',   tex: 'nbconyard.dds', scale: 0.270, faction: 'china' },
+    'china_power':          { file: 'NBPwrPlant.W3D',  scale: 0.260, faction: 'china' },
+    'china_barracks':       { file: 'NBBarracks.W3D',  scale: 0.260, faction: 'china' },
+    'china_factory':        { file: 'NBWarFact.W3D',   tex: 'nbwarfact.dds', scale: 0.260, faction: 'china' },
+    'china_supplyCenter':   { file: 'NBSupCent.W3D',   scale: 0.260, faction: 'china' },
+    'china_airfield':       { file: 'NBAirfield.W3D',  tex: 'nbairfield.dds', scale: 0.260, faction: 'china' },
+    'china_gatlingCannon':  { file: 'NBGattling.W3D',  scale: 0.200, faction: 'china' },
+    'china_bunker':         { file: 'NBBunker.W3D',    scale: 0.200, faction: 'china' },
+    'china_speakerTower':   { file: 'NBSpeaker.W3D',   scale: 0.200, faction: 'china' },
+    'china_propagandaCenter': { file: 'NBPropCen.W3D', scale: 0.260, faction: 'china' },
+    'china_nukeSilo':       { file: 'NBNukeSilo.W3D',  scale: 0.270, faction: 'china' },
+    'china_internetCenter': { file: 'NBIntCent.W3D',   scale: 0.270, faction: 'china' },
 
     // GLA
-    'gla_commandCenter':    { file: 'UBCmdHQ.W3D',     scale: 0.160, faction: 'gla' },
-    'gla_supplyCenter':     { file: 'UBSupply.W3D',    scale: 0.145, faction: 'gla' },
-    'gla_barracks':         { file: 'UBBarracks.W3D',  scale: 0.145, faction: 'gla' },
-    'gla_factory':          { file: 'UBArmDeal.W3D',   scale: 0.150, faction: 'gla' },
-    'gla_tunnel':           { file: 'UBUndTunn.W3D',   tex: 'ubundtunn.dds', scale: 0.135, faction: 'gla' },
-    'gla_stingerSite':      { file: 'UBStingerS.W3D',  scale: 0.135, faction: 'gla' },
-    'gla_palace':           { file: 'UBPalace.W3D',    scale: 0.155, faction: 'gla' },
-    'gla_blackMarket':      { file: 'UBBlackMkt.W3D',  scale: 0.150, faction: 'gla' },
-    'gla_scudStorm':        { file: 'UBScudStrm.W3D',  scale: 0.160, faction: 'gla' },
-    'gla_hole':             { file: 'UBHole.W3D',      scale: 0.140, faction: 'gla' },
+    'gla_commandCenter':    { file: 'UBCmdHQ.W3D',     scale: 0.270, faction: 'gla' },
+    'gla_supplyCenter':     { file: 'UBSupCent.W3D',   scale: 0.260, faction: 'gla' },
+    'gla_barracks':         { file: 'UBBarracks.W3D',  scale: 0.260, faction: 'gla' },
+    'gla_factory':          { file: 'UBArmsDeal.W3D',  scale: 0.260, faction: 'gla' },
+    'gla_tunnel':           { file: 'UBTunnel.W3D',    scale: 0.200, faction: 'gla' },
+    'gla_stingerSite':      { file: 'UBStinger.W3D',   scale: 0.200, faction: 'gla' },
+    'gla_palace':           { file: 'UBPalace.W3D',    scale: 0.270, faction: 'gla' },
+    'gla_blackMarket':      { file: 'UBBlkMrkt.W3D',   scale: 0.260, faction: 'gla' },
+    'gla_scudStorm':        { file: 'UBScudStm.W3D',   scale: 0.270, faction: 'gla' },
+    'gla_hole':             { file: 'UBHole.W3D',      scale: 0.200, faction: 'gla' },
 
     // Tech
-    'tech_oilDerrick':      { file: 'ZBODerrick.W3D',  scale: 0.140, faction: 'tech' },
-    'tech_hospital':        { file: 'ZBHospital.W3D',  scale: 0.150, faction: 'tech' },
-    'tech_refinery':        { file: 'CBOilRfny.W3D',   scale: 0.150, faction: 'tech' }
+    'tech_oilDerrick':      { file: 'ZBDerrick.W3D',   scale: 0.240, faction: 'tech' },
+    'tech_hospital':        { file: 'CBHospital.W3D',  scale: 0.260, faction: 'tech' },
+    'tech_refinery':        { file: 'CBOilRfny.W3D',   tex: 'cboilrfny.dds', scale: 0.260, faction: 'tech' }
 };
 
-// Retail Westwood 3D Infantry Characters (scaled to ~0.88 units tall, realistic human proportions)
+// Retail Westwood 3D Infantry Characters (scaled to ~0.80 units tall, realistic human proportions)
 const INFANTRY_CONFIG = {
     // USA
-    'ranger':     { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.088, faction: 'usa' },
-    'burton':     { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.092, faction: 'usa' },
+    'ranger':     { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.080, faction: 'usa' },
+    'burton':     { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.082, faction: 'usa' },
     // China
-    'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.088, faction: 'china' },
-    'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.088, faction: 'china' },
-    'hacker':     { file: 'NIHCKR_SKN.W3D', tex: 'zhca_nihacker.tga',   scale: 0.088, faction: 'china' },
-    'lotus':      { file: 'NIHERO_SKN.W3D', tex: 'zhca_niblotus.tga',   scale: 0.085, faction: 'china' },
+    'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.080, faction: 'china' },
+    'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.080, faction: 'china' },
+    'hacker':     { file: 'NIHCKR_SKN.W3D', tex: 'zhca_nihacker.tga',   scale: 0.080, faction: 'china' },
+    'lotus':      { file: 'NIHERO_SKN.W3D', tex: 'zhca_niblotus.tga',   scale: 0.078, faction: 'china' },
     // GLA
-    'rebel':      { file: 'UIRGRD_SKN.W3D', tex: 'zhca_uirguard.tga',   scale: 0.088, faction: 'gla' },
-    'rpg':        { file: 'UISMSD_SKN.W3D', tex: 'zhca_uirstnger.tga',  scale: 0.088, faction: 'gla' },
-    'terrorist':  { file: 'UITRST_SKN.W3D', tex: 'zhca_uiter.tga',      scale: 0.088, faction: 'gla' },
-    'jarmen':     { file: 'UIHERO_SKN.W3D', tex: 'zhca_uihero01.tga',   scale: 0.090, faction: 'gla' },
-    'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.085, faction: 'gla' }
+    'rebel':      { file: 'UIRGRD_SKN.W3D', tex: 'zhca_uirguard.tga',   scale: 0.080, faction: 'gla' },
+    'rpg':        { file: 'UISMSD_SKN.W3D', tex: 'zhca_uirstnger.tga',  scale: 0.080, faction: 'gla' },
+    'terrorist':  { file: 'UITRST_SKN.W3D', tex: 'zhca_uiter.tga',      scale: 0.080, faction: 'gla' },
+    'jarmen':     { file: 'UIHERO_SKN.W3D', tex: 'zhca_uihero01.tga',   scale: 0.082, faction: 'gla' },
+    'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.078, faction: 'gla' }
 };
 
 // Strict filter to eliminate light beams, muzzle flash billboards, and polygon spike glitches
 function isFxGlitchMesh(name) {
     return /headlight|lightbeam|muzzlefx|turretfx|smokefx|exnk|exhaustfx|treadfx|firepoint/i.test(name);
+}
+
+// Clean disconnected rogue test boxes or vertex spikes from meshes
+function cleanRogueVertices(mesh, maxDist = 20) {
+    if (!mesh || !mesh.v || !mesh.i) return;
+    const oldV = mesh.v, oldU = mesh.u, oldI = mesh.i;
+    const validFaces = [];
+    for (let f = 0; f < oldI.length; f += 3) {
+        const i0 = oldI[f], i1 = oldI[f+1], i2 = oldI[f+2];
+        const d0 = Math.hypot(oldV[i0*3], oldV[i0*3+1], oldV[i0*3+2]);
+        const d1 = Math.hypot(oldV[i1*3], oldV[i1*3+1], oldV[i1*3+2]);
+        const d2 = Math.hypot(oldV[i2*3], oldV[i2*3+1], oldV[i2*3+2]);
+        if (d0 <= maxDist && d1 <= maxDist && d2 <= maxDist) {
+            validFaces.push(i0, i1, i2);
+        }
+    }
+    const remap = new Map();
+    const newV = [];
+    const newU = oldU ? [] : null;
+    const newI = [];
+    for (const oldIdx of validFaces) {
+        if (!remap.has(oldIdx)) {
+            const newIdx = newV.length / 3;
+            remap.set(oldIdx, newIdx);
+            newV.push(oldV[oldIdx*3], oldV[oldIdx*3+1], oldV[oldIdx*3+2]);
+            if (oldU) newU.push(oldU[oldIdx*2], oldU[oldIdx*2+1]);
+        }
+        newI.push(remap.get(oldIdx));
+    }
+    mesh.v = newV;
+    mesh.i = newI;
+    if (newU) mesh.u = newU;
 }
 
 function processModels(map) {
@@ -128,6 +160,15 @@ function processModels(map) {
         for (const [mName, mData] of Object.entries(parsed.meshes)) {
             if (isFxGlitchMesh(mName)) continue;
             filteredMeshes[mName] = mData;
+        }
+
+        // Clean rogue geometry glitches
+        if (key === 'crawler' && filteredMeshes['nvtcrawler.housecolor']) {
+            // Strip detached 3ds Max test boxes located at X = -26 to -37
+            cleanRogueVertices(filteredMeshes['nvtcrawler.housecolor'], 15);
+        } else if (key === 'aurora' && filteredMeshes['avaurora.housecolor01']) {
+            // Strip rogue vertex at Z = 41.98
+            cleanRogueVertices(filteredMeshes['avaurora.housecolor01'], 25);
         }
 
         // Canonical 3D Axis Alignment for Aircraft:
@@ -156,6 +197,16 @@ function processModels(map) {
                 p.tx = oy; p.ty = -oz; p.tz = ox;
             });
         } else if (key === 'comanche') {
+            // Rotate Comanche fuselage meshes by -90 deg around Z to make fuselage upright
+            const fuselageMeshes = ['avcomanche.chassis', 'avcomanche.missileupgrade', 'avcomanche.housecolor01', 'avcomanche.turretfx01', 'avcomanche.nvbuggy_m'];
+            fuselageMeshes.forEach(name => {
+                const m = filteredMeshes[name];
+                if (!m) return;
+                for (let i = 0; i < m.v.length; i += 3) {
+                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                    m.v[i] = oy; m.v[i+1] = -ox; m.v[i+2] = oz;
+                }
+            });
             // Center rotor mast directly over helicopter cabin
             parsed.pivots.forEach(p => {
                 if (p.name === 'PROPELLER01') { p.tx = 0; p.ty = 4.92; p.tz = 5.16; }
@@ -167,6 +218,26 @@ function processModels(map) {
                 if (p.name === 'PROPELLER01') { p.tx = 0; p.ty = 5.21; p.tz = 12.74; }
                 if (p.name === 'PROPELLER02') { p.tx = 0; p.ty = 7.20; p.tz = -17.06; }
             });
+        }
+
+        // Infantry Standing Upright Calibration (Height to Y, boots to ground)
+        if (INFANTRY_CONFIG[key]) {
+            let minY = 1e9;
+            for (const m of Object.values(filteredMeshes)) {
+                for (let i = 0; i < m.v.length; i += 3) {
+                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                    const nx = ox, ny = oz, nz = -oy;
+                    m.v[i] = nx; m.v[i+1] = ny; m.v[i+2] = nz;
+                    if (ny < minY) minY = ny;
+                }
+            }
+            if (minY < 1e8) {
+                for (const m of Object.values(filteredMeshes)) {
+                    for (let i = 0; i < m.v.length; i += 3) {
+                        m.v[i+1] = parseFloat((m.v[i+1] - minY).toFixed(2));
+                    }
+                }
+            }
         }
 
         const meshEntries = parsed.hlodSubObjects.length > 0
@@ -192,7 +263,7 @@ function processModels(map) {
     return result;
 }
 
-// Extract DDS (DXT1 Mip 1 = 128x128 = 8192 bytes) and TGA (64x64 RGBA)
+// Extract DDS (DXT1 Mip 128x128 = 8192 bytes, DXT5 Mip 128x128 = 16384 bytes) and TGA (raw RGBA)
 const textureData = {};
 function processTextures(configMap) {
     for (const [key, cfg] of Object.entries(configMap)) {
@@ -201,7 +272,7 @@ function processTextures(configMap) {
         if (!fs.existsSync(texPath)) continue;
 
         if (cfg.tex.toLowerCase().endsWith('.tga')) {
-            // Read uncompressed 32bpp TGA
+            // Read uncompressed 32bpp or 24bpp TGA
             const buf = fs.readFileSync(texPath);
             const w = buf.readUInt16LE(12);
             const h = buf.readUInt16LE(14);
@@ -233,31 +304,31 @@ function processTextures(configMap) {
                 d: rgba.toString('base64')
             };
         } else {
-            // DDS DXT1
+            // DDS DXT1 or DXT5
             const buf = fs.readFileSync(texPath);
             const width = buf.readUInt32LE(16);
             const height = buf.readUInt32LE(12);
-            const mip0Size = (width * height) / 2;
-            const mip1Offset = 128 + mip0Size;
-            const mip1Size = 128 * 128 / 2; // 8192 bytes for 128x128 DXT1
+            const fourCC = buf.toString('ascii', 84, 88).trim();
+            const isDxt5 = (fourCC === 'DXT5');
+            const blockSize = isDxt5 ? 16 : 8;
 
-            if (buf.length >= mip1Offset + mip1Size) {
-                const mip1Slice = buf.slice(mip1Offset, mip1Offset + mip1Size);
-                textureData[key] = {
-                    t: 'dxt1',
-                    w: 128,
-                    h: 128,
-                    d: mip1Slice.toString('base64')
-                };
-            } else {
-                const slice = buf.slice(128, 128 + Math.min(mip0Size, 32768));
-                textureData[key] = {
-                    t: 'dxt1',
-                    w: Math.min(width, 128),
-                    h: Math.min(height, 128),
-                    d: slice.toString('base64')
-                };
+            let curW = width, curH = height, curOffset = 128;
+            while (curW > 128 && curH > 128 && curOffset < buf.length) {
+                const blocks = Math.max(1, Math.floor(curW / 4)) * Math.max(1, Math.floor(curH / 4));
+                curOffset += blocks * blockSize;
+                curW = Math.floor(curW / 2);
+                curH = Math.floor(curH / 2);
             }
+            const targetBlocks = Math.max(1, Math.floor(curW / 4)) * Math.max(1, Math.floor(curH / 4));
+            const targetSize = targetBlocks * blockSize;
+            const slice = buf.slice(curOffset, curOffset + targetSize);
+
+            textureData[key] = {
+                t: isDxt5 ? 'dxt5' : 'dxt1',
+                w: curW,
+                h: curH,
+                d: slice.toString('base64')
+            };
         }
     }
 }
@@ -278,8 +349,8 @@ console.log(`Processed ${Object.keys(infantryData).length} infantry characters.`
 
 const jsOutput = `/**
  * Command & Conquer: Generals Authentic Westwood 3D Retail Assets (Vehicles, Structures & Infantry)
- * Real EA retail models with UV mapping and embedded textures (DXT1 & TGA).
- * Proportional scale: Buildings (0.14-0.16) > Vehicles (0.08-0.10) > Infantry (0.085-0.09).
+ * Real EA retail models with UV mapping and embedded textures (DXT1, DXT5 & TGA).
+ * Proportional scale: Buildings (0.26-0.27) > Vehicles (0.08-0.10) > Infantry (0.078-0.082).
  */
 
 window.W3D_VEHICLE_DATA = ${JSON.stringify(vehicleData)};
@@ -290,7 +361,7 @@ window.W3D_TEXTURE_DATA = ${JSON.stringify(textureData)};
 window.W3D_TEXTURE_CACHE = {};
 
 /**
- * In-browser texture loader (supporting both DXT1 BC1 and raw TGA pixel buffers) to native Three.js DataTexture.
+ * In-browser texture loader (supporting DXT1 BC1, DXT5 BC3, and raw TGA pixel buffers) to native Three.js DataTexture.
  */
 function getW3dTexture(modelKey) {
     if (window.W3D_TEXTURE_CACHE[modelKey]) return window.W3D_TEXTURE_CACHE[modelKey];
@@ -308,6 +379,58 @@ function getW3dTexture(modelKey) {
         if (item.t === 'raw') {
             // Raw 32-bit RGBA from uncompressed TGA
             tex = new THREE.DataTexture(bytes, item.w, item.h, THREE.RGBAFormat);
+        } else if (item.t === 'dxt5') {
+            // High-performance in-browser DXT5 (BC3) decoder to RGBA DataTexture
+            const width = item.w || 128, height = item.h || 128;
+            const rgba = new Uint8Array(width * height * 4);
+            let offset = 0;
+
+            for (let by = 0; by < height; by += 4) {
+                for (let bx = 0; bx < width; bx += 4) {
+                    if (offset + 16 > len) break;
+                    const a0 = bytes[offset], a1 = bytes[offset + 1];
+                    const alphas = [a0, a1];
+                    if (a0 > a1) {
+                        for (let i = 1; i <= 6; i++) alphas[i + 1] = (((7 - i) * a0 + i * a1) / 7) | 0;
+                    } else {
+                        for (let i = 1; i <= 4; i++) alphas[i + 1] = (((5 - i) * a0 + i * a1) / 5) | 0;
+                        alphas[6] = 0; alphas[7] = 255;
+                    }
+                    const aBits0 = bytes[offset + 2] | (bytes[offset + 3] << 8) | (bytes[offset + 4] << 16);
+                    const aBits1 = bytes[offset + 5] | (bytes[offset + 6] << 8) | (bytes[offset + 7] << 16);
+
+                    const c0 = bytes[offset + 8] | (bytes[offset + 9] << 8);
+                    const c1 = bytes[offset + 10] | (bytes[offset + 11] << 8);
+                    const r0 = (((c0 >> 11) & 0x1F) * 255 / 31) | 0;
+                    const g0 = (((c0 >> 5) & 0x3F) * 255 / 63) | 0;
+                    const b0 = ((c0 & 0x1F) * 255 / 31) | 0;
+                    const r1 = (((c1 >> 11) & 0x1F) * 255 / 31) | 0;
+                    const g1 = (((c1 >> 5) & 0x3F) * 255 / 63) | 0;
+                    const b1 = ((c1 & 0x1F) * 255 / 31) | 0;
+
+                    const colors = [
+                        [r0, g0, b0],
+                        [r1, g1, b1],
+                        [((2*r0 + r1)/3)|0, ((2*g0 + g1)/3)|0, ((2*b0 + b1)/3)|0],
+                        [((r0 + 2*r1)/3)|0, ((r0 + 2*g1)/3)|0, ((b0 + 2*b1)/3)|0]
+                    ];
+                    const cBits = bytes[offset + 12] | (bytes[offset + 13] << 8) | (bytes[offset + 14] << 16) | (bytes[offset + 15] << 24);
+                    offset += 16;
+
+                    for (let p = 0; p < 16; p++) {
+                        const px = bx + (p % 4);
+                        const py = by + ((p / 4) | 0);
+                        const cIdx = (cBits >>> (p * 2)) & 0x03;
+                        const aIdx = (p < 8) ? ((aBits0 >>> (p * 3)) & 0x07) : ((aBits1 >>> ((p - 8) * 3)) & 0x07);
+                        const dest = (py * width + px) * 4;
+                        rgba[dest] = colors[cIdx][0];
+                        rgba[dest + 1] = colors[cIdx][1];
+                        rgba[dest + 2] = colors[cIdx][2];
+                        rgba[dest + 3] = alphas[aIdx];
+                    }
+                }
+            }
+            tex = new THREE.DataTexture(rgba, width, height, THREE.RGBAFormat);
         } else {
             // In-browser DXT1 (BC1) Decoder to 128x128 RGBA
             const width = item.w || 128, height = item.h || 128;
@@ -334,7 +457,7 @@ function getW3dTexture(modelKey) {
                         [r1, g1, b1, 255],
                         c0 > c1 ? [((2*r0 + r1)/3)|0, ((2*g0 + g1)/3)|0, ((2*b0 + b1)/3)|0, 255]
                                 : [((r0 + r1)/2)|0, ((g0 + g1)/2)|0, ((b0 + b1)/2)|0, 255],
-                        c0 > c1 ? [((r0 + 2*r1)/3)|0, ((g0 + 2*g1)/3)|0, ((b0 + 2*b1)/3)|0, 255]
+                        c0 > c1 ? [((r0 + 2*r1)/3)|0, ((r0 + 2*g1)/3)|0, ((b0 + 2*b1)/3)|0, 255]
                                 : [0, 0, 0, 0]
                     ];
 
@@ -343,13 +466,14 @@ function getW3dTexture(modelKey) {
 
                     for (let py = 0; py < 4; py++) {
                         for (let px = 0; px < 4; px++) {
-                            const idx = (lookup >> (2 * (py * 4 + px))) & 0x03;
-                            const col = colors[idx];
-                            const outIdx = ((by + py) * width + (bx + px)) * 4;
-                            rgba[outIdx] = col[0];
-                            rgba[outIdx + 1] = col[1];
-                            rgba[outIdx + 2] = col[2];
-                            rgba[outIdx + 3] = col[3];
+                            const pIndex = py * 4 + px;
+                            const colorIndex = (lookup >>> (pIndex * 2)) & 0x03;
+                            const dIndex = ((by + py) * width + (bx + px)) * 4;
+                            const col = colors[colorIndex];
+                            rgba[dIndex] = col[0];
+                            rgba[dIndex + 1] = col[1];
+                            rgba[dIndex + 2] = col[2];
+                            rgba[dIndex + 3] = col[3];
                         }
                     }
                 }
@@ -359,15 +483,14 @@ function getW3dTexture(modelKey) {
 
         tex.wrapS = THREE.RepeatWrapping;
         tex.wrapT = THREE.RepeatWrapping;
-        tex.flipY = false;
-        tex.generateMipmaps = true;
-        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.generateMipmaps = false;
+        tex.minFilter = THREE.LinearFilter;
         tex.magFilter = THREE.LinearFilter;
         tex.needsUpdate = true;
         window.W3D_TEXTURE_CACHE[modelKey] = tex;
         return tex;
-    } catch (err) {
-        console.warn('Error decoding texture for', modelKey, err);
+    } catch (e) {
+        console.warn('Failed to decode W3D texture:', modelKey, e);
         return null;
     }
 }
@@ -390,7 +513,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     let hullMat, houseMat;
     if (isEnemy) {
         hullMat = vTex 
-            ? new THREE.MeshStandardMaterial({ map: vTex, color: 0x993333, roughness: 0.6, metalness: 0.25 })
+            ? new THREE.MeshStandardMaterial({ map: vTex, color: 0xaa4444, roughness: 0.6, metalness: 0.25 })
             : new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.52, metalness: 0.35 });
         houseMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 });
     } else {
@@ -470,17 +593,18 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         let mat = hullMat;
         if (upper.includes('HOUSECOLOR')) {
             mat = houseMat;
-        } else if (upper.includes('TREAD')) {
-            mat = treadMat;
-        } else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON')) {
-            mat = gunMat;
+        } else if (!vTex) {
+            // Only assign flat procedural fallback materials when texture is missing
+            if (upper.includes('TREAD')) mat = treadMat;
+            else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON')) mat = gunMat;
+            else if (upper.includes('GLASS') || upper.includes('WINDSHIELD')) mat = glassMat;
+            else if (upper.includes('TIRE') || upper.includes('WHEEL')) mat = darkMat;
         } else if (upper.includes('GLASS') || upper.includes('WINDSHIELD')) {
             mat = glassMat;
-        } else if (upper.includes('TIRE') || upper.includes('WHEEL')) {
-            mat = darkMat;
         }
 
         const mesh = new THREE.Mesh(geom, mat);
+        mesh.name = meshName;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
 
@@ -515,11 +639,12 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         root.add(cargo);
     }
 
-    // Attach Battle Drone to Paladin Tank
+    // Attach authentic Battle Drone to Paladin Tank
     if (modelKey === 'paladin') {
         const drone = createW3DVehicleMesh('drone_battle', isEnemy);
         drone.name = 'paladinBattleDrone';
-        drone.position.set(0, 2.4 / scale, -2.6 / scale); // Offset in local space above & behind tank
+        drone.scale.set(0.075 / scale, 0.075 / scale, 0.075 / scale);
+        drone.position.set(0, 2.4 / scale, -2.6 / scale);
         root.add(drone);
     }
 
@@ -539,7 +664,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
 
     const data = window.W3D_BUILDING_DATA[buildingKey];
     const faction = data.f;
-    const scale = data.s || 0.15;
+    const scale = data.s || 0.26;
     const bTex = getW3dTexture(buildingKey);
 
     // Faction materials
@@ -584,7 +709,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     const coldFusionGlowMat = new THREE.MeshStandardMaterial({
         color: 0x00d2d3,
         emissive: 0x00a8ff,
-        emissiveIntensity: 1.6,
+        emissiveIntensity: 1.8,
         roughness: 0.1,
         metalness: 0.3
     });
@@ -636,16 +761,18 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
             mat = coldFusionGlowMat;
         } else if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
             mat = accentMat;
-        } else if (upper.includes('BASE') || upper.includes('CONCRETE') || upper.includes('SLAB') || upper.includes('FOUNDATION') || upper.includes('FENCE')) {
-            mat = concreteMat;
-        } else if (upper.includes('GLASS') || upper.includes('WINDOW')) {
-            mat = glassMat;
-        } else if (upper.includes('WIRE') || upper.includes('LADDER') || upper.includes('RAILING') || upper.includes('FAN')) {
-            mat = metalMat;
-        } else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('TURRET') || upper.includes('CANNON')) {
-            mat = gunMat;
-        } else if (upper.includes('GLOW') || upper.includes('NUKE')) {
-            mat = nukeMat;
+        } else if (!bTex) {
+            if (upper.includes('BASE') || upper.includes('CONCRETE') || upper.includes('SLAB') || upper.includes('FOUNDATION') || upper.includes('FENCE')) {
+                mat = concreteMat;
+            } else if (upper.includes('GLASS') || upper.includes('WINDOW')) {
+                mat = glassMat;
+            } else if (upper.includes('WIRE') || upper.includes('LADDER') || upper.includes('RAILING') || upper.includes('FAN')) {
+                mat = metalMat;
+            } else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('TURRET') || upper.includes('CANNON')) {
+                mat = gunMat;
+            } else if (upper.includes('GLOW') || upper.includes('NUKE')) {
+                mat = nukeMat;
+            }
         }
 
         const mesh = new THREE.Mesh(geom, mat);
@@ -663,6 +790,20 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     if (!root.getObjectByName('turretSystem')) {
         const altTurret = root.getObjectByName('TURRET') || root.getObjectByName('TURRET01');
         if (altTurret) altTurret.name = 'turretSystem';
+    }
+
+    if (buildingKey === 'usa_power') {
+        // Authentic Cold Fusion Reactor cyan/blue ambient point light
+        const glowLight = new THREE.PointLight(0x00d2ff, 2.2, 40);
+        glowLight.position.set(-11, 18, -7);
+        root.add(glowLight);
+
+        // Core pulsing energy plasma between rods
+        const coreGeom = new THREE.SphereGeometry(3.2, 12, 12);
+        const coreMesh = new THREE.Mesh(coreGeom, coldFusionGlowMat);
+        coreMesh.name = 'fusionCore';
+        coreMesh.position.set(-11, 16.5, -7);
+        root.add(coreMesh);
     }
 
     root.userData.isW3D = true;
@@ -685,7 +826,7 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
 
     const data = window.W3D_INFANTRY_DATA[infantryKey];
     const faction = data.f;
-    const scale = data.s || 0.088;
+    const scale = data.s || 0.080;
     const iTex = getW3dTexture(infantryKey);
 
     let skinMat;
@@ -729,4 +870,4 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
 
 const outputPath = path.join(__dirname, '..', 'src', 'js', '02b_w3d_models.js');
 fs.writeFileSync(outputPath, jsOutput, 'utf8');
-console.log(`\nSuccessfully exported textured assets to: ${outputPath} (${(jsOutput.length / 1024).toFixed(1)} KB)`);
+console.log(`Successfully generated ${outputPath} (${(jsOutput.length / 1024).toFixed(1)} KB)`);

@@ -321,7 +321,7 @@ function animate() {
                     const drone = u.mesh.getObjectByName('paladinBattleDrone');
                     if (drone) {
                         drone.position.y = (2.4 / 0.09) + Math.sin(animTime * 3.5 + u.mesh.id) * 1.5;
-                        const fan = drone.getObjectByName('fan') || drone.getObjectByName('FAN');
+                        const fan = drone.getObjectByName('fan') || drone.getObjectByName('FAN') || drone.getObjectByName('avbattledr.fan');
                         if (fan) fan.rotation.y += 0.55;
 
                         // Field repair: Battle Drone slowly repairs damaged Paladin (+3 HP per second)
@@ -815,10 +815,20 @@ function animate() {
                     while (diff > Math.PI) diff -= Math.PI * 2;
                     unit.mesh.rotation.y += diff * 0.18;
 
-                    // Aerodynamic banking tilt for aircraft into turns
+                    // Aerodynamic banking tilt for aircraft into turns; helicopters fly horizontal with slight forward pitch
                     if (unit.isAir) {
-                        const targetBank = THREE.MathUtils.clamp(-diff * 1.6, -0.4, 0.4);
-                        unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.12;
+                        const isHeli = (unit.type === 'comanche' || unit.type === 'chinook');
+                        if (!isHeli) {
+                            const targetBank = THREE.MathUtils.clamp(-diff * 1.6, -0.4, 0.4);
+                            unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.12;
+                            unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
+                        } else {
+                            // Helicopters stay strictly horizontal in roll (no sideways banking)
+                            unit.mesh.rotation.z = 0;
+                            // Pitch slightly forward when flying
+                            const targetPitch = 0.12;
+                            unit.mesh.rotation.x += (targetPitch - unit.mesh.rotation.x) * 0.10;
+                        }
                     }
                 } else {
                     // Reached waypoint: advance to next waypoint if routing across bridges!
@@ -826,8 +836,9 @@ function animate() {
                         const nextWp = unit.waypoints.shift();
                         unit.targetPosition.copy(nextWp);
                     } else if (unit.isAir) {
-                        // Unit is at destination! Settle aircraft banking to zero without spinning or flipping
+                        // Unit is at destination! Settle aircraft banking and pitch to zero without spinning or flipping
                         unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
+                        unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
                     }
                 }
 

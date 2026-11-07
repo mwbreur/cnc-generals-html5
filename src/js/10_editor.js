@@ -670,7 +670,11 @@
             });
             window.neutralStructures = [];
 
-            const contested = [
+            const contested = (selectedEnv === 'tournament_desert') ? [
+                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: -360, z: 0, maxHealth: 1500 },
+                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: 360, z: 0, maxHealth: 1500 },
+                { type: 'techHospital', name: 'Tech Hospital', x: 0, z: 0, maxHealth: 1800 }
+            ] : [
                 { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: -selectedSize * 0.22, z: selectedSize * 0.18, maxHealth: 1500 },
                 { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: selectedSize * 0.22, z: -selectedSize * 0.18, maxHealth: 1500 },
                 { type: 'techHospital', name: 'Tech Hospital', x: selectedSize * 0.20, z: selectedSize * 0.20, maxHealth: 1800 },

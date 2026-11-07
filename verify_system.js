@@ -218,6 +218,7 @@ const jsFiles = [
     '05_audio.js',
     '06_effects.js',
     '07_terrain.js',
+    '07b_tournament_desert.js',
     '08_collision.js',
     '09_fogOfWar.js',
     '10_editor.js',
@@ -238,7 +239,7 @@ for (const f of jsFiles) {
     }
 }
 
-console.log("✓ All 16 JS modules evaluated in sandbox successfully.");
+console.log(`✓ All ${jsFiles.length} JS modules evaluated in sandbox successfully.`);
 
 // Initialize Three.js scene
 vm.runInContext("init();", sandbox);
