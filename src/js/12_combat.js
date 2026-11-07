@@ -27,6 +27,39 @@ function processCombatScanning() {
                     }
                 }
 
+                // Autonomous Overlord Roof Gatling Cannon (Anti-Air & Anti-Infantry)
+                if (unit.type === 'overlord' && unit.overlordUpgrade === 'gatling' && unit.health > 0) {
+                    if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
+                    if (unit.overlordGatCooldown > 0) unit.overlordGatCooldown = Math.max(0, unit.overlordGatCooldown - combatDeltaScale);
+                    if (unit.overlordGatCooldown === 0) {
+                        const hostiles = (typeof enemyUnits !== 'undefined' ? enemyUnits : []).filter(e => e.health > 0 && e.mesh && !isFriendly(unit, e));
+                        let bestTarget = null;
+                        let bestScore = -Infinity;
+                        hostiles.forEach(h => {
+                            const d = unit.mesh.position.distanceTo(h.mesh.position);
+                            if (d <= 28) {
+                                let score = 100 - d;
+                                if (h.isAir) score += 60; // Prioritize airborne aircraft!
+                                if (getArmorCategory(h) === 'infantry') score += 30;
+                                if (score > bestScore) { bestScore = score; bestTarget = h; }
+                            }
+                        });
+                        if (bestTarget) {
+                            unit.overlordGatCooldown = 18; // ~0.3s rapid fire!
+                            const upgMesh = unit.overlordUpgradeMesh || unit.mesh.getObjectByName("overlordUpgrade");
+                            const muzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+                            const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
+                            tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
+                            const barrels = unit.mesh.getObjectByName("gatlingBarrels") || (upgMesh && upgMesh.getObjectByName("gatlingBarrels"));
+                            if (barrels) barrels.rotation.z += 1.6;
+                            spawnMuzzleFlash(muzzle, 0xffa502, 0.4);
+                            spawnBulletTracer(muzzle, tPos, 0xf1c40f, 2.8);
+                            if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling', {}, 'china');
+                            applyCalculatedDamage(unit, bestTarget, 16, 'GATLING');
+                        }
+                    }
+                }
+
                 // If combat target is friendly ally, clear immediately
                 if (unit.combatTarget && isFriendly(unit, unit.combatTarget)) {
                     unit.combatTarget = null;
@@ -156,7 +189,37 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     
     let finalDmg = Math.max(1, Math.round(baseDamage * mult));
 
-    // Target defensive upgrade buffs
+    // Attacker offensive buffs (USA Strategy Center Bombardment: +20% damage)
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'bombard' && typeof units !== 'undefined' && units.includes(attacker)) {
+        finalDmg = Math.round(finalDmg * 1.20);
+    }
+    // China Horde Bonus: 5+ friendly horde units (Red Guard, Battlemaster) within 22m grant +20% damage
+    if (attacker && (attacker.type === 'redguard' || attacker.type === 'battlemaster' || attacker.type === 'infantry' || attacker.type === 'tank') && (attacker.faction === 'china' || attacker.isChina || (typeof selectedFaction !== 'undefined' && selectedFaction === 'china' && units.includes(attacker)))) {
+        const friendlies = (typeof units !== 'undefined' && units.includes(attacker)) ? units : (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
+        let hordeCount = 0;
+        const aPos = attacker.mesh ? attacker.mesh.position : attacker.position;
+        if (aPos) {
+            for (let i = 0; i < friendlies.length; i++) {
+                const f = friendlies[i];
+                if (f.health > 0 && f.mesh && (f.type === 'redguard' || f.type === 'battlemaster' || f.type === 'infantry' || f.type === 'tank')) {
+                    if (aPos.distanceTo(f.mesh.position) <= 22) {
+                        hordeCount++;
+                        if (hordeCount >= 5) break;
+                    }
+                }
+            }
+        }
+        if (hordeCount >= 5) {
+            finalDmg = Math.round(finalDmg * 1.20);
+            attacker.isHordeActive = true;
+        } else {
+            attacker.isHordeActive = false;
+        }
+    }
+    // Target defensive upgrade buffs (USA Strategy Center Hold the Line: +20% armor / -20% damage taken)
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(target)) {
+        finalDmg = Math.max(1, Math.round(finalDmg * 0.80));
+    }
     if (target.salvageLevel >= 2) finalDmg = Math.max(1, Math.round(finalDmg * 0.8)); // GLA Level 2 Scrap Armor
     if (target.compositeArmor) finalDmg = Math.max(1, Math.round(finalDmg * 0.85)); // USA Composite Armor
 
@@ -254,6 +317,9 @@ function executeWeaponFire(attacker, target) {
 
     attacker.attackCooldown = baseCooldown;
 
+    if (attacker.isHordeActive) {
+        attacker.attackCooldown = Math.max(8, Math.floor(attacker.attackCooldown * 0.75)); // China Horde: +25% fire-rate
+    }
     if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 0.75);
     if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 1.25);
 
@@ -284,6 +350,22 @@ function executeWeaponFire(attacker, target) {
         playAudio('china_cannon', {}, 'china');
         const ovDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('uraniumShells')) ? 119 : 95;
         applyCalculatedDamage(attacker, target, ovDmg, 'ARMOR_PIERCING');
+
+        // Overlord Gatling Cannon Upgrade Firing!
+        if (attacker.overlordUpgrade === 'gatling') {
+            const upgMesh = attacker.overlordUpgradeMesh || attacker.mesh.getObjectByName("overlordUpgrade");
+            const gatPos = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : muzzleL;
+            const barrels = attacker.mesh.getObjectByName("gatlingBarrels") || (upgMesh && upgMesh.getObjectByName("gatlingBarrels"));
+            if (barrels) barrels.rotation.z += 1.8;
+            for (let b = 0; b < 3; b++) {
+                setTimeout(() => {
+                    spawnMuzzleFlash(gatPos, 0xffa502, 0.35);
+                    spawnBulletTracer(gatPos, targetPos, 0xf1c40f, 2.8);
+                }, b * 50);
+            }
+            if (typeof playAudio === 'function') playAudio('gatling', {}, 'china');
+            applyCalculatedDamage(attacker, target, 24, 'GATLING');
+        }
     } else if (attacker.type === 'dragon') {
         // Dragon Tank NAPALM FLAMETHROWER!
         spawnFlamethrowerBurst(muzzlePos, targetPos);

@@ -376,12 +376,20 @@ function animate() {
                     const cruiseAlt = unit.mesh.userData.flightAltitude || 8.5;
                     const groundY = getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z);
 
+                    // Dynamic State Transition: Automatically react to player orders!
+                    const distToGoal = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                    if (unit.combatTarget && unit.combatTarget.health > 0) {
+                        if (unit.airState === 'landed') unit.airState = 'taking_off';
+                        else if (unit.airState !== 'taking_off') unit.airState = 'attacking';
+                    } else if (distToGoal > 3.0 && unit.airState !== 'taking_off' && unit.airState !== 'landed') {
+                        unit.airState = 'flying';
+                    }
+
                     // 1. Landed on Airfield Runway / Pad
                     if (unit.airState === 'landed') {
                         unit.mesh.position.y = groundY + 0.35;
                         unit.mesh.rotation.z = 0;
-                        const distToDest = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
-                        if (unit.combatTarget || (unit.waypoints && unit.waypoints.length > 0) || distToDest > 4.0) {
+                        if (unit.combatTarget || (unit.waypoints && unit.waypoints.length > 0) || distToGoal > 4.0) {
                             unit.airState = 'taking_off';
                         }
                         return; // Stays safely on ground
@@ -390,7 +398,7 @@ function animate() {
                     // 2. Taking off & climbing to cruising altitude
                     if (unit.airState === 'taking_off') {
                         const targetY = groundY + cruiseAlt;
-                        unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.06;
+                        unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.08;
                         if (unit.mesh.position.y >= targetY * 0.85) {
                             unit.airState = unit.combatTarget ? 'attacking' : 'flying';
                         }
@@ -419,19 +427,27 @@ function animate() {
                             unit.mesh.rotation.y += diff * 0.22;
                             unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -0.45, 0.45) - unit.mesh.rotation.z) * 0.15;
 
-                            if (distToEnemy <= (unit.type === 'comanche' ? 22 : 25) && unit.attackCooldown === 0) {
+                            if (distToEnemy <= (unit.type === 'comanche' ? 24 : 28) && unit.attackCooldown === 0) {
                                 executeWeaponFire(unit, unit.combatTarget);
                             }
 
                             if (distToEnemy < 6.0 || unit.combatTarget.health <= 0) {
-                                if (unit.combatTarget.health <= 0) unit.combatTarget = null;
-                                unit.patrolCenter.copy(unit.mesh.position);
-                                unit.circleAngle = unit.mesh.rotation.y;
-                                unit.airState = 'circling';
+                                if (unit.combatTarget.health <= 0) {
+                                    unit.combatTarget = null;
+                                    unit.patrolCenter.copy(unit.mesh.position);
+                                    unit.circleAngle = unit.mesh.rotation.y;
+                                    unit.airState = 'circling';
+                                    unit.taskState = 'Idle';
+                                } else {
+                                    // Strafing turn pass: carry momentum past target
+                                    unit.mesh.position.x += dirX * (planeSpeed * 1.4);
+                                    unit.mesh.position.z += dirZ * (planeSpeed * 1.4);
+                                }
                             }
                         } else {
                             unit.combatTarget = null;
                             unit.airState = 'circling';
+                            unit.taskState = 'Idle';
                         }
                     }
 
@@ -457,7 +473,7 @@ function animate() {
                             if (unit.waypoints && unit.waypoints.length > 0) {
                                 unit.targetPosition.copy(unit.waypoints.shift());
                             } else {
-                                unit.patrolCenter.copy(unit.mesh.position);
+                                unit.patrolCenter.copy(unit.targetPosition);
                                 unit.circleAngle = unit.mesh.rotation.y;
                                 unit.airState = 'circling';
                                 unit.taskState = 'Idle';
@@ -466,10 +482,9 @@ function animate() {
                     }
 
                     // 5. Circling smoothly at location ("fly around slowly in circles at their location")
-                    if (unit.airState === 'circling' || (unit.taskState === 'Idle' && !unit.combatTarget && unit.airState !== 'landed')) {
-                        unit.airState = 'circling';
+                    if (unit.airState === 'circling') {
                         unit.circleAngle = (unit.circleAngle || 0) + (unit.speed * 0.045);
-                        const orbitR = unit.circleRadius || 15.0;
+                        const orbitR = unit.circleRadius || 12.0;
                         const targetOrbitX = unit.patrolCenter.x + Math.cos(unit.circleAngle) * orbitR;
                         const targetOrbitZ = unit.patrolCenter.z + Math.sin(unit.circleAngle) * orbitR;
 
@@ -525,6 +540,51 @@ function animate() {
                         // Target destroyed or lost: resume idle
                         unit.combatTarget = null;
                         unit.taskState = 'Idle';
+                    }
+                }
+
+                // --- CAPTURING NEUTRAL STRUCTURE CHANNELS ---
+                if (unit.taskState === 'Capturing' && unit.captureTarget && unit.captureTarget.health > 0) {
+                    const targetTech = unit.captureTarget;
+                    const dTech = Math.hypot(targetTech.position.x - unit.mesh.position.x, targetTech.position.z - unit.mesh.position.z);
+                    if (dTech <= (targetTech.radius + 3.0)) {
+                        // Halt movement while capturing
+                        unit.targetPosition.x = unit.mesh.position.x;
+                        unit.targetPosition.z = unit.mesh.position.z;
+                        targetTech.captureProgress = (targetTech.captureProgress || 0) + 1;
+                        if (targetTech.captureProgress >= 120) { // ~2 seconds channeling
+                            targetTech.captureProgress = 0;
+                            targetTech.capturedByTeam = unit.teamId;
+                            targetTech.teamId = unit.teamId;
+                            targetTech.ownerId = (unit.teamId === playerTeamId) ? 'player' : (unit.ownerId || ('ai_' + unit.teamId));
+
+                            // Turn flag cloth to player blue or enemy red
+                            const flagCloth = targetTech.mesh ? targetTech.mesh.getObjectByName("neutralFlagCloth") : null;
+                            if (flagCloth && flagCloth.material) {
+                                flagCloth.material.color.setHex((unit.teamId === playerTeamId) ? 0x3498db : 0xe74c3c);
+                            }
+
+                            if (unit.teamId === playerTeamId) {
+                                if (targetTech.type === 'techOilDerrick') {
+                                    playerResources += 1000;
+                                    const resEl = document.getElementById('resource-display');
+                                    if (resEl) resEl.innerText = `$${playerResources}`;
+                                    showNotification('Tech Oil Derrick SECURED! +$1,000 cash grant + steady flow online.', 'success');
+                                } else if (targetTech.type === 'techHospital') {
+                                    showNotification('Tech Hospital SECURED! Field medics online: friendly infantry passively heal.', 'success');
+                                } else if (targetTech.type === 'techRefinery') {
+                                    showNotification('Tech Oil Refinery SECURED! Combat vehicle & aircraft costs discounted 10%.', 'success');
+                                }
+                                playUSASound('radio_chirp');
+                            } else {
+                                showNotification(`Warning: Enemy forces captured ${targetTech.name}!`, 'error');
+                            }
+
+                            unit.taskState = 'Idle';
+                            unit.captureTarget = null;
+                            if (typeof updateSidebar === 'function') updateSidebar();
+                        }
+                        return;
                     }
                 }
 
@@ -719,6 +779,56 @@ function animate() {
             });
             if (units.length !== previousUnitCount) updateHUD();
 
+            // Neutral Tech Buildings Periodic Effects:
+            if (isMatchActive) {
+                if (window._techPassiveTimer === undefined) window._techPassiveTimer = 0;
+                window._techPassiveTimer++;
+                
+                const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
+
+                // 1. Tech Oil Derrick: +$200 every 12 seconds (~720 frames)
+                if (window._techPassiveTimer % 720 === 0) {
+                    const playerDerricks = allTechs.filter(s => s.type === 'techOilDerrick' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+                    if (playerDerricks.length > 0) {
+                        const bonus = playerDerricks.length * 200;
+                        playerResources += bonus;
+                        const resEl = document.getElementById('resource-display');
+                        if (resEl) resEl.innerText = `$${playerResources}`;
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Tech Oil Derrick: +$${bonus} passive supply revenue received.`, 'success');
+                        }
+                    }
+                }
+
+                // 2. Tech Hospital: Passive regeneration for all friendly infantry (+2 HP every 60 frames / 1.0s)
+                if (window._techPassiveTimer % 60 === 0) {
+                    const hasHospital = allTechs.some(s => s.type === 'techHospital' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+                    if (hasHospital) {
+                        units.forEach(u => {
+                            if (u.health > 0 && u.health < u.maxHealth && !u.isAir && ['ranger','infantry','redguard','rebel','rocket','rpg','tankhunter','pathfinder','burton','jarmen','worker'].includes(u.type)) {
+                                u.health = Math.min(u.maxHealth, u.health + 2);
+                            }
+                        });
+                    }
+                }
+
+                // 3. GLA Foundation Holes Rebuilding Timer
+                const glaHoles = [...structures, ...enemyStructures].filter(s => s.type === 'glaHole' && s.health > 0);
+                glaHoles.forEach(hole => {
+                    if (hole.rebuildTimer === undefined) hole.rebuildTimer = 18 * 60; // 18 seconds
+                    hole.rebuildTimer--;
+                    if (hole.rebuildTimer <= 0) {
+                        // Reconstruct structure for free!
+                        hole.health = 0;
+                        if (hole.mesh) scene.remove(hole.mesh);
+                        const origType = hole.originalType || 'barracks';
+                        if (typeof deployBaseStructureAt === 'function') {
+                            deployBaseStructureAt(origType, hole.position, hole.ownerId, hole.teamId, 'gla');
+                        }
+                    }
+                });
+            }
+
             // Tactical Mission Victory / Defeat Objective Check (Total Annihilation of Hostile Forces)
             if (isMatchActive && hasSpawnedInitialEnemyBase) {
                 const remainingHostileStructures = [...structures, ...enemyStructures].filter(s => s.health > 0 && !isFriendly({ teamId: playerTeamId }, s));
@@ -731,11 +841,13 @@ function animate() {
                     showNotification("MISSION ACCOMPLISHED: ALL HOSTILE FORCES ELIMINATED!", "success");
                     const ticker = document.getElementById('tactical-message');
                     if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: Operational theater secured. All hostile forces destroyed!</strong>';
+                    if (typeof showVictoryBanner === 'function') showVictoryBanner();
                 } else if (remainingFriendlyStructures.length === 0 && remainingFriendlyUnits.length === 0) {
                     isMatchActive = false;
                     showNotification("MISSION FAILED: ALL STRATEGIC ASSETS LOST!", "error");
                     const ticker = document.getElementById('tactical-message');
                     if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">CRITICAL DEFEAT: Command Center and all friendly forces destroyed.</strong>';
+                    if (typeof showDefeatBanner === 'function') showDefeatBanner();
                 }
             }
 

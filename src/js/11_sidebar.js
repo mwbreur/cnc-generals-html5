@@ -243,24 +243,40 @@ function toggleSellMode() {
 
 function resumeGame() {
     const menu = document.getElementById('start-menu');
-    if (menu) menu.style.display = 'none';
+    if (menu) {
+        menu.style.display = 'none';
+        menu.classList.remove('pause-mode');
+    }
     const pauseModal = document.getElementById('ingame-pause-modal');
     if (pauseModal) pauseModal.style.display = 'none';
     const startCard = document.getElementById('start-card');
     if (startCard) startCard.style.display = 'none';
+    const pauseWatermark = document.getElementById('pause-screen-watermark');
+    if (pauseWatermark) pauseWatermark.style.display = 'none';
+    const pauseClock = document.getElementById('pause-screen-clock');
+    if (pauseClock) pauseClock.style.display = 'none';
 }
 
 function showInGamePauseModal() {
     const menu = document.getElementById('start-menu');
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
+    const pauseWatermark = document.getElementById('pause-screen-watermark');
+    const pauseClock = document.getElementById('pause-screen-clock');
+    const matchClock = document.getElementById('match-clock');
     if (!menu) return;
 
     menu.style.display = 'flex';
+    menu.classList.add('pause-mode');
     if (startCard) startCard.style.display = 'none';
     if (pauseModal) {
         pauseModal.style.display = 'flex';
         updatePauseModalPlayerList();
+    }
+    if (pauseWatermark) pauseWatermark.style.display = 'block';
+    if (pauseClock) {
+        pauseClock.style.display = 'block';
+        if (matchClock) pauseClock.innerText = matchClock.innerText;
     }
 }
 
@@ -269,10 +285,15 @@ function showStartSetupCard() {
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
     const resumeBtn = document.getElementById('resume-game-btn');
+    const pauseWatermark = document.getElementById('pause-screen-watermark');
+    const pauseClock = document.getElementById('pause-screen-clock');
     if (!menu) return;
 
     menu.style.display = 'flex';
+    menu.classList.remove('pause-mode');
     if (pauseModal) pauseModal.style.display = 'none';
+    if (pauseWatermark) pauseWatermark.style.display = 'none';
+    if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
         startCard.style.display = 'block';
         if (resumeBtn) {
@@ -320,12 +341,13 @@ function updatePauseModalPlayerList() {
         const teamLabel = s.team ? `Team ${s.team}` : 'None';
         const armyLabel = (s.faction || 'USA').toUpperCase();
         const statusHtml = isAlive ? `<span style="color:#2ed573; font-weight:bold;">Playing</span>` : `<span style="color:#ff4757; font-weight:bold;">Defeated</span>`;
-        const nameColor = s.isPlayer ? '#2ed573' : (isFriendly(s, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) }) ? '#70a1ff' : '#e0e6ed');
+        const nameColor = s.isPlayer ? '#2ed573' : (isFriendly(s, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) }) ? '#2ed573' : '#ced6e0');
+        const armyColor = s.isPlayer ? '#2ed573' : '#ced6e0';
 
         html += `<tr>
             <td style="text-align:center;"><input type="checkbox" style="cursor:pointer;" title="Mute Tactical Audio"></td>
             <td style="color:${nameColor}; font-weight:bold;">${s.name || 'Commander'}</td>
-            <td style="color:#eccc68; font-weight:600;">${armyLabel}</td>
+            <td style="color:${armyColor}; font-weight:600;">${armyLabel}</td>
             <td style="color:#a4b0be;">${teamLabel}</td>
             <td>${statusHtml}</td>
         </tr>`;
@@ -1686,12 +1708,25 @@ function sellStructure(structure) {
     updateSidebar();
 }
 
+function getEffectiveUnitCost(type) {
+    const spec = unitRoster[type];
+    if (!spec) return 0;
+    let cost = spec.cost;
+    const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
+    const hasRefinery = allTechs.some(s => s.type === 'techRefinery' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+    if (hasRefinery && !isInfantryType(type)) {
+        cost = Math.round(cost * 0.90); // 10% vehicle & aircraft discount!
+    }
+    return cost;
+}
+
 function produceUnit(type) {
     const spec = unitRoster[type];
     if (!spec) return;
 
-    if (playerResources < spec.cost) {
-        showNotification(`Insufficient funds to train ${spec.name} ($${spec.cost} required).`, 'error');
+    const effCost = getEffectiveUnitCost(type);
+    if (playerResources < effCost) {
+        showNotification(`Insufficient funds to train ${spec.name} ($${effCost} required).`, 'error');
         return;
     }
 
@@ -1727,17 +1762,17 @@ function produceUnit(type) {
         return;
     }
 
-    playerResources -= spec.cost;
+    playerResources -= effCost;
     fac.productionQueue.push({
         type: type,
         name: spec.name,
-        cost: spec.cost,
+        cost: effCost,
         progress: 0,
         buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
     });
 
     playUSASound('radio_chirp');
-    showNotification(`Queued: ${spec.name}`, 'info');
+    showNotification(`Queued: ${spec.name}${effCost < spec.cost ? ' (10% Refinery Discount)' : ''}`, 'info');
     updateSidebar();
 }
 
@@ -2323,12 +2358,25 @@ function sellStructure(structure) {
     updateSidebar();
 }
 
+function getEffectiveUnitCost(type) {
+    const spec = unitRoster[type];
+    if (!spec) return 0;
+    let cost = spec.cost;
+    const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
+    const hasRefinery = allTechs.some(s => s.type === 'techRefinery' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+    if (hasRefinery && !isInfantryType(type)) {
+        cost = Math.round(cost * 0.90); // 10% vehicle & aircraft discount!
+    }
+    return cost;
+}
+
 function produceUnit(type) {
     const spec = unitRoster[type];
     if (!spec) return;
 
-    if (playerResources < spec.cost) {
-        showNotification(`Insufficient funds to train ${spec.name} ($${spec.cost} required).`, 'error');
+    const effCost = getEffectiveUnitCost(type);
+    if (playerResources < effCost) {
+        showNotification(`Insufficient funds to train ${spec.name} ($${effCost} required).`, 'error');
         return;
     }
 
@@ -2364,17 +2412,17 @@ function produceUnit(type) {
         return;
     }
 
-    playerResources -= spec.cost;
+    playerResources -= effCost;
     fac.productionQueue.push({
         type: type,
         name: spec.name,
-        cost: spec.cost,
+        cost: effCost,
         progress: 0,
         buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
     });
 
     playUSASound('radio_chirp');
-    showNotification(`Queued: ${spec.name}`, 'info');
+    showNotification(`Queued: ${spec.name}${effCost < spec.cost ? ' (10% Refinery Discount)' : ''}`, 'info');
     updateSidebar();
 }
 
@@ -2640,4 +2688,53 @@ function executeGeneralsPowerAt(pos) {
         return true;
     }
     return false;
+}
+
+function showVictoryBanner() {
+    const vModal = document.getElementById('victory-modal');
+    if (!vModal) return;
+    vModal.style.display = 'flex';
+    
+    const clockEl = document.getElementById('match-clock');
+    const timeEl = document.getElementById('victory-time-val');
+    if (timeEl && clockEl) timeEl.textContent = clockEl.textContent || '00:00:00';
+    
+    const facEl = document.getElementById('victory-faction-val');
+    if (facEl) facEl.textContent = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'USA').toUpperCase();
+
+    const rankEl = document.getElementById('victory-rank-val');
+    if (rankEl) {
+        const sc = typeof playerScore !== 'undefined' ? playerScore : 6000;
+        const stars = Math.min(5, Math.floor(sc / 2000) + 1);
+        rankEl.textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+    }
+    
+    if (typeof playUSASound === 'function') playUSASound('victory');
+}
+
+function showDefeatBanner() {
+    const dModal = document.getElementById('defeat-modal');
+    if (!dModal) return;
+    dModal.style.display = 'flex';
+
+    const clockEl = document.getElementById('match-clock');
+    const timeEl = document.getElementById('defeat-time-val');
+    if (timeEl && clockEl) timeEl.textContent = clockEl.textContent || '00:00:00';
+
+    const facEl = document.getElementById('defeat-faction-val');
+    if (facEl) facEl.textContent = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'USA').toUpperCase();
+
+    if (typeof playUSASound === 'function') playUSASound('defeat');
+}
+
+function dismissEndGameModal() {
+    const vModal = document.getElementById('victory-modal');
+    if (vModal) vModal.style.display = 'none';
+    const dModal = document.getElementById('defeat-modal');
+    if (dModal) dModal.style.display = 'none';
+}
+
+function openStartMenuFromEndGame() {
+    dismissEndGameModal();
+    if (typeof showStartSetupCard === 'function') showStartSetupCard();
 }

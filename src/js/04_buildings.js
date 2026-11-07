@@ -925,5 +925,138 @@ function createGLAScudStorm() {
 }
 
 
-        // =========================================================================
+// =========================================================================
+// NEUTRAL MAP TECH BUILDINGS & GLA RECONSTRUCTION HOLES
+// =========================================================================
+
+function createTechOilDerrickMesh() {
+    const g = new THREE.Group();
+    g.name = "techOilDerrick";
+    const matConcrete = new THREE.MeshStandardMaterial({ color: 0x4a5559, roughness: 0.85 });
+    const matSteel = new THREE.MeshStandardMaterial({ color: 0x2f3640, metalness: 0.85, roughness: 0.35 });
+    const matRust = new THREE.MeshStandardMaterial({ color: 0x8c4227, roughness: 0.7 });
+    const matYellow = new THREE.MeshStandardMaterial({ color: 0xe1b12c, roughness: 0.5 });
+
+    // Concrete base pad
+    const base = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.6, 6.2), matConcrete);
+    base.position.y = 0.3; base.castShadow = true; base.receiveShadow = true; g.add(base);
+
+    // Steel lattice derrick tower
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.8, 6.5, 4), matSteel);
+    tower.position.set(1.5, 3.5, 0); tower.castShadow = true; g.add(tower);
+
+    // Crown block & pulley
+    const crown = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), matYellow);
+    crown.position.set(1.5, 6.9, 0); g.add(crown);
+
+    // Walking-beam pumpjack assembly
+    const pumpGroup = new THREE.Group();
+    pumpGroup.name = "pumpjackArm";
+    pumpGroup.position.set(-1.2, 2.2, 0);
+
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, 0.6), matSteel);
+    post.position.y = -0.5; g.add(post); post.position.x = -1.2;
+
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.4, 0.4), matRust);
+    pumpGroup.add(beam);
+
+    const horsehead = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.35, 3), matSteel);
+    horsehead.rotation.z = Math.PI / 2;
+    horsehead.position.set(-1.8, 0, 0);
+    pumpGroup.add(horsehead);
+
+    g.add(pumpGroup);
+
+    // Fuel tanks and pipeline
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.8, 12), matRust);
+    tank.position.set(-1.2, 1.0, 1.8); tank.castShadow = true; g.add(tank);
+
+    return g;
+}
+
+function createTechHospitalMesh() {
+    const g = new THREE.Group();
+    g.name = "techHospital";
+    const matWhite = new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.4 });
+    const matRed = new THREE.MeshStandardMaterial({ color: 0xe84118, roughness: 0.3 });
+    const matGlass = new THREE.MeshStandardMaterial({ color: 0x00a8ff, roughness: 0.2, metalness: 0.8 });
+    const matRoof = new THREE.MeshStandardMaterial({ color: 0x353b48, roughness: 0.7 });
+
+    // Main clinic building
+    const mainBody = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.6, 5.2), matWhite);
+    mainBody.position.y = 1.3; mainBody.castShadow = true; g.add(mainBody);
+
+    // Upper medical bay
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.4, 3.6), matWhite);
+    upper.position.set(0, 3.1, 0); upper.castShadow = true; g.add(upper);
+
+    // Emergency cross logo on roof
+    const crossH = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 0.8), matRed);
+    crossH.position.set(0, 3.85, 0); g.add(crossH);
+    const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 2.4), matRed);
+    crossV.position.set(0, 3.85, 0); g.add(crossV);
+
+    // Glass entrance & windows
+    const win = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.8, 0.1), matGlass);
+    win.position.set(0, 1.2, 2.62); g.add(win);
+
+    return g;
+}
+
+function createTechRefineryMesh() {
+    const g = new THREE.Group();
+    g.name = "techRefinery";
+    const matSteel = new THREE.MeshStandardMaterial({ color: 0x718093, metalness: 0.8, roughness: 0.35 });
+    const matDark = new THREE.MeshStandardMaterial({ color: 0x2f3640, roughness: 0.8 });
+    const matOrange = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.4 });
+
+    // Foundation
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(7.0, 0.5, 6.0), matDark);
+    pad.position.y = 0.25; g.add(pad);
+
+    // Twin catalytic cracking distillation towers
+    const col1 = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 6.5, 14), matSteel);
+    col1.position.set(-1.8, 3.5, -0.8); col1.castShadow = true; g.add(col1);
+
+    const col2 = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 5.2, 14), matSteel);
+    col2.position.set(-0.2, 2.8, -0.8); col2.castShadow = true; g.add(col2);
+
+    // Spherical LNG / fuel pressure vessel
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.4, 14, 14), matSteel);
+    sphere.position.set(1.8, 1.8, 1.0); sphere.castShadow = true; g.add(sphere);
+
+    // Piping manifold
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.5, 8), matOrange);
+    pipe.rotation.z = Math.PI / 2;
+    pipe.position.set(-0.8, 4.2, -0.8); g.add(pipe);
+
+    return g;
+}
+
+function createGLAHoleMesh() {
+    const g = new THREE.Group();
+    g.name = "glaHole";
+    const matMud = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.95 });
+    const matTimber = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.85 });
+    const matMetal = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.6 });
+
+    // Excavated trench / mud pit
+    const pit = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 2.2, 1.2, 10), matMud);
+    pit.position.y = 0.5; pit.receiveShadow = true; g.add(pit);
+
+    // Wooden scaffolding and rebar support stakes
+    for (let i = 0; i < 6; i++) {
+        const ang = (i * Math.PI) / 3;
+        const stake = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.0, 0.15), matTimber);
+        stake.position.set(Math.cos(ang) * 2.6, 1.0, Math.sin(ang) * 2.6);
+        stake.rotation.z = (Math.random() - 0.5) * 0.3;
+        g.add(stake);
+    }
+
+    // Corrugated tin sheet over trench
+    const sheet = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 1.6), matMetal);
+    sheet.position.set(0.4, 0.8, -0.3); sheet.rotation.y = 0.4; g.add(sheet);
+
+    return g;
+}
         

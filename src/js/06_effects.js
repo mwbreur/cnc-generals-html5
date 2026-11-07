@@ -1154,106 +1154,113 @@
             const group = new THREE.Group();
             group.name = "overlordUpgrade";
             // Mount directly onto the turret roof at the cupola mount position!
-            group.position.set(0, 0.95, -0.45);
+            group.position.set(0, 0.88, -0.45);
 
             if (upgradeType === 'bunker') {
                 // Fortified hexagonal bunker pillbox with vision slits & firing embrasures
-                const bGeo = new THREE.CylinderGeometry(0.95, 1.15, 0.7, 6);
-                const bMat = new THREE.MeshStandardMaterial({ color: 0x47535e, roughness: 0.75, metalness: 0.3 });
+                const bGeo = new THREE.CylinderGeometry(1.15, 1.3, 0.9, 6);
+                const bMat = new THREE.MeshStandardMaterial({ color: 0x47535e, roughness: 0.75, metalness: 0.35 });
                 const b = new THREE.Mesh(bGeo, bMat);
+                b.position.y = 0.45;
                 b.castShadow = true;
                 group.add(b);
 
                 // Armored top rim / parapet
-                const rimGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.15, 6);
+                const rimGeo = new THREE.CylinderGeometry(1.22, 1.22, 0.18, 6);
                 const rimMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.6 });
                 const rim = new THREE.Mesh(rimGeo, rimMat);
-                rim.position.y = 0.35;
+                rim.position.y = 0.92;
                 group.add(rim);
 
                 // Vision / firing slits
                 for (let a = 0; a < 6; a++) {
-                    const slitGeo = new THREE.BoxGeometry(0.35, 0.12, 0.15);
+                    const slitGeo = new THREE.BoxGeometry(0.42, 0.14, 0.18);
                     const slitMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
                     const slit = new THREE.Mesh(slitGeo, slitMat);
                     const ang = (a * Math.PI) / 3;
-                    slit.position.set(Math.cos(ang) * 0.98, 0.15, Math.sin(ang) * 0.98);
+                    slit.position.set(Math.cos(ang) * 1.15, 0.55, Math.sin(ang) * 1.15);
                     slit.rotation.y = -ang + Math.PI / 2;
                     group.add(slit);
                 }
 
                 // Mini infantry helmet heads inside open hatch
                 const hMat = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
-                [-0.3, 0.3].forEach(x => {
-                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), hMat);
-                    h.position.set(x, 0.45, 0);
+                [-0.35, 0.35].forEach(x => {
+                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), hMat);
+                    h.position.set(x, 1.05, 0);
                     group.add(h);
                 });
             } else if (upgradeType === 'gatling') {
                 // Raised motorized rotary turret base
-                const baseGeo = new THREE.CylinderGeometry(0.75, 0.85, 0.4, 10);
-                const baseMat = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, metalness: 0.7, roughness: 0.4 });
+                const baseGeo = new THREE.CylinderGeometry(0.85, 0.95, 0.45, 12);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.8, roughness: 0.3 });
                 const base = new THREE.Mesh(baseGeo, baseMat);
+                base.position.y = 0.22;
                 base.castShadow = true;
                 group.add(base);
 
-                // Dual elevated 6-barrel rotary Gatling clusters
-                const mountGeo = new THREE.BoxGeometry(0.7, 0.35, 0.5);
-                const mountMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+                // Swivel gun mount
+                const mountGeo = new THREE.BoxGeometry(0.85, 0.45, 0.65);
+                const mountMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9 });
                 const mount = new THREE.Mesh(mountGeo, mountMat);
-                mount.position.set(0, 0.3, 0.1);
+                mount.position.set(0, 0.55, 0.1);
                 group.add(mount);
 
-                [-0.24, 0.24].forEach(bx => {
+                const barrelGroup = new THREE.Group();
+                barrelGroup.name = "gatlingBarrels";
+                barrelGroup.position.set(0, 0.65, 0.2);
+
+                [-0.3, 0.3].forEach(bx => {
                     // Twin long heavy Gatling barrel assemblies
-                    const bGeo = new THREE.CylinderGeometry(0.09, 0.09, 1.5, 8);
+                    const bGeo = new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8);
                     bGeo.rotateX(Math.PI / 2);
-                    const bMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.2 });
+                    const bMat = new THREE.MeshStandardMaterial({ color: 0x2f3542, metalness: 0.9, roughness: 0.2 });
                     const bMesh = new THREE.Mesh(bGeo, bMat);
-                    bMesh.position.set(bx, 0.35, 0.75);
+                    bMesh.position.set(bx, 0, 1.1);
                     bMesh.castShadow = true;
-                    group.add(bMesh);
+                    barrelGroup.add(bMesh);
 
                     // Muzzle flash arrestor rings
-                    const ringGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.15, 8);
+                    const ringGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.22, 8);
                     ringGeo.rotateX(Math.PI / 2);
-                    const ringMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8 });
+                    const ringMat = new THREE.MeshStandardMaterial({ color: 0x747d8c, metalness: 0.8 });
                     const ring = new THREE.Mesh(ringGeo, ringMat);
-                    ring.position.set(bx, 0.35, 1.45);
-                    group.add(ring);
+                    ring.position.set(bx, 0, 2.15);
+                    barrelGroup.add(ring);
                 });
+                group.add(barrelGroup);
 
                 // Rear Ammo feed box
-                const ammoGeo = new THREE.BoxGeometry(0.65, 0.3, 0.4);
-                const ammoMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6 });
+                const ammoGeo = new THREE.BoxGeometry(0.8, 0.4, 0.5);
+                const ammoMat = new THREE.MeshStandardMaterial({ color: 0x57606f, metalness: 0.6 });
                 const ammo = new THREE.Mesh(ammoGeo, ammoMat);
-                ammo.position.set(0, 0.35, -0.3);
+                ammo.position.set(0, 0.55, -0.4);
                 group.add(ammo);
             } else if (upgradeType === 'propaganda') {
                 // Sturdy speaker mast tower with crimson beacon and 4 gold megaphone horns
-                const mastGeo = new THREE.CylinderGeometry(0.14, 0.22, 1.6, 6);
+                const mastGeo = new THREE.CylinderGeometry(0.16, 0.24, 1.8, 8);
                 const mastMat = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 });
                 const mast = new THREE.Mesh(mastGeo, mastMat);
-                mast.position.y = 0.8;
+                mast.position.y = 0.9;
                 mast.castShadow = true;
                 group.add(mast);
 
                 // Flashing red propaganda beacon sphere
-                const beaconGeo = new THREE.SphereGeometry(0.2, 8, 8);
-                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+                const beaconGeo = new THREE.SphereGeometry(0.24, 8, 8);
+                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff3838 });
                 const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-                beacon.position.y = 1.65;
+                beacon.position.y = 1.9;
                 group.add(beacon);
 
                 // 4 heavy megaphone horn cones facing N, S, E, W
                 for (let a = 0; a < 4; a++) {
-                    const hornGeo = new THREE.ConeGeometry(0.26, 0.6, 8);
+                    const hornGeo = new THREE.ConeGeometry(0.32, 0.75, 8);
                     hornGeo.rotateX(Math.PI / 2);
                     const hornMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.4, metalness: 0.5 });
                     const horn = new THREE.Mesh(hornGeo, hornMat);
                     const ang = (a * Math.PI) / 2;
-                    horn.position.set(Math.cos(ang) * 0.45, 1.3, Math.sin(ang) * 0.45);
-                    horn.lookAt(new THREE.Vector3(horn.position.x * 2, 1.3, horn.position.z * 2));
+                    horn.position.set(Math.cos(ang) * 0.55, 1.5, Math.sin(ang) * 0.55);
+                    horn.lookAt(new THREE.Vector3(horn.position.x * 2, 1.5, horn.position.z * 2));
                     group.add(horn);
                 }
             }

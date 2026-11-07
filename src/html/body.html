@@ -1,13 +1,15 @@
 <div id="start-menu">
-        <!-- AUTHENTIC ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica) -->
-        <div id="ingame-pause-modal" class="pause-dialog" style="display: none;">
-            <div class="pause-watermark-container">
-                <div class="pause-watermark-title">C&amp;C Generals Zero Hour</div>
-                <div class="pause-watermark-pro">Control Bar Pro</div>
-                <div class="pause-watermark-hd">+ Control Bar HD</div>
-                <div class="pause-watermark-gentool">+ GenTool</div>
-            </div>
+        <!-- TOP-LEFT & TOP-RIGHT LIVE SCREEN OVERLAYS (Control Bar Pro replica) -->
+        <div id="pause-screen-watermark" class="pause-screen-watermark" style="display: none;">
+            <div class="pause-watermark-title">C&amp;C Generals Zero Hour</div>
+            <div class="pause-watermark-pro">Control Bar Pro</div>
+            <div class="pause-watermark-hd">+ Control Bar HD</div>
+            <div class="pause-watermark-gentool">+ GenTool</div>
+        </div>
+        <div id="pause-screen-clock" class="pause-screen-clock" style="display: none;">00:00:00</div>
 
+        <!-- AUTHENTIC ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL -->
+        <div id="ingame-pause-modal" class="pause-dialog" style="display: none;">
             <div class="pause-table-container">
                 <table class="pause-table">
                     <thead>
@@ -26,6 +28,10 @@
             </div>
 
             <div class="pause-actions-bar">
+                <div class="pause-watermark-bottom-left">
+                    CONTROL BAR PRO<br>
+                    <span>BY FAS &amp; XEZON</span>
+                </div>
                 <div class="pause-left-actions">
                     <button class="rts-btn pause-sub-btn" onclick="openSkirmishSetupFromGame()">⚙️ SETUP &amp; OPTIONS</button>
                     <button class="rts-btn pause-sub-btn" onclick="restartCurrentMatch()">🔄 RESTART MATCH</button>
@@ -482,37 +488,53 @@
             </div>
         </div>
     </div>
-            <div class="radar-bezel-controls">
-                <button class="bezel-btn" id="btn-ping" title="Tactical Ping / Beacon (B)" onclick="triggerTacticalBeacon()">
-                    <span>🔔</span><label>PING</label>
-                </button>
-                <button class="bezel-btn" id="btn-repair" title="Field Repair Mode (R)" onclick="toggleRepairMode()">
-                    <span>🔧</span><label>REPAIR</label>
-                </button>
-                <button class="bezel-btn" id="btn-sell" title="Demolish / Liquidate Structure ($)" onclick="toggleSellMode()">
-                    <span>💰</span><label>SELL</label>
-                </button>
-                <button class="bezel-btn" id="btn-recenter" title="Recenter Base (Space)" onclick="recenterBase()">
-                    <span>🎯</span><label>BASE</label>
-                </button>
+
+    <!-- ============================================================== -->
+    <!-- AUTHENTIC C&C GENERALS VICTORY & DEFEAT BANNERS                -->
+    <!-- ============================================================== -->
+    <div id="victory-modal" class="end-game-modal" style="display: none;">
+        <div class="end-game-card victory-card">
+            <div class="end-game-laurel">★ ★ ★ ★ ★</div>
+            <h1 class="victory-title">VICTORY</h1>
+            <div class="end-game-subtitle">OPERATIONAL THEATER SECURED • ALL HOSTILE FORCES DESTROYED</div>
+            
+            <div class="end-game-stats-grid">
+                <div class="end-game-stat">
+                    <span class="stat-label">MISSION TIME</span>
+                    <span id="victory-time-val" class="stat-val">00:00:00</span>
+                </div>
+                <div class="end-game-stat">
+                    <span class="stat-label">COMMAND FACTION</span>
+                    <span id="victory-faction-val" class="stat-val">USA</span>
+                </div>
+                <div class="end-game-stat">
+                    <span class="stat-label">THEATER STATUS</span>
+                    <span class="stat-val" style="color: #2ed573;">ANNIHILATED</span>
+                </div>
+                <div class="end-game-stat">
+                    <span class="stat-label">GENERAL RANK</span>
+                    <span id="victory-rank-val" class="stat-val" style="color: #ffd700;">★★★★★</span>
+                </div>
+            </div>
+
+            <div class="end-game-actions">
+                <button class="rts-btn end-game-btn" onclick="dismissEndGameModal()">▶ INSPECT BATTLEFIELD</button>
+                <button class="rts-btn end-game-btn play-again-btn" onclick="restartCurrentMatch()">🔄 PLAY AGAIN</button>
+                <button class="rts-btn end-game-btn" onclick="openStartMenuFromEndGame()">⚙️ COMMAND SETUP</button>
             </div>
         </div>
+    </div>
 
-        <!-- 2. CENTER: Unit & Structure Inspector Console -->
-        <div id="inspector-console" class="cmd-bar-section">
-            <!-- Dynamically populated by renderInspectorConsole() -->
-        </div>
-
-        <!-- 3. RIGHT: The 3x4 Command & Build Grid -->
-        <div id="grid-console" class="cmd-bar-section">
-            <div class="grid-category-tabs" id="grid-category-tabs">
-                <button id="grid-tab-commands" class="grid-cat-btn active" onclick="switchGridCategory('commands')">COMMANDS</button>
-                <button id="grid-tab-units" class="grid-cat-btn" onclick="switchGridCategory('units')">UNITS</button>
-                <button id="grid-tab-structures" class="grid-cat-btn" onclick="switchGridCategory('structures')">BUILDINGS</button>
-                <button id="grid-tab-defenses" class="grid-cat-btn" onclick="switchGridCategory('defenses')">DEFENSES</button>
-            </div>
-            <div class="command-grid-3x4" id="command-grid-3x4">
-                <!-- 12 slots populated dynamically with hotkey badges Q..V -->
+    <div id="defeat-modal" class="end-game-modal" style="display: none;">
+        <div class="end-game-card defeat-card">
+            <div class="end-game-laurel" style="color:#ff4757;">⚠️ ★ ⚠️</div>
+            <h1 class="defeat-title">DEFEATED</h1>
+            <div class="end-game-subtitle">ALL STRATEGIC ASSETS LOST • COMMAND CENTER DESTROYED</div>
+            
+            <div class="end-game-actions">
+                <button class="rts-btn end-game-btn" onclick="dismissEndGameModal()">▶ INSPECT BATTLEFIELD</button>
+                <button class="rts-btn end-game-btn play-again-btn" onclick="restartCurrentMatch()">🔄 TRY AGAIN</button>
+                <button class="rts-btn end-game-btn" onclick="openStartMenuFromEndGame()">⚙️ COMMAND SETUP</button>
             </div>
         </div>
     </div>

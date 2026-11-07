@@ -645,6 +645,11 @@ function processEnemyAIEngine() {
                         if (unit.selected) {
                             unit.combatTarget = targetedEnemy;
                             unit.taskState = 'MovingToAttack';
+                            if (unit.isAir) {
+                                unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'attacking';
+                                unit.targetPosition.copy(targetPos);
+                                unit.patrolCenter.copy(targetPos);
+                            }
 
                             const distToEnemy = unit.mesh.position.distanceTo(targetPos);
                             const desiredRange = unit.scanRange + targetRadius - 3;
@@ -703,6 +708,36 @@ function processEnemyAIEngine() {
                     showNotification(`Infantry ordered to embark into ${transport.type} (${(transport.garrisoned || []).length}/${transport.capacity} seats).`, 'info');
                     updateSidebar();
                     return;
+                }
+            }
+
+            // 1c. Check if right-clicking on a neutral capturable tech structure!
+            if (window.neutralStructures && window.neutralStructures.length > 0) {
+                const neutralMeshes = window.neutralStructures.map(ns => ns.mesh).filter(Boolean);
+                const neutralHits = raycaster.intersectObjects(neutralMeshes, true);
+                if (neutralHits.length > 0) {
+                    let hitObj = neutralHits[0].object;
+                    while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
+                    const targetTech = window.neutralStructures.find(ns => ns.mesh === hitObj);
+                    if (targetTech) {
+                        const selectedInfantry = units.filter(u => u.selected && isInfantryType(u.type));
+                        if (selectedInfantry.length > 0) {
+                            const tPos = targetTech.position.clone();
+                            if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(tPos, 'move');
+                            selectedInfantry.forEach(inf => {
+                                inf.combatTarget = null;
+                                inf.taskState = 'Capturing';
+                                inf.captureTarget = targetTech;
+                                inf.targetPosition.copy(tPos);
+                            });
+                            showNotification(`Infantry ordered to secure ${targetTech.name}!`, 'info');
+                            playUSASound('radio_chirp');
+                            updateSidebar();
+                            return;
+                        } else {
+                            showNotification(`Deploy Infantry (Ranger, Red Guard, Rebel) to capture ${targetTech.name}.`, 'warning');
+                        }
+                    }
                 }
             }
 
@@ -790,7 +825,11 @@ function processEnemyAIEngine() {
                         unit.targetPosition.copy(groundHit);
                     }
                     unit.combatTarget = null;
-                    unit.taskState = 'Idle';
+                    unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+                    if (unit.isAir) {
+                        unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
+                        unit.patrolCenter.copy(groundHit);
+                    }
                     if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
                         unit.targetStructure.dozerRef = null; unit.targetStructure = null;
                     }
@@ -873,7 +912,11 @@ function processEnemyAIEngine() {
                             unit.targetPosition.copy(destV);
                         }
                         unit.combatTarget = null;
-                        unit.taskState = 'Idle';
+                        unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+                        if (unit.isAir) {
+                            unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
+                            unit.patrolCenter.copy(destV);
+                        }
                         if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
                             unit.targetStructure.dozerRef = null; unit.targetStructure = null;
                         }
@@ -946,7 +989,7 @@ function processEnemyAIEngine() {
                 for (let u of units) {
                     if (u.garrisonedIn || !u.mesh) continue;
                     const d = Math.hypot(groundHit.x - u.mesh.position.x, groundHit.z - u.mesh.position.z);
-                    const pickRadius = Math.max((u.radius || 1.2) * 2.2, 3.2);
+                    const pickRadius = u.isAir ? 7.5 : Math.max((u.radius || 1.2) * 2.2, 3.2);
                     if (d <= pickRadius && d < closestDist) {
                         closestDist = d;
                         closestUnit = u;

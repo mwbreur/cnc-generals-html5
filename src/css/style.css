@@ -1698,35 +1698,53 @@ body {
 /* ========================================================================= */
 /* ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica)       */
 /* ========================================================================= */
+/* ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica)       */
+/* ========================================================================= */
+#start-menu.pause-mode {
+    background: rgba(0, 0, 0, 0.42) !important;
+    backdrop-filter: blur(1.5px);
+}
+
+.pause-screen-watermark {
+    position: fixed;
+    top: 18px;
+    left: 22px;
+    z-index: 35;
+    pointer-events: none;
+    font-family: 'Arial', sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    line-height: 1.35;
+}
+.pause-screen-clock {
+    position: fixed;
+    top: 18px;
+    right: 22px;
+    z-index: 35;
+    pointer-events: none;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    letter-spacing: 1px;
+}
+
 .pause-dialog {
     position: relative;
     box-sizing: border-box;
-    width: min(720px, calc(100vw - 28px));
-    min-height: 400px;
-    background: rgba(10, 14, 12, 0.92);
-    background-image: 
-        linear-gradient(rgba(46, 61, 49, 0.35) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(46, 61, 49, 0.35) 1px, transparent 1px);
-    background-size: 24px 24px;
-    border: 2px solid #5a543e;
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.95), inset 0 0 24px rgba(0, 0, 0, 0.6);
+    width: min(780px, calc(100vw - 32px));
+    min-height: 420px;
+    background: rgba(14, 18, 16, 0.90);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 12px 50px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 0, 0, 0.5);
     border-radius: 2px;
-    padding: 24px 28px 18px 28px;
+    padding: 22px 26px 18px 26px;
     display: flex;
     flex-direction: column;
 }
 
-.pause-watermark-container {
-    position: absolute;
-    top: -62px;
-    left: 4px;
-    line-height: 1.25;
-    pointer-events: none;
-    font-family: 'Arial', sans-serif;
-    font-size: 13px;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px #000;
-}
 .pause-watermark-title { color: #f1f2f6; }
 .pause-watermark-pro { color: #2ed573; }
 .pause-watermark-hd { color: #ffa502; }
@@ -1735,10 +1753,10 @@ body {
 .pause-table-container {
     flex: 1;
     width: 100%;
-    margin-top: 10px;
-    min-height: 240px;
-    border: 1px solid rgba(90, 84, 62, 0.5);
-    background: rgba(4, 8, 6, 0.55);
+    margin-top: 6px;
+    min-height: 260px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(5, 8, 7, 0.65);
     border-radius: 2px;
     overflow-y: auto;
 }
@@ -1752,26 +1770,42 @@ body {
 
 .pause-table th {
     text-align: left;
-    padding: 10px 14px;
-    color: #e5e0ce;
+    padding: 9px 14px;
+    color: #ffffff;
     font-weight: 600;
-    border-bottom: 1px solid rgba(90, 84, 62, 0.6);
-    background: rgba(20, 26, 22, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(22, 28, 25, 0.85);
     letter-spacing: 0.5px;
 }
 
 .pause-table td {
-    padding: 10px 14px;
-    border-bottom: 1px solid rgba(46, 61, 49, 0.35);
+    padding: 9px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     color: #ced6e0;
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .pause-actions-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 18px;
-    padding-top: 10px;
+    margin-top: 16px;
+    padding-top: 6px;
+}
+
+.pause-watermark-bottom-left {
+    font-family: 'Arial', sans-serif;
+    font-size: 10px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.32);
+    text-transform: uppercase;
+    line-height: 1.25;
+    letter-spacing: 0.8px;
+    user-select: none;
+}
+.pause-watermark-bottom-left span {
+    font-size: 9px;
+    opacity: 0.8;
 }
 
 .pause-left-actions {
@@ -1799,17 +1833,18 @@ body {
     padding: 8px 26px;
     font-size: 13px;
     font-weight: bold;
-    background: #1e2022 !important;
-    border: 1px solid #57606f !important;
-    color: #f1f2f6 !important;
-    letter-spacing: 1px;
+    background: #24282c !important;
+    border: 1px solid #747d8c !important;
+    color: #ffffff !important;
+    letter-spacing: 1.5px;
+    border-radius: 2px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.6);
     transition: all 0.15s ease;
 }
 .pause-back-btn:hover {
-    background: #2f3542 !important;
-    border-color: #a4b0be !important;
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+    background: #3a4049 !important;
+    border-color: #ced6e0 !important;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
 }
 
 .resume-banner-btn {
@@ -1843,4 +1878,137 @@ body {
     text-shadow: 0 0 6px rgba(85, 239, 196, 0.45);
     display: inline-flex;
     align-items: center;
+}
+
+/* ========================================================================= */
+/* AUTHENTIC C&C GENERALS VICTORY & DEFEAT BANNERS                           */
+/* ========================================================================= */
+.end-game-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(6px);
+    animation: fadeInModal 0.4s ease;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.end-game-card {
+    box-sizing: border-box;
+    width: min(640px, calc(100vw - 32px));
+    padding: 36px 32px;
+    border-radius: 4px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,0,0,0.95);
+}
+
+.victory-card {
+    background: linear-gradient(180deg, rgba(20, 36, 26, 0.96) 0%, rgba(8, 16, 12, 0.98) 100%);
+    border: 3px solid #2ed573;
+    box-shadow: 0 0 60px rgba(46, 213, 115, 0.35), inset 0 0 30px rgba(46, 213, 115, 0.15);
+}
+
+.defeat-card {
+    background: linear-gradient(180deg, rgba(36, 16, 18, 0.96) 0%, rgba(16, 6, 8, 0.98) 100%);
+    border: 3px solid #ff4757;
+    box-shadow: 0 0 60px rgba(255, 71, 87, 0.35), inset 0 0 30px rgba(255, 71, 87, 0.15);
+}
+
+.end-game-laurel {
+    font-size: 24px;
+    color: #ffd700;
+    letter-spacing: 6px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+}
+
+.victory-title {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 56px;
+    letter-spacing: 8px;
+    color: #55efc4;
+    text-transform: uppercase;
+    margin: 0;
+    text-shadow: 0 0 24px rgba(85, 239, 196, 0.8), 2px 2px 4px #000;
+}
+
+.defeat-title {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 56px;
+    letter-spacing: 8px;
+    color: #ff4757;
+    text-transform: uppercase;
+    margin: 0;
+    text-shadow: 0 0 24px rgba(255, 71, 87, 0.8), 2px 2px 4px #000;
+}
+
+.end-game-subtitle {
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #c8d6e5;
+    margin-top: 6px;
+    margin-bottom: 24px;
+}
+
+.end-game-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    padding: 14px;
+    margin-bottom: 28px;
+}
+
+.end-game-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: #8395a7;
+    letter-spacing: 1px;
+}
+
+.stat-val {
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    color: #f1f2f6;
+}
+
+.end-game-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.end-game-btn {
+    padding: 10px 18px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.8px;
+}
+
+.play-again-btn {
+    background: linear-gradient(180deg, #10ac84 0%, #006266 100%) !important;
+    border-color: #55efc4 !important;
+    color: #fff !important;
+}
+.play-again-btn:hover {
+    box-shadow: 0 0 16px rgba(85, 239, 196, 0.5);
 }

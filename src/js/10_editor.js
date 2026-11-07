@@ -517,6 +517,12 @@
             enemyStructures.length = 0;
             enemyUnits.forEach(eu => { if (eu.mesh) scene.remove(eu.mesh); });
             enemyUnits.length = 0;
+            if (window.neutralStructures) {
+                window.neutralStructures.forEach(ns => { if (ns.mesh) scene.remove(ns.mesh); });
+                window.neutralStructures.length = 0;
+            } else {
+                window.neutralStructures = [];
+            }
 
             choosingBaseLocation = false;
             document.getElementById('deployment-hint').style.display = 'none';
@@ -553,6 +559,9 @@
                 }
             });
 
+            // 2. Deploy Contested Neutral Map Tech Buildings (Derricks, Hospital, Refinery)
+            spawnNeutralMapTechBuildings(selectedSize, selectedEnv);
+
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
             matchStartTime = Date.now();
@@ -560,6 +569,77 @@
             if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Theater Initialized: ${activeSlots.length} Commanders deployed. Good luck, General!`, 'success');
+        }
+
+        function spawnNeutralMapTechBuildings(selectedSize, selectedEnv) {
+            if (!window.neutralStructures) window.neutralStructures = [];
+            window.neutralStructures.forEach(ns => {
+                if (ns.mesh && typeof scene !== 'undefined' && scene && scene.remove) scene.remove(ns.mesh);
+            });
+            window.neutralStructures = [];
+
+            const contested = [
+                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: -selectedSize * 0.22, z: selectedSize * 0.18, maxHealth: 1500 },
+                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: selectedSize * 0.22, z: -selectedSize * 0.18, maxHealth: 1500 },
+                { type: 'techHospital', name: 'Tech Hospital', x: selectedSize * 0.20, z: selectedSize * 0.20, maxHealth: 1800 },
+                { type: 'techRefinery', name: 'Tech Oil Refinery', x: -selectedSize * 0.20, z: -selectedSize * 0.20, maxHealth: 2000 }
+            ];
+
+            contested.forEach(item => {
+                const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(item.x, item.z) : 0;
+                const pos = new THREE.Vector3(item.x, y, item.z);
+                let meshGroup;
+                if (item.type === 'techOilDerrick' && typeof createTechOilDerrickMesh === 'function') meshGroup = createTechOilDerrickMesh();
+                else if (item.type === 'techHospital' && typeof createTechHospitalMesh === 'function') meshGroup = createTechHospitalMesh();
+                else if (item.type === 'techRefinery' && typeof createTechRefineryMesh === 'function') meshGroup = createTechRefineryMesh();
+
+                if (meshGroup) {
+                    meshGroup.position.copy(pos);
+                    meshGroup.scale.set(1.3, 1.3, 1.3);
+                    meshGroup.traverse(c => {
+                        if (c.isMesh) {
+                            c.castShadow = true;
+                            c.receiveShadow = true;
+                        }
+                    });
+
+                    // Neutral faction flag pole
+                    const flagGroup = new THREE.Group();
+                    flagGroup.name = "neutralFlagGroup";
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.2, 8), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8 }));
+                    pole.position.set(2.8, 2.1, 2.2);
+                    flagGroup.add(pole);
+
+                    const flagMat = new THREE.MeshStandardMaterial({ color: 0x95a5a6, roughness: 0.8, side: THREE.DoubleSide });
+                    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), flagMat);
+                    flag.name = "neutralFlagCloth";
+                    flag.position.set(3.6, 3.6, 2.2);
+                    flagGroup.add(flag);
+                    meshGroup.add(flagGroup);
+
+                    if (typeof scene !== 'undefined' && scene && scene.add) {
+                        scene.add(meshGroup);
+                    }
+
+                    const nObj = {
+                        type: item.type,
+                        name: item.name,
+                        isNeutral: true,
+                        teamId: 0,
+                        ownerId: 'neutral',
+                        position: pos,
+                        mesh: meshGroup,
+                        health: item.maxHealth,
+                        maxHealth: item.maxHealth,
+                        radius: 7.5 * 1.3,
+                        captureProgress: 0,
+                        capturingUnit: null,
+                        capturedByTeam: null,
+                        netId: 'NS_' + (++netIdSequence)
+                    };
+                    window.neutralStructures.push(nObj);
+                }
+            });
         }
 
         function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium') {

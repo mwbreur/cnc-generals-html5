@@ -1705,35 +1705,53 @@ body {
 /* ========================================================================= */
 /* ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica)       */
 /* ========================================================================= */
+/* ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica)       */
+/* ========================================================================= */
+#start-menu.pause-mode {
+    background: rgba(0, 0, 0, 0.42) !important;
+    backdrop-filter: blur(1.5px);
+}
+
+.pause-screen-watermark {
+    position: fixed;
+    top: 18px;
+    left: 22px;
+    z-index: 35;
+    pointer-events: none;
+    font-family: 'Arial', sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    line-height: 1.35;
+}
+.pause-screen-clock {
+    position: fixed;
+    top: 18px;
+    right: 22px;
+    z-index: 35;
+    pointer-events: none;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    letter-spacing: 1px;
+}
+
 .pause-dialog {
     position: relative;
     box-sizing: border-box;
-    width: min(720px, calc(100vw - 28px));
-    min-height: 400px;
-    background: rgba(10, 14, 12, 0.92);
-    background-image: 
-        linear-gradient(rgba(46, 61, 49, 0.35) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(46, 61, 49, 0.35) 1px, transparent 1px);
-    background-size: 24px 24px;
-    border: 2px solid #5a543e;
-    box-shadow: 0 0 50px rgba(0, 0, 0, 0.95), inset 0 0 24px rgba(0, 0, 0, 0.6);
+    width: min(780px, calc(100vw - 32px));
+    min-height: 420px;
+    background: rgba(14, 18, 16, 0.90);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 12px 50px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 0, 0, 0.5);
     border-radius: 2px;
-    padding: 24px 28px 18px 28px;
+    padding: 22px 26px 18px 26px;
     display: flex;
     flex-direction: column;
 }
 
-.pause-watermark-container {
-    position: absolute;
-    top: -62px;
-    left: 4px;
-    line-height: 1.25;
-    pointer-events: none;
-    font-family: 'Arial', sans-serif;
-    font-size: 13px;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px #000;
-}
 .pause-watermark-title { color: #f1f2f6; }
 .pause-watermark-pro { color: #2ed573; }
 .pause-watermark-hd { color: #ffa502; }
@@ -1742,10 +1760,10 @@ body {
 .pause-table-container {
     flex: 1;
     width: 100%;
-    margin-top: 10px;
-    min-height: 240px;
-    border: 1px solid rgba(90, 84, 62, 0.5);
-    background: rgba(4, 8, 6, 0.55);
+    margin-top: 6px;
+    min-height: 260px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(5, 8, 7, 0.65);
     border-radius: 2px;
     overflow-y: auto;
 }
@@ -1759,26 +1777,42 @@ body {
 
 .pause-table th {
     text-align: left;
-    padding: 10px 14px;
-    color: #e5e0ce;
+    padding: 9px 14px;
+    color: #ffffff;
     font-weight: 600;
-    border-bottom: 1px solid rgba(90, 84, 62, 0.6);
-    background: rgba(20, 26, 22, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(22, 28, 25, 0.85);
     letter-spacing: 0.5px;
 }
 
 .pause-table td {
-    padding: 10px 14px;
-    border-bottom: 1px solid rgba(46, 61, 49, 0.35);
+    padding: 9px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     color: #ced6e0;
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .pause-actions-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 18px;
-    padding-top: 10px;
+    margin-top: 16px;
+    padding-top: 6px;
+}
+
+.pause-watermark-bottom-left {
+    font-family: 'Arial', sans-serif;
+    font-size: 10px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.32);
+    text-transform: uppercase;
+    line-height: 1.25;
+    letter-spacing: 0.8px;
+    user-select: none;
+}
+.pause-watermark-bottom-left span {
+    font-size: 9px;
+    opacity: 0.8;
 }
 
 .pause-left-actions {
@@ -1806,17 +1840,18 @@ body {
     padding: 8px 26px;
     font-size: 13px;
     font-weight: bold;
-    background: #1e2022 !important;
-    border: 1px solid #57606f !important;
-    color: #f1f2f6 !important;
-    letter-spacing: 1px;
+    background: #24282c !important;
+    border: 1px solid #747d8c !important;
+    color: #ffffff !important;
+    letter-spacing: 1.5px;
+    border-radius: 2px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.6);
     transition: all 0.15s ease;
 }
 .pause-back-btn:hover {
-    background: #2f3542 !important;
-    border-color: #a4b0be !important;
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+    background: #3a4049 !important;
+    border-color: #ced6e0 !important;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
 }
 
 .resume-banner-btn {
@@ -1852,21 +1887,156 @@ body {
     align-items: center;
 }
 
+/* ========================================================================= */
+/* AUTHENTIC C&C GENERALS VICTORY & DEFEAT BANNERS                           */
+/* ========================================================================= */
+.end-game-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(6px);
+    animation: fadeInModal 0.4s ease;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.end-game-card {
+    box-sizing: border-box;
+    width: min(640px, calc(100vw - 32px));
+    padding: 36px 32px;
+    border-radius: 4px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,0,0,0.95);
+}
+
+.victory-card {
+    background: linear-gradient(180deg, rgba(20, 36, 26, 0.96) 0%, rgba(8, 16, 12, 0.98) 100%);
+    border: 3px solid #2ed573;
+    box-shadow: 0 0 60px rgba(46, 213, 115, 0.35), inset 0 0 30px rgba(46, 213, 115, 0.15);
+}
+
+.defeat-card {
+    background: linear-gradient(180deg, rgba(36, 16, 18, 0.96) 0%, rgba(16, 6, 8, 0.98) 100%);
+    border: 3px solid #ff4757;
+    box-shadow: 0 0 60px rgba(255, 71, 87, 0.35), inset 0 0 30px rgba(255, 71, 87, 0.15);
+}
+
+.end-game-laurel {
+    font-size: 24px;
+    color: #ffd700;
+    letter-spacing: 6px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+}
+
+.victory-title {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 56px;
+    letter-spacing: 8px;
+    color: #55efc4;
+    text-transform: uppercase;
+    margin: 0;
+    text-shadow: 0 0 24px rgba(85, 239, 196, 0.8), 2px 2px 4px #000;
+}
+
+.defeat-title {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 56px;
+    letter-spacing: 8px;
+    color: #ff4757;
+    text-transform: uppercase;
+    margin: 0;
+    text-shadow: 0 0 24px rgba(255, 71, 87, 0.8), 2px 2px 4px #000;
+}
+
+.end-game-subtitle {
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #c8d6e5;
+    margin-top: 6px;
+    margin-bottom: 24px;
+}
+
+.end-game-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    padding: 14px;
+    margin-bottom: 28px;
+}
+
+.end-game-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: #8395a7;
+    letter-spacing: 1px;
+}
+
+.stat-val {
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    color: #f1f2f6;
+}
+
+.end-game-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.end-game-btn {
+    padding: 10px 18px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.8px;
+}
+
+.play-again-btn {
+    background: linear-gradient(180deg, #10ac84 0%, #006266 100%) !important;
+    border-color: #55efc4 !important;
+    color: #fff !important;
+}
+.play-again-btn:hover {
+    box-shadow: 0 0 16px rgba(85, 239, 196, 0.5);
+}
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 <div id="start-menu">
-        <!-- AUTHENTIC ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica) -->
-        <div id="ingame-pause-modal" class="pause-dialog" style="display: none;">
-            <div class="pause-watermark-container">
-                <div class="pause-watermark-title">C&amp;C Generals Zero Hour</div>
-                <div class="pause-watermark-pro">Control Bar Pro</div>
-                <div class="pause-watermark-hd">+ Control Bar HD</div>
-                <div class="pause-watermark-gentool">+ GenTool</div>
-            </div>
+        <!-- TOP-LEFT & TOP-RIGHT LIVE SCREEN OVERLAYS (Control Bar Pro replica) -->
+        <div id="pause-screen-watermark" class="pause-screen-watermark" style="display: none;">
+            <div class="pause-watermark-title">C&amp;C Generals Zero Hour</div>
+            <div class="pause-watermark-pro">Control Bar Pro</div>
+            <div class="pause-watermark-hd">+ Control Bar HD</div>
+            <div class="pause-watermark-gentool">+ GenTool</div>
+        </div>
+        <div id="pause-screen-clock" class="pause-screen-clock" style="display: none;">00:00:00</div>
 
+        <!-- AUTHENTIC ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL -->
+        <div id="ingame-pause-modal" class="pause-dialog" style="display: none;">
             <div class="pause-table-container">
                 <table class="pause-table">
                     <thead>
@@ -1885,6 +2055,10 @@ body {
             </div>
 
             <div class="pause-actions-bar">
+                <div class="pause-watermark-bottom-left">
+                    CONTROL BAR PRO<br>
+                    <span>BY FAS &amp; XEZON</span>
+                </div>
                 <div class="pause-left-actions">
                     <button class="rts-btn pause-sub-btn" onclick="openSkirmishSetupFromGame()">⚙️ SETUP &amp; OPTIONS</button>
                     <button class="rts-btn pause-sub-btn" onclick="restartCurrentMatch()">🔄 RESTART MATCH</button>
@@ -2341,37 +2515,53 @@ body {
             </div>
         </div>
     </div>
-            <div class="radar-bezel-controls">
-                <button class="bezel-btn" id="btn-ping" title="Tactical Ping / Beacon (B)" onclick="triggerTacticalBeacon()">
-                    <span>🔔</span><label>PING</label>
-                </button>
-                <button class="bezel-btn" id="btn-repair" title="Field Repair Mode (R)" onclick="toggleRepairMode()">
-                    <span>🔧</span><label>REPAIR</label>
-                </button>
-                <button class="bezel-btn" id="btn-sell" title="Demolish / Liquidate Structure ($)" onclick="toggleSellMode()">
-                    <span>💰</span><label>SELL</label>
-                </button>
-                <button class="bezel-btn" id="btn-recenter" title="Recenter Base (Space)" onclick="recenterBase()">
-                    <span>🎯</span><label>BASE</label>
-                </button>
+
+    <!-- ============================================================== -->
+    <!-- AUTHENTIC C&C GENERALS VICTORY & DEFEAT BANNERS                -->
+    <!-- ============================================================== -->
+    <div id="victory-modal" class="end-game-modal" style="display: none;">
+        <div class="end-game-card victory-card">
+            <div class="end-game-laurel">★ ★ ★ ★ ★</div>
+            <h1 class="victory-title">VICTORY</h1>
+            <div class="end-game-subtitle">OPERATIONAL THEATER SECURED • ALL HOSTILE FORCES DESTROYED</div>
+            
+            <div class="end-game-stats-grid">
+                <div class="end-game-stat">
+                    <span class="stat-label">MISSION TIME</span>
+                    <span id="victory-time-val" class="stat-val">00:00:00</span>
+                </div>
+                <div class="end-game-stat">
+                    <span class="stat-label">COMMAND FACTION</span>
+                    <span id="victory-faction-val" class="stat-val">USA</span>
+                </div>
+                <div class="end-game-stat">
+                    <span class="stat-label">THEATER STATUS</span>
+                    <span class="stat-val" style="color: #2ed573;">ANNIHILATED</span>
+                </div>
+                <div class="end-game-stat">
+                    <span class="stat-label">GENERAL RANK</span>
+                    <span id="victory-rank-val" class="stat-val" style="color: #ffd700;">★★★★★</span>
+                </div>
+            </div>
+
+            <div class="end-game-actions">
+                <button class="rts-btn end-game-btn" onclick="dismissEndGameModal()">▶ INSPECT BATTLEFIELD</button>
+                <button class="rts-btn end-game-btn play-again-btn" onclick="restartCurrentMatch()">🔄 PLAY AGAIN</button>
+                <button class="rts-btn end-game-btn" onclick="openStartMenuFromEndGame()">⚙️ COMMAND SETUP</button>
             </div>
         </div>
+    </div>
 
-        <!-- 2. CENTER: Unit & Structure Inspector Console -->
-        <div id="inspector-console" class="cmd-bar-section">
-            <!-- Dynamically populated by renderInspectorConsole() -->
-        </div>
-
-        <!-- 3. RIGHT: The 3x4 Command & Build Grid -->
-        <div id="grid-console" class="cmd-bar-section">
-            <div class="grid-category-tabs" id="grid-category-tabs">
-                <button id="grid-tab-commands" class="grid-cat-btn active" onclick="switchGridCategory('commands')">COMMANDS</button>
-                <button id="grid-tab-units" class="grid-cat-btn" onclick="switchGridCategory('units')">UNITS</button>
-                <button id="grid-tab-structures" class="grid-cat-btn" onclick="switchGridCategory('structures')">BUILDINGS</button>
-                <button id="grid-tab-defenses" class="grid-cat-btn" onclick="switchGridCategory('defenses')">DEFENSES</button>
-            </div>
-            <div class="command-grid-3x4" id="command-grid-3x4">
-                <!-- 12 slots populated dynamically with hotkey badges Q..V -->
+    <div id="defeat-modal" class="end-game-modal" style="display: none;">
+        <div class="end-game-card defeat-card">
+            <div class="end-game-laurel" style="color:#ff4757;">⚠️ ★ ⚠️</div>
+            <h1 class="defeat-title">DEFEATED</h1>
+            <div class="end-game-subtitle">ALL STRATEGIC ASSETS LOST • COMMAND CENTER DESTROYED</div>
+            
+            <div class="end-game-actions">
+                <button class="rts-btn end-game-btn" onclick="dismissEndGameModal()">▶ INSPECT BATTLEFIELD</button>
+                <button class="rts-btn end-game-btn play-again-btn" onclick="restartCurrentMatch()">🔄 TRY AGAIN</button>
+                <button class="rts-btn end-game-btn" onclick="openStartMenuFromEndGame()">⚙️ COMMAND SETUP</button>
             </div>
         </div>
     </div>
@@ -5703,7 +5893,140 @@ function createGLAScudStorm() {
 }
 
 
-        // =========================================================================
+// =========================================================================
+// NEUTRAL MAP TECH BUILDINGS & GLA RECONSTRUCTION HOLES
+// =========================================================================
+
+function createTechOilDerrickMesh() {
+    const g = new THREE.Group();
+    g.name = "techOilDerrick";
+    const matConcrete = new THREE.MeshStandardMaterial({ color: 0x4a5559, roughness: 0.85 });
+    const matSteel = new THREE.MeshStandardMaterial({ color: 0x2f3640, metalness: 0.85, roughness: 0.35 });
+    const matRust = new THREE.MeshStandardMaterial({ color: 0x8c4227, roughness: 0.7 });
+    const matYellow = new THREE.MeshStandardMaterial({ color: 0xe1b12c, roughness: 0.5 });
+
+    // Concrete base pad
+    const base = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.6, 6.2), matConcrete);
+    base.position.y = 0.3; base.castShadow = true; base.receiveShadow = true; g.add(base);
+
+    // Steel lattice derrick tower
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.8, 6.5, 4), matSteel);
+    tower.position.set(1.5, 3.5, 0); tower.castShadow = true; g.add(tower);
+
+    // Crown block & pulley
+    const crown = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), matYellow);
+    crown.position.set(1.5, 6.9, 0); g.add(crown);
+
+    // Walking-beam pumpjack assembly
+    const pumpGroup = new THREE.Group();
+    pumpGroup.name = "pumpjackArm";
+    pumpGroup.position.set(-1.2, 2.2, 0);
+
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.2, 0.6), matSteel);
+    post.position.y = -0.5; g.add(post); post.position.x = -1.2;
+
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.4, 0.4), matRust);
+    pumpGroup.add(beam);
+
+    const horsehead = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.35, 3), matSteel);
+    horsehead.rotation.z = Math.PI / 2;
+    horsehead.position.set(-1.8, 0, 0);
+    pumpGroup.add(horsehead);
+
+    g.add(pumpGroup);
+
+    // Fuel tanks and pipeline
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.8, 12), matRust);
+    tank.position.set(-1.2, 1.0, 1.8); tank.castShadow = true; g.add(tank);
+
+    return g;
+}
+
+function createTechHospitalMesh() {
+    const g = new THREE.Group();
+    g.name = "techHospital";
+    const matWhite = new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.4 });
+    const matRed = new THREE.MeshStandardMaterial({ color: 0xe84118, roughness: 0.3 });
+    const matGlass = new THREE.MeshStandardMaterial({ color: 0x00a8ff, roughness: 0.2, metalness: 0.8 });
+    const matRoof = new THREE.MeshStandardMaterial({ color: 0x353b48, roughness: 0.7 });
+
+    // Main clinic building
+    const mainBody = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.6, 5.2), matWhite);
+    mainBody.position.y = 1.3; mainBody.castShadow = true; g.add(mainBody);
+
+    // Upper medical bay
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.4, 3.6), matWhite);
+    upper.position.set(0, 3.1, 0); upper.castShadow = true; g.add(upper);
+
+    // Emergency cross logo on roof
+    const crossH = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 0.8), matRed);
+    crossH.position.set(0, 3.85, 0); g.add(crossH);
+    const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 2.4), matRed);
+    crossV.position.set(0, 3.85, 0); g.add(crossV);
+
+    // Glass entrance & windows
+    const win = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.8, 0.1), matGlass);
+    win.position.set(0, 1.2, 2.62); g.add(win);
+
+    return g;
+}
+
+function createTechRefineryMesh() {
+    const g = new THREE.Group();
+    g.name = "techRefinery";
+    const matSteel = new THREE.MeshStandardMaterial({ color: 0x718093, metalness: 0.8, roughness: 0.35 });
+    const matDark = new THREE.MeshStandardMaterial({ color: 0x2f3640, roughness: 0.8 });
+    const matOrange = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.4 });
+
+    // Foundation
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(7.0, 0.5, 6.0), matDark);
+    pad.position.y = 0.25; g.add(pad);
+
+    // Twin catalytic cracking distillation towers
+    const col1 = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 6.5, 14), matSteel);
+    col1.position.set(-1.8, 3.5, -0.8); col1.castShadow = true; g.add(col1);
+
+    const col2 = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 5.2, 14), matSteel);
+    col2.position.set(-0.2, 2.8, -0.8); col2.castShadow = true; g.add(col2);
+
+    // Spherical LNG / fuel pressure vessel
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.4, 14, 14), matSteel);
+    sphere.position.set(1.8, 1.8, 1.0); sphere.castShadow = true; g.add(sphere);
+
+    // Piping manifold
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3.5, 8), matOrange);
+    pipe.rotation.z = Math.PI / 2;
+    pipe.position.set(-0.8, 4.2, -0.8); g.add(pipe);
+
+    return g;
+}
+
+function createGLAHoleMesh() {
+    const g = new THREE.Group();
+    g.name = "glaHole";
+    const matMud = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.95 });
+    const matTimber = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.85 });
+    const matMetal = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.6 });
+
+    // Excavated trench / mud pit
+    const pit = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 2.2, 1.2, 10), matMud);
+    pit.position.y = 0.5; pit.receiveShadow = true; g.add(pit);
+
+    // Wooden scaffolding and rebar support stakes
+    for (let i = 0; i < 6; i++) {
+        const ang = (i * Math.PI) / 3;
+        const stake = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.0, 0.15), matTimber);
+        stake.position.set(Math.cos(ang) * 2.6, 1.0, Math.sin(ang) * 2.6);
+        stake.rotation.z = (Math.random() - 0.5) * 0.3;
+        g.add(stake);
+    }
+
+    // Corrugated tin sheet over trench
+    const sheet = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 1.6), matMetal);
+    sheet.position.set(0.4, 0.8, -0.3); sheet.rotation.y = 0.4; g.add(sheet);
+
+    return g;
+}
         
 
 // --- MODULE: 05_audio.js ---
@@ -7255,106 +7578,113 @@ function playUSASound(type, options = {}) {
             const group = new THREE.Group();
             group.name = "overlordUpgrade";
             // Mount directly onto the turret roof at the cupola mount position!
-            group.position.set(0, 0.95, -0.45);
+            group.position.set(0, 0.88, -0.45);
 
             if (upgradeType === 'bunker') {
                 // Fortified hexagonal bunker pillbox with vision slits & firing embrasures
-                const bGeo = new THREE.CylinderGeometry(0.95, 1.15, 0.7, 6);
-                const bMat = new THREE.MeshStandardMaterial({ color: 0x47535e, roughness: 0.75, metalness: 0.3 });
+                const bGeo = new THREE.CylinderGeometry(1.15, 1.3, 0.9, 6);
+                const bMat = new THREE.MeshStandardMaterial({ color: 0x47535e, roughness: 0.75, metalness: 0.35 });
                 const b = new THREE.Mesh(bGeo, bMat);
+                b.position.y = 0.45;
                 b.castShadow = true;
                 group.add(b);
 
                 // Armored top rim / parapet
-                const rimGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.15, 6);
+                const rimGeo = new THREE.CylinderGeometry(1.22, 1.22, 0.18, 6);
                 const rimMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.6 });
                 const rim = new THREE.Mesh(rimGeo, rimMat);
-                rim.position.y = 0.35;
+                rim.position.y = 0.92;
                 group.add(rim);
 
                 // Vision / firing slits
                 for (let a = 0; a < 6; a++) {
-                    const slitGeo = new THREE.BoxGeometry(0.35, 0.12, 0.15);
+                    const slitGeo = new THREE.BoxGeometry(0.42, 0.14, 0.18);
                     const slitMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
                     const slit = new THREE.Mesh(slitGeo, slitMat);
                     const ang = (a * Math.PI) / 3;
-                    slit.position.set(Math.cos(ang) * 0.98, 0.15, Math.sin(ang) * 0.98);
+                    slit.position.set(Math.cos(ang) * 1.15, 0.55, Math.sin(ang) * 1.15);
                     slit.rotation.y = -ang + Math.PI / 2;
                     group.add(slit);
                 }
 
                 // Mini infantry helmet heads inside open hatch
                 const hMat = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
-                [-0.3, 0.3].forEach(x => {
-                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), hMat);
-                    h.position.set(x, 0.45, 0);
+                [-0.35, 0.35].forEach(x => {
+                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), hMat);
+                    h.position.set(x, 1.05, 0);
                     group.add(h);
                 });
             } else if (upgradeType === 'gatling') {
                 // Raised motorized rotary turret base
-                const baseGeo = new THREE.CylinderGeometry(0.75, 0.85, 0.4, 10);
-                const baseMat = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, metalness: 0.7, roughness: 0.4 });
+                const baseGeo = new THREE.CylinderGeometry(0.85, 0.95, 0.45, 12);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.8, roughness: 0.3 });
                 const base = new THREE.Mesh(baseGeo, baseMat);
+                base.position.y = 0.22;
                 base.castShadow = true;
                 group.add(base);
 
-                // Dual elevated 6-barrel rotary Gatling clusters
-                const mountGeo = new THREE.BoxGeometry(0.7, 0.35, 0.5);
-                const mountMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+                // Swivel gun mount
+                const mountGeo = new THREE.BoxGeometry(0.85, 0.45, 0.65);
+                const mountMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9 });
                 const mount = new THREE.Mesh(mountGeo, mountMat);
-                mount.position.set(0, 0.3, 0.1);
+                mount.position.set(0, 0.55, 0.1);
                 group.add(mount);
 
-                [-0.24, 0.24].forEach(bx => {
+                const barrelGroup = new THREE.Group();
+                barrelGroup.name = "gatlingBarrels";
+                barrelGroup.position.set(0, 0.65, 0.2);
+
+                [-0.3, 0.3].forEach(bx => {
                     // Twin long heavy Gatling barrel assemblies
-                    const bGeo = new THREE.CylinderGeometry(0.09, 0.09, 1.5, 8);
+                    const bGeo = new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8);
                     bGeo.rotateX(Math.PI / 2);
-                    const bMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.2 });
+                    const bMat = new THREE.MeshStandardMaterial({ color: 0x2f3542, metalness: 0.9, roughness: 0.2 });
                     const bMesh = new THREE.Mesh(bGeo, bMat);
-                    bMesh.position.set(bx, 0.35, 0.75);
+                    bMesh.position.set(bx, 0, 1.1);
                     bMesh.castShadow = true;
-                    group.add(bMesh);
+                    barrelGroup.add(bMesh);
 
                     // Muzzle flash arrestor rings
-                    const ringGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.15, 8);
+                    const ringGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.22, 8);
                     ringGeo.rotateX(Math.PI / 2);
-                    const ringMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8 });
+                    const ringMat = new THREE.MeshStandardMaterial({ color: 0x747d8c, metalness: 0.8 });
                     const ring = new THREE.Mesh(ringGeo, ringMat);
-                    ring.position.set(bx, 0.35, 1.45);
-                    group.add(ring);
+                    ring.position.set(bx, 0, 2.15);
+                    barrelGroup.add(ring);
                 });
+                group.add(barrelGroup);
 
                 // Rear Ammo feed box
-                const ammoGeo = new THREE.BoxGeometry(0.65, 0.3, 0.4);
-                const ammoMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6 });
+                const ammoGeo = new THREE.BoxGeometry(0.8, 0.4, 0.5);
+                const ammoMat = new THREE.MeshStandardMaterial({ color: 0x57606f, metalness: 0.6 });
                 const ammo = new THREE.Mesh(ammoGeo, ammoMat);
-                ammo.position.set(0, 0.35, -0.3);
+                ammo.position.set(0, 0.55, -0.4);
                 group.add(ammo);
             } else if (upgradeType === 'propaganda') {
                 // Sturdy speaker mast tower with crimson beacon and 4 gold megaphone horns
-                const mastGeo = new THREE.CylinderGeometry(0.14, 0.22, 1.6, 6);
+                const mastGeo = new THREE.CylinderGeometry(0.16, 0.24, 1.8, 8);
                 const mastMat = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 });
                 const mast = new THREE.Mesh(mastGeo, mastMat);
-                mast.position.y = 0.8;
+                mast.position.y = 0.9;
                 mast.castShadow = true;
                 group.add(mast);
 
                 // Flashing red propaganda beacon sphere
-                const beaconGeo = new THREE.SphereGeometry(0.2, 8, 8);
-                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+                const beaconGeo = new THREE.SphereGeometry(0.24, 8, 8);
+                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff3838 });
                 const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-                beacon.position.y = 1.65;
+                beacon.position.y = 1.9;
                 group.add(beacon);
 
                 // 4 heavy megaphone horn cones facing N, S, E, W
                 for (let a = 0; a < 4; a++) {
-                    const hornGeo = new THREE.ConeGeometry(0.26, 0.6, 8);
+                    const hornGeo = new THREE.ConeGeometry(0.32, 0.75, 8);
                     hornGeo.rotateX(Math.PI / 2);
                     const hornMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.4, metalness: 0.5 });
                     const horn = new THREE.Mesh(hornGeo, hornMat);
                     const ang = (a * Math.PI) / 2;
-                    horn.position.set(Math.cos(ang) * 0.45, 1.3, Math.sin(ang) * 0.45);
-                    horn.lookAt(new THREE.Vector3(horn.position.x * 2, 1.3, horn.position.z * 2));
+                    horn.position.set(Math.cos(ang) * 0.55, 1.5, Math.sin(ang) * 0.55);
+                    horn.lookAt(new THREE.Vector3(horn.position.x * 2, 1.5, horn.position.z * 2));
                     group.add(horn);
                 }
             }
@@ -10184,6 +10514,12 @@ function playUSASound(type, options = {}) {
             enemyStructures.length = 0;
             enemyUnits.forEach(eu => { if (eu.mesh) scene.remove(eu.mesh); });
             enemyUnits.length = 0;
+            if (window.neutralStructures) {
+                window.neutralStructures.forEach(ns => { if (ns.mesh) scene.remove(ns.mesh); });
+                window.neutralStructures.length = 0;
+            } else {
+                window.neutralStructures = [];
+            }
 
             choosingBaseLocation = false;
             document.getElementById('deployment-hint').style.display = 'none';
@@ -10220,6 +10556,9 @@ function playUSASound(type, options = {}) {
                 }
             });
 
+            // 2. Deploy Contested Neutral Map Tech Buildings (Derricks, Hospital, Refinery)
+            spawnNeutralMapTechBuildings(selectedSize, selectedEnv);
+
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
             matchStartTime = Date.now();
@@ -10227,6 +10566,77 @@ function playUSASound(type, options = {}) {
             if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Theater Initialized: ${activeSlots.length} Commanders deployed. Good luck, General!`, 'success');
+        }
+
+        function spawnNeutralMapTechBuildings(selectedSize, selectedEnv) {
+            if (!window.neutralStructures) window.neutralStructures = [];
+            window.neutralStructures.forEach(ns => {
+                if (ns.mesh && typeof scene !== 'undefined' && scene && scene.remove) scene.remove(ns.mesh);
+            });
+            window.neutralStructures = [];
+
+            const contested = [
+                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: -selectedSize * 0.22, z: selectedSize * 0.18, maxHealth: 1500 },
+                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: selectedSize * 0.22, z: -selectedSize * 0.18, maxHealth: 1500 },
+                { type: 'techHospital', name: 'Tech Hospital', x: selectedSize * 0.20, z: selectedSize * 0.20, maxHealth: 1800 },
+                { type: 'techRefinery', name: 'Tech Oil Refinery', x: -selectedSize * 0.20, z: -selectedSize * 0.20, maxHealth: 2000 }
+            ];
+
+            contested.forEach(item => {
+                const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(item.x, item.z) : 0;
+                const pos = new THREE.Vector3(item.x, y, item.z);
+                let meshGroup;
+                if (item.type === 'techOilDerrick' && typeof createTechOilDerrickMesh === 'function') meshGroup = createTechOilDerrickMesh();
+                else if (item.type === 'techHospital' && typeof createTechHospitalMesh === 'function') meshGroup = createTechHospitalMesh();
+                else if (item.type === 'techRefinery' && typeof createTechRefineryMesh === 'function') meshGroup = createTechRefineryMesh();
+
+                if (meshGroup) {
+                    meshGroup.position.copy(pos);
+                    meshGroup.scale.set(1.3, 1.3, 1.3);
+                    meshGroup.traverse(c => {
+                        if (c.isMesh) {
+                            c.castShadow = true;
+                            c.receiveShadow = true;
+                        }
+                    });
+
+                    // Neutral faction flag pole
+                    const flagGroup = new THREE.Group();
+                    flagGroup.name = "neutralFlagGroup";
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.2, 8), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8 }));
+                    pole.position.set(2.8, 2.1, 2.2);
+                    flagGroup.add(pole);
+
+                    const flagMat = new THREE.MeshStandardMaterial({ color: 0x95a5a6, roughness: 0.8, side: THREE.DoubleSide });
+                    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), flagMat);
+                    flag.name = "neutralFlagCloth";
+                    flag.position.set(3.6, 3.6, 2.2);
+                    flagGroup.add(flag);
+                    meshGroup.add(flagGroup);
+
+                    if (typeof scene !== 'undefined' && scene && scene.add) {
+                        scene.add(meshGroup);
+                    }
+
+                    const nObj = {
+                        type: item.type,
+                        name: item.name,
+                        isNeutral: true,
+                        teamId: 0,
+                        ownerId: 'neutral',
+                        position: pos,
+                        mesh: meshGroup,
+                        health: item.maxHealth,
+                        maxHealth: item.maxHealth,
+                        radius: 7.5 * 1.3,
+                        captureProgress: 0,
+                        capturingUnit: null,
+                        capturedByTeam: null,
+                        netId: 'NS_' + (++netIdSequence)
+                    };
+                    window.neutralStructures.push(nObj);
+                }
+            });
         }
 
         function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium') {
@@ -10729,24 +11139,40 @@ function toggleSellMode() {
 
 function resumeGame() {
     const menu = document.getElementById('start-menu');
-    if (menu) menu.style.display = 'none';
+    if (menu) {
+        menu.style.display = 'none';
+        menu.classList.remove('pause-mode');
+    }
     const pauseModal = document.getElementById('ingame-pause-modal');
     if (pauseModal) pauseModal.style.display = 'none';
     const startCard = document.getElementById('start-card');
     if (startCard) startCard.style.display = 'none';
+    const pauseWatermark = document.getElementById('pause-screen-watermark');
+    if (pauseWatermark) pauseWatermark.style.display = 'none';
+    const pauseClock = document.getElementById('pause-screen-clock');
+    if (pauseClock) pauseClock.style.display = 'none';
 }
 
 function showInGamePauseModal() {
     const menu = document.getElementById('start-menu');
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
+    const pauseWatermark = document.getElementById('pause-screen-watermark');
+    const pauseClock = document.getElementById('pause-screen-clock');
+    const matchClock = document.getElementById('match-clock');
     if (!menu) return;
 
     menu.style.display = 'flex';
+    menu.classList.add('pause-mode');
     if (startCard) startCard.style.display = 'none';
     if (pauseModal) {
         pauseModal.style.display = 'flex';
         updatePauseModalPlayerList();
+    }
+    if (pauseWatermark) pauseWatermark.style.display = 'block';
+    if (pauseClock) {
+        pauseClock.style.display = 'block';
+        if (matchClock) pauseClock.innerText = matchClock.innerText;
     }
 }
 
@@ -10755,10 +11181,15 @@ function showStartSetupCard() {
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
     const resumeBtn = document.getElementById('resume-game-btn');
+    const pauseWatermark = document.getElementById('pause-screen-watermark');
+    const pauseClock = document.getElementById('pause-screen-clock');
     if (!menu) return;
 
     menu.style.display = 'flex';
+    menu.classList.remove('pause-mode');
     if (pauseModal) pauseModal.style.display = 'none';
+    if (pauseWatermark) pauseWatermark.style.display = 'none';
+    if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
         startCard.style.display = 'block';
         if (resumeBtn) {
@@ -10806,12 +11237,13 @@ function updatePauseModalPlayerList() {
         const teamLabel = s.team ? `Team ${s.team}` : 'None';
         const armyLabel = (s.faction || 'USA').toUpperCase();
         const statusHtml = isAlive ? `<span style="color:#2ed573; font-weight:bold;">Playing</span>` : `<span style="color:#ff4757; font-weight:bold;">Defeated</span>`;
-        const nameColor = s.isPlayer ? '#2ed573' : (isFriendly(s, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) }) ? '#70a1ff' : '#e0e6ed');
+        const nameColor = s.isPlayer ? '#2ed573' : (isFriendly(s, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) }) ? '#2ed573' : '#ced6e0');
+        const armyColor = s.isPlayer ? '#2ed573' : '#ced6e0';
 
         html += `<tr>
             <td style="text-align:center;"><input type="checkbox" style="cursor:pointer;" title="Mute Tactical Audio"></td>
             <td style="color:${nameColor}; font-weight:bold;">${s.name || 'Commander'}</td>
-            <td style="color:#eccc68; font-weight:600;">${armyLabel}</td>
+            <td style="color:${armyColor}; font-weight:600;">${armyLabel}</td>
             <td style="color:#a4b0be;">${teamLabel}</td>
             <td>${statusHtml}</td>
         </tr>`;
@@ -12172,12 +12604,25 @@ function sellStructure(structure) {
     updateSidebar();
 }
 
+function getEffectiveUnitCost(type) {
+    const spec = unitRoster[type];
+    if (!spec) return 0;
+    let cost = spec.cost;
+    const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
+    const hasRefinery = allTechs.some(s => s.type === 'techRefinery' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+    if (hasRefinery && !isInfantryType(type)) {
+        cost = Math.round(cost * 0.90); // 10% vehicle & aircraft discount!
+    }
+    return cost;
+}
+
 function produceUnit(type) {
     const spec = unitRoster[type];
     if (!spec) return;
 
-    if (playerResources < spec.cost) {
-        showNotification(`Insufficient funds to train ${spec.name} ($${spec.cost} required).`, 'error');
+    const effCost = getEffectiveUnitCost(type);
+    if (playerResources < effCost) {
+        showNotification(`Insufficient funds to train ${spec.name} ($${effCost} required).`, 'error');
         return;
     }
 
@@ -12213,17 +12658,17 @@ function produceUnit(type) {
         return;
     }
 
-    playerResources -= spec.cost;
+    playerResources -= effCost;
     fac.productionQueue.push({
         type: type,
         name: spec.name,
-        cost: spec.cost,
+        cost: effCost,
         progress: 0,
         buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
     });
 
     playUSASound('radio_chirp');
-    showNotification(`Queued: ${spec.name}`, 'info');
+    showNotification(`Queued: ${spec.name}${effCost < spec.cost ? ' (10% Refinery Discount)' : ''}`, 'info');
     updateSidebar();
 }
 
@@ -12809,12 +13254,25 @@ function sellStructure(structure) {
     updateSidebar();
 }
 
+function getEffectiveUnitCost(type) {
+    const spec = unitRoster[type];
+    if (!spec) return 0;
+    let cost = spec.cost;
+    const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
+    const hasRefinery = allTechs.some(s => s.type === 'techRefinery' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+    if (hasRefinery && !isInfantryType(type)) {
+        cost = Math.round(cost * 0.90); // 10% vehicle & aircraft discount!
+    }
+    return cost;
+}
+
 function produceUnit(type) {
     const spec = unitRoster[type];
     if (!spec) return;
 
-    if (playerResources < spec.cost) {
-        showNotification(`Insufficient funds to train ${spec.name} ($${spec.cost} required).`, 'error');
+    const effCost = getEffectiveUnitCost(type);
+    if (playerResources < effCost) {
+        showNotification(`Insufficient funds to train ${spec.name} ($${effCost} required).`, 'error');
         return;
     }
 
@@ -12850,17 +13308,17 @@ function produceUnit(type) {
         return;
     }
 
-    playerResources -= spec.cost;
+    playerResources -= effCost;
     fac.productionQueue.push({
         type: type,
         name: spec.name,
-        cost: spec.cost,
+        cost: effCost,
         progress: 0,
         buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
     });
 
     playUSASound('radio_chirp');
-    showNotification(`Queued: ${spec.name}`, 'info');
+    showNotification(`Queued: ${spec.name}${effCost < spec.cost ? ' (10% Refinery Discount)' : ''}`, 'info');
     updateSidebar();
 }
 
@@ -13128,6 +13586,55 @@ function executeGeneralsPowerAt(pos) {
     return false;
 }
 
+function showVictoryBanner() {
+    const vModal = document.getElementById('victory-modal');
+    if (!vModal) return;
+    vModal.style.display = 'flex';
+    
+    const clockEl = document.getElementById('match-clock');
+    const timeEl = document.getElementById('victory-time-val');
+    if (timeEl && clockEl) timeEl.textContent = clockEl.textContent || '00:00:00';
+    
+    const facEl = document.getElementById('victory-faction-val');
+    if (facEl) facEl.textContent = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'USA').toUpperCase();
+
+    const rankEl = document.getElementById('victory-rank-val');
+    if (rankEl) {
+        const sc = typeof playerScore !== 'undefined' ? playerScore : 6000;
+        const stars = Math.min(5, Math.floor(sc / 2000) + 1);
+        rankEl.textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+    }
+    
+    if (typeof playUSASound === 'function') playUSASound('victory');
+}
+
+function showDefeatBanner() {
+    const dModal = document.getElementById('defeat-modal');
+    if (!dModal) return;
+    dModal.style.display = 'flex';
+
+    const clockEl = document.getElementById('match-clock');
+    const timeEl = document.getElementById('defeat-time-val');
+    if (timeEl && clockEl) timeEl.textContent = clockEl.textContent || '00:00:00';
+
+    const facEl = document.getElementById('defeat-faction-val');
+    if (facEl) facEl.textContent = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'USA').toUpperCase();
+
+    if (typeof playUSASound === 'function') playUSASound('defeat');
+}
+
+function dismissEndGameModal() {
+    const vModal = document.getElementById('victory-modal');
+    if (vModal) vModal.style.display = 'none';
+    const dModal = document.getElementById('defeat-modal');
+    if (dModal) dModal.style.display = 'none';
+}
+
+function openStartMenuFromEndGame() {
+    dismissEndGameModal();
+    if (typeof showStartSetupCard === 'function') showStartSetupCard();
+}
+
 
 // --- MODULE: 12_combat.js ---
 function processCombatScanning() {
@@ -13155,6 +13662,39 @@ function processCombatScanning() {
                         // Fire Weapon Command Trigger Sequence
                         if (unit.attackCooldown === 0) {
                             executeWeaponFire(unit, unit.combatTarget);
+                        }
+                    }
+                }
+
+                // Autonomous Overlord Roof Gatling Cannon (Anti-Air & Anti-Infantry)
+                if (unit.type === 'overlord' && unit.overlordUpgrade === 'gatling' && unit.health > 0) {
+                    if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
+                    if (unit.overlordGatCooldown > 0) unit.overlordGatCooldown = Math.max(0, unit.overlordGatCooldown - combatDeltaScale);
+                    if (unit.overlordGatCooldown === 0) {
+                        const hostiles = (typeof enemyUnits !== 'undefined' ? enemyUnits : []).filter(e => e.health > 0 && e.mesh && !isFriendly(unit, e));
+                        let bestTarget = null;
+                        let bestScore = -Infinity;
+                        hostiles.forEach(h => {
+                            const d = unit.mesh.position.distanceTo(h.mesh.position);
+                            if (d <= 28) {
+                                let score = 100 - d;
+                                if (h.isAir) score += 60; // Prioritize airborne aircraft!
+                                if (getArmorCategory(h) === 'infantry') score += 30;
+                                if (score > bestScore) { bestScore = score; bestTarget = h; }
+                            }
+                        });
+                        if (bestTarget) {
+                            unit.overlordGatCooldown = 18; // ~0.3s rapid fire!
+                            const upgMesh = unit.overlordUpgradeMesh || unit.mesh.getObjectByName("overlordUpgrade");
+                            const muzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+                            const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
+                            tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
+                            const barrels = unit.mesh.getObjectByName("gatlingBarrels") || (upgMesh && upgMesh.getObjectByName("gatlingBarrels"));
+                            if (barrels) barrels.rotation.z += 1.6;
+                            spawnMuzzleFlash(muzzle, 0xffa502, 0.4);
+                            spawnBulletTracer(muzzle, tPos, 0xf1c40f, 2.8);
+                            if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling', {}, 'china');
+                            applyCalculatedDamage(unit, bestTarget, 16, 'GATLING');
                         }
                     }
                 }
@@ -13288,7 +13828,37 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     
     let finalDmg = Math.max(1, Math.round(baseDamage * mult));
 
-    // Target defensive upgrade buffs
+    // Attacker offensive buffs (USA Strategy Center Bombardment: +20% damage)
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'bombard' && typeof units !== 'undefined' && units.includes(attacker)) {
+        finalDmg = Math.round(finalDmg * 1.20);
+    }
+    // China Horde Bonus: 5+ friendly horde units (Red Guard, Battlemaster) within 22m grant +20% damage
+    if (attacker && (attacker.type === 'redguard' || attacker.type === 'battlemaster' || attacker.type === 'infantry' || attacker.type === 'tank') && (attacker.faction === 'china' || attacker.isChina || (typeof selectedFaction !== 'undefined' && selectedFaction === 'china' && units.includes(attacker)))) {
+        const friendlies = (typeof units !== 'undefined' && units.includes(attacker)) ? units : (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
+        let hordeCount = 0;
+        const aPos = attacker.mesh ? attacker.mesh.position : attacker.position;
+        if (aPos) {
+            for (let i = 0; i < friendlies.length; i++) {
+                const f = friendlies[i];
+                if (f.health > 0 && f.mesh && (f.type === 'redguard' || f.type === 'battlemaster' || f.type === 'infantry' || f.type === 'tank')) {
+                    if (aPos.distanceTo(f.mesh.position) <= 22) {
+                        hordeCount++;
+                        if (hordeCount >= 5) break;
+                    }
+                }
+            }
+        }
+        if (hordeCount >= 5) {
+            finalDmg = Math.round(finalDmg * 1.20);
+            attacker.isHordeActive = true;
+        } else {
+            attacker.isHordeActive = false;
+        }
+    }
+    // Target defensive upgrade buffs (USA Strategy Center Hold the Line: +20% armor / -20% damage taken)
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(target)) {
+        finalDmg = Math.max(1, Math.round(finalDmg * 0.80));
+    }
     if (target.salvageLevel >= 2) finalDmg = Math.max(1, Math.round(finalDmg * 0.8)); // GLA Level 2 Scrap Armor
     if (target.compositeArmor) finalDmg = Math.max(1, Math.round(finalDmg * 0.85)); // USA Composite Armor
 
@@ -13386,6 +13956,9 @@ function executeWeaponFire(attacker, target) {
 
     attacker.attackCooldown = baseCooldown;
 
+    if (attacker.isHordeActive) {
+        attacker.attackCooldown = Math.max(8, Math.floor(attacker.attackCooldown * 0.75)); // China Horde: +25% fire-rate
+    }
     if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 0.75);
     if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 1.25);
 
@@ -13416,6 +13989,22 @@ function executeWeaponFire(attacker, target) {
         playAudio('china_cannon', {}, 'china');
         const ovDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('uraniumShells')) ? 119 : 95;
         applyCalculatedDamage(attacker, target, ovDmg, 'ARMOR_PIERCING');
+
+        // Overlord Gatling Cannon Upgrade Firing!
+        if (attacker.overlordUpgrade === 'gatling') {
+            const upgMesh = attacker.overlordUpgradeMesh || attacker.mesh.getObjectByName("overlordUpgrade");
+            const gatPos = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : muzzleL;
+            const barrels = attacker.mesh.getObjectByName("gatlingBarrels") || (upgMesh && upgMesh.getObjectByName("gatlingBarrels"));
+            if (barrels) barrels.rotation.z += 1.8;
+            for (let b = 0; b < 3; b++) {
+                setTimeout(() => {
+                    spawnMuzzleFlash(gatPos, 0xffa502, 0.35);
+                    spawnBulletTracer(gatPos, targetPos, 0xf1c40f, 2.8);
+                }, b * 50);
+            }
+            if (typeof playAudio === 'function') playAudio('gatling', {}, 'china');
+            applyCalculatedDamage(attacker, target, 24, 'GATLING');
+        }
     } else if (attacker.type === 'dragon') {
         // Dragon Tank NAPALM FLAMETHROWER!
         spawnFlamethrowerBurst(muzzlePos, targetPos);
@@ -14324,6 +14913,11 @@ function processEnemyAIEngine() {
                         if (unit.selected) {
                             unit.combatTarget = targetedEnemy;
                             unit.taskState = 'MovingToAttack';
+                            if (unit.isAir) {
+                                unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'attacking';
+                                unit.targetPosition.copy(targetPos);
+                                unit.patrolCenter.copy(targetPos);
+                            }
 
                             const distToEnemy = unit.mesh.position.distanceTo(targetPos);
                             const desiredRange = unit.scanRange + targetRadius - 3;
@@ -14382,6 +14976,36 @@ function processEnemyAIEngine() {
                     showNotification(`Infantry ordered to embark into ${transport.type} (${(transport.garrisoned || []).length}/${transport.capacity} seats).`, 'info');
                     updateSidebar();
                     return;
+                }
+            }
+
+            // 1c. Check if right-clicking on a neutral capturable tech structure!
+            if (window.neutralStructures && window.neutralStructures.length > 0) {
+                const neutralMeshes = window.neutralStructures.map(ns => ns.mesh).filter(Boolean);
+                const neutralHits = raycaster.intersectObjects(neutralMeshes, true);
+                if (neutralHits.length > 0) {
+                    let hitObj = neutralHits[0].object;
+                    while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
+                    const targetTech = window.neutralStructures.find(ns => ns.mesh === hitObj);
+                    if (targetTech) {
+                        const selectedInfantry = units.filter(u => u.selected && isInfantryType(u.type));
+                        if (selectedInfantry.length > 0) {
+                            const tPos = targetTech.position.clone();
+                            if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(tPos, 'move');
+                            selectedInfantry.forEach(inf => {
+                                inf.combatTarget = null;
+                                inf.taskState = 'Capturing';
+                                inf.captureTarget = targetTech;
+                                inf.targetPosition.copy(tPos);
+                            });
+                            showNotification(`Infantry ordered to secure ${targetTech.name}!`, 'info');
+                            playUSASound('radio_chirp');
+                            updateSidebar();
+                            return;
+                        } else {
+                            showNotification(`Deploy Infantry (Ranger, Red Guard, Rebel) to capture ${targetTech.name}.`, 'warning');
+                        }
+                    }
                 }
             }
 
@@ -14469,7 +15093,11 @@ function processEnemyAIEngine() {
                         unit.targetPosition.copy(groundHit);
                     }
                     unit.combatTarget = null;
-                    unit.taskState = 'Idle';
+                    unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+                    if (unit.isAir) {
+                        unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
+                        unit.patrolCenter.copy(groundHit);
+                    }
                     if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
                         unit.targetStructure.dozerRef = null; unit.targetStructure = null;
                     }
@@ -14552,7 +15180,11 @@ function processEnemyAIEngine() {
                             unit.targetPosition.copy(destV);
                         }
                         unit.combatTarget = null;
-                        unit.taskState = 'Idle';
+                        unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+                        if (unit.isAir) {
+                            unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
+                            unit.patrolCenter.copy(destV);
+                        }
                         if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
                             unit.targetStructure.dozerRef = null; unit.targetStructure = null;
                         }
@@ -14625,7 +15257,7 @@ function processEnemyAIEngine() {
                 for (let u of units) {
                     if (u.garrisonedIn || !u.mesh) continue;
                     const d = Math.hypot(groundHit.x - u.mesh.position.x, groundHit.z - u.mesh.position.z);
-                    const pickRadius = Math.max((u.radius || 1.2) * 2.2, 3.2);
+                    const pickRadius = u.isAir ? 7.5 : Math.max((u.radius || 1.2) * 2.2, 3.2);
                     if (d <= pickRadius && d < closestDist) {
                         closestDist = d;
                         closestUnit = u;
@@ -15247,12 +15879,20 @@ function animate() {
                     const cruiseAlt = unit.mesh.userData.flightAltitude || 8.5;
                     const groundY = getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z);
 
+                    // Dynamic State Transition: Automatically react to player orders!
+                    const distToGoal = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                    if (unit.combatTarget && unit.combatTarget.health > 0) {
+                        if (unit.airState === 'landed') unit.airState = 'taking_off';
+                        else if (unit.airState !== 'taking_off') unit.airState = 'attacking';
+                    } else if (distToGoal > 3.0 && unit.airState !== 'taking_off' && unit.airState !== 'landed') {
+                        unit.airState = 'flying';
+                    }
+
                     // 1. Landed on Airfield Runway / Pad
                     if (unit.airState === 'landed') {
                         unit.mesh.position.y = groundY + 0.35;
                         unit.mesh.rotation.z = 0;
-                        const distToDest = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
-                        if (unit.combatTarget || (unit.waypoints && unit.waypoints.length > 0) || distToDest > 4.0) {
+                        if (unit.combatTarget || (unit.waypoints && unit.waypoints.length > 0) || distToGoal > 4.0) {
                             unit.airState = 'taking_off';
                         }
                         return; // Stays safely on ground
@@ -15261,7 +15901,7 @@ function animate() {
                     // 2. Taking off & climbing to cruising altitude
                     if (unit.airState === 'taking_off') {
                         const targetY = groundY + cruiseAlt;
-                        unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.06;
+                        unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.08;
                         if (unit.mesh.position.y >= targetY * 0.85) {
                             unit.airState = unit.combatTarget ? 'attacking' : 'flying';
                         }
@@ -15290,19 +15930,27 @@ function animate() {
                             unit.mesh.rotation.y += diff * 0.22;
                             unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -0.45, 0.45) - unit.mesh.rotation.z) * 0.15;
 
-                            if (distToEnemy <= (unit.type === 'comanche' ? 22 : 25) && unit.attackCooldown === 0) {
+                            if (distToEnemy <= (unit.type === 'comanche' ? 24 : 28) && unit.attackCooldown === 0) {
                                 executeWeaponFire(unit, unit.combatTarget);
                             }
 
                             if (distToEnemy < 6.0 || unit.combatTarget.health <= 0) {
-                                if (unit.combatTarget.health <= 0) unit.combatTarget = null;
-                                unit.patrolCenter.copy(unit.mesh.position);
-                                unit.circleAngle = unit.mesh.rotation.y;
-                                unit.airState = 'circling';
+                                if (unit.combatTarget.health <= 0) {
+                                    unit.combatTarget = null;
+                                    unit.patrolCenter.copy(unit.mesh.position);
+                                    unit.circleAngle = unit.mesh.rotation.y;
+                                    unit.airState = 'circling';
+                                    unit.taskState = 'Idle';
+                                } else {
+                                    // Strafing turn pass: carry momentum past target
+                                    unit.mesh.position.x += dirX * (planeSpeed * 1.4);
+                                    unit.mesh.position.z += dirZ * (planeSpeed * 1.4);
+                                }
                             }
                         } else {
                             unit.combatTarget = null;
                             unit.airState = 'circling';
+                            unit.taskState = 'Idle';
                         }
                     }
 
@@ -15328,7 +15976,7 @@ function animate() {
                             if (unit.waypoints && unit.waypoints.length > 0) {
                                 unit.targetPosition.copy(unit.waypoints.shift());
                             } else {
-                                unit.patrolCenter.copy(unit.mesh.position);
+                                unit.patrolCenter.copy(unit.targetPosition);
                                 unit.circleAngle = unit.mesh.rotation.y;
                                 unit.airState = 'circling';
                                 unit.taskState = 'Idle';
@@ -15337,10 +15985,9 @@ function animate() {
                     }
 
                     // 5. Circling smoothly at location ("fly around slowly in circles at their location")
-                    if (unit.airState === 'circling' || (unit.taskState === 'Idle' && !unit.combatTarget && unit.airState !== 'landed')) {
-                        unit.airState = 'circling';
+                    if (unit.airState === 'circling') {
                         unit.circleAngle = (unit.circleAngle || 0) + (unit.speed * 0.045);
-                        const orbitR = unit.circleRadius || 15.0;
+                        const orbitR = unit.circleRadius || 12.0;
                         const targetOrbitX = unit.patrolCenter.x + Math.cos(unit.circleAngle) * orbitR;
                         const targetOrbitZ = unit.patrolCenter.z + Math.sin(unit.circleAngle) * orbitR;
 
@@ -15396,6 +16043,51 @@ function animate() {
                         // Target destroyed or lost: resume idle
                         unit.combatTarget = null;
                         unit.taskState = 'Idle';
+                    }
+                }
+
+                // --- CAPTURING NEUTRAL STRUCTURE CHANNELS ---
+                if (unit.taskState === 'Capturing' && unit.captureTarget && unit.captureTarget.health > 0) {
+                    const targetTech = unit.captureTarget;
+                    const dTech = Math.hypot(targetTech.position.x - unit.mesh.position.x, targetTech.position.z - unit.mesh.position.z);
+                    if (dTech <= (targetTech.radius + 3.0)) {
+                        // Halt movement while capturing
+                        unit.targetPosition.x = unit.mesh.position.x;
+                        unit.targetPosition.z = unit.mesh.position.z;
+                        targetTech.captureProgress = (targetTech.captureProgress || 0) + 1;
+                        if (targetTech.captureProgress >= 120) { // ~2 seconds channeling
+                            targetTech.captureProgress = 0;
+                            targetTech.capturedByTeam = unit.teamId;
+                            targetTech.teamId = unit.teamId;
+                            targetTech.ownerId = (unit.teamId === playerTeamId) ? 'player' : (unit.ownerId || ('ai_' + unit.teamId));
+
+                            // Turn flag cloth to player blue or enemy red
+                            const flagCloth = targetTech.mesh ? targetTech.mesh.getObjectByName("neutralFlagCloth") : null;
+                            if (flagCloth && flagCloth.material) {
+                                flagCloth.material.color.setHex((unit.teamId === playerTeamId) ? 0x3498db : 0xe74c3c);
+                            }
+
+                            if (unit.teamId === playerTeamId) {
+                                if (targetTech.type === 'techOilDerrick') {
+                                    playerResources += 1000;
+                                    const resEl = document.getElementById('resource-display');
+                                    if (resEl) resEl.innerText = `$${playerResources}`;
+                                    showNotification('Tech Oil Derrick SECURED! +$1,000 cash grant + steady flow online.', 'success');
+                                } else if (targetTech.type === 'techHospital') {
+                                    showNotification('Tech Hospital SECURED! Field medics online: friendly infantry passively heal.', 'success');
+                                } else if (targetTech.type === 'techRefinery') {
+                                    showNotification('Tech Oil Refinery SECURED! Combat vehicle & aircraft costs discounted 10%.', 'success');
+                                }
+                                playUSASound('radio_chirp');
+                            } else {
+                                showNotification(`Warning: Enemy forces captured ${targetTech.name}!`, 'error');
+                            }
+
+                            unit.taskState = 'Idle';
+                            unit.captureTarget = null;
+                            if (typeof updateSidebar === 'function') updateSidebar();
+                        }
+                        return;
                     }
                 }
 
@@ -15590,6 +16282,56 @@ function animate() {
             });
             if (units.length !== previousUnitCount) updateHUD();
 
+            // Neutral Tech Buildings Periodic Effects:
+            if (isMatchActive) {
+                if (window._techPassiveTimer === undefined) window._techPassiveTimer = 0;
+                window._techPassiveTimer++;
+                
+                const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
+
+                // 1. Tech Oil Derrick: +$200 every 12 seconds (~720 frames)
+                if (window._techPassiveTimer % 720 === 0) {
+                    const playerDerricks = allTechs.filter(s => s.type === 'techOilDerrick' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+                    if (playerDerricks.length > 0) {
+                        const bonus = playerDerricks.length * 200;
+                        playerResources += bonus;
+                        const resEl = document.getElementById('resource-display');
+                        if (resEl) resEl.innerText = `$${playerResources}`;
+                        if (typeof showNotification === 'function') {
+                            showNotification(`Tech Oil Derrick: +$${bonus} passive supply revenue received.`, 'success');
+                        }
+                    }
+                }
+
+                // 2. Tech Hospital: Passive regeneration for all friendly infantry (+2 HP every 60 frames / 1.0s)
+                if (window._techPassiveTimer % 60 === 0) {
+                    const hasHospital = allTechs.some(s => s.type === 'techHospital' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+                    if (hasHospital) {
+                        units.forEach(u => {
+                            if (u.health > 0 && u.health < u.maxHealth && !u.isAir && ['ranger','infantry','redguard','rebel','rocket','rpg','tankhunter','pathfinder','burton','jarmen','worker'].includes(u.type)) {
+                                u.health = Math.min(u.maxHealth, u.health + 2);
+                            }
+                        });
+                    }
+                }
+
+                // 3. GLA Foundation Holes Rebuilding Timer
+                const glaHoles = [...structures, ...enemyStructures].filter(s => s.type === 'glaHole' && s.health > 0);
+                glaHoles.forEach(hole => {
+                    if (hole.rebuildTimer === undefined) hole.rebuildTimer = 18 * 60; // 18 seconds
+                    hole.rebuildTimer--;
+                    if (hole.rebuildTimer <= 0) {
+                        // Reconstruct structure for free!
+                        hole.health = 0;
+                        if (hole.mesh) scene.remove(hole.mesh);
+                        const origType = hole.originalType || 'barracks';
+                        if (typeof deployBaseStructureAt === 'function') {
+                            deployBaseStructureAt(origType, hole.position, hole.ownerId, hole.teamId, 'gla');
+                        }
+                    }
+                });
+            }
+
             // Tactical Mission Victory / Defeat Objective Check (Total Annihilation of Hostile Forces)
             if (isMatchActive && hasSpawnedInitialEnemyBase) {
                 const remainingHostileStructures = [...structures, ...enemyStructures].filter(s => s.health > 0 && !isFriendly({ teamId: playerTeamId }, s));
@@ -15602,11 +16344,13 @@ function animate() {
                     showNotification("MISSION ACCOMPLISHED: ALL HOSTILE FORCES ELIMINATED!", "success");
                     const ticker = document.getElementById('tactical-message');
                     if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: Operational theater secured. All hostile forces destroyed!</strong>';
+                    if (typeof showVictoryBanner === 'function') showVictoryBanner();
                 } else if (remainingFriendlyStructures.length === 0 && remainingFriendlyUnits.length === 0) {
                     isMatchActive = false;
                     showNotification("MISSION FAILED: ALL STRATEGIC ASSETS LOST!", "error");
                     const ticker = document.getElementById('tactical-message');
                     if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">CRITICAL DEFEAT: Command Center and all friendly forces destroyed.</strong>';
+                    if (typeof showDefeatBanner === 'function') showDefeatBanner();
                 }
             }
 
