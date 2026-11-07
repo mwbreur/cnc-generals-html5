@@ -742,8 +742,12 @@ function createAuroraMesh(isEnemy = false) {
     return g;
 }
 
-function createRangerMesh() {
+function createRangerMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['ranger']) {
+        return createW3DInfantryMesh('ranger', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     // Tactical uniform & combat boots
     const boots = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.4), matDarkMetal);
     boots.position.y = 0.15; g.add(boots);
@@ -792,8 +796,12 @@ function createMissileDefenderMesh() {
     return g;
 }
 
-function createBurtonMesh() {
+function createBurtonMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['burton']) {
+        return createW3DInfantryMesh('burton', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xd2a679, roughness: 0.75 });
     const pantsMat = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, roughness: 0.8 });
 
@@ -1201,8 +1209,12 @@ function createNukeCannonMesh(isEnemy = false) {
     return g;
 }
 
-function createRedGuardMesh() {
+function createRedGuardMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['redguard']) {
+        return createW3DInfantryMesh('redguard', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     // PLA infantry uniform & combat boots
     const boots = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.28, 0.38), matDarkMetal);
     boots.position.y = 0.14; g.add(boots);
@@ -1237,8 +1249,11 @@ function createRedGuardMesh() {
     return g;
 }
 
-function createTankHunterMesh() {
-    const g = createRedGuardMesh();
+function createTankHunterMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['tankhunter']) {
+        return createW3DInfantryMesh('tankhunter', isEnemy);
+    }
+    const g = createRedGuardMesh(isEnemy);
     // Conical field hat / steel helmet
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.24, 12), matGLAColor);
     hat.position.y = 1.48; g.add(hat);
@@ -1256,8 +1271,12 @@ function createTankHunterMesh() {
     return g;
 }
 
-function createHackerMesh() {
+function createHackerMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['hacker']) {
+        return createW3DInfantryMesh('hacker', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     // Field operative coat & civilian hacker attire
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 1.15, 0.38), matDarkMetal);
     body.position.y = 0.58; g.add(body);
@@ -1289,8 +1308,12 @@ function createHackerMesh() {
     return g;
 }
 
-function createBlackLotusMesh() {
+function createBlackLotusMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['lotus']) {
+        return createW3DInfantryMesh('lotus', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     const stealthMat = new THREE.MeshStandardMaterial({ color: 0x181a1d, roughness: 0.35, metalness: 0.85 });
     const hairMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.5 });
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.7 });
@@ -1320,8 +1343,12 @@ function createBlackLotusMesh() {
         // Module: Enhanced GLA Units
 // Scavenger scrap metal, rusted plates, toxic tanks, improvised vehicles, guerrilla armaments
 
-function createGLAWorkerMesh() {
+function createGLAWorkerMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['worker']) {
+        return createW3DInfantryMesh('worker', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     const robeMat = new THREE.MeshStandardMaterial({ color: 0x8a775b, roughness: 0.95 });
     const skinMat = new THREE.MeshStandardMaterial({ color: 0xc89d6b, roughness: 0.8 });
 
@@ -1744,8 +1771,12 @@ function createRadarVanMesh(isEnemy = false) {
     return g;
 }
 
-function createRebelMesh() {
+function createRebelMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['rebel']) {
+        return createW3DInfantryMesh('rebel', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     // Guerrilla fighter with desert robe & keffiyeh
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 1.25, 8), matGLAColor);
     body.position.y = 0.64; body.castShadow = true; g.add(body);
@@ -1767,8 +1798,11 @@ function createRebelMesh() {
     return g;
 }
 
-function createRPGTrooperMesh() {
-    const g = createRebelMesh();
+function createRPGTrooperMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['rpg']) {
+        return createW3DInfantryMesh('rpg', isEnemy);
+    }
+    const g = createRebelMesh(isEnemy);
     // RPG-7 launcher
     const rpg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.45, 8), matGunmetal);
     rpg.rotation.x = Math.PI / 2; rpg.position.set(0.34, 1.18, 0.2); g.add(rpg);
@@ -1778,8 +1812,11 @@ function createRPGTrooperMesh() {
     return g;
 }
 
-function createTerroristMesh() {
-    const g = createRebelMesh();
+function createTerroristMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['terrorist']) {
+        return createW3DInfantryMesh('terrorist', isEnemy);
+    }
+    const g = createRebelMesh(isEnemy);
     // Suicide explosive vest with dynamite sticks
     const vest = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.48, 0.38), matRedStar);
     vest.position.y = 0.88; g.add(vest);
@@ -1824,8 +1861,12 @@ function createHijackerMesh() {
     return g;
 }
 
-function createJarmenKellMesh() {
+function createJarmenKellMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['jarmen']) {
+        return createW3DInfantryMesh('jarmen', isEnemy);
+    }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     const cloakMat = new THREE.MeshStandardMaterial({ color: 0x8a775b, roughness: 0.95 });
 
     // Ghillie desert burlap poncho

@@ -2726,13 +2726,19 @@ function updateHUD() {
                 mesh = selectedFaction === 'china' ? createBattlemasterTankMesh(false) : selectedFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);
             }
 
-            // 1.35x Scale Boost for high visual fidelity & detail
+            // Scale calibration: vehicles/structures get 1.35x visual boost if procedural, infantry stays realistic (~0.88 units tall)
             if (!mesh.userData || !mesh.userData.isW3D) {
-                mesh.scale.set(1.35, 1.35, 1.35);
+                if (typeof isInfantryType === 'function' && isInfantryType(type)) {
+                    mesh.scale.set(0.52, 0.52, 0.52);
+                } else {
+                    mesh.scale.set(1.35, 1.35, 1.35);
+                }
             }
-            radius *= 1.35;
-            scanRange *= 1.35;
-            speed *= 1.15;
+            if (typeof isInfantryType !== 'function' || !isInfantryType(type)) {
+                radius *= 1.35;
+                scanRange *= 1.35;
+                speed *= 1.15;
+            }
 
             if (!position) {
                 const angle = units.length * 2.4;

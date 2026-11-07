@@ -305,11 +305,17 @@
             }
 
             if (!mesh.userData || !mesh.userData.isW3D) {
-                mesh.scale.set(1.35, 1.35, 1.35);
+                if (typeof isInfantryType === 'function' && isInfantryType(type)) {
+                    mesh.scale.set(0.52, 0.52, 0.52);
+                } else {
+                    mesh.scale.set(1.35, 1.35, 1.35);
+                }
             }
-            radius *= 1.35;
-            scanRange *= 1.35;
-            speed *= 1.15;
+            if (typeof isInfantryType !== 'function' || !isInfantryType(type)) {
+                radius *= 1.35;
+                scanRange *= 1.35;
+                speed *= 1.15;
+            }
             mesh.position.copy(position);
 
             if (isAir) {

@@ -314,6 +314,38 @@ function animate() {
                     u.mesh.position.y += (flightY - u.mesh.position.y) * 0.06;
                 }
             });
+
+            // Paladin Tank Battle Drone Hover Animation & Field Repair
+            units.forEach(u => {
+                if (u.type === 'paladin' && u.health > 0) {
+                    const drone = u.mesh.getObjectByName('paladinBattleDrone');
+                    if (drone) {
+                        drone.position.y = (2.4 / 0.09) + Math.sin(animTime * 3.5 + u.mesh.id) * 1.5;
+                        const fan = drone.getObjectByName('fan') || drone.getObjectByName('FAN');
+                        if (fan) fan.rotation.y += 0.55;
+
+                        // Field repair: Battle Drone slowly repairs damaged Paladin (+3 HP per second)
+                        if (u.health < u.maxHealth && buildingTick % 20 === 0) {
+                            u.health = Math.min(u.maxHealth, u.health + 3);
+                        }
+                    }
+                }
+            });
+
+            // Animate Cold Fusion Reactor pulsing blue rods
+            const pulseBlue = 1.3 + Math.sin(animTime * 4.0) * 0.45;
+            structures.forEach(s => {
+                if ((s.type === 'power' || s.type === 'coldFusionReactor') && s.mesh && s.health > 0) {
+                    s.mesh.traverse(c => {
+                        if (c.isMesh && c.name && c.name.toLowerCase().includes('cylinder')) {
+                            if (c.material && c.material.emissiveIntensity !== undefined) {
+                                c.material.emissiveIntensity = pulseBlue;
+                            }
+                        }
+                    });
+                }
+            });
+
             processPointDefenseLasers();
             processScrapCrateCollection();
             processCameraKeyboardPanning();
@@ -532,7 +564,7 @@ function animate() {
                             while (diff < -Math.PI) diff += Math.PI * 2;
                             while (diff > Math.PI) diff -= Math.PI * 2;
                             unit.mesh.rotation.y += diff * 0.22;
-                            const maxBank = isHeli ? 0.20 : 0.45;
+                            const maxBank = isHeli ? 0.0 : 0.45;
                             unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -maxBank, maxBank) - unit.mesh.rotation.z) * 0.15;
 
                             if (distToEnemy <= (unit.type === 'comanche' ? 24 : 28) && unit.attackCooldown === 0) {
@@ -581,7 +613,7 @@ function animate() {
                             while (diff > Math.PI) diff -= Math.PI * 2;
                             unit.mesh.rotation.y += diff * 0.18;
 
-                            const maxBank = isHeli ? 0.18 : 0.42;
+                            const maxBank = isHeli ? 0.0 : 0.42;
                             unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.6, -maxBank, maxBank) - unit.mesh.rotation.z) * 0.12;
                         } else {
                             if (unit.waypoints && unit.waypoints.length > 0) {
@@ -627,9 +659,9 @@ function animate() {
                         while (diff > Math.PI) diff -= Math.PI * 2;
                         unit.mesh.rotation.y += diff * 0.16;
 
-                        // Graceful inward banking roll
-                        const targetBank = isHeli ? -0.10 : -0.28;
-                        unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.08;
+                        // Graceful inward banking roll for planes, STRICTLY HORIZONTAL for helicopters
+                        const targetBank = isHeli ? 0.0 : -0.28;
+                        unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.12;
                     }
 
                     // Maintain flight cruising altitude above ground
