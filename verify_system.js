@@ -242,7 +242,7 @@ const allUnitTypes = [
     'chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'ranger', 'missiledefender',
     'pathfinder', 'burton',
     // China
-    'battlemaster', 'overlord', 'gatling', 'dragon', 'crawler', 'inferno', 'nukecannon',
+    'battlemaster', 'overlord', 'gatling', 'dragon', 'crawler', 'inferno', 'nukecannon', 'nuketank',
     'redguard', 'tankhunter', 'hacker', 'blacklotus',
     // GLA
     'worker', 'technical', 'scorpion', 'marauder', 'buggy', 'quad', 'toxintractor',

@@ -297,7 +297,7 @@
                     crawler: ['Troop Crawler', 700, 'Armored personnel carrier with 8 Red Guard soldiers.'],
                     overlord: ['Overlord Tank', 1500, 'Super-heavy double-barrel dreadnought tank.'],
                     inferno: ['Inferno Cannon', 900, 'Napalm siege artillery creating firestorms.'],
-                    nukecannon: ['Nuke Cannon', 1800, 'Mobile tactical nuclear siege artillery.']
+                    nukecannon: ['Nuke Tank (Nuke Cannon)', 1800, 'Mobile tactical nuclear siege tank firing atomic shells.']
                 },
                 airfield: {
                     raptor: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
@@ -692,7 +692,7 @@
                     return { building: 'strategyCenter', name: 'Strategy Center' };
                 }
             } else if (selectedFaction === 'china') {
-                if (['overlord', 'inferno', 'nukecannon', 'blacklotus', 'hacker'].includes(type)) {
+                if (['overlord', 'inferno', 'nukecannon', 'nuketank', 'blacklotus', 'hacker'].includes(type)) {
                     return { building: 'propagandaCenter', name: 'Propaganda Center' };
                 }
             } else if (selectedFaction === 'gla') {
@@ -735,7 +735,8 @@
             crawler: { name: 'Troop Crawler', role: 'Troop Carrier & Radar', cost: '$700', desc: 'Heavy all-terrain transport carrying 8 Red Guards. Equipped with mobile base radar dish and medical station.', req: 'War Factory', unlock: 'Infantry Transport, Mobile Radar' },
             overlord: { name: 'Overlord Tank', role: 'Super-Heavy Dual-Cannon Tank', cost: '$1500', desc: 'Massive siege tank featuring twin 125mm cannons. Can be upgraded with Gatling Cannon, Bunker, or Speaker Tower.', req: 'Propaganda Center', unlock: 'Crushes Vehicles, Mobile Bastion' },
             inferno: { name: 'Inferno Cannon', role: 'Napalm Artillery', cost: '$900', desc: 'Self-propelled artillery firing combustible napalm canisters that trigger sweeping firestorms.', req: 'Propaganda Center', unlock: 'Napalm Firestorm Barrage' },
-            nukecannon: { name: 'Nuke Cannon', role: 'Tactical Nuclear Artillery', cost: '$1800', desc: 'Heavy tracked artillery firing miniaturized tactical nuclear shells that leave radioactive fallout.', req: 'Propaganda Center', unlock: 'Tactical Nuclear Strikes, Area Denial' },
+            nukecannon: { name: 'Nuke Tank (Nuke Cannon)', role: 'Tactical Nuclear Artillery', cost: '$1800', desc: 'Heavy tracked nuclear siege tank firing miniaturized tactical atomic shells that leave radioactive fallout.', req: 'Propaganda Center', unlock: 'Tactical Nuclear Strikes, Area Denial' },
+            nuketank: { name: 'Nuke Tank (Nuke Cannon)', role: 'Tactical Nuclear Artillery', cost: '$1800', desc: 'Heavy tracked nuclear siege tank firing miniaturized tactical atomic shells that leave radioactive fallout.', req: 'Propaganda Center', unlock: 'Tactical Nuclear Strikes, Area Denial' },
             mig: { name: 'MiG Fighter', role: 'Multirole Fighter Jet', cost: '$1200', desc: 'Delta-wing combat jet armed with dual Blackshark napalm rockets. Multiple MiGs trigger firestorms.', req: 'Airfield', unlock: 'Air Napalm Firestorms' },
 
             // GLA Units

@@ -491,7 +491,7 @@ function purchaseOverlordUpgrade(upgType, cost) {
 }
 
 function purchaseNukeCannonUpgrade(cost) {
-    const nukeCannons = units.filter(u => u.selected && u.type === 'nukecannon');
+    const nukeCannons = units.filter(u => u.selected && (u.type === 'nukecannon' || u.type === 'nuketank'));
     if (nukeCannons.length === 0) {
         showNotification('Select a Nuke Cannon first.', 'error');
         return;
@@ -726,7 +726,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                 { name: 'GATLING TOWER', cost: 1200, badge: 'TOWER', action: () => purchaseOverlordUpgrade('gatling', 1200), desc: 'Twin 20mm rotary anti-air/anti-infantry turret' },
                 { name: 'PROPAGANDA', cost: 500, badge: 'TOWER', action: () => purchaseOverlordUpgrade('propaganda', 500), desc: 'Heals friendly armor (+4 HP/s) & buffs fire rate 25%' }
             );
-        } else if (u.type === 'nukecannon') {
+        } else if (u.type === 'nukecannon' || u.type === 'nuketank') {
             currentGridSlots.push(
                 { name: 'OUTRIGGERS', badge: 'DEPLOY', action: () => deployNukeCannonOutriggers(u), desc: 'Deploy hydraulic stabilization legs for siege artillery' },
                 { name: 'NEUTRON SHELLS', cost: 1000, badge: 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
@@ -914,13 +914,15 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         (buildingUpgradesCatalog[selectedFaction][structure.type] || buildingUpgradesCatalog[selectedFaction][lookupKey])) || [];
 
     if (producers.length > 0) {
-        // Populate units into slots 0..4
-        producers.slice(0, 5).forEach(([type, spec], idx) => {
+        let uIdx = 0;
+        // Populate first 5 units into Row 1 (slots 0..4)
+        for (; uIdx < Math.min(5, producers.length); uIdx++) {
+            const [type, spec] = producers[uIdx];
             const techReq = getUnitTechPrerequisite(type);
             const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
             const canAfford = playerResources >= spec.cost;
             let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
-            currentGridSlots[idx] = {
+            currentGridSlots[uIdx] = {
                 id: type,
                 name: spec.name.toUpperCase(),
                 cost: spec.cost,
@@ -929,7 +931,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
                 action: () => produceUnit(type),
                 desc: spec.role || 'Combat Unit'
             };
-        });
+        }
 
         // Slot 5 (Top-Right): RALLY POINT
         currentGridSlots[5] = {
@@ -942,10 +944,30 @@ function renderStructureInspectorAndGrid(inspector, structure) {
             desc: 'Set unit deployment rally point'
         };
 
-        // Upgrades for this unit-producing building in slots 6..10
-        factionUpgs.slice(0, 5).forEach((upg, idx) => {
-            assignUpgradeToSlot(6 + idx, upg, structure, isConstructing);
-        });
+        // Row 2 (slots 6..10): Overflow units from index 5 onward + building upgrades
+        let slotPos = 6;
+        for (; uIdx < producers.length && slotPos < 11; uIdx++, slotPos++) {
+            const [type, spec] = producers[uIdx];
+            const techReq = getUnitTechPrerequisite(type);
+            const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
+            const canAfford = playerResources >= spec.cost;
+            let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
+            currentGridSlots[slotPos] = {
+                id: type,
+                name: spec.name.toUpperCase(),
+                cost: spec.cost,
+                badge: badge,
+                disabled: !hasTech || !canAfford || isConstructing,
+                action: () => produceUnit(type),
+                desc: spec.role || 'Combat Unit'
+            };
+        }
+
+        // Upgrades for this unit-producing building in remaining slots on Row 2
+        let upgIdx = 0;
+        for (; slotPos < 11 && upgIdx < factionUpgs.length; slotPos++, upgIdx++) {
+            assignUpgradeToSlot(slotPos, factionUpgs[upgIdx], structure, isConstructing);
+        }
     } else {
         // Non-unit producing structure: All slots 0..10 available for upgrades, stances, and abilities!
         factionUpgs.slice(0, 11).forEach((upg, idx) => {
@@ -2676,7 +2698,7 @@ function updateHUD() {
             else if (type === 'dragon') { mesh = createDragonTankMesh(false); radius = 1.3; speed = 0.15; health = 450; scanRange = 18; }
             else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 1.4; speed = 0.15; health = 480; scanRange = 20; capacity = 8; garrisoned = []; }
             else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 1.3; speed = 0.10; health = 220; scanRange = 36; }
-            else if (type === 'nukecannon') { mesh = createNukeCannonMesh(); radius = 1.6; speed = 0.08; health = 260; scanRange = 42; }
+            else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(); radius = 1.6; speed = 0.08; health = 260; scanRange = 42; }
             else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
             else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
             else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.5; speed = 0.07; health = 100; }

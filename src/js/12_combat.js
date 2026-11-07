@@ -490,7 +490,7 @@ function executeWeaponFire(attacker, target) {
         spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5);
         setTimeout(() => spawnNapalmScorchPool(targetPos), 300);
         applyCalculatedDamage(attacker, target, 65, 'FLAME');
-    } else if (attacker.type === 'nukecannon') {
+    } else if (attacker.type === 'nukecannon' || attacker.type === 'nuketank') {
         // Tactical Atomic Shell with Mini-Mushroom Cloud!
         deployNukeCannonOutriggers(attacker);
         spawnMuzzleFlash(muzzlePos, 0x10ac84, 1.5);
