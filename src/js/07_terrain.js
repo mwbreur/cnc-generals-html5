@@ -1,7 +1,7 @@
 // MAP ENVIRONMENTS, PROCEDURAL TERRAIN, WATER & PROPS (TREES / CITY)
         // =========================================================================
         let currentMapType = 'desert';
-        let currentMapSize = 800;
+        let currentMapSize = 1500;
         let terrainMesh = null;
         let waterMesh = null;
         let mapPropsGroup = null;
@@ -394,7 +394,7 @@
         }
 
         // Build Terrain, Water, and Props for the selected Map
-        function setupMapEnvironment(mapType = 'desert', mapSize = 800) {
+        function setupMapEnvironment(mapType = 'desert', mapSize = 1500) {
             // 0. Resolve activeCustomMap if mapType starts with custom_
             if (mapType && mapType.startsWith('custom_')) {
                 if (!activeCustomMap || activeCustomMap.id !== mapType) {
@@ -447,7 +447,7 @@
             }
 
             // 2. Procedural Displaced Terrain Mesh
-            const segments = mapSize > 1000 ? 140 : mapSize > 600 ? 100 : 70;
+            const segments = mapSize >= 2200 ? 180 : mapSize >= 1400 ? 140 : 100;
             const geo = new THREE.PlaneGeometry(mapSize, mapSize, segments, segments);
             geo.rotateX(-Math.PI / 2);
 

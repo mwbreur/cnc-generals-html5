@@ -13,7 +13,7 @@ window.aiCommanders = aiCommanders;
 function initAICommanders() {
     aiCommanders = {};
     window.aiCommanders = aiCommanders;
-    const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 800);
+    const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 1500);
     const env = (typeof activeTheme !== 'undefined' ? activeTheme : 'desert');
     const allSpawns = (typeof getSpawnPointsForMap === 'function') ? getSpawnPointsForMap(mapSize, env, null) : [];
     const activeAISlots = (typeof spSlots !== 'undefined' ? spSlots : []).filter(s => s.active && !s.isPlayer);
@@ -127,7 +127,7 @@ function processEnemyAIEngine() {
         initAICommanders();
     }
 
-    const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 800);
+    const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 1500);
     const allUnits = [...units, ...enemyUnits];
     const allStructures = [...structures, ...enemyStructures];
 
@@ -615,7 +615,7 @@ function processEnemyAIEngine() {
                 return;
             }
             e.preventDefault(); cameraRadius += e.deltaY * 0.04 * zoomSpeed;
-            cameraRadius = Math.max(22, Math.min(360, cameraRadius)); updateCameraPosition();
+            cameraRadius = Math.max(25, Math.min(450, cameraRadius)); updateCameraPosition();
         }
 
         // River Crossing Bridge Waypoint Finder: detects if straight path hits water and routes via bridge

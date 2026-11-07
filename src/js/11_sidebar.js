@@ -37,7 +37,7 @@ function initRadarMinimap() {
         const rect = radarCanvas.getBoundingClientRect();
         const px = e.clientX - rect.left;
         const py = e.clientY - rect.top;
-        const mapSize = currentMapSize || 800;
+        const mapSize = currentMapSize || 1500;
         const worldX = (px / radarCanvas.width - 0.5) * mapSize;
         const worldZ = (py / radarCanvas.height - 0.5) * mapSize;
 
@@ -97,7 +97,7 @@ function renderRadarMinimap() {
     const ctx = radarCtx;
     const w = radarCanvas.width;
     const h = radarCanvas.height;
-    const mapSize = currentMapSize || 800;
+    const mapSize = currentMapSize || 1500;
     const half = mapSize / 2;
 
     // Check if player has active radar telemetry
@@ -2880,7 +2880,7 @@ function updateHUD() {
         }
 
         function updateCameraPosition() {
-            const maxCam = (currentMapSize || 800) * 0.45;
+            const maxCam = (currentMapSize || 1500) * 0.45;
             cameraTarget.x = THREE.MathUtils.clamp(cameraTarget.x, -maxCam, maxCam);
             cameraTarget.z = THREE.MathUtils.clamp(cameraTarget.z, -maxCam, maxCam);
             const x = cameraTarget.x + cameraRadius * Math.sin(cameraBeta) * Math.sin(cameraAlpha);

@@ -41,9 +41,9 @@ function createTerrainTexture() {
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0a0c10);
-            scene.fog = new THREE.FogExp2(0x0a0c10, 0.003);
+            scene.fog = new THREE.FogExp2(0x0a0c10, 0.0012);
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2500);
             updateCameraPosition();
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -77,7 +77,7 @@ function createTerrainTexture() {
             initLobbySlots('single');
             initLobbySlots('multiplayer');
             initMapEditor();
-            setupMapEnvironment('desert', 800);
+            setupMapEnvironment('desert', 1500);
 
             window.addEventListener('pointerdown', onPointerDown);
             window.addEventListener('pointermove', onPointerMove);

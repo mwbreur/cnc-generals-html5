@@ -84,7 +84,7 @@ function parseW3dModel(filePath) {
         if (c.type === 0x00) {
             const sub = readChunk(c.dataStart, c.dataEnd);
             let containerName = '', meshName = '';
-            let vertices = null, indices = null;
+            let vertices = null, indices = null, uvs = null;
 
             sub.forEach(sc => {
                 if (sc.type === 0x1f) {
@@ -119,6 +119,27 @@ function parseW3dModel(filePath) {
                         // Swap v1 and v2 for CCW winding due to reflection determinant = -1
                         indices.push(v0, v2, v1);
                     }
+                } else if (sc.type === 0x38) {
+                    const passChunks = readChunk(sc.dataStart, sc.dataEnd);
+                    passChunks.forEach(pc => {
+                        if (pc.type === 0x48) {
+                            const stageChunks = readChunk(pc.dataStart, pc.dataEnd);
+                            stageChunks.forEach(stc => {
+                                if (stc.type === 0x4a) {
+                                    const uvCount = Math.floor((stc.dataEnd - stc.dataStart) / 8);
+                                    uvs = [];
+                                    for (let i = 0; i < uvCount; i++) {
+                                        const u = buf.readFloatLE(stc.dataStart + i * 8 + 0);
+                                        const v = buf.readFloatLE(stc.dataStart + i * 8 + 4);
+                                        uvs.push(
+                                            parseFloat(u.toFixed(3)),
+                                            parseFloat((1.0 - v).toFixed(3))
+                                        );
+                                    }
+                                }
+                            });
+                        }
+                    });
                 }
             });
 
@@ -126,7 +147,8 @@ function parseW3dModel(filePath) {
             if (vertices && indices) {
                 meshes[fullName.toLowerCase()] = {
                     v: vertices,
-                    i: indices
+                    i: indices,
+                    u: uvs
                 };
             }
         } else if (c.hasSub) {

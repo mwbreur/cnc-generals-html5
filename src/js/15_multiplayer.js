@@ -235,7 +235,7 @@
             startingMoney: moneyEl ? parseInt(moneyEl.value, 10) : 10000,
             startingUnits: unitsEl ? unitsEl.value : 'small',
             mapEnv: envEl ? envEl.value : 'desert',
-            mapSize: sizeEl ? parseInt(sizeEl.value, 10) : 800,
+            mapSize: sizeEl ? parseInt(sizeEl.value, 10) : 1500,
             customMapData: activeCustomMap ? activeCustomMap : null
         });
     }
@@ -280,7 +280,7 @@
                     }
                     const clientView = document.getElementById('mp-client-view');
                     if (clientView) clientView.style.display = 'block';
-                    renderMapPreview('mp-client-map-preview', packet.mapEnv || 'desert', packet.mapSize || 800, mpSlots, false);
+                    renderMapPreview('mp-client-map-preview', packet.mapEnv || 'desert', packet.mapSize || 1500, mpSlots, false);
                     renderClientSlotsList(mpSlots);
                 }
             }
@@ -346,7 +346,9 @@
                 const group = (typeof createStructureMeshForFaction === 'function') 
                     ? createStructureMeshForFaction(packet.structType, foeFaction)
                     : createChinaWarFactory();
-                group.scale.set(1.35, 1.35, 1.35);
+                if (!group.userData || !group.userData.isW3D) {
+                    group.scale.set(1.35, 1.35, 1.35);
+                }
                 group.position.copy(pos);
                 if (packet.position && packet.position.rotationY) group.rotation.y = packet.position.rotationY;
                 scene.add(group);
@@ -681,7 +683,7 @@
             isMatchActive = false;
 
             if (typeof resetEntireBattlefieldState === 'function') {
-                resetEntireBattlefieldState(currentMapSize || 800);
+                resetEntireBattlefieldState(currentMapSize || 1500);
             }
 
             const badge = document.getElementById('mp-status-badge');

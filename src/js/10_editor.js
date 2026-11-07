@@ -1,6 +1,6 @@
 // --- MAP EDITOR ENGINE ---
         let editorTheme = 'desert';
-        let editorSize = 800;
+        let editorSize = 1500;
         let editorWaterLevel = 0;
         let editorTool = 'hill';
         let editorHeightGrid = new Float32Array(32 * 32);
@@ -509,7 +509,7 @@
             updateSidebar();
         }
 
-        function resetEntireBattlefieldState(mapSize = 800) {
+        function resetEntireBattlefieldState(mapSize = 1500) {
             // 1. Deselect everything and reset cursors & blueprint states
             if (typeof selectedStructure !== 'undefined') selectedStructure = null;
             if (typeof selectedSupplyPoint !== 'undefined') selectedSupplyPoint = null;
@@ -637,7 +637,7 @@
                 if (slot.isPlayer) {
                     // Deploy Player base
                     deployBase(spawnPos, slot.faction, slot.team);
-                    cameraRadius = selectedSize > 900 ? 220 : selectedSize > 600 ? 180 : 140;
+                    cameraRadius = selectedSize >= 2200 ? 280 : selectedSize >= 1400 ? 220 : 160;
                     cameraTarget.copy(spawnPos);
                     updateCameraPosition();
                 } else {
@@ -687,7 +687,9 @@
 
                 if (meshGroup) {
                     meshGroup.position.copy(pos);
-                    meshGroup.scale.set(1.3, 1.3, 1.3);
+                    if (!meshGroup.userData || !meshGroup.userData.isW3D) {
+                        meshGroup.scale.set(1.3, 1.3, 1.3);
+                    }
                     meshGroup.traverse(c => {
                         if (c.isMesh) {
                             c.castShadow = true;
@@ -738,7 +740,7 @@
             // Enemy Command Center
             const ccType = 'center';
             const ccGroup = faction === 'china' ? createChinaCommandCenter() : faction === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
-            ccGroup.scale.set(1.35, 1.35, 1.35);
+            if (!ccGroup.userData || !ccGroup.userData.isW3D) ccGroup.scale.set(1.35, 1.35, 1.35);
             ccGroup.position.copy(pos);
             ccGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(ccGroup);
@@ -755,7 +757,7 @@
             if (faction === 'china') pwrGroup = createChinaNuclearReactor();
             else if (faction === 'gla') pwrGroup = createGLASupplyStash();
             else pwrGroup = createUSAColdFusionReactor();
-            pwrGroup.scale.set(1.35, 1.35, 1.35);
+            if (!pwrGroup.userData || !pwrGroup.userData.isW3D) pwrGroup.scale.set(1.35, 1.35, 1.35);
             pwrGroup.position.copy(pwrPos);
             pwrGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(pwrGroup);
@@ -769,7 +771,7 @@
             const facPos = pos.clone().add(new THREE.Vector3(26, 0, -20));
             facPos.y = getTerrainHeight(facPos.x, facPos.z);
             const facGroup = faction === 'china' ? createChinaWarFactory() : faction === 'gla' ? createGLAArmsDealer(false) : createUSAWarFactory();
-            facGroup.scale.set(1.35, 1.35, 1.35);
+            if (!facGroup.userData || !facGroup.userData.isW3D) facGroup.scale.set(1.35, 1.35, 1.35);
             facGroup.position.copy(facPos);
             facGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(facGroup);
@@ -783,7 +785,7 @@
             const barPos = pos.clone().add(new THREE.Vector3(-22, 0, 22));
             barPos.y = getTerrainHeight(barPos.x, barPos.z);
             const barGroup = faction === 'china' ? createChinaBarracks() : faction === 'gla' ? createGLABarracks(false) : createUSABarracks();
-            barGroup.scale.set(1.35, 1.35, 1.35);
+            if (!barGroup.userData || !barGroup.userData.isW3D) barGroup.scale.set(1.35, 1.35, 1.35);
             barGroup.position.copy(barPos);
             barGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(barGroup);
@@ -800,7 +802,7 @@
             if (faction === 'china') defGroup = createChinaGatlingCannon();
             else if (faction === 'gla') defGroup = createGLAStingerSite();
             else defGroup = createUSAPatriotBattery();
-            defGroup.scale.set(1.35, 1.35, 1.35);
+            if (!defGroup.userData || !defGroup.userData.isW3D) defGroup.scale.set(1.35, 1.35, 1.35);
             defGroup.position.copy(defPos);
             defGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(defGroup);

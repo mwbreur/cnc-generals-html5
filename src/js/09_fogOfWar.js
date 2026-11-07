@@ -993,7 +993,7 @@
             }
 
             const spawns = [];
-            if (mapSize <= 600) {
+            if (mapSize <= 1000) {
                 // Small map: 4 spawn points (quadrants)
                 const d = mapSize * 0.30;
                 spawns.push(
@@ -1002,7 +1002,7 @@
                     { id: 3, name: 'Spawn 3 (NW)', x: -d, z: -d },
                     { id: 4, name: 'Spawn 4 (SE)', x: d, z: d }
                 );
-            } else if (mapSize <= 900) {
+            } else if (mapSize <= 1800) {
                 // Medium map: 6 spawn points evenly distributed in a ring
                 const r = mapSize * 0.32;
                 const count = 6;
@@ -1171,7 +1171,7 @@
         // --- SKIRMISH & MULTIPLAYER LOBBY SLOTS MANAGEMENT ---
         function initLobbySlots(mode) {
             const mapSize = parseInt(document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size').value, 10);
-            const maxSpawns = mapSize <= 600 ? 4 : mapSize <= 900 ? 6 : 8;
+            const maxSpawns = mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8;
             const slots = mode === 'single' ? spSlots : mpSlots;
 
             slots.forEach((s, idx) => {
@@ -1213,7 +1213,7 @@
             const listEl = document.getElementById(mode === 'single' ? 'sp-slots-list' : 'mp-slots-list');
             if (!listEl) return;
             const mapSize = parseInt(document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size').value, 10);
-            const maxSpawns = mapSize <= 600 ? 4 : mapSize <= 900 ? 6 : 8;
+            const maxSpawns = mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8;
             const slots = mode === 'single' ? spSlots : mpSlots;
             const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
             const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
@@ -1325,7 +1325,7 @@
 
             if (mapType.startsWith('custom_') && savedCustomMaps[mapType]) {
                 activeCustomMap = savedCustomMaps[mapType];
-                if (sizeEl) sizeEl.value = String(activeCustomMap.size || 800);
+                if (sizeEl) sizeEl.value = String(activeCustomMap.size || 1500);
             } else {
                 activeCustomMap = null;
             }
