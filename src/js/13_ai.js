@@ -1,5 +1,6 @@
 
-        let isRightDragging = false;
+        let isPlacingBlueprint = false;
+        let blueprintPlacementPos = null;
         let rightDragStart = null;
         let lastRightPointerPos = { x: 0, y: 0 };
 
@@ -378,11 +379,13 @@ function processEnemyAIEngine() {
                     if (targetPosition) {
                         const weapon = pendingSuperweapon;
                         if (buildingTick < (weapon.cooldownUntil || 0)) {
-                            alert('Superweapon is recharging.');
+                            const secsLeft = Math.ceil((weapon.cooldownUntil - buildingTick) / 60);
+                            showNotification(`Superweapon is recharging (${secsLeft}s remaining).`, 'error');
                         } else {
                             strikeWithSuperweapon(weapon, targetPosition);
                         }
                         pendingSuperweapon = null;
+                        document.body.style.cursor = 'default';
                     }
                     return;
                 }
@@ -391,31 +394,8 @@ function processEnemyAIEngine() {
                         showNotification("Cannot place structure in water, on bridges, or obstructed ground!", "error");
                         return;
                     }
-                    if (isBlueprintValid) {
-                        const cost = getStructureCost(activeBlueprintType);
-                        if (playerResources < cost) {
-                            alert("Insufficient resources.");
-                            scene.remove(blueprintMesh);
-                            blueprintMesh = null;
-                            activeBlueprintType = null;
-                            return;
-                        }
-                        playerResources -= cost;
-                        document.getElementById('resource-display').innerText = `$${playerResources}`;
-                        
-                        const placementPosition = blueprintMesh.position.clone();
-                        placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
-                        const newStruct = buildStructureMesh(activeBlueprintType, placementPosition);
-                        playUSASound('construction');
-                        scene.remove(blueprintMesh); blueprintMesh = null; activeBlueprintType = null;
-
-                        const freeDozer = units.find(u => (u.type === 'dozer' || u.type === 'worker') && u.taskState === 'Idle');
-                        if (freeDozer) {
-                            freeDozer.taskState = 'MovingToBuild';
-                            freeDozer.targetStructure = newStruct;
-                            newStruct.dozerRef = freeDozer;
-                        }
-                    }
+                    isPlacingBlueprint = true;
+                    blueprintPlacementPos = blueprintMesh.position.clone();
                     return;
                 }
                 isDragging = true;
@@ -431,8 +411,27 @@ function processEnemyAIEngine() {
                 previousMousePosition = { x: e.clientX, y: e.clientY };
                 e.preventDefault();
             } else if (e.button === 2) { 
-                if (pendingSuperweapon) { pendingSuperweapon = null; return; }
-                if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; activeBlueprintType = null; return; }
+                if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+                    activeGeneralPower = null;
+                    document.body.style.cursor = 'default';
+                    showNotification('General power cancelled.', 'info');
+                    return;
+                }
+                if (pendingSuperweapon) {
+                    pendingSuperweapon = null;
+                    document.body.style.cursor = 'default';
+                    showNotification('Superweapon strike cancelled.', 'info');
+                    return;
+                }
+                if (blueprintMesh) {
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
+                    isPlacingBlueprint = false;
+                    document.body.style.cursor = 'default';
+                    showNotification('Construction cancelled.', 'info');
+                    return;
+                }
                 // Hold Right-Click & Drag to rapidly scroll across map
                 isRightDragging = false;
                 rightDragStart = { x: e.clientX, y: e.clientY };
@@ -466,6 +465,15 @@ function processEnemyAIEngine() {
             const groundHit = getGroundIntersectPoint();
             if (groundHit) {
                 intersect.copy(groundHit);
+                if (isPlacingBlueprint && blueprintMesh && blueprintPlacementPos) {
+                    const dx = groundHit.x - blueprintPlacementPos.x;
+                    const dz = groundHit.z - blueprintPlacementPos.z;
+                    if (Math.hypot(dx, dz) > 1.2) {
+                        blueprintRotationY = Math.atan2(dx, dz);
+                        blueprintMesh.rotation.y = blueprintRotationY;
+                    }
+                    return;
+                }
                 if (blueprintMesh) {
                     updateBlueprintPosition(intersect);
                     return;
@@ -499,9 +507,41 @@ function processEnemyAIEngine() {
                 const wasDragging = isRightDragging;
                 isRightDragging = false;
                 rightDragStart = null;
+                isPlacingBlueprint = false;
                 if (!wasDragging) {
                     issueMoveCommand(e);
                 }
+                return;
+            }
+            if (e.button === 0 && isPlacingBlueprint && blueprintMesh && blueprintPlacementPos) {
+                isPlacingBlueprint = false;
+                const cost = getStructureCost(activeBlueprintType);
+                if (playerResources < cost) {
+                    showNotification("Insufficient resources for construction.", "error");
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
+                    return;
+                }
+                playerResources -= cost;
+                const resEl = document.getElementById('resource-display');
+                if (resEl) resEl.innerText = `$${playerResources}`;
+                
+                const placementPosition = blueprintPlacementPos.clone();
+                placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
+                const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
+                playUSASound('construction');
+                scene.remove(blueprintMesh);
+                blueprintMesh = null;
+                activeBlueprintType = null;
+
+                const freeDozer = units.find(u => (u.type === 'dozer' || u.type === 'worker') && u.taskState === 'Idle');
+                if (freeDozer) {
+                    freeDozer.taskState = 'MovingToBuild';
+                    freeDozer.targetStructure = newStruct;
+                    newStruct.dozerRef = freeDozer;
+                }
+                showNotification('Construction started!', 'info');
                 return;
             }
             if (e.button !== 0 || !isDragging) return;
@@ -528,6 +568,12 @@ function processEnemyAIEngine() {
         }
 
         function onWindowWheel(e) {
+            if (blueprintMesh) {
+                e.preventDefault();
+                blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) + (e.deltaY > 0 ? Math.PI / 8 : -Math.PI / 8);
+                blueprintMesh.rotation.y = blueprintRotationY;
+                return;
+            }
             e.preventDefault(); cameraRadius += e.deltaY * 0.04 * zoomSpeed;
             cameraRadius = Math.max(35, Math.min(360, cameraRadius)); updateCameraPosition();
         }
@@ -1114,8 +1160,8 @@ function processEnemyAIEngine() {
 
         // Advanced Turret System: Locks onto active combat targets or sweeps in natural idle radar scans
         function updateTurretSystems() {
-            const allCombatUnits = [...units, ...enemyUnits];
-            allCombatUnits.forEach(unit => {
+            const allCombatEntities = [...units, ...enemyUnits, ...structures, ...enemyStructures];
+            allCombatEntities.forEach(unit => {
                 if (!unit.mesh) return;
                 const turret = unit.mesh.getObjectByName("turretSystem");
                 if (!turret) return;

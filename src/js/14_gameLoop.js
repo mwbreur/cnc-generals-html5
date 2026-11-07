@@ -73,9 +73,22 @@ function animate() {
             // ACTIVE STRUCTURE PRODUCTION QUEUES
             // =========================================================
             structures.forEach(structure => {
+                // Nuclear Reactor overcharge green radioactive venting
+                if (structure.type === 'nuclearReactor' && structure.overcharged && buildingTick % 24 === 0 && typeof spawnMuzzleFlash === 'function') {
+                    const ventPos = structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.5, 4.8, (Math.random() - 0.5) * 2.5));
+                    spawnMuzzleFlash(ventPos, 0x2ecc71, 0.45);
+                }
+
                 if (structure.productionQueue && structure.productionQueue.length > 0 && !structure.isBuilding && structure.health > 0) {
                     const item = structure.productionQueue[0];
                     item.progress = (item.progress || 0) + (dt / (item.buildTime || 4.0));
+
+                    // Vehicle Production Animation: Electric welding sparks at factory assembly bay
+                    if (structure.type === 'factory' && buildingTick % 16 === 0 && typeof spawnMuzzleFlash === 'function') {
+                        const weldPos = structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 2.2, (Math.random() - 0.5) * 3));
+                        spawnMuzzleFlash(weldPos, 0x00d2d3, 0.55);
+                    }
+
                     if (item.progress >= 1.0) {
                         // Training complete! Deploy unit at rally point or structure entrance
                         const spawnPos = structure.position.clone().add(new THREE.Vector3(structure.radius + 3.5, 0, structure.radius + 3.5));
@@ -212,19 +225,47 @@ function animate() {
                 waterMesh.position.y = baseWaterY + Math.sin(animTime * 2.5) * 0.05;
             }
 
-            // Dynamic military animations (Helicopter rotors, radar dishes, beacon lights, reactor core pulses)
+            // Dynamic military & building animations (Authentic C&C Generals building movements)
             scene.traverse(obj => {
                 if (obj.name === "comanche_rotor" || obj.name === "chinook_rotor1") {
                     obj.rotation.y += 0.45;
                 } else if (obj.name === "chinook_rotor2") {
                     obj.rotation.y -= 0.45;
                 } else if (obj.name === "radarDish") {
+                    // Continuous radar dish / array rotation
                     obj.rotation.y += 0.025;
                 } else if (obj.name === "hazardBeacon") {
-                    obj.visible = (Math.floor(animTime * 3) % 2 === 0);
+                    // Alert strobes blinking
+                    obj.visible = (Math.floor(animTime * 4) % 2 === 0);
                 } else if (obj.name === "fusionCore" || obj.name === "nukeCore") {
+                    // Reactor core pulsing energy
                     const pulse = 1.0 + Math.sin(animTime * 4) * 0.18;
                     obj.scale.set(pulse, pulse, pulse);
+                } else if (obj.name === "pumpjackArm") {
+                    // Tech Oil Derrick walking-beam pumpjack rocking motion
+                    obj.rotation.x = Math.sin(animTime * 2.2) * 0.28;
+                } else if (obj.name === "particleAcceleratorRing") {
+                    // Particle Cannon magnetic accelerator spinning ring
+                    obj.rotation.z += 0.04;
+                } else if (obj.name === "particleEmitter") {
+                    // Particle Cannon pulsating ion lens
+                    const pPulse = 1.0 + Math.sin(animTime * 5.0) * 0.14;
+                    obj.scale.set(pPulse, pPulse, pPulse);
+                } else if (obj.name === "nukeTip") {
+                    // Thermonuclear missile cryogenic breathing elevation
+                    obj.position.y = 1.8 + Math.sin(animTime * 1.5) * 0.25;
+                } else if (obj.name === "nukeBlastDoorL") {
+                    const openAmt = Math.max(0, Math.sin(animTime * 1.5)) * 0.35;
+                    obj.position.x = -2.2 - openAmt;
+                } else if (obj.name === "nukeBlastDoorR") {
+                    const openAmt = Math.max(0, Math.sin(animTime * 1.5)) * 0.35;
+                    obj.position.x = 2.2 + openAmt;
+                } else if (obj.name === "scudGantry") {
+                    // SCUD Storm launch gantry breathing angle
+                    obj.rotation.x = -Math.PI / 5.5 + Math.sin(animTime * 1.2) * 0.03;
+                } else if (obj.name === "factionFlag") {
+                    // Barracks cloth flagpole flag waving in wind
+                    obj.rotation.y = Math.sin(animTime * 3.8) * 0.18;
                 }
             });
 

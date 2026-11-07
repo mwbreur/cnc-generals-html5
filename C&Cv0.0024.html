@@ -5102,6 +5102,7 @@ function createUSABarracks() {
     mast.position.set(-4.0, 1.8, 3.4); g.add(mast);
 
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.5, 0.04), matUSAColor);
+    flag.name = "factionFlag";
     flag.position.set(-3.5, 3.0, 3.4); g.add(flag);
 
     // Rooftop air conditioning / ventilation unit
@@ -5305,14 +5306,14 @@ function createUSAParticleCannon() {
 
     // Circular magnetic accelerator ring
     const ring = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.65, 12, 24), matDarkMetal);
-    ring.rotation.x = Math.PI / 2; ring.position.y = 1.0; g.add(ring);
+    ring.rotation.x = Math.PI / 2; ring.position.y = 1.0; ring.name = "particleAcceleratorRing"; g.add(ring);
 
     // Central high-energy particle uplinking emitter
     const emitter = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 3.4, 16), matUSA);
     emitter.position.y = 2.4; emitter.castShadow = true; g.add(emitter);
 
     const beamLens = new THREE.Mesh(new THREE.SphereGeometry(1.1, 14, 12), matIonBlue);
-    beamLens.position.y = 4.2; g.add(beamLens);
+    beamLens.position.y = 4.2; beamLens.name = "particleEmitter"; g.add(beamLens);
 
     // 4 High-voltage power generator pylons
     for (let i = 0; i < 4; i++) {
@@ -5436,6 +5437,7 @@ function createChinaBarracks() {
     mast.position.set(-4.0, 1.9, 3.2); g.add(mast);
 
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.5, 0.04), matRedStar);
+    flag.name = "factionFlag";
     flag.position.set(-3.5, 3.2, 3.2); g.add(flag);
 
     return g;
@@ -5556,17 +5558,22 @@ function createChinaNukeSilo() {
     shaft.position.y = 0.4; g.add(shaft);
 
     // Heavy hydraulic blast door panels
-    [-2.2, 2.2].forEach(x => {
+    [-2.2, 2.2].forEach((x, idx) => {
         const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 6.8), matChina);
-        door.position.set(x, 0.8, 0); g.add(door);
+        door.position.set(x, 0.8, 0);
+        door.name = idx === 0 ? "nukeBlastDoorL" : "nukeBlastDoorR";
+        g.add(door);
     });
 
     // Visible nuclear missile nose tip emerging from shaft
+    const nukeTipGroup = new THREE.Group();
+    nukeTipGroup.name = "nukeTip";
     const nukeTip = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 14), matChinaColor);
-    nukeTip.position.set(0, 1.8, 0); g.add(nukeTip);
+    nukeTip.position.set(0, 1.8, 0); nukeTipGroup.add(nukeTip);
 
     const warhead = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 10), matNukeGreen);
-    warhead.position.set(0, 2.9, 0); g.add(warhead);
+    warhead.position.set(0, 2.9, 0); nukeTipGroup.add(warhead);
+    g.add(nukeTipGroup);
 
     return g;
 }
@@ -5867,6 +5874,7 @@ function createGLAScudStorm() {
         const z = (i < 2 ? -2.2 : 2.2);
 
         const missileGroup = new THREE.Group();
+        missileGroup.name = "scudGantry";
         missileGroup.position.set(x, 0.85, z);
         missileGroup.rotation.x = -Math.PI / 5.5; // Elevated ballistic angle
 
@@ -8988,7 +8996,7 @@ function playUSASound(type, options = {}) {
             return null;
         }
 
-        function buildStructureMesh(type, pos, instant = false) {
+        function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
             let group;
             const f = selectedFaction;
             if (type === 'center') {
@@ -9049,10 +9057,12 @@ function playUSASound(type, options = {}) {
 
             group.scale.set(1.35, 1.35, 1.35);
             group.position.copy(pos);
+            group.rotation.y = rotationY || 0;
             
             const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
             const structObj = {
                 type: type, mesh: group, position: pos.clone(),
+                rotationY: rotationY || 0,
                 radius: getStructureFootprint(type).radius,
                 isBuilding: !instant, buildProgress: instant ? 100 : 0, dozerRef: null,
                 health: 1200, maxHealth: 1200,
@@ -9066,7 +9076,7 @@ function playUSASound(type, options = {}) {
                 broadcastNetPacket({
                     type: 'build_structure',
                     structType: type,
-                    position: { x: pos.x, y: pos.y, z: pos.z },
+                    position: { x: pos.x, y: pos.y, z: pos.z, rotationY: rotationY || 0 },
                     netId: structNetId
                 });
             }
@@ -9469,6 +9479,9 @@ function playUSASound(type, options = {}) {
                     { id: 'advancedTraining', name: 'ADVANCED TRAINING', cost: 800, desc: 'Doubles combat experience gain, rapidly promoting units to Veteran rank.' },
                     { id: 'chemicalSuits', name: 'CHEMICAL SUITS', cost: 800, desc: 'USA forces gain +50% resistance to toxin, anthrax, and radiation damage.' },
                     { id: 'supplyLines', name: 'SUPPLY LINES', cost: 800, desc: 'USA Supply Trucks and Chinooks bring back +10% extra cash per delivery.' }
+                ],
+                particleCannon: [
+                    { id: 'superweapon', name: 'PARTICLE BEAM STRIKE', cost: 0, isSuperweapon: true, desc: 'Channels space-based orbital particle beam weapon at target coordinates anywhere on the battlefield.' }
                 ]
             },
             china: {
@@ -9510,6 +9523,7 @@ function playUSASound(type, options = {}) {
                     { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the internet center.' }
                 ],
                 nukeSilo: [
+                    { id: 'superweapon', name: 'NUCLEAR MISSILE STRIKE', cost: 0, isSuperweapon: true, desc: 'Launches thermonuclear ballistic missile causing catastrophic area destruction and radiation.' },
                     { id: 'uraniumShells', name: 'URANIUM SHELLS', cost: 1200, desc: 'Grants +25% damage to Battlemaster and Overlord tank cannons.' },
                     { id: 'nuclearTanks', name: 'NUCLEAR ENGINES', cost: 800, desc: 'Increases Battlemaster and Overlord tank movement speed by +25%.' },
                     { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the silo.' }
@@ -9561,6 +9575,10 @@ function playUSASound(type, options = {}) {
                 ],
                 tunnel: [
                     { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths this Tunnel Network until it engages enemies.' }
+                ],
+                scudStorm: [
+                    { id: 'superweapon', name: 'SCUD STORM SALVO', cost: 0, isSuperweapon: true, desc: 'Fires a 9-missile ballistic SCUD rocket salvo loaded with deadly Anthrax Beta.' },
+                    { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths the SCUD Storm with camouflage netting.' }
                 ],
                 stingerSite: [
                     { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths this Stinger Site until it fires upon an aircraft.' }
@@ -11378,7 +11396,18 @@ function initRadarMinimap() {
         const worldX = (px / radarCanvas.width - 0.5) * mapSize;
         const worldZ = (py / radarCanvas.height - 0.5) * mapSize;
 
-        if (e.buttons === 1 || e.button === 0) { // Left-click drag: Pan camera
+        if (e.buttons === 1 || e.button === 0) {
+            if (pendingSuperweapon) {
+                const targetPos = new THREE.Vector3(worldX, typeof getTerrainHeight === 'function' ? getTerrainHeight(worldX, worldZ) : 0, worldZ);
+                strikeWithSuperweapon(pendingSuperweapon, targetPos);
+                return;
+            }
+            if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+                const targetPos = new THREE.Vector3(worldX, typeof getTerrainHeight === 'function' ? getTerrainHeight(worldX, worldZ) : 0, worldZ);
+                executeGeneralsPowerAt(targetPos);
+                return;
+            }
+            // Left-click drag: Pan camera
             cameraTarget.x = worldX;
             cameraTarget.z = worldZ;
             updateCameraPosition();
@@ -12244,6 +12273,20 @@ function assignUpgradeToSlot(slotIndex, upg, structure, isConstructing) {
             badge = canAfford ? 'READY' : 'FUNDS';
             disabled = !canAfford || isConstructing;
         }
+    } else if (upg.isSuperweapon || upg.id === 'superweapon') {
+        const onCooldown = structure.cooldownUntil && (typeof buildingTick !== 'undefined') && buildingTick < structure.cooldownUntil;
+        if (isConstructing) {
+            badge = 'BUILDING';
+            disabled = true;
+        } else if (onCooldown) {
+            const secsLeft = Math.ceil((structure.cooldownUntil - buildingTick) / 60);
+            badge = `${secsLeft}s ⏱`;
+            disabled = true;
+        } else {
+            badge = 'READY ⚡';
+            disabled = false;
+        }
+        costStr = 'LAUNCH';
     } else if (upg.isAbility) {
         const onCooldown = structure.abilityCooldownUntil && (typeof buildingTick !== 'undefined') && buildingTick < structure.abilityCooldownUntil;
         const canAfford = playerResources >= upg.cost;
@@ -13005,6 +13048,20 @@ window.addEventListener('keydown', e => {
         return;
     }
 
+    // Blueprint Rotation Keys: R / Q / E
+    if (blueprintMesh) {
+        if (k === 'r' || k === 'e') {
+            blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) + Math.PI / 4;
+            blueprintMesh.rotation.y = blueprintRotationY;
+            return;
+        }
+        if (k === 'q') {
+            blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) - Math.PI / 4;
+            blueprintMesh.rotation.y = blueprintRotationY;
+            return;
+        }
+    }
+
     // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all / toggle menu
     if (e.key === 'Escape' || k === 'escape') {
         const menu = document.getElementById('start-menu');
@@ -13016,16 +13073,19 @@ window.addEventListener('keydown', e => {
             scene.remove(blueprintMesh);
             blueprintMesh = null;
             activeBlueprintType = null;
+            document.body.style.cursor = 'default';
             showNotification('Construction cancelled.', 'info');
             return;
         }
         if (pendingSuperweapon) {
             pendingSuperweapon = null;
+            document.body.style.cursor = 'default';
             showNotification('Targeting cancelled.', 'info');
             return;
         }
         if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
             activeGeneralPower = null;
+            document.body.style.cursor = 'default';
             showNotification('Power cancelled.', 'info');
             return;
         }
@@ -13519,10 +13579,17 @@ function executeStructureUpgradeOrAction(upg, structure) {
         return;
     }
 
-    if (upg.id === 'superweapon') {
-        if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Superweapon is recharging.', 'error'); return; }
+    if (upg.id === 'superweapon' || upg.isSuperweapon) {
+        if (buildingTick < (structure.cooldownUntil || 0)) {
+            const secsLeft = Math.ceil((structure.cooldownUntil - buildingTick) / 60);
+            showNotification(`Superweapon is recharging (${secsLeft}s remaining).`, 'error');
+            return;
+        }
         pendingSuperweapon = structure;
-        showNotification(`Click map to target ${structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Strike' : 'SCUD Storm'}. Right-click to cancel.`, 'info');
+        document.body.style.cursor = 'crosshair';
+        const weaponTitle = structure.type === 'particleCannon' ? 'Orbital Particle Beam' : structure.type === 'nukeSilo' ? 'Thermonuclear Missile' : 'SCUD Storm Salvo';
+        showNotification(`⚡ TARGETING READY: Left-click target coordinates on terrain or minimap to fire ${weaponTitle}! (Right-click or Esc to cancel)`, 'warning');
+        if (typeof playUSASound === 'function') playUSASound('radio_chirp');
         return;
     }
 
@@ -13693,9 +13760,11 @@ function strikeWithSuperweapon(structure, targetPosition) {
         createImpactExplosion(targetPosition);
     }
     structure.lastFired = buildingTick;
-    structure.cooldownUntil = buildingTick + 1800;
+    structure.cooldownUntil = buildingTick + 1800; // 30s cooldown
     pendingSuperweapon = null;
-    showNotification('Superweapon strike confirmed on target coordinates!', 'info');
+    document.body.style.cursor = 'default';
+    showNotification('Superweapon strike confirmed on target coordinates!', 'success');
+    updateSidebar();
 }
 
 function renderStructureMenu(structure) {
@@ -14158,10 +14227,15 @@ let activeGeneralPower = null;
 
 function activateGeneralsPower(powerType) {
     activeGeneralPower = powerType;
+    document.body.style.cursor = 'crosshair';
     if (powerType === 'spySatellite') {
-        showNotification('USA Spy Satellite: Click on the terrain or minimap to survey target sector.', 'info');
+        showNotification('USA Spy Satellite: Click terrain or minimap to survey target sector (Right-click/Esc to cancel).', 'info');
     } else if (powerType === 'a10Strike') {
-        showNotification('A-10 Thunderbolt Strike: Click ground target to order CAS air strike.', 'info');
+        showNotification('A-10 Thunderbolt Strike: Click ground target to order CAS air strike (Right-click/Esc to cancel).', 'info');
+    } else if (powerType === 'artilleryBarrage') {
+        showNotification('Red Army Artillery Barrage: Click ground target to order 152mm artillery strike.', 'info');
+    } else if (powerType === 'rebelAmbush') {
+        showNotification('GLA Rebel Ambush: Click ground target to deploy armed subterranean guerrilla cell.', 'info');
     }
 }
 
@@ -14169,6 +14243,7 @@ function executeGeneralsPowerAt(pos) {
     if (!activeGeneralPower) return false;
     const p = activeGeneralPower;
     activeGeneralPower = null;
+    document.body.style.cursor = 'default';
 
     if (p === 'spySatellite') {
         if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, 42, 1800);
@@ -14205,6 +14280,25 @@ function executeGeneralsPowerAt(pos) {
                     }, r * 150);
                 }
             }, i * 350);
+        }
+        return true;
+    } else if (p === 'artilleryBarrage') {
+        showNotification('★ Heavy 152mm Artillery Barrage firing on coordinates!', 'warning');
+        playAudio('explosion');
+        for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+                const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff5722, 3.2, true);
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', units[0] || { teamId: playerTeamId });
+            }, i * 250);
+        }
+        return true;
+    } else if (p === 'rebelAmbush') {
+        showNotification('★ Rebel Ambush cell surfacing from tunnels!', 'success');
+        playAudio('construction', {}, 'gla');
+        for (let i = 0; i < 4; i++) {
+            const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6));
+            if (typeof spawnUnit === 'function') spawnUnit('rebel', rPos);
         }
         return true;
     }
@@ -14899,79 +14993,125 @@ function executeWeaponFire(attacker, target) {
     }
 }
 
+let blueprintRotationY = 0;
+window.blueprintRotationY = 0;
+
 function activateBlueprint(type) {
-            if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; }
+    if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; }
 
-            // Prerequisite tech tree check!
-            const structReq = getStructureTechPrerequisite(type);
-            if (structReq && !hasCompletedStructure(structReq.building, structReq.altBuilding)) {
-                showNotification(`Construction blocked: Requires operational ${structReq.name}!`, 'error');
-                return;
-            }
+    // Prerequisite tech tree check!
+    const structReq = getStructureTechPrerequisite(type);
+    if (structReq && !hasCompletedStructure(structReq.building, structReq.altBuilding)) {
+        showNotification(`Construction blocked: Requires operational ${structReq.name}!`, 'error');
+        return;
+    }
 
-            const cost = getStructureCost(type);
-            if (!cost || playerResources < cost) { showNotification("Insufficient resources for construction.", "error"); return; }
+    const cost = getStructureCost(type);
+    if (!cost || playerResources < cost) { showNotification("Insufficient resources for construction.", "error"); return; }
 
-            activeBlueprintType = type;
-            const footprint = getStructureFootprint(type);
-            const size = { x: footprint.width, y: footprint.height, z: footprint.depth };
-            const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
-            const mat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.4 });
-            
-            blueprintMesh = new THREE.Mesh(geo, mat);
-            blueprintMesh.position.set(0, size.y / 2, 0);
-            scene.add(blueprintMesh);
+    activeBlueprintType = type;
+    blueprintRotationY = 0;
+    window.blueprintRotationY = 0;
+
+    const footprint = getStructureFootprint(type);
+    const size = { x: footprint.width, y: footprint.height, z: footprint.depth };
+
+    const group = new THREE.Group();
+    group.name = "blueprintGroup";
+
+    // 1. Semi-transparent foundation footprint box
+    const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.45 });
+    const boxMesh = new THREE.Mesh(geo, mat);
+    boxMesh.name = "blueprintBox";
+    group.add(boxMesh);
+
+    // 2. Wireframe grid cage
+    const wireGeo = new THREE.EdgesGeometry(geo);
+    const wireMat = new THREE.LineBasicMaterial({ color: 0x00ffcc, linewidth: 2 });
+    const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
+    wireMesh.name = "blueprintWire";
+    group.add(wireMesh);
+
+    // 3. Directional Front-Facing Pointer Arrow (shows building front entrance/facing orientation)
+    const arrowGroup = new THREE.Group();
+    arrowGroup.name = "blueprintArrow";
+    arrowGroup.position.set(0, -size.y / 2 + 0.15, size.z / 2 + 1.2);
+
+    const arrowHead = new THREE.Mesh(new THREE.ConeGeometry(size.x * 0.18, 1.8, 4), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+    arrowHead.rotation.x = Math.PI / 2;
+    arrowGroup.add(arrowHead);
+
+    const arrowShaft = new THREE.Mesh(new THREE.BoxGeometry(size.x * 0.08, 0.15, 1.2), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+    arrowShaft.position.z = -0.8;
+    arrowGroup.add(arrowShaft);
+
+    group.add(arrowGroup);
+
+    blueprintMesh = group;
+    blueprintMesh.position.set(0, size.y / 2, 0);
+    blueprintMesh.rotation.y = 0;
+    scene.add(blueprintMesh);
+
+    showNotification(`Place ${footprint.name || type}. Rotate with Mouse Wheel, [R], [Q], [E], or Click-and-Drag! Right-click to cancel.`, 'info');
+}
+
+function updateBlueprintPosition(intersectPoint) {
+    if (!blueprintMesh) return;
+    blueprintMesh.position.x = intersectPoint.x;
+    blueprintMesh.position.z = intersectPoint.z;
+    const groundH = getTerrainHeight(intersectPoint.x, intersectPoint.z);
+    blueprintMesh.position.y = groundH + getStructureFootprint(activeBlueprintType).height / 2;
+    blueprintMesh.rotation.y = (typeof blueprintRotationY !== 'undefined') ? blueprintRotationY : 0;
+
+    isBlueprintValid = true;
+    const footprint = getStructureFootprint(activeBlueprintType);
+    const rBoundary = footprint.radius;
+
+    // 1. Water restriction: Buildings CANNOT be placed in water or on riverbeds!
+    if (groundH < currentWaterLevel) {
+        isBlueprintValid = false;
+    }
+
+    // Check footprint perimeter samples to ensure the entire foundation is on dry land
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+        const px = intersectPoint.x + Math.cos(a) * (rBoundary * 0.85);
+        const pz = intersectPoint.z + Math.sin(a) * (rBoundary * 0.85);
+        if (getTerrainHeight(px, pz) < currentWaterLevel) {
+            isBlueprintValid = false;
+            break;
         }
+    }
 
-        function updateBlueprintPosition(intersectPoint) {
-            if (!blueprintMesh) return;
-            blueprintMesh.position.x = intersectPoint.x;
-            blueprintMesh.position.z = intersectPoint.z;
-            const groundH = getTerrainHeight(intersectPoint.x, intersectPoint.z);
-            blueprintMesh.position.y = groundH + getStructureFootprint(activeBlueprintType).height / 2;
+    // 2. Bridges restriction: Cannot place buildings on bridge decks
+    if (mapBridges.some(b => isPointOnBridge(intersectPoint.x, intersectPoint.z, b))) {
+        isBlueprintValid = false;
+    }
 
-            isBlueprintValid = true;
-            const footprint = getStructureFootprint(activeBlueprintType);
-            const rBoundary = footprint.radius;
+    // 3. Distance to existing structures
+    for (let s of structures) {
+        const d = intersectPoint.distanceTo(s.position);
+        if (d < (rBoundary + s.radius)) { isBlueprintValid = false; break; }
+    }
 
-            // 1. Water restriction: Buildings CANNOT be placed in water or on riverbeds!
-            if (groundH < currentWaterLevel) {
-                isBlueprintValid = false;
-            }
+    // 4. Map edge bounds
+    const limit = currentMapSize * 0.44;
+    if (Math.abs(intersectPoint.x) > limit || Math.abs(intersectPoint.z) > limit) isBlueprintValid = false;
 
-            // Check footprint perimeter samples to ensure the entire foundation is on dry land
-            for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-                const px = intersectPoint.x + Math.cos(a) * (rBoundary * 0.85);
-                const pz = intersectPoint.z + Math.sin(a) * (rBoundary * 0.85);
-                if (getTerrainHeight(px, pz) < currentWaterLevel) {
-                    isBlueprintValid = false;
-                    break;
-                }
-            }
-
-            // 2. Bridges restriction: Cannot place buildings on bridge decks
-            if (mapBridges.some(b => isPointOnBridge(intersectPoint.x, intersectPoint.z, b))) {
-                isBlueprintValid = false;
-            }
-
-            // 3. Distance to existing structures
-            for (let s of structures) {
-                const d = intersectPoint.distanceTo(s.position);
-                if (d < (rBoundary + s.radius)) { isBlueprintValid = false; break; }
-            }
-
-            // 4. Map edge bounds
-            const limit = currentMapSize * 0.44;
-            if (Math.abs(intersectPoint.x) > limit || Math.abs(intersectPoint.z) > limit) isBlueprintValid = false;
-
-            blueprintMesh.material.color.setHex(isBlueprintValid ? 0x00ffcc : 0xff4757);
+    const colorHex = isBlueprintValid ? 0x00ffcc : 0xff4757;
+    blueprintMesh.traverse(child => {
+        if (child.material && child.material.color) {
+            child.material.color.setHex(colorHex);
         }
+    });
+}
 let aiProductionTick = 0;
 
 
 // --- MODULE: 13_ai.js ---
 
-        let isRightDragging = false;
+        let isPlacingBlueprint = false;
+        let blueprintPlacementPos = null;
         let rightDragStart = null;
         let lastRightPointerPos = { x: 0, y: 0 };
 
@@ -15350,11 +15490,13 @@ function processEnemyAIEngine() {
                     if (targetPosition) {
                         const weapon = pendingSuperweapon;
                         if (buildingTick < (weapon.cooldownUntil || 0)) {
-                            alert('Superweapon is recharging.');
+                            const secsLeft = Math.ceil((weapon.cooldownUntil - buildingTick) / 60);
+                            showNotification(`Superweapon is recharging (${secsLeft}s remaining).`, 'error');
                         } else {
                             strikeWithSuperweapon(weapon, targetPosition);
                         }
                         pendingSuperweapon = null;
+                        document.body.style.cursor = 'default';
                     }
                     return;
                 }
@@ -15363,31 +15505,8 @@ function processEnemyAIEngine() {
                         showNotification("Cannot place structure in water, on bridges, or obstructed ground!", "error");
                         return;
                     }
-                    if (isBlueprintValid) {
-                        const cost = getStructureCost(activeBlueprintType);
-                        if (playerResources < cost) {
-                            alert("Insufficient resources.");
-                            scene.remove(blueprintMesh);
-                            blueprintMesh = null;
-                            activeBlueprintType = null;
-                            return;
-                        }
-                        playerResources -= cost;
-                        document.getElementById('resource-display').innerText = `$${playerResources}`;
-                        
-                        const placementPosition = blueprintMesh.position.clone();
-                        placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
-                        const newStruct = buildStructureMesh(activeBlueprintType, placementPosition);
-                        playUSASound('construction');
-                        scene.remove(blueprintMesh); blueprintMesh = null; activeBlueprintType = null;
-
-                        const freeDozer = units.find(u => (u.type === 'dozer' || u.type === 'worker') && u.taskState === 'Idle');
-                        if (freeDozer) {
-                            freeDozer.taskState = 'MovingToBuild';
-                            freeDozer.targetStructure = newStruct;
-                            newStruct.dozerRef = freeDozer;
-                        }
-                    }
+                    isPlacingBlueprint = true;
+                    blueprintPlacementPos = blueprintMesh.position.clone();
                     return;
                 }
                 isDragging = true;
@@ -15403,8 +15522,27 @@ function processEnemyAIEngine() {
                 previousMousePosition = { x: e.clientX, y: e.clientY };
                 e.preventDefault();
             } else if (e.button === 2) { 
-                if (pendingSuperweapon) { pendingSuperweapon = null; return; }
-                if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; activeBlueprintType = null; return; }
+                if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+                    activeGeneralPower = null;
+                    document.body.style.cursor = 'default';
+                    showNotification('General power cancelled.', 'info');
+                    return;
+                }
+                if (pendingSuperweapon) {
+                    pendingSuperweapon = null;
+                    document.body.style.cursor = 'default';
+                    showNotification('Superweapon strike cancelled.', 'info');
+                    return;
+                }
+                if (blueprintMesh) {
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
+                    isPlacingBlueprint = false;
+                    document.body.style.cursor = 'default';
+                    showNotification('Construction cancelled.', 'info');
+                    return;
+                }
                 // Hold Right-Click & Drag to rapidly scroll across map
                 isRightDragging = false;
                 rightDragStart = { x: e.clientX, y: e.clientY };
@@ -15438,6 +15576,15 @@ function processEnemyAIEngine() {
             const groundHit = getGroundIntersectPoint();
             if (groundHit) {
                 intersect.copy(groundHit);
+                if (isPlacingBlueprint && blueprintMesh && blueprintPlacementPos) {
+                    const dx = groundHit.x - blueprintPlacementPos.x;
+                    const dz = groundHit.z - blueprintPlacementPos.z;
+                    if (Math.hypot(dx, dz) > 1.2) {
+                        blueprintRotationY = Math.atan2(dx, dz);
+                        blueprintMesh.rotation.y = blueprintRotationY;
+                    }
+                    return;
+                }
                 if (blueprintMesh) {
                     updateBlueprintPosition(intersect);
                     return;
@@ -15471,9 +15618,41 @@ function processEnemyAIEngine() {
                 const wasDragging = isRightDragging;
                 isRightDragging = false;
                 rightDragStart = null;
+                isPlacingBlueprint = false;
                 if (!wasDragging) {
                     issueMoveCommand(e);
                 }
+                return;
+            }
+            if (e.button === 0 && isPlacingBlueprint && blueprintMesh && blueprintPlacementPos) {
+                isPlacingBlueprint = false;
+                const cost = getStructureCost(activeBlueprintType);
+                if (playerResources < cost) {
+                    showNotification("Insufficient resources for construction.", "error");
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
+                    return;
+                }
+                playerResources -= cost;
+                const resEl = document.getElementById('resource-display');
+                if (resEl) resEl.innerText = `$${playerResources}`;
+                
+                const placementPosition = blueprintPlacementPos.clone();
+                placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
+                const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
+                playUSASound('construction');
+                scene.remove(blueprintMesh);
+                blueprintMesh = null;
+                activeBlueprintType = null;
+
+                const freeDozer = units.find(u => (u.type === 'dozer' || u.type === 'worker') && u.taskState === 'Idle');
+                if (freeDozer) {
+                    freeDozer.taskState = 'MovingToBuild';
+                    freeDozer.targetStructure = newStruct;
+                    newStruct.dozerRef = freeDozer;
+                }
+                showNotification('Construction started!', 'info');
                 return;
             }
             if (e.button !== 0 || !isDragging) return;
@@ -15500,6 +15679,12 @@ function processEnemyAIEngine() {
         }
 
         function onWindowWheel(e) {
+            if (blueprintMesh) {
+                e.preventDefault();
+                blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) + (e.deltaY > 0 ? Math.PI / 8 : -Math.PI / 8);
+                blueprintMesh.rotation.y = blueprintRotationY;
+                return;
+            }
             e.preventDefault(); cameraRadius += e.deltaY * 0.04 * zoomSpeed;
             cameraRadius = Math.max(35, Math.min(360, cameraRadius)); updateCameraPosition();
         }
@@ -16086,8 +16271,8 @@ function processEnemyAIEngine() {
 
         // Advanced Turret System: Locks onto active combat targets or sweeps in natural idle radar scans
         function updateTurretSystems() {
-            const allCombatUnits = [...units, ...enemyUnits];
-            allCombatUnits.forEach(unit => {
+            const allCombatEntities = [...units, ...enemyUnits, ...structures, ...enemyStructures];
+            allCombatEntities.forEach(unit => {
                 if (!unit.mesh) return;
                 const turret = unit.mesh.getObjectByName("turretSystem");
                 if (!turret) return;
@@ -16284,9 +16469,22 @@ function animate() {
             // ACTIVE STRUCTURE PRODUCTION QUEUES
             // =========================================================
             structures.forEach(structure => {
+                // Nuclear Reactor overcharge green radioactive venting
+                if (structure.type === 'nuclearReactor' && structure.overcharged && buildingTick % 24 === 0 && typeof spawnMuzzleFlash === 'function') {
+                    const ventPos = structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.5, 4.8, (Math.random() - 0.5) * 2.5));
+                    spawnMuzzleFlash(ventPos, 0x2ecc71, 0.45);
+                }
+
                 if (structure.productionQueue && structure.productionQueue.length > 0 && !structure.isBuilding && structure.health > 0) {
                     const item = structure.productionQueue[0];
                     item.progress = (item.progress || 0) + (dt / (item.buildTime || 4.0));
+
+                    // Vehicle Production Animation: Electric welding sparks at factory assembly bay
+                    if (structure.type === 'factory' && buildingTick % 16 === 0 && typeof spawnMuzzleFlash === 'function') {
+                        const weldPos = structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 2.2, (Math.random() - 0.5) * 3));
+                        spawnMuzzleFlash(weldPos, 0x00d2d3, 0.55);
+                    }
+
                     if (item.progress >= 1.0) {
                         // Training complete! Deploy unit at rally point or structure entrance
                         const spawnPos = structure.position.clone().add(new THREE.Vector3(structure.radius + 3.5, 0, structure.radius + 3.5));
@@ -16423,19 +16621,47 @@ function animate() {
                 waterMesh.position.y = baseWaterY + Math.sin(animTime * 2.5) * 0.05;
             }
 
-            // Dynamic military animations (Helicopter rotors, radar dishes, beacon lights, reactor core pulses)
+            // Dynamic military & building animations (Authentic C&C Generals building movements)
             scene.traverse(obj => {
                 if (obj.name === "comanche_rotor" || obj.name === "chinook_rotor1") {
                     obj.rotation.y += 0.45;
                 } else if (obj.name === "chinook_rotor2") {
                     obj.rotation.y -= 0.45;
                 } else if (obj.name === "radarDish") {
+                    // Continuous radar dish / array rotation
                     obj.rotation.y += 0.025;
                 } else if (obj.name === "hazardBeacon") {
-                    obj.visible = (Math.floor(animTime * 3) % 2 === 0);
+                    // Alert strobes blinking
+                    obj.visible = (Math.floor(animTime * 4) % 2 === 0);
                 } else if (obj.name === "fusionCore" || obj.name === "nukeCore") {
+                    // Reactor core pulsing energy
                     const pulse = 1.0 + Math.sin(animTime * 4) * 0.18;
                     obj.scale.set(pulse, pulse, pulse);
+                } else if (obj.name === "pumpjackArm") {
+                    // Tech Oil Derrick walking-beam pumpjack rocking motion
+                    obj.rotation.x = Math.sin(animTime * 2.2) * 0.28;
+                } else if (obj.name === "particleAcceleratorRing") {
+                    // Particle Cannon magnetic accelerator spinning ring
+                    obj.rotation.z += 0.04;
+                } else if (obj.name === "particleEmitter") {
+                    // Particle Cannon pulsating ion lens
+                    const pPulse = 1.0 + Math.sin(animTime * 5.0) * 0.14;
+                    obj.scale.set(pPulse, pPulse, pPulse);
+                } else if (obj.name === "nukeTip") {
+                    // Thermonuclear missile cryogenic breathing elevation
+                    obj.position.y = 1.8 + Math.sin(animTime * 1.5) * 0.25;
+                } else if (obj.name === "nukeBlastDoorL") {
+                    const openAmt = Math.max(0, Math.sin(animTime * 1.5)) * 0.35;
+                    obj.position.x = -2.2 - openAmt;
+                } else if (obj.name === "nukeBlastDoorR") {
+                    const openAmt = Math.max(0, Math.sin(animTime * 1.5)) * 0.35;
+                    obj.position.x = 2.2 + openAmt;
+                } else if (obj.name === "scudGantry") {
+                    // SCUD Storm launch gantry breathing angle
+                    obj.rotation.x = -Math.PI / 5.5 + Math.sin(animTime * 1.2) * 0.03;
+                } else if (obj.name === "factionFlag") {
+                    // Barracks cloth flagpole flag waving in wind
+                    obj.rotation.y = Math.sin(animTime * 3.8) * 0.18;
                 }
             });
 

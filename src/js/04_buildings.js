@@ -131,6 +131,7 @@ function createUSABarracks() {
     mast.position.set(-4.0, 1.8, 3.4); g.add(mast);
 
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.5, 0.04), matUSAColor);
+    flag.name = "factionFlag";
     flag.position.set(-3.5, 3.0, 3.4); g.add(flag);
 
     // Rooftop air conditioning / ventilation unit
@@ -334,14 +335,14 @@ function createUSAParticleCannon() {
 
     // Circular magnetic accelerator ring
     const ring = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.65, 12, 24), matDarkMetal);
-    ring.rotation.x = Math.PI / 2; ring.position.y = 1.0; g.add(ring);
+    ring.rotation.x = Math.PI / 2; ring.position.y = 1.0; ring.name = "particleAcceleratorRing"; g.add(ring);
 
     // Central high-energy particle uplinking emitter
     const emitter = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 3.4, 16), matUSA);
     emitter.position.y = 2.4; emitter.castShadow = true; g.add(emitter);
 
     const beamLens = new THREE.Mesh(new THREE.SphereGeometry(1.1, 14, 12), matIonBlue);
-    beamLens.position.y = 4.2; g.add(beamLens);
+    beamLens.position.y = 4.2; beamLens.name = "particleEmitter"; g.add(beamLens);
 
     // 4 High-voltage power generator pylons
     for (let i = 0; i < 4; i++) {
@@ -465,6 +466,7 @@ function createChinaBarracks() {
     mast.position.set(-4.0, 1.9, 3.2); g.add(mast);
 
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.5, 0.04), matRedStar);
+    flag.name = "factionFlag";
     flag.position.set(-3.5, 3.2, 3.2); g.add(flag);
 
     return g;
@@ -585,17 +587,22 @@ function createChinaNukeSilo() {
     shaft.position.y = 0.4; g.add(shaft);
 
     // Heavy hydraulic blast door panels
-    [-2.2, 2.2].forEach(x => {
+    [-2.2, 2.2].forEach((x, idx) => {
         const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 6.8), matChina);
-        door.position.set(x, 0.8, 0); g.add(door);
+        door.position.set(x, 0.8, 0);
+        door.name = idx === 0 ? "nukeBlastDoorL" : "nukeBlastDoorR";
+        g.add(door);
     });
 
     // Visible nuclear missile nose tip emerging from shaft
+    const nukeTipGroup = new THREE.Group();
+    nukeTipGroup.name = "nukeTip";
     const nukeTip = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 14), matChinaColor);
-    nukeTip.position.set(0, 1.8, 0); g.add(nukeTip);
+    nukeTip.position.set(0, 1.8, 0); nukeTipGroup.add(nukeTip);
 
     const warhead = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 10), matNukeGreen);
-    warhead.position.set(0, 2.9, 0); g.add(warhead);
+    warhead.position.set(0, 2.9, 0); nukeTipGroup.add(warhead);
+    g.add(nukeTipGroup);
 
     return g;
 }
@@ -896,6 +903,7 @@ function createGLAScudStorm() {
         const z = (i < 2 ? -2.2 : 2.2);
 
         const missileGroup = new THREE.Group();
+        missileGroup.name = "scudGantry";
         missileGroup.position.set(x, 0.85, z);
         missileGroup.rotation.x = -Math.PI / 5.5; // Elevated ballistic angle
 

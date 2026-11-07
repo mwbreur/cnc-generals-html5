@@ -41,7 +41,18 @@ function initRadarMinimap() {
         const worldX = (px / radarCanvas.width - 0.5) * mapSize;
         const worldZ = (py / radarCanvas.height - 0.5) * mapSize;
 
-        if (e.buttons === 1 || e.button === 0) { // Left-click drag: Pan camera
+        if (e.buttons === 1 || e.button === 0) {
+            if (pendingSuperweapon) {
+                const targetPos = new THREE.Vector3(worldX, typeof getTerrainHeight === 'function' ? getTerrainHeight(worldX, worldZ) : 0, worldZ);
+                strikeWithSuperweapon(pendingSuperweapon, targetPos);
+                return;
+            }
+            if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+                const targetPos = new THREE.Vector3(worldX, typeof getTerrainHeight === 'function' ? getTerrainHeight(worldX, worldZ) : 0, worldZ);
+                executeGeneralsPowerAt(targetPos);
+                return;
+            }
+            // Left-click drag: Pan camera
             cameraTarget.x = worldX;
             cameraTarget.z = worldZ;
             updateCameraPosition();
@@ -907,6 +918,20 @@ function assignUpgradeToSlot(slotIndex, upg, structure, isConstructing) {
             badge = canAfford ? 'READY' : 'FUNDS';
             disabled = !canAfford || isConstructing;
         }
+    } else if (upg.isSuperweapon || upg.id === 'superweapon') {
+        const onCooldown = structure.cooldownUntil && (typeof buildingTick !== 'undefined') && buildingTick < structure.cooldownUntil;
+        if (isConstructing) {
+            badge = 'BUILDING';
+            disabled = true;
+        } else if (onCooldown) {
+            const secsLeft = Math.ceil((structure.cooldownUntil - buildingTick) / 60);
+            badge = `${secsLeft}s ⏱`;
+            disabled = true;
+        } else {
+            badge = 'READY ⚡';
+            disabled = false;
+        }
+        costStr = 'LAUNCH';
     } else if (upg.isAbility) {
         const onCooldown = structure.abilityCooldownUntil && (typeof buildingTick !== 'undefined') && buildingTick < structure.abilityCooldownUntil;
         const canAfford = playerResources >= upg.cost;
@@ -1668,6 +1693,20 @@ window.addEventListener('keydown', e => {
         return;
     }
 
+    // Blueprint Rotation Keys: R / Q / E
+    if (blueprintMesh) {
+        if (k === 'r' || k === 'e') {
+            blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) + Math.PI / 4;
+            blueprintMesh.rotation.y = blueprintRotationY;
+            return;
+        }
+        if (k === 'q') {
+            blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) - Math.PI / 4;
+            blueprintMesh.rotation.y = blueprintRotationY;
+            return;
+        }
+    }
+
     // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all / toggle menu
     if (e.key === 'Escape' || k === 'escape') {
         const menu = document.getElementById('start-menu');
@@ -1679,16 +1718,19 @@ window.addEventListener('keydown', e => {
             scene.remove(blueprintMesh);
             blueprintMesh = null;
             activeBlueprintType = null;
+            document.body.style.cursor = 'default';
             showNotification('Construction cancelled.', 'info');
             return;
         }
         if (pendingSuperweapon) {
             pendingSuperweapon = null;
+            document.body.style.cursor = 'default';
             showNotification('Targeting cancelled.', 'info');
             return;
         }
         if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
             activeGeneralPower = null;
+            document.body.style.cursor = 'default';
             showNotification('Power cancelled.', 'info');
             return;
         }
@@ -2182,10 +2224,17 @@ function executeStructureUpgradeOrAction(upg, structure) {
         return;
     }
 
-    if (upg.id === 'superweapon') {
-        if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Superweapon is recharging.', 'error'); return; }
+    if (upg.id === 'superweapon' || upg.isSuperweapon) {
+        if (buildingTick < (structure.cooldownUntil || 0)) {
+            const secsLeft = Math.ceil((structure.cooldownUntil - buildingTick) / 60);
+            showNotification(`Superweapon is recharging (${secsLeft}s remaining).`, 'error');
+            return;
+        }
         pendingSuperweapon = structure;
-        showNotification(`Click map to target ${structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Strike' : 'SCUD Storm'}. Right-click to cancel.`, 'info');
+        document.body.style.cursor = 'crosshair';
+        const weaponTitle = structure.type === 'particleCannon' ? 'Orbital Particle Beam' : structure.type === 'nukeSilo' ? 'Thermonuclear Missile' : 'SCUD Storm Salvo';
+        showNotification(`⚡ TARGETING READY: Left-click target coordinates on terrain or minimap to fire ${weaponTitle}! (Right-click or Esc to cancel)`, 'warning');
+        if (typeof playUSASound === 'function') playUSASound('radio_chirp');
         return;
     }
 
@@ -2356,9 +2405,11 @@ function strikeWithSuperweapon(structure, targetPosition) {
         createImpactExplosion(targetPosition);
     }
     structure.lastFired = buildingTick;
-    structure.cooldownUntil = buildingTick + 1800;
+    structure.cooldownUntil = buildingTick + 1800; // 30s cooldown
     pendingSuperweapon = null;
-    showNotification('Superweapon strike confirmed on target coordinates!', 'info');
+    document.body.style.cursor = 'default';
+    showNotification('Superweapon strike confirmed on target coordinates!', 'success');
+    updateSidebar();
 }
 
 function renderStructureMenu(structure) {
@@ -2821,10 +2872,15 @@ let activeGeneralPower = null;
 
 function activateGeneralsPower(powerType) {
     activeGeneralPower = powerType;
+    document.body.style.cursor = 'crosshair';
     if (powerType === 'spySatellite') {
-        showNotification('USA Spy Satellite: Click on the terrain or minimap to survey target sector.', 'info');
+        showNotification('USA Spy Satellite: Click terrain or minimap to survey target sector (Right-click/Esc to cancel).', 'info');
     } else if (powerType === 'a10Strike') {
-        showNotification('A-10 Thunderbolt Strike: Click ground target to order CAS air strike.', 'info');
+        showNotification('A-10 Thunderbolt Strike: Click ground target to order CAS air strike (Right-click/Esc to cancel).', 'info');
+    } else if (powerType === 'artilleryBarrage') {
+        showNotification('Red Army Artillery Barrage: Click ground target to order 152mm artillery strike.', 'info');
+    } else if (powerType === 'rebelAmbush') {
+        showNotification('GLA Rebel Ambush: Click ground target to deploy armed subterranean guerrilla cell.', 'info');
     }
 }
 
@@ -2832,6 +2888,7 @@ function executeGeneralsPowerAt(pos) {
     if (!activeGeneralPower) return false;
     const p = activeGeneralPower;
     activeGeneralPower = null;
+    document.body.style.cursor = 'default';
 
     if (p === 'spySatellite') {
         if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, 42, 1800);
@@ -2868,6 +2925,25 @@ function executeGeneralsPowerAt(pos) {
                     }, r * 150);
                 }
             }, i * 350);
+        }
+        return true;
+    } else if (p === 'artilleryBarrage') {
+        showNotification('★ Heavy 152mm Artillery Barrage firing on coordinates!', 'warning');
+        playAudio('explosion');
+        for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+                const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff5722, 3.2, true);
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', units[0] || { teamId: playerTeamId });
+            }, i * 250);
+        }
+        return true;
+    } else if (p === 'rebelAmbush') {
+        showNotification('★ Rebel Ambush cell surfacing from tunnels!', 'success');
+        playAudio('construction', {}, 'gla');
+        for (let i = 0; i < 4; i++) {
+            const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6));
+            if (typeof spawnUnit === 'function') spawnUnit('rebel', rPos);
         }
         return true;
     }

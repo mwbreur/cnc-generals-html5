@@ -334,6 +334,9 @@
                     { id: 'advancedTraining', name: 'ADVANCED TRAINING', cost: 800, desc: 'Doubles combat experience gain, rapidly promoting units to Veteran rank.' },
                     { id: 'chemicalSuits', name: 'CHEMICAL SUITS', cost: 800, desc: 'USA forces gain +50% resistance to toxin, anthrax, and radiation damage.' },
                     { id: 'supplyLines', name: 'SUPPLY LINES', cost: 800, desc: 'USA Supply Trucks and Chinooks bring back +10% extra cash per delivery.' }
+                ],
+                particleCannon: [
+                    { id: 'superweapon', name: 'PARTICLE BEAM STRIKE', cost: 0, isSuperweapon: true, desc: 'Channels space-based orbital particle beam weapon at target coordinates anywhere on the battlefield.' }
                 ]
             },
             china: {
@@ -375,6 +378,7 @@
                     { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the internet center.' }
                 ],
                 nukeSilo: [
+                    { id: 'superweapon', name: 'NUCLEAR MISSILE STRIKE', cost: 0, isSuperweapon: true, desc: 'Launches thermonuclear ballistic missile causing catastrophic area destruction and radiation.' },
                     { id: 'uraniumShells', name: 'URANIUM SHELLS', cost: 1200, desc: 'Grants +25% damage to Battlemaster and Overlord tank cannons.' },
                     { id: 'nuclearTanks', name: 'NUCLEAR ENGINES', cost: 800, desc: 'Increases Battlemaster and Overlord tank movement speed by +25%.' },
                     { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the silo.' }
@@ -426,6 +430,10 @@
                 ],
                 tunnel: [
                     { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths this Tunnel Network until it engages enemies.' }
+                ],
+                scudStorm: [
+                    { id: 'superweapon', name: 'SCUD STORM SALVO', cost: 0, isSuperweapon: true, desc: 'Fires a 9-missile ballistic SCUD rocket salvo loaded with deadly Anthrax Beta.' },
+                    { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths the SCUD Storm with camouflage netting.' }
                 ],
                 stingerSite: [
                     { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths this Stinger Site until it fires upon an aircraft.' }

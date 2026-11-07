@@ -139,7 +139,7 @@
             return null;
         }
 
-        function buildStructureMesh(type, pos, instant = false) {
+        function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
             let group;
             const f = selectedFaction;
             if (type === 'center') {
@@ -200,10 +200,12 @@
 
             group.scale.set(1.35, 1.35, 1.35);
             group.position.copy(pos);
+            group.rotation.y = rotationY || 0;
             
             const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
             const structObj = {
                 type: type, mesh: group, position: pos.clone(),
+                rotationY: rotationY || 0,
                 radius: getStructureFootprint(type).radius,
                 isBuilding: !instant, buildProgress: instant ? 100 : 0, dozerRef: null,
                 health: 1200, maxHealth: 1200,
@@ -217,7 +219,7 @@
                 broadcastNetPacket({
                     type: 'build_structure',
                     structType: type,
-                    position: { x: pos.x, y: pos.y, z: pos.z },
+                    position: { x: pos.x, y: pos.y, z: pos.z, rotationY: rotationY || 0 },
                     netId: structNetId
                 });
             }

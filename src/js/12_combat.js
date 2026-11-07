@@ -635,71 +635,116 @@ function executeWeaponFire(attacker, target) {
     }
 }
 
+let blueprintRotationY = 0;
+window.blueprintRotationY = 0;
+
 function activateBlueprint(type) {
-            if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; }
+    if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; }
 
-            // Prerequisite tech tree check!
-            const structReq = getStructureTechPrerequisite(type);
-            if (structReq && !hasCompletedStructure(structReq.building, structReq.altBuilding)) {
-                showNotification(`Construction blocked: Requires operational ${structReq.name}!`, 'error');
-                return;
-            }
+    // Prerequisite tech tree check!
+    const structReq = getStructureTechPrerequisite(type);
+    if (structReq && !hasCompletedStructure(structReq.building, structReq.altBuilding)) {
+        showNotification(`Construction blocked: Requires operational ${structReq.name}!`, 'error');
+        return;
+    }
 
-            const cost = getStructureCost(type);
-            if (!cost || playerResources < cost) { showNotification("Insufficient resources for construction.", "error"); return; }
+    const cost = getStructureCost(type);
+    if (!cost || playerResources < cost) { showNotification("Insufficient resources for construction.", "error"); return; }
 
-            activeBlueprintType = type;
-            const footprint = getStructureFootprint(type);
-            const size = { x: footprint.width, y: footprint.height, z: footprint.depth };
-            const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
-            const mat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.4 });
-            
-            blueprintMesh = new THREE.Mesh(geo, mat);
-            blueprintMesh.position.set(0, size.y / 2, 0);
-            scene.add(blueprintMesh);
+    activeBlueprintType = type;
+    blueprintRotationY = 0;
+    window.blueprintRotationY = 0;
+
+    const footprint = getStructureFootprint(type);
+    const size = { x: footprint.width, y: footprint.height, z: footprint.depth };
+
+    const group = new THREE.Group();
+    group.name = "blueprintGroup";
+
+    // 1. Semi-transparent foundation footprint box
+    const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.45 });
+    const boxMesh = new THREE.Mesh(geo, mat);
+    boxMesh.name = "blueprintBox";
+    group.add(boxMesh);
+
+    // 2. Wireframe grid cage
+    const wireGeo = new THREE.EdgesGeometry(geo);
+    const wireMat = new THREE.LineBasicMaterial({ color: 0x00ffcc, linewidth: 2 });
+    const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
+    wireMesh.name = "blueprintWire";
+    group.add(wireMesh);
+
+    // 3. Directional Front-Facing Pointer Arrow (shows building front entrance/facing orientation)
+    const arrowGroup = new THREE.Group();
+    arrowGroup.name = "blueprintArrow";
+    arrowGroup.position.set(0, -size.y / 2 + 0.15, size.z / 2 + 1.2);
+
+    const arrowHead = new THREE.Mesh(new THREE.ConeGeometry(size.x * 0.18, 1.8, 4), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+    arrowHead.rotation.x = Math.PI / 2;
+    arrowGroup.add(arrowHead);
+
+    const arrowShaft = new THREE.Mesh(new THREE.BoxGeometry(size.x * 0.08, 0.15, 1.2), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+    arrowShaft.position.z = -0.8;
+    arrowGroup.add(arrowShaft);
+
+    group.add(arrowGroup);
+
+    blueprintMesh = group;
+    blueprintMesh.position.set(0, size.y / 2, 0);
+    blueprintMesh.rotation.y = 0;
+    scene.add(blueprintMesh);
+
+    showNotification(`Place ${footprint.name || type}. Rotate with Mouse Wheel, [R], [Q], [E], or Click-and-Drag! Right-click to cancel.`, 'info');
+}
+
+function updateBlueprintPosition(intersectPoint) {
+    if (!blueprintMesh) return;
+    blueprintMesh.position.x = intersectPoint.x;
+    blueprintMesh.position.z = intersectPoint.z;
+    const groundH = getTerrainHeight(intersectPoint.x, intersectPoint.z);
+    blueprintMesh.position.y = groundH + getStructureFootprint(activeBlueprintType).height / 2;
+    blueprintMesh.rotation.y = (typeof blueprintRotationY !== 'undefined') ? blueprintRotationY : 0;
+
+    isBlueprintValid = true;
+    const footprint = getStructureFootprint(activeBlueprintType);
+    const rBoundary = footprint.radius;
+
+    // 1. Water restriction: Buildings CANNOT be placed in water or on riverbeds!
+    if (groundH < currentWaterLevel) {
+        isBlueprintValid = false;
+    }
+
+    // Check footprint perimeter samples to ensure the entire foundation is on dry land
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+        const px = intersectPoint.x + Math.cos(a) * (rBoundary * 0.85);
+        const pz = intersectPoint.z + Math.sin(a) * (rBoundary * 0.85);
+        if (getTerrainHeight(px, pz) < currentWaterLevel) {
+            isBlueprintValid = false;
+            break;
         }
+    }
 
-        function updateBlueprintPosition(intersectPoint) {
-            if (!blueprintMesh) return;
-            blueprintMesh.position.x = intersectPoint.x;
-            blueprintMesh.position.z = intersectPoint.z;
-            const groundH = getTerrainHeight(intersectPoint.x, intersectPoint.z);
-            blueprintMesh.position.y = groundH + getStructureFootprint(activeBlueprintType).height / 2;
+    // 2. Bridges restriction: Cannot place buildings on bridge decks
+    if (mapBridges.some(b => isPointOnBridge(intersectPoint.x, intersectPoint.z, b))) {
+        isBlueprintValid = false;
+    }
 
-            isBlueprintValid = true;
-            const footprint = getStructureFootprint(activeBlueprintType);
-            const rBoundary = footprint.radius;
+    // 3. Distance to existing structures
+    for (let s of structures) {
+        const d = intersectPoint.distanceTo(s.position);
+        if (d < (rBoundary + s.radius)) { isBlueprintValid = false; break; }
+    }
 
-            // 1. Water restriction: Buildings CANNOT be placed in water or on riverbeds!
-            if (groundH < currentWaterLevel) {
-                isBlueprintValid = false;
-            }
+    // 4. Map edge bounds
+    const limit = currentMapSize * 0.44;
+    if (Math.abs(intersectPoint.x) > limit || Math.abs(intersectPoint.z) > limit) isBlueprintValid = false;
 
-            // Check footprint perimeter samples to ensure the entire foundation is on dry land
-            for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-                const px = intersectPoint.x + Math.cos(a) * (rBoundary * 0.85);
-                const pz = intersectPoint.z + Math.sin(a) * (rBoundary * 0.85);
-                if (getTerrainHeight(px, pz) < currentWaterLevel) {
-                    isBlueprintValid = false;
-                    break;
-                }
-            }
-
-            // 2. Bridges restriction: Cannot place buildings on bridge decks
-            if (mapBridges.some(b => isPointOnBridge(intersectPoint.x, intersectPoint.z, b))) {
-                isBlueprintValid = false;
-            }
-
-            // 3. Distance to existing structures
-            for (let s of structures) {
-                const d = intersectPoint.distanceTo(s.position);
-                if (d < (rBoundary + s.radius)) { isBlueprintValid = false; break; }
-            }
-
-            // 4. Map edge bounds
-            const limit = currentMapSize * 0.44;
-            if (Math.abs(intersectPoint.x) > limit || Math.abs(intersectPoint.z) > limit) isBlueprintValid = false;
-
-            blueprintMesh.material.color.setHex(isBlueprintValid ? 0x00ffcc : 0xff4757);
+    const colorHex = isBlueprintValid ? 0x00ffcc : 0xff4757;
+    blueprintMesh.traverse(child => {
+        if (child.material && child.material.color) {
+            child.material.color.setHex(colorHex);
         }
+    });
+}
 let aiProductionTick = 0;
