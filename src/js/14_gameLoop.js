@@ -81,8 +81,22 @@ function animate() {
                         const spawnPos = structure.position.clone().add(new THREE.Vector3(structure.radius + 3.5, 0, structure.radius + 3.5));
                         spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
                         const newUnit = spawnUnit(item.type, spawnPos);
-                        const targetRally = structure.rallyPoint ? structure.rallyPoint.clone() : spawnPos.clone().add(new THREE.Vector3(6, 0, 6));
-                        newUnit.targetPosition.copy(targetRally);
+                        if (newUnit.isAir) {
+                            if (structure.rallyPoint) {
+                                newUnit.targetPosition.copy(structure.rallyPoint);
+                                newUnit.patrolCenter.copy(structure.rallyPoint);
+                                newUnit.airState = 'flying';
+                                newUnit.taskState = 'Moving';
+                            } else {
+                                newUnit.targetPosition.copy(spawnPos);
+                                newUnit.patrolCenter.copy(spawnPos);
+                                newUnit.airState = 'circling';
+                                newUnit.taskState = 'Idle';
+                            }
+                        } else {
+                            const targetRally = structure.rallyPoint ? structure.rallyPoint.clone() : spawnPos.clone().add(new THREE.Vector3(6, 0, 6));
+                            newUnit.targetPosition.copy(targetRally);
+                        }
                         playUSASound('construction');
                         showNotification('Unit deployed: ' + item.name, 'success');
                         structure.productionQueue.shift();
@@ -373,23 +387,37 @@ function animate() {
                 // AIRPLANE & HELICOPTER FLIGHT, LANDING & CIRCLING ENGINE
                 // =========================================================
                 if (unit.isAir) {
-                    const cruiseAlt = unit.mesh.userData.flightAltitude || 8.5;
-                    const groundY = getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z);
+                    const cruiseAlt = (unit.mesh.userData && unit.mesh.userData.flightAltitude) ? unit.mesh.userData.flightAltitude : 8.5;
+                    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z) : 0;
+                    const isHeli = (unit.type === 'comanche' || unit.type === 'chinook');
 
-                    // Dynamic State Transition: Automatically react to player orders!
-                    const distToGoal = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                    if (!unit.patrolCenter) unit.patrolCenter = unit.mesh.position.clone();
+                    if (!unit.circleRadius) unit.circleRadius = isHeli ? 11.0 : 15.0;
+                    if (unit.circleAngle === undefined) unit.circleAngle = Math.random() * Math.PI * 2;
+                    if (!unit.airState || unit.airState === 'none') unit.airState = 'circling';
+
+                    // Dynamic State Transition: Automatically react to player/AI orders!
                     if (unit.combatTarget && unit.combatTarget.health > 0) {
-                        if (unit.airState === 'landed') unit.airState = 'taking_off';
-                        else if (unit.airState !== 'taking_off') unit.airState = 'attacking';
-                    } else if (distToGoal > 3.0 && unit.airState !== 'taking_off' && unit.airState !== 'landed') {
-                        unit.airState = 'flying';
+                        if (unit.airState === 'landed') {
+                            unit.airState = 'taking_off';
+                        } else if (unit.airState !== 'taking_off') {
+                            unit.airState = 'attacking';
+                        }
+                    } else if (unit.airState === 'circling') {
+                        // Switch from circling to flying ONLY if a new destination away from patrolCenter is commanded
+                        const distToPatrol = Math.hypot(unit.targetPosition.x - unit.patrolCenter.x, unit.targetPosition.z - unit.patrolCenter.z);
+                        if (distToPatrol > 4.0 || unit.taskState === 'Moving') {
+                            unit.airState = 'flying';
+                            unit.patrolCenter.copy(unit.targetPosition);
+                        }
                     }
 
                     // 1. Landed on Airfield Runway / Pad
                     if (unit.airState === 'landed') {
                         unit.mesh.position.y = groundY + 0.35;
                         unit.mesh.rotation.z = 0;
-                        if (unit.combatTarget || (unit.waypoints && unit.waypoints.length > 0) || distToGoal > 4.0) {
+                        const distToGoal = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                        if (unit.combatTarget || (unit.waypoints && unit.waypoints.length > 0) || distToGoal > 4.0 || unit.taskState === 'Moving') {
                             unit.airState = 'taking_off';
                         }
                         return; // Stays safely on ground
@@ -400,7 +428,7 @@ function animate() {
                         const targetY = groundY + cruiseAlt;
                         unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.08;
                         if (unit.mesh.position.y >= targetY * 0.85) {
-                            unit.airState = unit.combatTarget ? 'attacking' : 'flying';
+                            unit.airState = (unit.combatTarget && unit.combatTarget.health > 0) ? 'attacking' : 'flying';
                         }
                     }
 
@@ -425,7 +453,8 @@ function animate() {
                             while (diff < -Math.PI) diff += Math.PI * 2;
                             while (diff > Math.PI) diff -= Math.PI * 2;
                             unit.mesh.rotation.y += diff * 0.22;
-                            unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -0.45, 0.45) - unit.mesh.rotation.z) * 0.15;
+                            const maxBank = isHeli ? 0.20 : 0.45;
+                            unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -maxBank, maxBank) - unit.mesh.rotation.z) * 0.15;
 
                             if (distToEnemy <= (unit.type === 'comanche' ? 24 : 28) && unit.attackCooldown === 0) {
                                 executeWeaponFire(unit, unit.combatTarget);
@@ -435,7 +464,8 @@ function animate() {
                                 if (unit.combatTarget.health <= 0) {
                                     unit.combatTarget = null;
                                     unit.patrolCenter.copy(unit.mesh.position);
-                                    unit.circleAngle = unit.mesh.rotation.y;
+                                    unit.targetPosition.copy(unit.mesh.position);
+                                    unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
                                     unit.airState = 'circling';
                                     unit.taskState = 'Idle';
                                 } else {
@@ -446,6 +476,9 @@ function animate() {
                             }
                         } else {
                             unit.combatTarget = null;
+                            unit.patrolCenter.copy(unit.mesh.position);
+                            unit.targetPosition.copy(unit.mesh.position);
+                            unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
                             unit.airState = 'circling';
                             unit.taskState = 'Idle';
                         }
@@ -457,7 +490,7 @@ function animate() {
                         const dz = unit.targetPosition.z - unit.mesh.position.z;
                         const dist2D = Math.hypot(dx, dz);
 
-                        if (dist2D > 2.5) {
+                        if (dist2D > 3.5) {
                             const dirX = dx / dist2D;
                             const dirZ = dz / dist2D;
                             unit.mesh.position.x += dirX * unit.speed;
@@ -468,13 +501,15 @@ function animate() {
                             while (diff < -Math.PI) diff += Math.PI * 2;
                             while (diff > Math.PI) diff -= Math.PI * 2;
                             unit.mesh.rotation.y += diff * 0.18;
-                            unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.6, -0.4, 0.4) - unit.mesh.rotation.z) * 0.12;
+
+                            const maxBank = isHeli ? 0.18 : 0.42;
+                            unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.6, -maxBank, maxBank) - unit.mesh.rotation.z) * 0.12;
                         } else {
                             if (unit.waypoints && unit.waypoints.length > 0) {
                                 unit.targetPosition.copy(unit.waypoints.shift());
                             } else {
                                 unit.patrolCenter.copy(unit.targetPosition);
-                                unit.circleAngle = unit.mesh.rotation.y;
+                                unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
                                 unit.airState = 'circling';
                                 unit.taskState = 'Idle';
                             }
@@ -483,8 +518,13 @@ function animate() {
 
                     // 5. Circling smoothly at location ("fly around slowly in circles at their location")
                     if (unit.airState === 'circling') {
-                        unit.circleAngle = (unit.circleAngle || 0) + (unit.speed * 0.045);
-                        const orbitR = unit.circleRadius || 12.0;
+                        const orbitR = unit.circleRadius || (isHeli ? 11.0 : 15.0);
+                        const orbitSpeed = unit.speed * 0.70; // Smooth, slow loiter speed
+                        const angularSpeed = orbitSpeed / orbitR;
+
+                        unit.circleAngle = (unit.circleAngle || 0) + angularSpeed;
+                        if (unit.circleAngle > Math.PI * 2) unit.circleAngle -= Math.PI * 2;
+
                         const targetOrbitX = unit.patrolCenter.x + Math.cos(unit.circleAngle) * orbitR;
                         const targetOrbitZ = unit.patrolCenter.z + Math.sin(unit.circleAngle) * orbitR;
 
@@ -492,19 +532,25 @@ function animate() {
                         const dzO = targetOrbitZ - unit.mesh.position.z;
                         const distO = Math.hypot(dxO, dzO);
 
-                        const orbitSpeed = unit.speed * 0.85;
-                        const dirX = dxO / (distO || 1);
-                        const dirZ = dzO / (distO || 1);
-                        unit.mesh.position.x += dirX * Math.min(distO, orbitSpeed);
-                        unit.mesh.position.z += dirZ * Math.min(distO, orbitSpeed);
+                        if (distO > 0.05) {
+                            const step = Math.min(distO, orbitSpeed);
+                            unit.mesh.position.x += (dxO / distO) * step;
+                            unit.mesh.position.z += (dzO / distO) * step;
+                        }
 
-                        const targetAngle = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                        // Align heading with circle tangent
+                        const tangentX = -Math.sin(unit.circleAngle);
+                        const tangentZ = Math.cos(unit.circleAngle);
+                        const targetAngle = Math.atan2(-tangentZ, tangentX) + Math.PI / 2;
+
                         let diff = targetAngle - unit.mesh.rotation.y;
                         while (diff < -Math.PI) diff += Math.PI * 2;
                         while (diff > Math.PI) diff -= Math.PI * 2;
                         unit.mesh.rotation.y += diff * 0.16;
 
-                        unit.mesh.rotation.z += (-0.28 - unit.mesh.rotation.z) * 0.1;
+                        // Graceful inward banking roll
+                        const targetBank = isHeli ? -0.10 : -0.28;
+                        unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.08;
                     }
 
                     // Maintain flight cruising altitude above ground

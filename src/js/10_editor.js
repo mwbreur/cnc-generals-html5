@@ -796,23 +796,28 @@
             const angle = units.length * 2.4;
             const spawnDist = facility.radius + 3.5;
             let spawnPos = facility.position.clone().add(new THREE.Vector3(Math.cos(angle) * spawnDist, 0, Math.sin(angle) * spawnDist));
-            const isAircraft = ['raptor', 'stealthfighter', 'aurora', 'comanche', 'chinook'].includes(type);
+            const isAircraft = ['raptor', 'mig', 'stealthfighter', 'aurora', 'comanche', 'chinook'].includes(type);
 
             if (isAircraft && actualBldg === 'airfield') {
-                // Airplane spawns LANDED on the airfield runway / tarmac!
-                const groundY = getTerrainHeight(spawnPos.x, spawnPos.z);
-                spawnPos.y = groundY + 0.35;
+                const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
+                spawnPos.y = groundY + 8.5;
                 const newU = spawnUnit(type, spawnPos);
                 if (newU) {
-                    newU.airState = 'landed';
                     newU.homeAirfield = facility;
-                    newU.patrolCenter = facility.position.clone();
-                    newU.circleAngle = Math.random() * Math.PI * 2;
-                    newU.circleRadius = 15.0;
-                    newU.mesh.position.y = groundY + 0.35;
-                    newU.mesh.rotation.z = 0;
+                    newU.circleRadius = (type === 'comanche' || type === 'chinook') ? 11.0 : 15.0;
+                    if (facility.rallyPoint) {
+                        newU.targetPosition.copy(facility.rallyPoint);
+                        newU.patrolCenter.copy(facility.rallyPoint);
+                        newU.airState = 'flying';
+                        newU.taskState = 'Moving';
+                    } else {
+                        newU.targetPosition.copy(spawnPos);
+                        newU.patrolCenter.copy(spawnPos);
+                        newU.airState = 'circling';
+                        newU.taskState = 'Idle';
+                    }
                 }
-                showNotification(`Assembled: ${unitSpec.name} (Ready on Airfield)`, 'success');
+                showNotification(`Assembled: ${unitSpec.name} (Airborne)`, 'success');
                 updateSidebar();
                 return;
             }

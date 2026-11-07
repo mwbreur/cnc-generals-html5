@@ -625,8 +625,12 @@ function processEnemyAIEngine() {
                         units.forEach(unit => {
                             if (unit.selected) {
                                 unit.combatTarget = null;
-                                unit.taskState = 'Idle';
+                                unit.taskState = unit.isAir ? 'Moving' : 'Idle';
                                 unit.targetPosition.copy(tPos);
+                                if (unit.isAir) {
+                                    unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
+                                    unit.patrolCenter.copy(tPos);
+                                }
                             }
                         });
                         showNotification(`Support order: Rendezvous with allied ${targetedEnemy.type || 'unit'}`, 'info');

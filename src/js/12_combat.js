@@ -66,7 +66,8 @@ function processCombatScanning() {
                 }
 
                 // Auto-Scan fallback loop if completely idle (Only engage hostile targets!)
-                if (!unit.combatTarget) {
+                if (!unit.combatTarget && unit.type !== 'chinook' && unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'dozer') {
+                    if (!(unit.isAir && unit.taskState === 'Moving')) {
                     // 1. Scan for nearest hostile units (Skip friendly allies!)
                     if (enemyUnits.length > 0) {
                         for (let enemy of enemyUnits) {
@@ -93,6 +94,7 @@ function processCombatScanning() {
                                 }
                             }
                         }
+                    }
                     }
                 }
             });

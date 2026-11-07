@@ -2,7 +2,7 @@ function getUnitInitials(type) {
     const map = {
         infantry: 'RG', rocket: 'MD', pathfinder: 'PF', burton: 'CB',
         crusader: 'CR', paladin: 'PL', humvee: 'HV', ambulance: 'AM', tomahawk: 'TM',
-        chinook: 'CH', comanche: 'CM', raptor: 'RP', stealthfighter: 'SF', aurora: 'AU',
+        chinook: 'CH', comanche: 'CM', raptor: 'RP', mig: 'MIG', stealthfighter: 'SF', aurora: 'AU',
         redguard: 'RG', tankhunter: 'TH', hacker: 'HK', blacklotus: 'BL',
         battlemaster: 'BM', dragon: 'DT', gatling: 'GT', crawler: 'TC', overlord: 'OL', inferno: 'IC', nukecannon: 'NC',
         rebel: 'RB', rpg: 'RPG', terrorist: 'TR', mob: 'MOB', hijacker: 'HJ', jarmen: 'JK',
@@ -2435,8 +2435,8 @@ function updateHUD() {
                 if (['factory', 'airfield'].includes(structure.type)) {
                     units.forEach(unit => {
                         const matchingUnit = structure.type === 'airfield'
-                            ? ['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora'].includes(unit.type)
-                            : !['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'worker', 'dozer'].includes(unit.type);
+                            ? ['chinook', 'comanche', 'raptor', 'mig', 'stealthfighter', 'aurora'].includes(unit.type)
+                            : !['chinook', 'comanche', 'raptor', 'mig', 'stealthfighter', 'aurora', 'infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'worker', 'dozer'].includes(unit.type);
                         if (matchingUnit && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < 16) {
                             unit.health = Math.min(unit.maxHealth, unit.health + 3);
                         }
@@ -2515,7 +2515,7 @@ function updateHUD() {
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 1.2; speed = 0.13; health = 260; }
             else if (type === 'chinook') { mesh = createChinookMesh(); radius = 1.6; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
             else if (type === 'comanche') { mesh = createComancheMesh(); radius = 1.4; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
-            else if (type === 'raptor') { mesh = createRaptorMesh(); radius = 1.5; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
+            else if (type === 'raptor' || type === 'mig') { mesh = createRaptorMesh(); radius = 1.5; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
             else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(); radius = 1.4; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
             else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 1.6; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
             else if (type === 'infantry') { mesh = createRangerMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
@@ -2570,11 +2570,9 @@ function updateHUD() {
             }
             mesh.position.copy(position);
             if (isAir) {
-                const groundY = getTerrainHeight(position.x, position.z);
-                const isSpawnLanded = position && Math.abs(position.y - groundY) < 1.5;
-                if (!isSpawnLanded) {
-                    mesh.position.y = mesh.userData.flightAltitude || 8.5;
-                }
+                const cruiseAlt = (mesh.userData && mesh.userData.flightAltitude) ? mesh.userData.flightAltitude : 8.5;
+                const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(position.x, position.z) : 0;
+                mesh.position.y = groundY + cruiseAlt;
             }
             scene.add(mesh);
 
@@ -2584,7 +2582,7 @@ function updateHUD() {
                 if (researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')) {
                     health = Math.floor(health * 1.25);
                 }
-                if (researchedTechs.has('migArmor') && type === 'raptor' && (selectedFaction === 'china')) {
+                if (researchedTechs.has('migArmor') && (type === 'raptor' || type === 'mig') && (selectedFaction === 'china')) {
                     health = Math.floor(health * 1.25);
                 }
                 if (researchedTechs.has('redGuardTraining') && type === 'redguard') {
@@ -2607,9 +2605,10 @@ function updateHUD() {
                 cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
                 health: health, maxHealth: health, scanRange: scanRange, netId: myNetId,
                 attackCooldown: 0, combatTarget: null, isAir: isAir,
-                airState: isAir ? (position && Math.abs(position.y - getTerrainHeight(position.x, position.z)) < 1.5 ? 'landed' : 'circling') : 'none',
+                airState: isAir ? 'circling' : 'none',
                 patrolCenter: position ? position.clone() : new THREE.Vector3(),
-                circleAngle: Math.random() * Math.PI * 2, circleRadius: 15.0,
+                circleAngle: Math.random() * Math.PI * 2,
+                circleRadius: (type === 'comanche' || type === 'chinook') ? 11.0 : 15.0,
                 capacity: capacity || 0, garrisoned: garrisoned || [], waypoints: [],
                 veterancy: initialVeterancy,
                 compositeArmor: (typeof researchedTechs !== 'undefined' && researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')),
