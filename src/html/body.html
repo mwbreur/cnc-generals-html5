@@ -291,73 +291,95 @@
     </div>
     <div id="health-bars" aria-hidden="true"></div>
 
-    <!-- Tactical Status Bar at Bottom -->
-    <div id="hud">
-        <div id="mp-status-badge" style="display: none; background: rgba(12, 28, 18, 0.9); border: 1px solid #55efc4; color: #55efc4; padding: 4px 12px; border-radius: 4px; font-family: monospace; font-size: 12px; font-weight: bold; letter-spacing: 1px; margin-bottom: 6px; box-shadow: 0 0 10px rgba(85,239,196,0.3);">
-            🟢 P2P WEBRTC ONLINE | ROOM: CNC-XXXX
-        </div>
-        <div id="tactical-ticker" style="display: flex; align-items: center; gap: 8px;">
-            <span style="color: #00ffcc; font-weight: bold;">[STRATEGIC COMMAND]</span>
-            <span id="tactical-message">Command Center Online. Awaiting tactical orders.</span>
-        </div>
-        <div style="color: #8f8a70; font-size: 11px;">
-            WASD: Pan · Scroll: Zoom · MMB: Rotate · R-Click: Move / Attack / Harvest
-        </div>
-    </div>
-
-    <!-- Floating Tactical Briefing Tooltip -->
+    <!-- Tactical Briefing Floating Tooltip -->
     <div id="tactical-tooltip" class="tactical-tooltip" style="display: none;"></div>
 
-    <!-- C&C Generals Construction Sidebar -->
-    <div id="cnc-sidebar">
-        <!-- Top Faction & Resources Header -->
-        <div class="sidebar-header">
-            <div class="sidebar-faction-title">
-                <span id="sidebar-faction-badge">USA STRATEGIC COMMAND</span>
-                <span style="color: #6d664c; font-size: 9px;">DEFCON 1</span>
+    <!-- ============================================================== -->
+    <!-- C&C GENERALS TOP TACTICAL RIM (HUD)                           -->
+    <!-- ============================================================== -->
+    <div id="top-hud-bar" class="theme-usa">
+        <div class="top-hud-left">
+            <span id="sidebar-faction-badge" class="hud-faction-tag">USA STRATEGIC FORCES</span>
+            <span class="hud-defcon-tag">DEFCON 1</span>
+        </div>
+        
+        <div class="top-hud-center">
+            <div class="hud-res-counter" title="Available Supply Funds">
+                <span class="hud-res-symbol">$</span>
+                <span id="resource-display" class="hud-res-value">10,000</span>
             </div>
-            <div class="sidebar-resources">
-                <div class="res-box">
-                    <span class="res-label">SUPPLY FUNDS</span>
-                    <span id="resource-display" class="res-val">$1,200</span>
+            
+            <div class="hud-power-gauge" id="power-meter-container" title="Base Electrical Grid Output">
+                <span id="power-status-text" class="hud-power-text">⚡ POWER: NORMAL</span>
+                <div class="hud-power-track">
+                    <div id="power-bar-fill" class="hud-power-fill" style="width: 100%;"></div>
                 </div>
-                <div class="res-box" style="text-align: right;">
-                    <span class="res-label">GENERALS RANK</span>
-                    <span id="generals-rank" style="font-size: 13px; font-weight: bold; color: #dbc46d;">★★★☆☆</span>
-                </div>
+                <span id="power-nums" class="hud-power-nums">10 / 5</span>
             </div>
-            <!-- Power Output Meter -->
-            <div class="power-meter" id="power-meter-container">
-                <span style="font-weight: bold; color: #a9a389;" id="power-status-text">⚡ POWER: NORMAL</span>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <div class="power-bar-bg">
-                        <div id="power-bar-fill" class="power-bar-fill" style="width: 100%;"></div>
-                    </div>
-                    <span id="power-nums" style="font-weight: bold; color: #e5e0ce;">10 / 5</span>
-                </div>
+
+            <div class="hud-generals-rank" title="Command Experience & Promotion Stars">
+                <span class="hud-rank-label">RANK</span>
+                <span id="generals-rank" class="hud-rank-stars">★★★☆☆</span>
             </div>
         </div>
 
-        <!-- Sidebar Navigation Tabs -->
-        <div class="sidebar-tabs">
-            <button id="tab-btn-production" class="sidebar-tab active" onclick="setSidebarTab('production')">COMMAND &amp; PROD</button>
-            <button id="tab-btn-structures" class="sidebar-tab" onclick="setSidebarTab('structures')">BUILDINGS</button>
-            <button id="tab-btn-defenses" class="sidebar-tab" onclick="setSidebarTab('defenses')">DEFENSES</button>
-        </div>
-
-        <!-- Scrollable Sidebar Body Content -->
-        <div id="sidebar-body" class="sidebar-body">
-            <!-- Dynamic Content Injected Here by updateSidebar() -->
-        </div>
-
-        <!-- Sidebar Quick Controls Footer -->
-        <div class="sidebar-footer">
-            <div style="display: flex; gap: 6px;">
-                <button class="rts-btn" style="flex: 1;" onclick="spawnEnemyUnit('tank')">Spawn Enemy Tank</button>
-                <button class="rts-btn" style="flex: 1;" onclick="recenterBase()">Recenter Base</button>
+        <div class="top-hud-right">
+            <div id="mp-status-badge" style="display: none;" class="hud-mp-badge">
+                🟢 P2P WEBRTC: CNC-XXXX
             </div>
-            <div style="font-size: 9.5px; color: #7f7a65; text-align: center; margin-top: 2px;">
-                C&amp;C Generals Tactical Command Engine
+            <div id="tactical-ticker" class="hud-ticker">
+                <span class="hud-ticker-prefix">[COMMAND]</span>
+                <span id="tactical-message">Command Center Online. Awaiting tactical orders.</span>
+            </div>
+            <button id="in-game-menu-btn" class="hud-menu-btn" onclick="toggleInGameMenu()">⚙ MENU</button>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- C&C GENERALS BOTTOM COMMAND BAR (THE CLASSIC CONTROL CONSOLE)  -->
+    <!-- ============================================================== -->
+    <div id="generals-command-bar" class="theme-usa">
+        <!-- 1. LEFT: Circular / Octagonal Radar Console -->
+        <div id="radar-console" class="cmd-bar-section">
+            <div class="radar-bezel-frame">
+                <canvas id="radar-canvas" width="160" height="160" class="radar-screen"></canvas>
+                <div class="radar-sweep-line"></div>
+                <div class="radar-crosshairs"></div>
+            </div>
+            <div class="radar-bezel-controls">
+                <button class="bezel-btn" id="btn-ping" title="Tactical Ping / Beacon (B)" onclick="triggerTacticalBeacon()">
+                    <span>🔔</span><label>PING</label>
+                </button>
+                <button class="bezel-btn" id="btn-repair" title="Field Repair Mode (R)" onclick="toggleRepairMode()">
+                    <span>🔧</span><label>REPAIR</label>
+                </button>
+                <button class="bezel-btn" id="btn-sell" title="Demolish / Liquidate Structure ($)" onclick="toggleSellMode()">
+                    <span>💰</span><label>SELL</label>
+                </button>
+                <button class="bezel-btn" id="btn-recenter" title="Recenter Base (Space)" onclick="recenterBase()">
+                    <span>🎯</span><label>BASE</label>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. CENTER: Unit & Structure Inspector Console -->
+        <div id="inspector-console" class="cmd-bar-section">
+            <!-- Dynamically populated by renderInspectorConsole() -->
+        </div>
+
+        <!-- 3. RIGHT: The 3x4 Command & Build Grid -->
+        <div id="grid-console" class="cmd-bar-section">
+            <div class="grid-category-tabs" id="grid-category-tabs">
+                <button id="grid-tab-commands" class="grid-cat-btn active" onclick="switchGridCategory('commands')">COMMANDS</button>
+                <button id="grid-tab-units" class="grid-cat-btn" onclick="switchGridCategory('units')">UNITS</button>
+                <button id="grid-tab-structures" class="grid-cat-btn" onclick="switchGridCategory('structures')">BUILDINGS</button>
+                <button id="grid-tab-defenses" class="grid-cat-btn" onclick="switchGridCategory('defenses')">DEFENSES</button>
+            </div>
+            <div class="command-grid-3x4" id="command-grid-3x4">
+                <!-- 12 slots populated dynamically with hotkey badges Q..V -->
             </div>
         </div>
     </div>
+
+    <!-- Hidden compatibility container for legacy references -->
+    <div id="sidebar-body" style="display: none;"></div>

@@ -585,3 +585,322 @@ body {
     color: #74b9ff;
     font-style: italic;
 }
+/* ============================================================== */
+/* AUTHENTIC C&C GENERALS COMMAND BAR & TOP HUD STYLES           */
+/* ============================================================== */
+
+/* 1. TOP TACTICAL RIM */
+#top-hud-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 38px;
+    background: linear-gradient(180deg, #18221b 0%, #0e1511 60%, #080c09 100%);
+    border-bottom: 2px solid #55efc4;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.7);
+    z-index: 25;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e5e0ce; user-select: none;
+}
+.top-hud-left { display: flex; align-items: center; gap: 10px; }
+.hud-faction-tag {
+    font-size: 12px; font-weight: 800; letter-spacing: 2px;
+    color: #55efc4; text-transform: uppercase;
+}
+.hud-defcon-tag {
+    font-size: 9px; font-weight: bold; background: rgba(231,76,60,0.25);
+    color: #ff7675; border: 1px solid #e74c3c; padding: 2px 6px; border-radius: 2px;
+}
+
+.top-hud-center { display: flex; align-items: center; gap: 20px; }
+.hud-res-counter {
+    display: flex; align-items: baseline; gap: 4px;
+    background: rgba(0,0,0,0.5); padding: 3px 10px; border: 1px solid #4a4530; border-radius: 2px;
+}
+.hud-res-symbol { font-size: 14px; font-weight: bold; color: #ffe685; }
+.hud-res-value {
+    font-size: 18px; font-weight: bold; color: #ffe685;
+    font-family: 'Consolas', monospace; letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(255,230,133,0.4);
+}
+
+.hud-power-gauge {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(0,0,0,0.4); padding: 3px 8px; border: 1px solid #3d4a3e; border-radius: 2px;
+    font-size: 10px;
+}
+.hud-power-text { font-weight: bold; color: #55efc4; }
+.hud-power-track {
+    width: 80px; height: 7px; background: #201515; border: 1px solid #4a3838; overflow: hidden;
+}
+.hud-power-fill { height: 100%; width: 100%; background: #42e66b; transition: width 0.3s; }
+.hud-power-fill.low { background: #e74c3c; }
+.hud-power-nums { font-weight: bold; color: #e5e0ce; }
+
+.hud-generals-rank {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: bold; color: #dbc46d;
+}
+.hud-rank-label { font-size: 9px; letter-spacing: 1px; color: #8e8870; }
+.hud-rank-stars { font-size: 13px; color: #ffe685; text-shadow: 0 0 8px rgba(255,230,133,0.4); }
+
+.top-hud-right { display: flex; align-items: center; gap: 14px; }
+.hud-mp-badge {
+    background: rgba(12,28,18,0.9); border: 1px solid #55efc4; color: #55efc4;
+    padding: 3px 8px; border-radius: 2px; font-family: monospace; font-size: 10.5px;
+}
+.hud-ticker {
+    display: flex; align-items: center; gap: 6px; font-size: 11px; color: #c5b98e;
+}
+.hud-ticker-prefix { color: #55efc4; font-weight: bold; }
+.hud-menu-btn {
+    background: #253328; border: 1px solid #55efc4; color: #55efc4;
+    padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; border-radius: 2px;
+    transition: all 0.2s;
+}
+.hud-menu-btn:hover { background: #3b5240; color: #fff; }
+
+/* 2. THE BOTTOM COMMAND BAR */
+#generals-command-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 185px;
+    background: linear-gradient(180deg, #1b241e 0%, #101713 45%, #080c09 100%);
+    border-top: 3px solid #55efc4;
+    box-shadow: 0 -6px 26px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.08);
+    z-index: 25;
+    display: flex; align-items: stretch; justify-content: space-between;
+    padding: 8px 12px; gap: 12px; box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e5e0ce; user-select: none;
+}
+
+.cmd-bar-section {
+    position: relative; box-sizing: border-box;
+}
+
+/* 2A. RADAR CONSOLE */
+#radar-console {
+    width: 225px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    background: rgba(0,0,0,0.45); border: 1px solid #3d4a3e; border-radius: 3px; padding: 4px;
+}
+.radar-bezel-frame {
+    position: relative; width: 160px; height: 160px;
+    border-radius: 50%; overflow: hidden;
+    background: #040906; border: 3px solid #3d4a3e;
+    box-shadow: inset 0 0 20px rgba(0,255,180,0.2), 0 0 10px rgba(0,0,0,0.7);
+    cursor: crosshair;
+}
+.radar-screen {
+    width: 160px; height: 160px; display: block; border-radius: 50%;
+}
+.radar-crosshairs {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle, transparent 40%, rgba(0,255,180,0.05) 100%);
+}
+.radar-bezel-controls {
+    display: flex; flex-direction: column; gap: 4px; flex: 1; height: 160px; justify-content: space-between;
+}
+.bezel-btn {
+    flex: 1; background: linear-gradient(180deg, #253328 0%, #151d17 100%);
+    border: 1px solid #3d4a3e; color: #a8b8aa; cursor: pointer;
+    border-radius: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 2px 4px; font-size: 11px; transition: all 0.15s;
+}
+.bezel-btn label { font-size: 8px; font-weight: bold; letter-spacing: 0.5px; margin-top: 1px; cursor: pointer; }
+.bezel-btn:hover { background: #354738; color: #55efc4; border-color: #55efc4; transform: scale(1.03); }
+.bezel-btn.active { background: #1c472d; color: #55efc4; border-color: #55efc4; box-shadow: 0 0 8px rgba(85,239,196,0.3); }
+
+/* 2B. INSPECTOR CONSOLE */
+#inspector-console {
+    flex: 1; min-width: 320px; max-width: 580px;
+    background: linear-gradient(180deg, rgba(22,30,25,0.7) 0%, rgba(10,14,12,0.9) 100%);
+    border: 1px solid #3d4a3e; border-radius: 3px; padding: 8px 12px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    overflow-y: auto;
+}
+.inspector-card {
+    display: flex; gap: 10px; height: 100%; align-items: stretch;
+}
+.inspector-avatar-box {
+    width: 65px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.4); border: 1px solid #3d4a3e; border-radius: 2px; padding: 4px;
+}
+.inspector-avatar-icon { font-size: 28px; line-height: 1; margin-bottom: 4px; }
+.inspector-rank-badge {
+    font-size: 9px; font-weight: bold; text-align: center;
+    padding: 1px 4px; border-radius: 2px;
+}
+.rank-regular { color: #8e8870; }
+.rank-veteran { color: #cd7f32; border: 1px solid #cd7f32; background: rgba(205,127,50,0.15); }
+.rank-elite { color: #bdc3c7; border: 1px solid #bdc3c7; background: rgba(189,195,199,0.15); }
+.rank-heroic {
+    color: #ffe685; border: 1px solid #ffe685; background: rgba(255,230,133,0.25);
+    box-shadow: 0 0 8px rgba(255,230,133,0.4); font-weight: 800;
+}
+
+.inspector-info-pane {
+    flex: 1; display: flex; flex-direction: column; justify-content: space-between;
+}
+.inspector-header-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+}
+.inspector-title {
+    font-size: 13px; font-weight: bold; color: #ffe685; letter-spacing: 0.5px;
+}
+.inspector-kills-tag {
+    font-size: 10px; font-weight: bold; color: #55efc4;
+}
+.inspector-sub-role {
+    font-size: 9.5px; color: #8f9e91; text-transform: uppercase; letter-spacing: 1px;
+}
+
+.inspector-hp-box { margin: 4px 0; }
+.inspector-hp-label {
+    display: flex; justify-content: space-between; font-size: 9.5px; color: #a8b8aa; margin-bottom: 2px;
+}
+.inspector-hp-track {
+    height: 8px; background: #201515; border: 1px solid #452525; border-radius: 1px; overflow: hidden;
+}
+.inspector-hp-fill { height: 100%; transition: width 0.2s; }
+.inspector-hp-fill.high { background: #2ecc71; }
+.inspector-hp-fill.mid { background: #f39c12; }
+.inspector-hp-fill.low { background: #e74c3c; }
+
+.inspector-attachments-row {
+    font-size: 10px; color: #c5b98e; display: flex; justify-content: space-between;
+    background: rgba(0,0,0,0.3); padding: 3px 6px; border-radius: 2px; border: 1px dashed #3d4a3e;
+}
+.inspector-passengers-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    font-size: 9.5px; color: #55efc4; margin-top: 4px;
+}
+.inspector-unload-btn {
+    background: #1c3b29; border: 1px solid #55efc4; color: #55efc4;
+    padding: 2px 6px; font-size: 9px; font-weight: bold; cursor: pointer; border-radius: 2px;
+}
+
+/* Idle Base Inspector State */
+.inspector-idle-box {
+    display: flex; flex-direction: column; justify-content: space-between; height: 100%;
+}
+.inspector-idle-crest {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
+}
+.crest-icon { font-size: 26px; }
+.crest-heading { font-size: 13px; font-weight: bold; color: #ffe685; letter-spacing: 1px; }
+.crest-sub { font-size: 9.5px; color: #55efc4; }
+.inspector-army-stats {
+    font-size: 10px; color: #c5b98e; line-height: 1.5; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 2px;
+}
+.inspector-quick-btns {
+    display: flex; gap: 6px; margin-top: 4px;
+}
+.quick-army-btn {
+    flex: 1; background: #202b23; border: 1px solid #3d4a3e; color: #a8b8aa;
+    padding: 4px; font-size: 9.5px; font-weight: bold; cursor: pointer; border-radius: 2px;
+    transition: all 0.15s;
+}
+.quick-army-btn:hover { background: #2e3e32; color: #55efc4; border-color: #55efc4; }
+
+/* 2C. 3X4 COMMAND & BUILD GRID */
+#grid-console {
+    width: 380px; flex-shrink: 0;
+    display: flex; flex-direction: column; justify-content: space-between;
+}
+.grid-category-tabs {
+    display: flex; gap: 4px; margin-bottom: 4px;
+}
+.grid-cat-btn {
+    flex: 1; background: #141b16; border: 1px solid #3d4a3e; color: #8e8870;
+    padding: 3px 2px; font-size: 9px; font-weight: bold; cursor: pointer; border-radius: 2px;
+    letter-spacing: 0.5px; transition: all 0.15s;
+}
+.grid-cat-btn:hover { color: #e5e0ce; background: #1f2821; }
+.grid-cat-btn.active {
+    color: #55efc4; background: #1d3627; border-color: #55efc4;
+}
+
+.command-grid-3x4 {
+    display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 44px);
+    gap: 4px; height: 140px;
+}
+
+.grid-slot-btn {
+    position: relative;
+    background: linear-gradient(180deg, #273429 0%, #161e18 100%);
+    border: 1px solid #3d4a3e; border-radius: 2px;
+    color: #e5e0ce; cursor: pointer; padding: 3px 4px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    transition: all 0.1s ease;
+    box-sizing: border-box; overflow: hidden;
+}
+.grid-slot-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #384d3b 0%, #202e23 100%);
+    border-color: #55efc4; color: #fff; transform: translateY(-1px);
+    box-shadow: 0 0 8px rgba(85,239,196,0.3);
+}
+.grid-slot-btn.hotkey-pulse {
+    background: #55efc4 !important; color: #000 !important;
+}
+
+.grid-key-badge {
+    position: absolute; top: 1px; left: 3px;
+    font-size: 8px; font-weight: 800; font-family: monospace;
+    color: #ffd86b; background: rgba(0,0,0,0.6); padding: 0 2px; border-radius: 1px;
+}
+.grid-slot-name {
+    font-size: 9.5px; font-weight: bold; line-height: 1.1; margin-top: 10px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;
+}
+.grid-slot-footer {
+    display: flex; justify-content: space-between; align-items: center; margin-top: 1px;
+}
+.grid-slot-cost {
+    font-size: 9px; font-weight: bold; color: #ffe685;
+}
+.grid-slot-badge {
+    font-size: 7.5px; font-weight: bold; text-transform: uppercase;
+    padding: 0 2px; border-radius: 1px;
+}
+.badge-ready { color: #55efc4; }
+.badge-locked { color: #ff7675; }
+.badge-funds { color: #ffeaa7; }
+
+.grid-slot-btn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+    background: #141815; border-color: #2b332c; color: #6e6b5c;
+}
+.grid-slot-btn.empty {
+    opacity: 0.18; cursor: default; pointer-events: none;
+    background: #0f1411; border: 1px dashed #243026;
+}
+
+/* 3. FACTION THEMES */
+/* USA Theme: High-Tech Brushed Titanium & Cyan */
+.theme-usa #top-hud-bar { border-bottom-color: #00e5ff; }
+.theme-usa #generals-command-bar { border-top-color: #00e5ff; }
+.theme-usa .radar-screen { box-shadow: inset 0 0 16px rgba(0,229,255,0.3); }
+
+/* China Theme: Riveted Industrial Iron & Red Star */
+.theme-china #top-hud-bar {
+    background: linear-gradient(180deg, #2b1f1a 0%, #17110e 100%);
+    border-bottom-color: #e74c3c;
+}
+.theme-china #generals-command-bar {
+    background: linear-gradient(180deg, #281d18 0%, #17100d 50%, #0d0907 100%);
+    border-top-color: #e74c3c;
+}
+.theme-china .hud-faction-tag { color: #f1c40f; }
+.theme-china .grid-cat-btn.active { color: #f1c40f; background: #3d1c15; border-color: #e74c3c; }
+.theme-china .bezel-btn:hover, .theme-china .bezel-btn.active { color: #f1c40f; border-color: #f1c40f; }
+
+/* GLA Theme: Corrugated Rusted Scrap Metal & Sand/Olive */
+.theme-gla #top-hud-bar {
+    background: linear-gradient(180deg, #221c15 0%, #14100c 100%);
+    border-bottom-color: #d35400;
+}
+.theme-gla #generals-command-bar {
+    background: linear-gradient(180deg, #221c15 0%, #14100c 50%, #0a0806 100%);
+    border-top-color: #d35400;
+}
+.theme-gla .hud-faction-tag { color: #e67e22; }
+.theme-gla .grid-cat-btn.active { color: #e67e22; background: #382413; border-color: #d35400; }

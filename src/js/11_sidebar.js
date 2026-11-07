@@ -1,865 +1,1038 @@
-// C&C GENERALS CONSTRUCTION SIDEBAR RENDERING ENGINE
-        // =========================================================================
+// =========================================================================
+// AUTHENTIC C&C GENERALS COMMAND BAR & RADAR MINIMAP ENGINE
+// =========================================================================
 
-        function updateSidebar() {
-            const body = document.getElementById('sidebar-body');
-            if (!body) return;
+let activeGridCategory = 'commands'; // 'commands', 'units', 'structures', 'defenses'
+let isRepairMode = false;
+let isSellMode = false;
+let radarCanvas = null;
+let radarCtx = null;
+let radarSweepAngle = 0;
+const GRID_HOTKEYS = ['Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F', 'Z', 'X', 'C', 'V'];
+let currentGridSlots = [];
 
-            // 1. Update Power Grid Status
-            let produced = 0, consumed = 0;
-            if (selectedFaction !== 'gla') {
-                structures.forEach(s => {
-                    if (s.health <= 0 || s.isBuilding) return;
-                    if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
-                    if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
-                    const drain = {
-                        barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
-                        strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
-                        propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                        particleCannon: 4, nukeSilo: 4
-                    }[s.type] || 0;
-                    consumed += drain;
-                });
-            }
+// 1. RADAR MINIMAP ENGINE
+function initRadarMinimap() {
+    radarCanvas = document.getElementById('radar-canvas');
+    if (!radarCanvas) return;
+    radarCtx = radarCanvas.getContext('2d');
 
-            const powerBar = document.getElementById('power-bar-fill');
-            const powerNums = document.getElementById('power-nums');
-            const powerText = document.getElementById('power-status-text');
+    let isRadarDragging = false;
+    function handleRadarPointer(e) {
+        if (!radarCanvas) return;
+        const rect = radarCanvas.getBoundingClientRect();
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+        const mapSize = currentMapSize || 800;
+        const worldX = (px / radarCanvas.width - 0.5) * mapSize;
+        const worldZ = (py / radarCanvas.height - 0.5) * mapSize;
 
-            if (selectedFaction === 'gla') {
-                if (powerText) powerText.textContent = '⚡ POWER: NONE NEEDED (GLA)';
-                if (powerNums) powerNums.textContent = 'N/A';
-                if (powerBar) { powerBar.style.width = '100%'; powerBar.classList.remove('low'); }
-            } else {
-                const ratio = consumed === 0 ? 1 : Math.min(1.5, produced / consumed);
-                const percent = Math.min(100, Math.round((produced / Math.max(1, consumed)) * 100));
-                if (powerNums) powerNums.textContent = `${produced} / ${consumed}`;
-                if (powerBar) {
-                    powerBar.style.width = `${Math.min(100, percent)}%`;
-                    if (produced < consumed) powerBar.classList.add('low');
-                    else powerBar.classList.remove('low');
-                }
-                if (powerText) {
-                    if (produced >= consumed) {
-                        powerText.textContent = '⚡ POWER: NORMAL';
-                        powerText.style.color = '#42e66b';
-                    } else {
-                        powerText.textContent = '⚡ POWER: LOW (-50% SPD)';
-                        powerText.style.color = '#e74c3c';
-                    }
-                }
-            }
-
-            // 2. Active Tab Rendering
-            if (activeSidebarTab === 'structures') {
-                renderStructuresPalette(body);
-                return;
-            }
-
-            if (activeSidebarTab === 'defenses') {
-                renderDefensesPalette(body);
-                return;
-            }
-
-            // Tab: 'production'
-            if (selectedStructure) {
-                renderSelectedBuildingPanel(body, selectedStructure);
-            } else if (selectedSupplyPoint) {
-                renderSelectedSupplyPanel(body, selectedSupplyPoint);
-            } else {
-                const selectedUnits = units.filter(u => u.selected);
-                if (selectedUnits.length > 0) {
-                    renderSelectedUnitsPanel(body, selectedUnits);
-                } else {
-                    renderBaseHeadquartersPanel(body);
-                }
-            }
-        }
-
-        function renderSelectedSupplyPanel(container, supplyPoint) {
-            const stock = supplyPoint.stock || 0;
-            const maxStock = supplyPoint.maxStock || 8000;
-            const percent = Math.max(0, Math.min(100, Math.round((stock / maxStock) * 100)));
-            const statusText = stock <= 0 ? '⚠ EXHAUSTED' : stock < 2000 ? '⚡ LOW STOCK' : '● ACTIVE RESOURCE';
-
-            let html = `
-                <div class="info-card">
-                    <div class="info-card-header">
-                        <div>
-                            <div class="info-card-title">SUPPLY FIELD / DEPOT</div>
-                            <div style="font-size: 9px; color: #8e8870; margin-top: 2px;">STRATEGIC RESOURCE CACHE</div>
-                        </div>
-                        <span class="info-card-status ${stock <= 0 ? 'building' : ''}">${statusText}</span>
-                    </div>
-
-                    <div class="hp-wrapper">
-                        <div class="hp-labels">
-                            <span>REMAINING RESOURCES</span>
-                            <span style="color: #ffe685; font-weight: bold;">$${stock.toLocaleString()} / $${maxStock.toLocaleString()} (${percent}%)</span>
-                        </div>
-                        <div class="hp-bar-track">
-                            <div class="hp-bar-fill" style="width: ${percent}%; background: ${percent > 50 ? 'linear-gradient(90deg, #f1c40f, #2ed573)' : percent > 20 ? 'linear-gradient(90deg, #e67e22, #f1c40f)' : 'linear-gradient(90deg, #e74c3c, #e67e22)'};"></div>
-                        </div>
-                    </div>
-
-                    <div style="font-size: 11px; line-height: 1.5; color: #c5b98e; margin: 8px 0 4px 0;">
-                        Supply field contains raw industrial salvage and minerals (4x capacity). Deploy Supply Trucks or Workers to harvest credits for your command.
-                    </div>
-
-                    <div class="util-btn-row">
-                        <button class="util-btn" onclick="orderAllHarvestersToTargetSupply()" style="color: #ffe685; border-color: #ffd86b;">
-                            ⛏ Dispatch All Harvesters
-                        </button>
-                        <button class="util-btn" onclick="selectedSupplyPoint = null; updateSidebar();">
-                            ✕ Deselect
-                        </button>
-                    </div>
-                </div>
-
-                <div class="section-header">
-                    <span>RESOURCE OPERATIONS</span>
-                </div>
-                <div class="cmd-grid">
-                ${(() => {
-                    if (selectedUnits.length !== 1) return '';
-                    const u = selectedUnits[0];
-                    let upgHtml = '';
-
-                    // Veterancy Rank Badge
-                    const rankNames = ['ROOKIE', '★ VETERAN', '★★ ELITE', '★★★ HEROIC'];
-                    const rankColors = ['#ced6e0', '#f1c40f', '#e67e22', '#ff4757'];
-                    upgHtml += `
-                        <div style="grid-column: span 2; padding: 6px; background: rgba(0,0,0,0.4); border-left: 3px solid ${rankColors[u.veterancy || 0]}; margin-bottom: 4px;">
-                            <span style="font-size: 11px; font-weight: bold; color: ${rankColors[u.veterancy || 0]};">${rankNames[u.veterancy || 0]}</span>
-                            <span style="font-size: 10px; color: #a4b0be; margin-left: 6px;">(${u.kills || 0} Confirmed Kills${u.veterancy === 3 ? ' - Regenerating HP' : ''})</span>
-                        </div>
-                    `;
-
-                    // USA Drones for Crusader, Paladin, Humvee
-                    if (['crusader', 'paladin', 'humvee'].includes(u.type)) {
-                        upgHtml += `
-                            <button class="cmd-btn" onclick="purchaseVehicleDrone('battle', 300)">
-                                <div class="cmd-btn-name" style="color: #00d2d3;">+ BATTLE DRONE</div>
-                                <div class="cmd-btn-desc">Repairs hull (+2 HP/s) & shoots infantry</div>
-                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$300</span></div>
-                            </button>
-                            <button class="cmd-btn" onclick="purchaseVehicleDrone('scout', 100)">
-                                <div class="cmd-btn-name" style="color: #2ed573;">+ SCOUT DRONE</div>
-                                <div class="cmd-btn-desc">+50% Sight range & stealth detection</div>
-                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$100</span></div>
-                            </button>
-                            <button class="cmd-btn" onclick="purchaseVehicleDrone('hellfire', 500)">
-                                <div class="cmd-btn-name" style="color: #ff4757;">+ HELLFIRE DRONE</div>
-                                <div class="cmd-btn-desc">Launches guided anti-tank rockets</div>
-                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$500</span></div>
-                            </button>
-                        `;
-                    }
-
-                    // China Overlord Mounts
-                    if (u.type === 'overlord') {
-                        upgHtml += `
-                            <button class="cmd-btn" onclick="purchaseOverlordUpgrade('bunker', 500)">
-                                <div class="cmd-btn-name" style="color: #eccc68;">+ BUNKER TOWER</div>
-                                <div class="cmd-btn-desc">2 troops fire 360° while moving</div>
-                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$500</span></div>
-                            </button>
-                            <button class="cmd-btn" onclick="purchaseOverlordUpgrade('gatling', 1200)">
-                                <div class="cmd-btn-name" style="color: #ff7f50;">+ GATLING TOWER</div>
-                                <div class="cmd-btn-desc">Twin 20mm rotary anti-air/infantry</div>
-                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$1200</span></div>
-                            </button>
-                            <button class="cmd-btn" onclick="purchaseOverlordUpgrade('propaganda', 500)">
-                                <div class="cmd-btn-name" style="color: #ff4757;">+ PROPAGANDA TOWER</div>
-                                <div class="cmd-btn-desc">Heals (+3 HP/s) & buffs fire rate +25%</div>
-                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$500</span></div>
-                            </button>
-                        `;
-                    }
-
-                    // China Nuke Cannon Neutron Shells
-                    if (u.type === 'nukecannon' && !u.neutronShells) {
-                        upgHtml += `
-                            <button class="cmd-btn" style="grid-column: span 2;" onclick="purchaseNukeCannonUpgrade(1000)">
-                                <div class="cmd-btn-name" style="color: #2ed573;">☢ NEUTRON SHELLS</div>
-                                <div class="cmd-btn-desc">Eradicates vehicle crews leaving capturable hulks</div>
-                                <div class="cmd-btn-footer"><span class="cmd-btn-cost">$1000</span></div>
-                            </button>
-                        `;
-                    }
-
-                    return upgHtml;
-                })()}
-                    <button class="cmd-btn" style="grid-column: span 2;" onclick="orderAllHarvestersToTargetSupply()">
-                        <div class="cmd-btn-name">⛏ HARVEST FROM THIS FIELD</div>
-                        <div class="cmd-btn-desc">Orders all friendly trucks and workers to gather supplies here</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">HARVEST</span>
-                            <span class="cmd-btn-badge badge-ready">DISPATCH</span>
-                        </div>
-                    </button>
-                    <button class="cmd-btn" onclick="selectUnitsByType('harvesters')">
-                        <div class="cmd-btn-name">SELECT HARVESTERS</div>
-                        <div class="cmd-btn-desc">Select all trucks and workers</div>
-                        <div class="cmd-btn-footer"><span class="cmd-btn-badge badge-ready">SELECT</span></div>
-                    </button>
-                    <button class="cmd-btn" onclick="selectedSupplyPoint = null; updateSidebar();">
-                        <div class="cmd-btn-name">RETURN TO HQ</div>
-                        <div class="cmd-btn-desc">Return to Base Overview</div>
-                        <div class="cmd-btn-footer"><span class="cmd-btn-badge badge-ready">HQ</span></div>
-                    </button>
-                </div>
-            `;
-            container.innerHTML = html;
-        }
-
-        function orderAllHarvestersToTargetSupply() {
-            if (!selectedSupplyPoint) return;
-            const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker');
-            if (harvesters.length === 0) {
-                showNotification('No harvesters available! Build Supply Trucks or Workers.', 'error');
-                return;
-            }
-            harvesters.forEach(h => {
-                h.supplyTarget = selectedSupplyPoint;
-                h.aiState = 'MovingToDock';
-                h.taskState = 'Idle';
-                h.combatTarget = null;
-                h.targetPosition.copy(selectedSupplyPoint.position);
-            });
-            showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies ($${selectedSupplyPoint.stock} left).`, 'success');
-            updateSidebar();
-        }
-
-        function renderSelectedBuildingPanel(container, structure) {
-            const names = {
-                center: 'Command Center', power: 'Cold Fusion Reactor', nuclearReactor: 'Nuclear Reactor',
-                factory: selectedFaction === 'gla' ? 'Arms Dealer' : 'War Factory', supplyCenter: 'Supply Center',
-                supplyStash: 'Supply Stash', supplyDrop: 'Supply Drop Zone', airfield: 'Air Field',
-                strategyCenter: 'Strategy Center', detentionCamp: 'Detention Camp', internetCenter: 'Internet Center',
-                propagandaCenter: 'Propaganda Center', bunker: 'Bunker', patriot: 'Patriot Missile System',
-                gatlingCannon: 'Gatling Cannon', speakerTower: 'Speaker Tower', particleCannon: 'Particle Cannon',
-                nukeSilo: 'Nuclear Missile Silo', blackMarket: 'Black Market', tunnel: 'Tunnel Network',
-                stingerSite: 'Stinger Site', demoTrap: 'Demo Trap', palace: 'Palace', scudStorm: 'SCUD Storm',
-                fakeBarracks: 'Fake Barracks', fakeArmsDealer: 'Fake Arms Dealer', barracks: 'Barracks'
-            };
-            const title = (names[structure.type] || structure.type).toUpperCase();
-            const hpPercent = Math.max(0, Math.round((structure.health / structure.maxHealth) * 100));
-            const isConstructing = structure.isBuilding;
-
-            let html = `
-                <div class="info-card">
-                    <div class="info-card-header">
-                        <div>
-                            <div class="info-card-title">${title}</div>
-                            <div style="font-size: 9px; color: #8e8870; margin-top: 2px;">
-                                ${structure.isAir ? 'Airfield Structure' : 'Tactical Facility'}
-                            </div>
-                        </div>
-                        <span class="info-card-status ${isConstructing ? 'building' : ''}">
-                            ${isConstructing ? '🔨 CONSTRUCTING' : '● OPERATIONAL'}
-                        </span>
-                    </div>
-
-                    <div class="hp-wrapper">
-                        <div class="hp-labels">
-                            <span>STRUCTURAL INTEGRITY</span>
-                            <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP (${hpPercent}%)</span>
-                        </div>
-                        <div class="hp-bar-track">
-                            <div class="hp-bar-fill" style="width: ${hpPercent}%;"></div>
-                        </div>
-                    </div>
-
-                    <div class="util-btn-row">
-                        <button class="util-btn" onclick="repairStructure(selectedStructure)" ${structure.health >= structure.maxHealth ? 'disabled style="opacity:0.5;"' : ''}>
-                            🔧 Repair ($50)
-                        </button>
-                        <button class="util-btn sell" onclick="sellStructure(selectedStructure)">
-                            💰 Demolish / Sell
-                        </button>
-                    </div>
-                </div>
-
-                <div class="section-header">
-                    <span>PRODUCTION &amp; COMMAND ORDERS</span>
-                    <span style="font-size: 9px; color: #ffe685;">[HOTKEYS: CLICK]</span>
-                </div>
-                <div class="cmd-grid" id="building-cmd-grid">
-            `;
-
-            // Unit Production Buttons for this building
-            const productionType = structure.type === 'center' ? 'commandCenter' : structure.type;
-            const producers = Object.entries(unitRoster).filter(([type, spec]) => {
-                if (spec.building === productionType) return true;
-                if (structure.type === 'supplyCenter' && type === 'truck') return true;
-                if (structure.type === 'supplyStash' && type === 'worker') return true;
-                if (structure.type === 'factory' && type === 'truck' && selectedFaction !== 'gla') return true;
-                return false;
-            });
-
-            producers.forEach(([type, spec]) => {
-                const techReq = getUnitTechPrerequisite(type);
-                const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
-                const canAfford = playerResources >= spec.cost;
-                const isReady = hasTech && canAfford && !isConstructing;
-
-                let badge = '';
-                if (!hasTech) {
-                    badge = `<span class="cmd-btn-badge badge-locked">🔒 REQ: ${techReq.name.toUpperCase()}</span>`;
-                } else if (!canAfford) {
-                    badge = `<span class="cmd-btn-badge badge-funds">NEED FUNDS</span>`;
-                } else if (isConstructing) {
-                    badge = `<span class="cmd-btn-badge badge-funds">BUILDING...</span>`;
-                } else {
-                    badge = `<span class="cmd-btn-badge badge-ready">READY</span>`;
-                }
-
-                html += `
-                    <button class="cmd-btn ${!hasTech ? 'locked-tech' : ''}" onclick="produceUnit('${type}')" onmouseenter="showTacticalTooltip(event, '${type}')" onmouseleave="hideTacticalTooltip()" ${!isReady ? 'disabled' : ''}>
-                        <div class="cmd-btn-name">${spec.name}</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">$${spec.cost}</span>
-                            ${badge}
-                        </div>
-                    </button>
-                `;
-            });
-
-            // Special Upgrades and Abilities for this building
-            const abilityButtons = getBuildingAbilities(structure);
-            abilityButtons.forEach(ab => {
-                html += `
-                    <button class="cmd-btn" onclick="useStructureAbility('${ab.action}')" onmouseenter="showTacticalTooltip(event, '${ab.action}')" onmouseleave="hideTacticalTooltip()" ${ab.disabled ? 'disabled' : ''}>
-                        <div class="cmd-btn-name">${ab.label}</div>
-                        <div class="cmd-btn-desc">${ab.desc || ''}</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">${ab.cost ? '$' + ab.cost : 'READY'}</span>
-                            <span class="cmd-btn-badge badge-ready">${ab.badge || 'ACTION'}</span>
-                        </div>
-                    </button>
-                `;
-            });
-
-            if (producers.length === 0 && abilityButtons.length === 0) {
-                html += `
-                    <div style="grid-column: span 2; padding: 14px; text-align: center; color: #8e8870; font-size: 11px; background: rgba(0,0,0,0.25); border: 1px dashed #4a4530;">
-                        No unit production at this facility.<br>Structure functions automatically.
-                    </div>
-                `;
-            }
-
-            html += `</div>`;
-            container.innerHTML = html;
-        }
-
-        function getBuildingAbilities(structure) {
-            if (structure.isBuilding) return [];
-            const abilities = [];
-
-            if (structure.type === 'center') {
-                abilities.push({ action: 'intel', label: 'Radar Recon Sweep', desc: 'Scan enemy positions', cost: 0, badge: 'RECON' });
-                if (selectedFaction === 'china') {
-                    abilities.push({ action: 'plantMines', label: 'Deploy Landmines', desc: 'Perimeter minefield', cost: 100, badge: 'DEFENSE', disabled: structure.minesPlanted });
-                }
-            } else if (structure.type === 'power') {
-                abilities.push({ action: 'upgradePower', label: structure.powerUpgraded ? 'Control Rods Active' : 'Upgrade Control Rods', desc: 'Doubles power output', cost: 300, badge: '+100% PWR', disabled: structure.powerUpgraded });
-            } else if (structure.type === 'nuclearReactor') {
-                abilities.push({ action: 'overcharge', label: structure.overcharged ? 'Disable Overcharge' : 'Overcharge Reactor', desc: '+50% power generation', cost: 0, badge: 'OVERDRIVE' });
-                abilities.push({ action: 'plantMines', label: 'Deploy Landmines', desc: 'Perimeter minefield', cost: 100, badge: 'DEFENSE', disabled: structure.minesPlanted });
-            } else if (structure.type === 'factory') {
-                if (selectedFaction === 'usa') {
-                    abilities.push({ action: 'towMissile', label: 'TOW Missile Tech', desc: 'Humvees gain TOW missile (+40% dmg)', cost: 800, badge: 'UPGRADE', disabled: researchedTechs.has('towMissile') });
-                    abilities.push({ action: 'battleDrone', label: 'Battle Drone Upgrade', desc: 'Tanks gain auto-repair drone', cost: 400, badge: 'DRONE', disabled: researchedTechs.has('battleDrone') });
-                } else if (selectedFaction === 'china') {
-                    abilities.push({ action: 'chainGuns', label: 'Chain Guns Tech', desc: 'Gatling weapons deal +25% dmg', cost: 1000, badge: 'UPGRADE', disabled: researchedTechs.has('chainGuns') });
-                } else if (selectedFaction === 'gla') {
-                    abilities.push({ action: 'scorpionRocket', label: 'Scorpion Rocket Tech', desc: 'Scorpions mount turret rocket (+40% dmg)', cost: 1000, badge: 'UPGRADE', disabled: researchedTechs.has('scorpionRocket') });
-                }
-            } else if (structure.type === 'strategyCenter') {
-                abilities.push({ action: 'planHold', label: 'Plan: Hold the Line', desc: '+20% armor buff', cost: 0, badge: battlePlan === 'hold' ? 'ACTIVE' : 'SELECT' });
-                abilities.push({ action: 'planSearch', label: 'Plan: Search & Destroy', desc: '+20% vision & range', cost: 0, badge: battlePlan === 'search' ? 'ACTIVE' : 'SELECT' });
-                abilities.push({ action: 'planBombard', label: 'Plan: Bombardment', desc: '+20% shell damage', cost: 0, badge: battlePlan === 'bombard' ? 'ACTIVE' : 'SELECT' });
-                abilities.push({ action: 'compositeArmor', label: 'Composite Armor Tech', desc: 'Tanks gain +25% HP', cost: 1200, badge: 'TECH', disabled: researchedTechs.has('compositeArmor') });
-            } else if (structure.type === 'propagandaCenter') {
-                abilities.push({ action: 'nationalism', label: 'Nationalism Tech', desc: '+25% attack rate', cost: 1000, badge: 'TECH', disabled: researchedTechs.has('nationalism') });
-                abilities.push({ action: 'subliminal', label: 'Subliminal Messaging', desc: '2x speaker recovery', cost: 800, badge: 'TECH', disabled: researchedTechs.has('subliminal') });
-                abilities.push({ action: 'uraniumShells', label: 'Uranium Shells Tech', desc: 'Battlemaster/Overlord tanks deal +25% dmg', cost: 1200, badge: 'TECH', disabled: researchedTechs.has('uraniumShells') });
-            } else if (structure.type === 'palace') {
-                const count = (structure.garrisoned || []).length;
-                abilities.push({ action: count > 0 ? 'ungarrison' : 'garrison', label: count > 0 ? `Evacuate Palace (${count})` : 'Garrison Infantry (Up to 5)', desc: 'Fire from fortified slits', cost: 0, badge: count > 0 ? 'EVAC' : 'GARRISON' });
-                abilities.push({ action: 'anthraxBeta', label: 'Anthrax Beta Tech', desc: '+25% chemical toxin dmg', cost: 1200, badge: 'TECH', disabled: researchedTechs.has('anthraxBeta') });
-                abilities.push({ action: 'armTheMob', label: 'Arm the Mob Tech', desc: 'Mobs get AK-47 assault rifles', cost: 1000, badge: 'TECH', disabled: researchedTechs.has('armTheMob') });
-                abilities.push({ action: 'apBullets', label: 'AP Bullets Tech', desc: 'Rebels & Technicals +25% dmg', cost: 1000, badge: 'TECH', disabled: researchedTechs.has('apBullets') });
-                abilities.push({ action: 'apRockets', label: 'AP Rockets Tech', desc: 'RPG Troopers & Buggies +25% dmg', cost: 1200, badge: 'TECH', disabled: researchedTechs.has('apRockets') });
-                abilities.push({ action: 'junkRepair', label: 'Junk Repair Tech', desc: 'GLA vehicles auto-regenerate (+1 HP/s)', cost: 1000, badge: 'REPAIR', disabled: researchedTechs.has('junkRepair') });
-                abilities.push({ action: 'camouflage', label: 'Camouflage Tech', desc: 'Rebels gain stealth when stationary', cost: 1000, badge: 'STEALTH', disabled: researchedTechs.has('camouflage') });
-            } else if (structure.type === 'bunker') {
-                const count = (structure.garrisoned || []).length;
-                abilities.push({ action: count > 0 ? 'ungarrison' : 'garrison', label: count > 0 ? `Evacuate Bunker (${count}/5)` : 'Garrison Nearby Infantry', desc: 'Infantry fire through bunker', cost: 0, badge: count > 0 ? 'EVAC' : 'GARRISON' });
-            } else if (structure.type === 'tunnel') {
-                abilities.push({ action: 'tunnel', label: 'Tunnel Transfer Network', desc: 'Instantly warp between tunnels', cost: 0, badge: 'WARP' });
-            } else if (structure.type === 'internetCenter') {
-                abilities.push({ action: 'networkHack', label: 'Satellite Network Hack', desc: 'Steal $250 enemy funds', cost: 0, badge: 'HACK' });
-            } else if (['particleCannon', 'nukeSilo', 'scudStorm'].includes(structure.type)) {
-                abilities.push({ action: 'superweapon', label: 'FIRE SUPERWEAPON', desc: 'Target weapon strike on map', cost: 0, badge: 'STRIKE' });
-            } else if (structure.type === 'barracks') {
-                abilities.push({ action: 'captureBuilding', label: 'Capture Tech Upgrade', desc: 'Infantry capture neutral tech', cost: 1000, badge: 'UPGRADE', disabled: researchedTechs.has('captureBuilding') });
-            }
-
-            return abilities;
-        }
-
-        function renderSelectedUnitsPanel(container, selectedUnits) {
-            const hasHarvester = selectedUnits.some(u => u.type === 'truck' || u.type === 'worker');
-            const totalHP = selectedUnits.reduce((acc, u) => acc + u.health, 0);
-            const maxHP = selectedUnits.reduce((acc, u) => acc + u.maxHealth, 0);
-            const percent = Math.max(0, Math.round((totalHP / maxHP) * 100));
-
-            // Breakdown
-            const counts = {};
-            selectedUnits.forEach(u => { counts[u.type] = (counts[u.type] || 0) + 1; });
-            const breakdown = Object.entries(counts).map(([type, c]) => `${c} ${unitRoster[type] ? unitRoster[type].name : type}`).join(', ');
-
-            let html = `
-                <div class="info-card">
-                    <div class="info-card-header">
-                        <div>
-                            <div class="info-card-title">COMMAND GROUP (${selectedUnits.length})</div>
-                            <div style="font-size: 10px; color: #ffe685; margin-top: 2px;">${breakdown}</div>
-                        </div>
-                        <span class="info-card-status">READY</span>
-                    </div>
-
-                    <div class="hp-wrapper">
-                        <div class="hp-labels">
-                            <span>SQUAD COMBAT READINESS</span>
-                            <span>${Math.ceil(totalHP)} / ${maxHP} HP (${percent}%)</span>
-                        </div>
-                        <div class="hp-bar-track">
-                            <div class="hp-bar-fill" style="width: ${percent}%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section-header">
-                    <span>TACTICAL UNIT COMMANDS</span>
-                </div>
-                <div class="cmd-grid">
-            `;
-
-            // Harvester Gather Supplies Button!
-            if (hasHarvester) {
-                html += `
-                    <button class="cmd-btn" style="grid-column: span 2; border-color: #ffd86b; background: linear-gradient(180deg, #3d3b23 0%, #201f12 100%);" onclick="orderSelectedHarvestersToGather()">
-                        <div class="cmd-btn-name" style="color: #ffe685; font-size: 12px;">⛏ GATHER SUPPLIES</div>
-                        <div class="cmd-btn-desc">Orders selected harvesters to gather supplies from field</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">HARVEST</span>
-                            <span class="cmd-btn-badge badge-ready">DISPATCH</span>
-                        </div>
-                    </button>
-                `;
-            }
-
-            // Transport Passengers & Evacuate Control!
-            const transportsWithPassengers = selectedUnits.filter(u => u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0);
-            if (transportsWithPassengers.length > 0) {
-                let totalPassengers = 0;
-                const pCounts = {};
-                transportsWithPassengers.forEach(t => {
-                    totalPassengers += t.garrisoned.length;
-                    t.garrisoned.forEach(p => { pCounts[p.type] = (pCounts[p.type] || 0) + 1; });
-                });
-                const pList = Object.entries(pCounts).map(([type, c]) => `${c} ${type.toUpperCase()}`).join(', ');
-                html += `
-                    <button class="cmd-btn" style="grid-column: span 2; border-color: #55efc4; background: linear-gradient(180deg, #133a2d 0%, #0d201a 100%);" onclick="orderSelectedTransportsToUnload()">
-                        <div class="cmd-btn-name" style="color: #55efc4; font-size: 12px;">⬇ UNLOAD / EVACUATE (${totalPassengers} PASSENGERS)</div>
-                        <div class="cmd-btn-desc" style="color: #a8e6cf;">Embarked: ${pList}</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">DEPLOY</span>
-                            <span class="cmd-btn-badge badge-ready">UNLOAD ALL</span>
-                        </div>
-                    </button>
-                `;
-            }
-
-            html += `
-                    <button class="cmd-btn" onclick="orderUnitsHalt()">
-                        <div class="cmd-btn-name">⏹ STOP ORDER</div>
-                        <div class="cmd-btn-desc">Halt all movement</div>
-                        <div class="cmd-btn-footer"><span class="cmd-btn-badge badge-ready">HALT</span></div>
-                    </button>
-                    <button class="cmd-btn" onclick="selectUnitsByType('combat')">
-                        <div class="cmd-btn-name">⚔ ALL COMBAT</div>
-                        <div class="cmd-btn-desc">Select all battle units</div>
-                        <div class="cmd-btn-footer"><span class="cmd-btn-badge badge-ready">SELECT</span></div>
-                    </button>
-                </div>
-            `;
-            container.innerHTML = html;
-        }
-
-        function isInfantryType(type) {
-            return ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'mob'].includes(type);
-        }
-
-        function orderSelectedTransportsToUnload() {
-            const selectedTransports = units.filter(u => u.selected && u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0);
-            if (selectedTransports.length === 0) return;
-
-            selectedTransports.forEach(transport => {
-                const count = transport.garrisoned.length;
-                transport.garrisoned.forEach((passenger, idx) => {
-                    passenger.garrisonedIn = null;
-                    passenger.mesh.visible = true;
-                    const ang = (idx / count) * Math.PI * 2;
-                    const dropDist = (transport.radius || 1.4) + 2.4;
-                    const dropX = transport.mesh.position.x + Math.cos(ang) * dropDist;
-                    const dropZ = transport.mesh.position.z + Math.sin(ang) * dropDist;
-                    passenger.mesh.position.set(dropX, getTerrainHeight(dropX, dropZ), dropZ);
-                    passenger.targetPosition.copy(passenger.mesh.position);
-                    passenger.taskState = 'Idle';
-                });
-                transport.garrisoned = [];
-            });
-            showNotification('Garrisoned infantry disembarked from transport.', 'info');
-            updateSidebar();
-        }
-
-        function orderUnitsHalt() {
-            units.forEach(u => {
-                if (u.selected) {
-                    u.targetPosition.copy(u.mesh.position);
+        if (e.buttons === 1 || e.button === 0) { // Left-click drag: Pan camera
+            cameraTarget.x = worldX;
+            cameraTarget.z = worldZ;
+            updateCameraPosition();
+        } else if (e.button === 2 || e.buttons === 2) { // Right-click: Move order to map coordinates!
+            e.preventDefault();
+            const selectedList = units.filter(u => u.selected);
+            if (selectedList.length > 0) {
+                const targetPos = new THREE.Vector3(worldX, getTerrainHeight(worldX, worldZ), worldZ);
+                selectedList.forEach(u => {
+                    u.targetPosition.copy(targetPos);
+                    u.waypoints = [];
                     u.combatTarget = null;
                     u.taskState = 'Idle';
-                    if (u.type === 'truck' || u.type === 'worker') u.aiState = 'Idle';
-                }
-            });
-            showNotification('Unit movement halted.', 'info');
-        }
-
-        function renderBaseHeadquartersPanel(container) {
-            const combatCount = units.filter(u => !['dozer', 'worker', 'truck'].includes(u.type)).length;
-            const harvesterCount = units.filter(u => u.type === 'truck' || u.type === 'worker').length;
-            const builderCount = units.filter(u => u.type === 'dozer' || u.type === 'worker').length;
-
-            let html = `
-                <div class="info-card">
-                    <div class="info-card-header">
-                        <div>
-                            <div class="info-card-title">BASE STRATEGIC OVERVIEW</div>
-                            <div style="font-size: 9px; color: #8e8870; margin-top: 2px;">HEADQUARTERS MONITOR</div>
-                        </div>
-                        <span class="info-card-status">ONLINE</span>
-                    </div>
-                    <div style="font-size: 11px; line-height: 1.6; color: #c5b98e; margin: 6px 0;">
-                        Operational Assets: <strong>${structures.length}</strong> structures, <strong>${units.length}</strong> units.<br>
-                        Combat Force: <strong>${combatCount}</strong> · Harvesters: <strong>${harvesterCount}</strong> · Builders: <strong>${builderCount}</strong>.
-                    </div>
-                    <div class="util-btn-row">
-                        <button class="util-btn" onclick="selectUnitsByType('combat')">⚔ All Combat</button>
-                        <button class="util-btn" onclick="selectUnitsByType('harvesters')">⛏ Harvesters</button>
-                        <button class="util-btn" onclick="selectUnitsByType('builders')">🔨 Builders</button>
-                    </div>
-                </div>
-
-                <div class="section-header">
-                    <span>QUICK CONSTRUCTION PALETTE</span>
-                    <span style="font-size: 9px; color: #ffe685;">[PLACE ON MAP]</span>
-                </div>
-                <div class="cmd-grid">
-            `;
-
-            const buildings = factionBuildings[selectedFaction] || [];
-            buildings.forEach(([type, name, cost]) => {
-                const structReq = getStructureTechPrerequisite(type);
-                const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
-                const canAfford = playerResources >= cost;
-                const isReady = hasTech && canAfford;
-
-                let badge = '';
-                if (!hasTech) {
-                    badge = `<span class="cmd-btn-badge badge-locked">🔒 REQ: ${structReq.name.toUpperCase()}</span>`;
-                } else if (!canAfford) {
-                    badge = `<span class="cmd-btn-badge badge-funds">FUNDS</span>`;
-                } else {
-                    badge = `<span class="cmd-btn-badge badge-ready">BUILD</span>`;
-                }
-
-                html += `
-                    <button class="cmd-btn ${!hasTech ? 'locked-tech' : ''}" onclick="activateBlueprint('${type}')" onmouseenter="showTacticalTooltip(event, '${type}')" onmouseleave="hideTacticalTooltip()" ${!isReady ? 'disabled' : ''}>
-                        <div class="cmd-btn-name">${name}</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">$${cost}</span>
-                            ${badge}
-                        </div>
-                    </button>
-                `;
-            });
-
-            html += `</div>`;
-            container.innerHTML = html;
-        }
-
-        function renderStructuresPalette(container) {
-            let html = `
-                <div class="section-header">
-                    <span>BASE STRUCTURES CATALOG</span>
-                    <span style="font-size: 9px; color: #ffe685;">[CLICK TO PLACE]</span>
-                </div>
-                <div class="cmd-grid">
-            `;
-
-            const buildings = factionBuildings[selectedFaction] || [];
-            buildings.forEach(([type, name, cost]) => {
-                const structReq = getStructureTechPrerequisite(type);
-                const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
-                const canAfford = playerResources >= cost;
-                const isReady = hasTech && canAfford;
-
-                let badge = '';
-                if (!hasTech) {
-                    badge = `<span class="cmd-btn-badge badge-locked">🔒 REQ: ${structReq.name.toUpperCase()}</span>`;
-                } else if (!canAfford) {
-                    badge = `<span class="cmd-btn-badge badge-funds">FUNDS</span>`;
-                } else {
-                    badge = `<span class="cmd-btn-badge badge-ready">BUILD</span>`;
-                }
-
-                html += `
-                    <button class="cmd-btn ${!hasTech ? 'locked-tech' : ''}" onclick="activateBlueprint('${type}')" onmouseenter="showTacticalTooltip(event, '${type}')" onmouseleave="hideTacticalTooltip()" ${!isReady ? 'disabled' : ''}>
-                        <div class="cmd-btn-name">${name}</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">$${cost}</span>
-                            ${badge}
-                        </div>
-                    </button>
-                `;
-            });
-
-            html += `</div>`;
-            container.innerHTML = html;
-        }
-
-        function renderDefensesPalette(container) {
-            let html = `
-                <div class="section-header">
-                    <span>PERIMETER DEFENSES &amp; SUPERWEAPONS</span>
-                </div>
-                <div class="cmd-grid">
-            `;
-
-            const allBuildings = factionBuildings[selectedFaction] || [];
-            const defenseKeys = ['patriot', 'gatlingCannon', 'speakerTower', 'bunker', 'tunnel', 'stingerSite', 'demoTrap', 'particleCannon', 'nukeSilo', 'scudStorm'];
-            const defenses = allBuildings.filter(([type]) => defenseKeys.includes(type));
-
-            defenses.forEach(([type, name, cost]) => {
-                const structReq = getStructureTechPrerequisite(type);
-                const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
-                const canAfford = playerResources >= cost;
-                const isReady = hasTech && canAfford;
-
-                let badge = '';
-                if (!hasTech) {
-                    badge = `<span class="cmd-btn-badge badge-locked">🔒 REQ: ${structReq.name.toUpperCase()}</span>`;
-                } else if (!canAfford) {
-                    badge = `<span class="cmd-btn-badge badge-funds">FUNDS</span>`;
-                } else {
-                    badge = `<span class="cmd-btn-badge badge-ready">DEPLOY</span>`;
-                }
-
-                html += `
-                    <button class="cmd-btn ${!hasTech ? 'locked-tech' : ''}" onclick="activateBlueprint('${type}')" onmouseenter="showTacticalTooltip(event, '${type}')" onmouseleave="hideTacticalTooltip()" ${!isReady ? 'disabled' : ''}>
-                        <div class="cmd-btn-name">${name}</div>
-                        <div class="cmd-btn-footer">
-                            <span class="cmd-btn-cost">$${cost}</span>
-                            ${badge}
-                        </div>
-                    </button>
-                `;
-            });
-
-            html += `</div>`;
-            container.innerHTML = html;
-        }
-
-        function renderStructureMenu(structure) {
-            selectedStructure = structure;
-            activeSidebarTab = 'production';
-            updateSidebar();
-        }
-
-        function updateHUD() {
-            updateSidebar();
-        }
-
-        function useStructureAbility(action) {
-            const structure = selectedStructure;
-            if (!structure || structure.isBuilding) return;
-
-            if (action === 'upgradePower') {
-                if (structure.powerUpgraded) return;
-                if (playerResources < 300) { showNotification('Insufficient resources for control rods.', 'error'); return; }
-                playerResources -= 300;
-                structure.powerUpgraded = true;
-                structure.powerOutput = 10;
-                showNotification('Control rods installed: Cold Fusion power doubled (+100%).', 'success');
-            } else if (action === 'overcharge') {
-                structure.overcharged = !structure.overcharged;
-                showNotification(`Nuclear Reactor overcharge ${structure.overcharged ? 'ACTIVATED (+50% PWR)' : 'DEACTIVATED'}.`, 'info');
-            } else if (action === 'planHold') {
-                battlePlan = 'hold';
-                showNotification('Strategy Center: Battle plan Hold the Line active (+20% armor).', 'info');
-            } else if (action === 'planSearch') {
-                battlePlan = 'search';
-                showNotification('Strategy Center: Battle plan Search & Destroy active (+20% range & sight).', 'info');
-            } else if (action === 'planBombard') {
-                battlePlan = 'bombard';
-                showNotification('Strategy Center: Battle plan Bombardment active (+20% firepower).', 'info');
-            } else if (action === 'compositeArmor') {
-                if (playerResources < 1200) { showNotification('Need $1200 for Composite Armor.', 'error'); return; }
-                playerResources -= 1200;
-                researchedTechs.add('compositeArmor');
-                units.filter(u => u.type === 'tank' || u.type === 'paladin').forEach(u => { u.health += 100; u.maxHealth += 100; });
-                showNotification('Composite Armor researched: Tanks gained +25% HP!', 'success');
-            } else if (action === 'nationalism') {
-                if (playerResources < 1000) { showNotification('Need $1000 for Nationalism.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('nationalism');
-                showNotification('Nationalism researched: Chinese troops fire +25% faster!', 'success');
-            } else if (action === 'subliminal') {
-                if (playerResources < 800) { showNotification('Need $800 for Subliminal Messaging.', 'error'); return; }
-                playerResources -= 800;
-                researchedTechs.add('subliminal');
-                showNotification('Subliminal Messaging researched: Healing recovery doubled!', 'success');
-            } else if (action === 'anthraxBeta') {
-                if (playerResources < 1200) { showNotification('Need $1200 for Anthrax Beta.', 'error'); return; }
-                playerResources -= 1200;
-                researchedTechs.add('anthraxBeta');
-                showNotification('Anthrax Beta researched: Toxin weapons deal +25% damage!', 'success');
-            } else if (action === 'armTheMob') {
-                if (playerResources < 1000) { showNotification('Need $1000 for Arm the Mob.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('armTheMob');
-                showNotification('Arm the Mob researched: Mobs equipped with AK-47 assault rifles!', 'success');
-            } else if (action === 'captureBuilding') {
-                if (playerResources < 1000) { showNotification('Need $1000 for Capture Building.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('captureBuilding');
-                showNotification('Capture Building researched: Infantry can now capture enemy tech!', 'success');
-            } else if (action === 'intel') {
-                intelTimer = 1800;
-                const hostiles = enemyUnits.filter(enemy => enemy.health > 0);
-                const report = hostiles.map(enemy => `${enemy.type} (${Math.ceil(enemy.health)} HP)`).join(', ') || 'No hostiles detected';
-                showNotification(`Intelligence sweep complete: ${report}.`, 'info');
-            } else if (action === 'garrison') {
-                structure.garrisoned = units.filter(unit => unit.health > 0 && unit.mesh.visible &&
-                    ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker'].includes(unit.type) &&
-                    unit.mesh.position.distanceTo(structure.position) < 18).slice(0, 5);
-                structure.garrisoned.forEach(unit => { unit.mesh.visible = false; unit.garrisonedIn = structure; });
-                showNotification(`Garrisoned ${structure.garrisoned.length} infantry soldiers inside facility.`, 'success');
-            } else if (action === 'ungarrison') {
-                (structure.garrisoned || []).forEach((unit, index) => {
-                    unit.mesh.visible = true;
-                    unit.mesh.position.copy(structure.position).add(new THREE.Vector3(7 + index * 1.5, 0, 0));
-                    unit.targetPosition.copy(unit.mesh.position);
-                    unit.garrisonedIn = null;
                 });
-                showNotification(`Evacuated ${structure.garrisoned.length} infantry soldiers from facility.`, 'info');
-                structure.garrisoned = [];
-            } else if (action === 'tunnel') {
-                const exits = structures.filter(candidate => candidate.type === 'tunnel' && candidate !== structure && !candidate.isBuilding);
-                if (!exits.length) { showNotification('Build a second Tunnel Network as an exit.', 'error'); return; }
-                const exit = exits[0];
-                const transferCount = units.filter(unit => unit.health > 0 && unit.mesh.position.distanceTo(structure.position) < 18).length;
-                units.filter(unit => unit.health > 0 && unit.mesh.position.distanceTo(structure.position) < 18).forEach((unit, index) => {
-                    unit.mesh.position.copy(exit.position).add(new THREE.Vector3(exit.radius + 2 + index * 1.5, 0, 0));
-                    unit.targetPosition.copy(unit.mesh.position);
-                });
-                showNotification(`Tunneled ${transferCount} unit(s) through network.`, 'success');
-            } else if (action === 'networkHack') {
-                if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Satellite network hack recharging.', 'error'); return; }
-                playerResources += 250;
-                structure.cooldownUntil = buildingTick + 600;
-                intelTimer = 600;
-                showNotification(`Network hack complete: +$250 acquired from orbital relay!`, 'success');
-            } else if (action === 'plantMines') {
-                if (structure.minesPlanted) { showNotification('Minefield already deployed around facility.', 'info'); return; }
-                if (playerResources < 100) { showNotification('Need $100 for landmines.', 'error'); return; }
-                playerResources -= 100;
-                structure.minesPlanted = true;
-                for (const x of [-12, 12]) for (const z of [-12, 12]) {
-                    landmines.push({ position: structure.position.clone().add(new THREE.Vector3(x, 0, z)), active: true });
-                }
-                showNotification('Perimeter landmines deployed around facility.', 'success');
-            } else if (action === 'towMissile') {
-                if (playerResources < 800) { showNotification('Need $800 for TOW Missiles.', 'error'); return; }
-                playerResources -= 800;
-                researchedTechs.add('towMissile');
-                showNotification('TOW Missiles researched: Humvees equipped with anti-tank missiles (+40% damage)!', 'success');
-            } else if (action === 'battleDrone') {
-                if (playerResources < 400) { showNotification('Need $400 for Battle Drones.', 'error'); return; }
-                playerResources -= 400;
-                researchedTechs.add('battleDrone');
-                showNotification('Battle Drones researched: Tanks gain auto-repair and point defense!', 'success');
-            } else if (action === 'chainGuns') {
-                if (playerResources < 1000) { showNotification('Need $1000 for Chain Guns.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('chainGuns');
-                showNotification('Chain Guns researched: Gatling weapons fire +25% harder and spin up instantly!', 'success');
-            } else if (action === 'uraniumShells') {
-                if (playerResources < 1200) { showNotification('Need $1200 for Uranium Shells.', 'error'); return; }
-                playerResources -= 1200;
-                researchedTechs.add('uraniumShells');
-                showNotification('Uranium Shells researched: Battlemaster & Overlord tank rounds deal +25% damage!', 'success');
-            } else if (action === 'scorpionRocket') {
-                if (playerResources < 1000) { showNotification('Need $1000 for Scorpion Rockets.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('scorpionRocket');
-                showNotification('Scorpion Rockets researched: Scorpion tanks equipped with explosive turret rockets!', 'success');
-            } else if (action === 'apBullets') {
-                if (playerResources < 1000) { showNotification('Need $1000 for AP Bullets.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('apBullets');
-                showNotification('AP Bullets researched: Rebels, Technicals, and Quad Cannons deal +25% damage!', 'success');
-            } else if (action === 'apRockets') {
-                if (playerResources < 1200) { showNotification('Need $1200 for AP Rockets.', 'error'); return; }
-                playerResources -= 1200;
-                researchedTechs.add('apRockets');
-                showNotification('AP Rockets researched: RPG Troopers & Rocket Buggies deal +25% armor-piercing damage!', 'success');
-            } else if (action === 'junkRepair') {
-                if (playerResources < 1000) { showNotification('Need $1000 for Junk Repair.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('junkRepair');
-                showNotification('Junk Repair researched: All GLA armored vehicles continuously self-heal!', 'success');
-            } else if (action === 'camouflage') {
-                if (playerResources < 1000) { showNotification('Need $1000 for Camouflage.', 'error'); return; }
-                playerResources -= 1000;
-                researchedTechs.add('camouflage');
-                showNotification('Camouflage researched: Rebels become invisible when motionless!', 'success');
-            } else if (action === 'superweapon') {
-                if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Superweapon is recharging.', 'error'); return; }
-                pendingSuperweapon = structure;
-                showNotification(`Click map to target ${structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Strike' : 'SCUD Storm'}. Right-click to cancel.`, 'info');
+                playUSASound('acknowledge');
+                showNotification(`Tactical rally order to coordinates [${Math.round(worldX)}, ${Math.round(worldZ)}]`, 'info');
+                spawnPingEffect(targetPos);
             }
+        }
+    }
 
-            document.getElementById('resource-display').textContent = `$${playerResources}`;
-            updateSidebar();
+    radarCanvas.addEventListener('mousedown', e => {
+        if (e.button === 0) isRadarDragging = true;
+        handleRadarPointer(e);
+    });
+    window.addEventListener('mousemove', e => {
+        if (isRadarDragging) handleRadarPointer(e);
+    });
+    window.addEventListener('mouseup', e => {
+        if (e.button === 0) isRadarDragging = false;
+    });
+    radarCanvas.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        handleRadarPointer(e);
+    });
+}
+
+function renderRadarMinimap() {
+    if (!radarCanvas) radarCanvas = document.getElementById('radar-canvas');
+    if (!radarCanvas || !scene) return;
+    if (!radarCtx) radarCtx = radarCanvas.getContext('2d');
+    const ctx = radarCtx;
+    const w = radarCanvas.width;
+    const h = radarCanvas.height;
+    const mapSize = currentMapSize || 800;
+    const half = mapSize / 2;
+
+    // Clear radar background
+    ctx.fillStyle = '#061009';
+    ctx.fillRect(0, 0, w, h);
+
+    // Radar grid rings & crosshairs
+    ctx.strokeStyle = 'rgba(0, 255, 180, 0.14)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(w/2, h/2, w * 0.44, 0, Math.PI * 2);
+    ctx.arc(w/2, h/2, w * 0.28, 0, Math.PI * 2);
+    ctx.moveTo(w/2, 4); ctx.lineTo(w/2, h - 4);
+    ctx.moveTo(4, h/2); ctx.lineTo(w - 4, h/2);
+    ctx.stroke();
+
+    // Transform world coord to radar canvas coord
+    const toRX = (x) => ((x + half) / mapSize) * w;
+    const toRZ = (z) => ((z + half) / mapSize) * h;
+
+    // Draw bridges
+    if (mapBridges && mapBridges.length > 0) {
+        ctx.strokeStyle = '#636e72';
+        ctx.lineWidth = 3;
+        mapBridges.forEach(b => {
+            ctx.beginPath();
+            ctx.moveTo(toRX(b.x1), toRZ(b.z1));
+            ctx.lineTo(toRX(b.x2), toRZ(b.z2));
+            ctx.stroke();
+        });
+    }
+
+    // Draw Supply Docks (Gold Diamonds)
+    if (supplyPoints && supplyPoints.length > 0) {
+        ctx.fillStyle = '#f1c40f';
+        supplyPoints.forEach(sp => {
+            if (sp.stock > 0) {
+                const rx = toRX(sp.position.x);
+                const rz = toRZ(sp.position.z);
+                ctx.fillRect(rx - 2, rz - 2, 4, 4);
+            }
+        });
+    }
+
+    // Draw Friendly Structures (Solid Emerald Green Squares)
+    ctx.fillStyle = '#2ecc71';
+    structures.forEach(s => {
+        if (s.health > 0) {
+            const rx = toRX(s.position.x);
+            const rz = toRZ(s.position.z);
+            const sz = Math.max(4, (s.radius || 4) / mapSize * w * 2.2);
+            ctx.fillRect(rx - sz/2, rz - sz/2, sz, sz);
+        }
+    });
+
+    // Draw Enemy Structures (Solid Crimson Red Squares)
+    ctx.fillStyle = '#e74c3c';
+    enemyStructures.forEach(es => {
+        if (es.health > 0) {
+            const rx = toRX(es.position.x);
+            const rz = toRZ(es.position.z);
+            const sz = Math.max(4, (es.radius || 4) / mapSize * w * 2.2);
+            ctx.fillRect(rx - sz/2, rz - sz/2, sz, sz);
+        }
+    });
+
+    // Draw Friendly Units (Bright Neon Green Dots, Selected = Pulsing White)
+    units.forEach(u => {
+        if (u.health > 0 && u.mesh && !u.garrisonedIn) {
+            const rx = toRX(u.mesh.position.x);
+            const rz = toRZ(u.mesh.position.z);
+            if (u.selected) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(rx - 2, rz - 2, 4, 4);
+            } else {
+                ctx.fillStyle = '#55efc4';
+                ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);
+            }
+        }
+    });
+
+    // Draw Enemy Units (Bright Crimson Red Dots)
+    ctx.fillStyle = '#ff4757';
+    enemyUnits.forEach(eu => {
+        if (eu.health > 0 && eu.mesh) {
+            const rx = toRX(eu.mesh.position.x);
+            const rz = toRZ(eu.mesh.position.z);
+            ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);
+        }
+    });
+
+    // Draw Camera Viewport Frustum on Radar (Cyan Outline)
+    if (camera) {
+        ctx.strokeStyle = '#00ffcc';
+        ctx.lineWidth = 1;
+        const camX = toRX(cameraTarget.x);
+        const camZ = toRZ(cameraTarget.z);
+        const viewW = (cameraRadius / mapSize) * w * 1.4;
+        const viewH = (cameraRadius / mapSize) * h * 0.9;
+        ctx.strokeRect(camX - viewW/2, camZ - viewH/2, viewW, viewH);
+    }
+
+    // Sweeping Radar Line with phosphor fade!
+    radarSweepAngle = (radarSweepAngle + 0.045) % (Math.PI * 2);
+    const sweepLen = w * 0.46;
+    const sweepX = w/2 + Math.cos(radarSweepAngle) * sweepLen;
+    const sweepY = h/2 + Math.sin(radarSweepAngle) * sweepLen;
+    const grad = ctx.createRadialGradient(w/2, h/2, 2, w/2, h/2, sweepLen);
+    grad.addColorStop(0, 'rgba(0, 255, 180, 0.4)');
+    grad.addColorStop(1, 'rgba(0, 255, 180, 0.0)');
+    ctx.strokeStyle = 'rgba(0, 255, 204, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(w/2, h/2);
+    ctx.lineTo(sweepX, sweepY);
+    ctx.stroke();
+}
+
+function triggerTacticalBeacon() {
+    playUSASound('radio_chirp');
+    showNotification('Tactical beacon placed. Coordinates transmitted to squad.', 'info');
+    spawnPingEffect(cameraTarget);
+}
+
+function toggleRepairMode() {
+    isRepairMode = !isRepairMode;
+    isSellMode = false;
+    document.getElementById('btn-repair')?.classList.toggle('active', isRepairMode);
+    document.getElementById('btn-sell')?.classList.remove('active');
+    document.body.style.cursor = isRepairMode ? 'crosshair' : 'default';
+    showNotification(isRepairMode ? '🔧 REPAIR MODE: Click any damaged building to repair ($50)' : 'Repair mode deactivated.', 'info');
+}
+
+function toggleSellMode() {
+    isSellMode = !isSellMode;
+    isRepairMode = false;
+    document.getElementById('btn-sell')?.classList.toggle('active', isSellMode);
+    document.getElementById('btn-repair')?.classList.remove('active');
+    document.body.style.cursor = isSellMode ? 'not-allowed' : 'default';
+    showNotification(isSellMode ? '💰 SELL MODE: Click any structure to demolish for 50% refund' : 'Sell mode deactivated.', 'info');
+}
+
+function toggleInGameMenu() {
+    const menu = document.getElementById('start-menu');
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+    }
+}
+
+function switchGridCategory(cat) {
+    activeGridCategory = cat;
+    document.querySelectorAll('.grid-cat-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.id === `grid-tab-${cat}`);
+    });
+    updateSidebar();
+}
+
+function scatterSelectedUnits() {
+    const selectedList = units.filter(u => u.selected);
+    if (selectedList.length === 0) return;
+    selectedList.forEach(u => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 6 + Math.random() * 8;
+        const nx = u.mesh.position.x + Math.cos(angle) * dist;
+        const nz = u.mesh.position.z + Math.sin(angle) * dist;
+        u.targetPosition.set(nx, getTerrainHeight(nx, nz), nz);
+        u.taskState = 'Idle';
+    });
+    playUSASound('acknowledge');
+    showNotification('Units scattered into tactical spread!', 'info');
+}
+
+function purchaseVehicleDrone(droneType, cost) {
+    const selectedVehicles = units.filter(u => u.selected && ['crusader', 'paladin', 'humvee'].includes(u.type));
+    if (selectedVehicles.length === 0) {
+        showNotification('Select a Crusader Tank, Paladin Tank, or Humvee first.', 'error');
+        return;
+    }
+    if (playerResources < cost) {
+        showNotification(`Insufficient funds for ${droneType} drone ($${cost} needed).`, 'error');
+        return;
+    }
+    playerResources -= cost;
+    selectedVehicles.forEach(v => attachVehicleDrone(v, droneType));
+    playUSASound('radio_chirp');
+    showNotification(`${droneType.toUpperCase()} Drone attached to vehicle!`, 'success');
+    updateSidebar();
+}
+
+function purchaseOverlordUpgrade(upgType, cost) {
+    const overlords = units.filter(u => u.selected && u.type === 'overlord');
+    if (overlords.length === 0) {
+        showNotification('Select an Overlord Tank first.', 'error');
+        return;
+    }
+    if (playerResources < cost) {
+        showNotification(`Insufficient funds for Overlord upgrade ($${cost} needed).`, 'error');
+        return;
+    }
+    playerResources -= cost;
+    overlords.forEach(ov => attachOverlordUpgrade(ov, upgType));
+    playAudio('china_cannon', {}, 'china');
+    showNotification(`Overlord ${upgType.toUpperCase()} superstructure installed!`, 'success');
+    updateSidebar();
+}
+
+function purchaseNukeCannonUpgrade(cost) {
+    const nukeCannons = units.filter(u => u.selected && u.type === 'nukecannon');
+    if (nukeCannons.length === 0) {
+        showNotification('Select a Nuke Cannon first.', 'error');
+        return;
+    }
+    if (playerResources < cost) {
+        showNotification(`Insufficient funds for Neutron Shells ($${cost} needed).`, 'error');
+        return;
+    }
+    playerResources -= cost;
+    nukeCannons.forEach(nc => { nc.neutronShells = true; });
+    playAudio('nuke_artillery', {}, 'china');
+    showNotification(`Neutron Shells loaded into Nuke Cannon battery!`, 'success');
+    updateSidebar();
+}
+
+// 2. THE UPGRADED C&C GENERALS COMMAND BAR UPDATE LOOP
+function updateSidebar() {
+    if (!radarCanvas) initRadarMinimap();
+
+    // Faction Themes applied to top HUD and bottom command bar
+    const topBar = document.getElementById('top-hud-bar');
+    const cmdBar = document.getElementById('generals-command-bar');
+    const themeClass = `theme-${selectedFaction}`;
+    if (topBar) topBar.className = themeClass;
+    if (cmdBar) cmdBar.className = themeClass;
+
+    const factionTitles = {
+        usa: 'USA STRATEGIC FORCES',
+        china: 'PEOPLE\'S LIBERATION ARMY',
+        gla: 'GLOBAL LIBERATION ARMY'
+    };
+    const badge = document.getElementById('sidebar-faction-badge');
+    if (badge) badge.textContent = factionTitles[selectedFaction] || 'STRATEGIC FORCES';
+
+    // 1. Update Power Grid Status
+    let produced = 0, consumed = 0;
+    if (selectedFaction !== 'gla') {
+        structures.forEach(s => {
+            if (s.health <= 0 || s.isBuilding) return;
+            if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
+            if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
+            const drain = {
+                barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
+                strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
+                propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
+                particleCannon: 4, nukeSilo: 4
+            }[s.type] || 0;
+            consumed += drain;
+        });
+    }
+
+    const powerBar = document.getElementById('power-bar-fill');
+    const powerNums = document.getElementById('power-nums');
+    const powerText = document.getElementById('power-status-text');
+
+    if (selectedFaction === 'gla') {
+        if (powerText) powerText.textContent = '⚡ POWER: NONE NEEDED (GLA)';
+        if (powerNums) powerNums.textContent = 'N/A';
+        if (powerBar) { powerBar.style.width = '100%'; powerBar.classList.remove('low'); }
+    } else {
+        const percent = Math.min(100, Math.round((produced / Math.max(1, consumed)) * 100));
+        if (powerNums) powerNums.textContent = `${produced} / ${consumed}`;
+        if (powerBar) {
+            powerBar.style.width = `${Math.min(100, percent)}%`;
+            if (produced < consumed) powerBar.classList.add('low');
+            else powerBar.classList.remove('low');
+        }
+        if (powerText) {
+            if (produced >= consumed) {
+                powerText.textContent = '⚡ POWER: NORMAL';
+                powerText.style.color = '#55efc4';
+            } else {
+                powerText.textContent = '⚡ POWER: LOW (-50% SPD)';
+                powerText.style.color = '#e74c3c';
+            }
+        }
+    }
+
+    // Update Cash counter
+    const resDisp = document.getElementById('resource-display');
+    if (resDisp) resDisp.textContent = Number(playerResources).toLocaleString();
+
+    // 2. RENDER INSPECTOR CONSOLE & 3X4 COMMAND GRID
+    const inspector = document.getElementById('inspector-console');
+    const gridContainer = document.getElementById('command-grid-3x4');
+    if (!inspector || !gridContainer) return;
+
+    currentGridSlots = [];
+
+    const selectedUnits = units.filter(u => u.selected);
+
+    if (selectedStructure) {
+        renderStructureInspectorAndGrid(inspector, selectedStructure);
+    } else if (selectedSupplyPoint) {
+        renderSupplyInspectorAndGrid(inspector, selectedSupplyPoint);
+    } else if (selectedUnits.length > 0) {
+        renderUnitsInspectorAndGrid(inspector, selectedUnits);
+    } else {
+        renderBaseOverviewInspectorAndGrid(inspector);
+    }
+
+    // Render the 3x4 Grid Buttons
+    renderCommandGrid(gridContainer, currentGridSlots);
+}
+
+function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
+    if (selectedUnits.length === 1) {
+        const u = selectedUnits[0];
+        const spec = unitRoster[u.type] || { name: u.type.toUpperCase(), role: 'Combat Unit', cost: '' };
+        const hpPct = Math.max(0, Math.min(100, Math.round((u.health / u.maxHealth) * 100)));
+        const hpClass = hpPct > 50 ? 'high' : hpPct > 25 ? 'mid' : 'low';
+
+        const rankClasses = ['rank-regular', 'rank-veteran', 'rank-elite', 'rank-heroic'];
+        const rankTitles = ['ROOKIE', '★ VETERAN', '★★ ELITE', '★★★ HEROIC'];
+        const rankClass = rankClasses[u.veterancy || 0];
+        const rankTitle = rankTitles[u.veterancy || 0];
+
+        // Attachment text
+        let attachedText = 'Standard Hull';
+        if (u.drone) attachedText = `Drone: ${u.drone.type.toUpperCase()}`;
+        else if (u.overlordUpgrade) attachedText = `Tower: ${u.overlordUpgrade.toUpperCase()}`;
+        else if (u.neutronShells) attachedText = 'Shells: NEUTRON ☢';
+
+        // Passengers
+        let passHtml = '';
+        if (u.capacity && u.garrisoned) {
+            passHtml = `
+                <div class="inspector-passengers-row">
+                    <span>👥 Garrison: ${u.garrisoned.length} / ${u.capacity} Seats</span>
+                    ${u.garrisoned.length > 0 ? '<button class="inspector-unload-btn" onclick="orderSelectedTransportsToUnload()">UNLOAD ALL</button>' : ''}
+                </div>
+            `;
         }
 
-        function strikeWithSuperweapon(structure, targetPosition) {
-            const radius = structure.type === 'particleCannon' ? 18 : 24;
-            const damage = structure.type === 'particleCannon' ? 500 : structure.type === 'nukeSilo' ? 650 : 450;
-            enemyUnits.forEach(enemy => {
-                if (enemy.mesh.position.distanceTo(targetPosition) <= radius) enemy.health -= damage;
-            });
-            createImpactExplosion(targetPosition);
-            structure.lastFired = buildingTick;
-            structure.cooldownUntil = buildingTick + 1800;
-            pendingSuperweapon = null;
-            selectionStatus.textContent = 'Superweapon impact confirmed.';
+        const icons = {
+            crusader: '🛡️', paladin: '⚔️', humvee: '🚙', comanche: '🚁', raptor: '✈️', stealthfighter: '🛩️', aurora: '🚀',
+            battlemaster: '🛡️', overlord: '🏰', gatling: '🔄', dragon: '🔥', nukecannon: '☢️',
+            scorpion: '🦂', marauder: '🛞', technical: '🛻', quad: '⚡', buggy: '🚀', toxintractor: '☣️', scud: '🚀'
+        };
+        const uIcon = icons[u.type] || '🎖️';
+
+        inspector.innerHTML = `
+            <div class="inspector-card">
+                <div class="inspector-avatar-box">
+                    <div class="inspector-avatar-icon">${uIcon}</div>
+                    <div class="inspector-rank-badge ${rankClass}">${rankTitle}</div>
+                </div>
+                <div class="inspector-info-pane">
+                    <div class="inspector-header-row">
+                        <span class="inspector-title">${spec.name}</span>
+                        <span class="inspector-kills-tag">★ ${u.kills || 0} KILLS</span>
+                    </div>
+                    <div class="inspector-sub-role">${spec.role}</div>
+                    <div class="inspector-hp-box">
+                        <div class="inspector-hp-label">
+                            <span>COMBAT INTEGRITY</span>
+                            <span>${Math.ceil(u.health)} / ${u.maxHealth} HP</span>
+                        </div>
+                        <div class="inspector-hp-track">
+                            <div class="inspector-hp-fill ${hpClass}" style="width: ${hpPct}%;"></div>
+                        </div>
+                    </div>
+                    <div class="inspector-attachments-row">
+                        <span>Speed: ${Math.round(u.speed * 100)}</span>
+                        <span>${attachedText}</span>
+                    </div>
+                    ${passHtml}
+                </div>
+            </div>
+        `;
+
+        // 3x4 Grid Slots for Single Unit
+        currentGridSlots = [
+            { name: 'MOVE', badge: 'DIR', action: () => {}, desc: 'Move to coordinates' },
+            { name: 'STOP', badge: 'HALT', action: () => orderUnitsHalt(), desc: 'Halt all movement' },
+            { name: 'GUARD', badge: 'DEF', action: () => showNotification('Unit holding defensive guard posture.', 'info'), desc: 'Guard current sector' },
+            { name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter into spread formation' }
+        ];
+
+        // Vehicle Upgrades & Drones
+        if (['crusader', 'paladin', 'humvee'].includes(u.type)) {
+            currentGridSlots.push(
+                { name: 'BATTLE DRONE', cost: 300, badge: 'DRONE', action: () => purchaseVehicleDrone('battle', 300), desc: 'Repairs hull (+3 HP/s) and suppresses infantry' },
+                { name: 'SCOUT DRONE', cost: 100, badge: 'VISION', action: () => purchaseVehicleDrone('scout', 100), desc: '+50% Sight range & reconnaissance sweep' },
+                { name: 'HELLFIRE DRONE', cost: 500, badge: 'MISSILE', action: () => purchaseVehicleDrone('hellfire', 500), desc: 'Launches miniature guided anti-tank missiles' }
+            );
+        } else if (u.type === 'overlord') {
+            currentGridSlots.push(
+                { name: 'BUNKER TOWER', cost: 500, badge: 'TOWER', action: () => purchaseOverlordUpgrade('bunker', 500), desc: 'Garrison bunker pillbox for troops firing 360°' },
+                { name: 'GATLING TOWER', cost: 1200, badge: 'TOWER', action: () => purchaseOverlordUpgrade('gatling', 1200), desc: 'Twin 20mm rotary anti-air/anti-infantry turret' },
+                { name: 'PROPAGANDA', cost: 500, badge: 'TOWER', action: () => purchaseOverlordUpgrade('propaganda', 500), desc: 'Heals friendly armor (+4 HP/s) & buffs fire rate 25%' }
+            );
+        } else if (u.type === 'nukecannon') {
+            currentGridSlots.push(
+                { name: 'OUTRIGGERS', badge: 'DEPLOY', action: () => deployNukeCannonOutriggers(u), desc: 'Deploy hydraulic stabilization legs for siege artillery' },
+                { name: 'NEUTRON SHELLS', cost: 1000, badge: 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
+            );
+        } else if (u.type === 'truck' || u.type === 'worker') {
+            currentGridSlots.push(
+                { name: 'HARVEST', badge: 'GATHER', action: () => orderSelectedHarvestersToGather(), desc: 'Dispatch to nearest supply depot' }
+            );
         }
+    } else {
+        // Multi-Unit Squad
+        const totalHP = selectedUnits.reduce((a, u) => a + u.health, 0);
+        const maxHP = selectedUnits.reduce((a, u) => a + u.maxHealth, 0);
+        const hpPct = Math.max(0, Math.min(100, Math.round((totalHP / maxHP) * 100)));
+        const totalKills = selectedUnits.reduce((a, u) => a + (u.kills || 0), 0);
+
+        const counts = {};
+        selectedUnits.forEach(u => { counts[u.type] = (counts[u.type] || 0) + 1; });
+        const breakdown = Object.entries(counts).map(([type, c]) => `${c}x ${unitRoster[type] ? unitRoster[type].name : type.toUpperCase()}`).join(', ');
+
+        inspector.innerHTML = `
+            <div class="inspector-card">
+                <div class="inspector-info-pane" style="width: 100%;">
+                    <div class="inspector-header-row">
+                        <span class="inspector-title">TACTICAL SQUAD (${selectedUnits.length} UNITS)</span>
+                        <span class="inspector-kills-tag">★ ${totalKills} TOTAL KILLS</span>
+                    </div>
+                    <div class="inspector-sub-role">${breakdown}</div>
+                    <div class="inspector-hp-box">
+                        <div class="inspector-hp-label">
+                            <span>SQUAD READINESS</span>
+                            <span>${Math.ceil(totalHP)} / ${maxHP} HP</span>
+                        </div>
+                        <div class="inspector-hp-track">
+                            <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                        </div>
+                    </div>
+                    <div class="inspector-quick-btns">
+                        <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ Combat</button>
+                        <button class="quick-army-btn" onclick="orderUnitsHalt()">⏹ Stop</button>
+                        <button class="quick-army-btn" onclick="scatterSelectedUnits()">💨 Scatter</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        currentGridSlots = [
+            { name: 'MOVE', badge: 'DIR', action: () => {}, desc: 'Move squad' },
+            { name: 'STOP', badge: 'HALT', action: () => orderUnitsHalt(), desc: 'Halt all movement' },
+            { name: 'GUARD', badge: 'DEF', action: () => showNotification('Squad holding defensive perimeter.', 'info'), desc: 'Guard sector' },
+            { name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter squad' },
+            { name: 'ALL COMBAT', badge: 'SEL', action: () => selectUnitsByType('combat'), desc: 'Select all combat units' },
+            { name: 'HARVESTERS', badge: 'SEL', action: () => selectUnitsByType('harvesters'), desc: 'Select harvesters' }
+        ];
+    }
+}
+
+function renderStructureInspectorAndGrid(inspector, structure) {
+    const names = {
+        center: 'Command Center', power: 'Cold Fusion Reactor', nuclearReactor: 'Nuclear Reactor',
+        factory: selectedFaction === 'gla' ? 'Arms Dealer' : 'War Factory', supplyCenter: 'Supply Center',
+        supplyStash: 'Supply Stash', supplyDrop: 'Supply Drop Zone', airfield: 'Air Field',
+        strategyCenter: 'Strategy Center', detentionCamp: 'Detention Camp', internetCenter: 'Internet Center',
+        propagandaCenter: 'Propaganda Center', bunker: 'Bunker', patriot: 'Patriot Missile System',
+        gatlingCannon: 'Gatling Cannon', speakerTower: 'Speaker Tower', particleCannon: 'Particle Cannon',
+        nukeSilo: 'Nuclear Missile Silo', blackMarket: 'Black Market', tunnel: 'Tunnel Network',
+        stingerSite: 'Stinger Site', demoTrap: 'Demo Trap', palace: 'Palace', scudStorm: 'SCUD Storm',
+        barracks: 'Barracks'
+    };
+    const title = (names[structure.type] || structure.type).toUpperCase();
+    const hpPct = Math.max(0, Math.min(100, Math.round((structure.health / structure.maxHealth) * 100)));
+    const isConstructing = structure.isBuilding;
+
+    inspector.innerHTML = `
+        <div class="inspector-card">
+            <div class="inspector-info-pane" style="width: 100%;">
+                <div class="inspector-header-row">
+                    <span class="inspector-title">${title}</span>
+                    <span class="inspector-kills-tag">${isConstructing ? '🔨 BUILDING...' : '● OPERATIONAL'}</span>
+                </div>
+                <div class="inspector-sub-role">${structure.isAir ? 'Airfield Operations' : 'Forward Installation'}</div>
+                <div class="inspector-hp-box">
+                    <div class="inspector-hp-label">
+                        <span>STRUCTURAL INTEGRITY</span>
+                        <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP</span>
+                    </div>
+                    <div class="inspector-hp-track">
+                        <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                    </div>
+                </div>
+                <div class="inspector-quick-btns">
+                    <button class="quick-army-btn" onclick="repairStructure(selectedStructure)">🔧 Repair ($50)</button>
+                    <button class="quick-army-btn" onclick="sellStructure(selectedStructure)">💰 Demolish / Sell</button>
+                    <button class="quick-army-btn" onclick="selectedStructure = null; updateSidebar();">✕ Deselect</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 3x4 Grid for Building: Unit Production & Facility Abilities
+    const productionType = structure.type === 'center' ? 'commandCenter' : structure.type;
+    const producers = Object.entries(unitRoster).filter(([type, spec]) => {
+        if (spec.building === productionType) return true;
+        if (structure.type === 'supplyCenter' && type === 'truck') return true;
+        if (structure.type === 'supplyStash' && type === 'worker') return true;
+        if (structure.type === 'factory' && type === 'truck' && selectedFaction !== 'gla') return true;
+        return false;
+    });
+
+    currentGridSlots = producers.map(([type, spec]) => {
+        const techReq = getUnitTechPrerequisite(type);
+        const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
+        const canAfford = playerResources >= spec.cost;
+        let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
+        return {
+            id: type,
+            name: spec.name.toUpperCase(),
+            cost: spec.cost,
+            badge: badge,
+            disabled: !hasTech || !canAfford || isConstructing,
+            action: () => produceUnit(type),
+            desc: spec.role || 'Combat Unit'
+        };
+    });
+
+    const abilityButtons = getBuildingAbilities(structure);
+    abilityButtons.forEach(ab => {
+        currentGridSlots.push({
+            name: ab.label.toUpperCase(),
+            cost: ab.cost || '',
+            badge: ab.badge || 'ACTION',
+            disabled: ab.disabled,
+            action: () => useStructureAbility(ab.action),
+            desc: ab.desc || ''
+        });
+    });
+}
+
+function renderSupplyInspectorAndGrid(inspector, supplyPoint) {
+    const stock = supplyPoint.stock || 0;
+    const maxStock = supplyPoint.maxStock || 8000;
+    const percent = Math.max(0, Math.min(100, Math.round((stock / maxStock) * 100)));
+
+    inspector.innerHTML = `
+        <div class="inspector-card">
+            <div class="inspector-info-pane" style="width: 100%;">
+                <div class="inspector-header-row">
+                    <span class="inspector-title">SUPPLY FIELD / DEPOT</span>
+                    <span class="inspector-kills-tag">${stock <= 0 ? '⚠ EXHAUSTED' : '● ACTIVE CACHE'}</span>
+                </div>
+                <div class="inspector-sub-role">STRATEGIC RESOURCE POINT</div>
+                <div class="inspector-hp-box">
+                    <div class="inspector-hp-label">
+                        <span>RESOURCES REMAINING</span>
+                        <span>$${stock.toLocaleString()} / $${maxStock.toLocaleString()} (${percent}%)</span>
+                    </div>
+                    <div class="inspector-hp-track">
+                        <div class="inspector-hp-fill high" style="width: ${percent}%;"></div>
+                    </div>
+                </div>
+                <div class="inspector-quick-btns">
+                    <button class="quick-army-btn" onclick="orderAllHarvestersToTargetSupply()">⛏ Dispatch All Harvesters</button>
+                    <button class="quick-army-btn" onclick="selectedSupplyPoint = null; updateSidebar();">✕ Deselect</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    currentGridSlots = [
+        { name: 'DISPATCH ALL', badge: 'MINE', action: () => orderAllHarvestersToTargetSupply(), desc: 'Order all harvesters to gather here' },
+        { name: 'SELECT TRUCKS', badge: 'SEL', action: () => selectUnitsByType('harvesters'), desc: 'Select all supply trucks and workers' },
+        { name: 'RECENTER BASE', badge: 'BASE', action: () => recenterBase(), desc: 'Recenter camera on base' }
+    ];
+}
+
+function renderBaseOverviewInspectorAndGrid(inspector) {
+    const combatCount = units.filter(u => !['dozer', 'worker', 'truck'].includes(u.type)).length;
+    const harvesterCount = units.filter(u => u.type === 'truck' || u.type === 'worker').length;
+    const builderCount = units.filter(u => u.type === 'dozer' || u.type === 'worker').length;
+
+    const factionCrests = {
+        usa: { icon: '🦅', title: 'USA STRATEGIC COMMAND', sub: 'HIGH-TECH AIR & ARMOR DOCTRINE' },
+        china: { icon: '★', title: 'PEOPLE\'S LIBERATION ARMY', sub: 'HEAVY ARMOR & MASS BOMBARDMENT' },
+        gla: { icon: '⚔️', title: 'GLOBAL LIBERATION ARMY', sub: 'GUERRILLA CELL & CHEMICAL WARFARE' }
+    };
+    const crest = factionCrests[selectedFaction] || factionCrests.usa;
+
+    inspector.innerHTML = `
+        <div class="inspector-idle-box">
+            <div class="inspector-idle-crest">
+                <div class="crest-icon">${crest.icon}</div>
+                <div>
+                    <div class="crest-heading">${crest.title}</div>
+                    <div class="crest-sub">${crest.sub}</div>
+                </div>
+            </div>
+            <div class="inspector-army-stats">
+                Operational: <strong>${structures.length}</strong> structures, <strong>${units.length}</strong> units.<br>
+                Force: <strong>${combatCount}</strong> Combat · <strong>${harvesterCount}</strong> Harvesters · <strong>${builderCount}</strong> Builders.
+            </div>
+            <div class="inspector-quick-btns">
+                <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ Combat (${combatCount})</button>
+                <button class="quick-army-btn" onclick="selectUnitsByType('harvesters')">⛏ Harvesters (${harvesterCount})</button>
+                <button class="quick-army-btn" onclick="selectUnitsByType('builders')">🔨 Builders (${builderCount})</button>
+            </div>
+        </div>
+    `;
+
+    // 3x4 Grid based on active category
+    if (activeGridCategory === 'commands') {
+        currentGridSlots = [
+            { name: 'ALL COMBAT', badge: 'SEL', action: () => selectUnitsByType('combat'), desc: 'Select all battle units' },
+            { name: 'HARVESTERS', badge: 'SEL', action: () => selectUnitsByType('harvesters'), desc: 'Select all supply trucks and workers' },
+            { name: 'BUILDERS', badge: 'SEL', action: () => selectUnitsByType('builders'), desc: 'Select all construction dozers / workers' },
+            { name: 'RECENTER', badge: 'BASE', action: () => recenterBase(), desc: 'Center camera on main Command Center' },
+            { name: 'REPAIR MODE', badge: 'TOOL', action: () => toggleRepairMode(), desc: 'Click buildings to repair' },
+            { name: 'SELL MODE', badge: 'TOOL', action: () => toggleSellMode(), desc: 'Click buildings to demolish for cash' },
+            { name: 'PING MAP', badge: 'ALERT', action: () => triggerTacticalBeacon(), desc: 'Broadcast tactical alert beacon' },
+            { name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter selected forces' }
+        ];
+    } else if (activeGridCategory === 'structures' || activeGridCategory === 'defenses') {
+        const allBuildings = factionBuildings[selectedFaction] || [];
+        const defenseKeys = ['patriot', 'gatlingCannon', 'speakerTower', 'bunker', 'tunnel', 'stingerSite', 'demoTrap', 'particleCannon', 'nukeSilo', 'scudStorm'];
+        const bList = activeGridCategory === 'defenses'
+            ? allBuildings.filter(([type]) => defenseKeys.includes(type))
+            : allBuildings.filter(([type]) => !defenseKeys.includes(type));
+
+        currentGridSlots = bList.map(([type, name, cost]) => {
+            const structReq = getStructureTechPrerequisite(type);
+            const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
+            const canAfford = playerResources >= cost;
+            return {
+                id: type,
+                name: name.toUpperCase(),
+                cost: cost,
+                badge: hasTech ? (canAfford ? 'BUILD' : 'FUNDS') : 'REQ',
+                disabled: !hasTech || !canAfford,
+                action: () => activateBlueprint(type),
+                desc: `Construct ${name}`
+            };
+        });
+    } else if (activeGridCategory === 'units') {
+        // Quick Units production across operational facilities
+        currentGridSlots = Object.entries(unitRoster).slice(0, 12).map(([type, spec]) => {
+            const canAfford = playerResources >= spec.cost;
+            return {
+                id: type,
+                name: spec.name.toUpperCase(),
+                cost: spec.cost,
+                badge: canAfford ? 'TRAIN' : 'FUNDS',
+                disabled: !canAfford,
+                action: () => produceUnit(type),
+                desc: spec.role || 'Train combat unit'
+            };
+        });
+    }
+}
+
+function renderCommandGrid(container, slots) {
+    let html = '';
+    for (let i = 0; i < 12; i++) {
+        const key = GRID_HOTKEYS[i];
+        const s = slots[i];
+        if (s) {
+            html += `
+                <button class="grid-slot-btn" onclick="currentGridSlots[${i}].action()" onmouseenter="showTacticalTooltip(event, '${s.id || ''}')" onmouseleave="hideTacticalTooltip()" ${s.disabled ? 'disabled' : ''}>
+                    <span class="grid-key-badge">${key}</span>
+                    <span class="grid-slot-name">${s.name}</span>
+                    <div class="grid-slot-footer">
+                        <span class="grid-slot-cost">${s.cost ? '$' + s.cost : ''}</span>
+                        <span class="grid-slot-badge badge-ready">${s.badge || ''}</span>
+                    </div>
+                </button>
+            `;
+        } else {
+            html += `
+                <div class="grid-slot-btn empty">
+                    <span class="grid-key-badge">${key}</span>
+                </div>
+            `;
+        }
+    }
+    container.innerHTML = html;
+}
+
+// 3. KEYBOARD HOTKEY LISTENER (Q, W, E, R, A, S, D, F, Z, X, C, V)
+const KEY_SLOT_MAP = {
+    'q': 0, 'w': 1, 'e': 2, 'r': 3,
+    'a': 4, 's': 5, 'd': 6, 'f': 7,
+    'z': 8, 'x': 9, 'c': 10, 'v': 11
+};
+window.addEventListener('keydown', e => {
+    if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    const k = e.key.toLowerCase();
+    if (KEY_SLOT_MAP[k] !== undefined) {
+        const slotIdx = KEY_SLOT_MAP[k];
+        if (currentGridSlots && currentGridSlots[slotIdx] && !currentGridSlots[slotIdx].disabled) {
+            currentGridSlots[slotIdx].action();
+            const btn = document.querySelectorAll('.command-grid-3x4 .grid-slot-btn')[slotIdx];
+            if (btn) {
+                btn.classList.add('hotkey-pulse');
+                setTimeout(() => btn.classList.remove('hotkey-pulse'), 120);
+            }
+        }
+    }
+});
+
+function isInfantryType(type) {
+    return ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'mob'].includes(type);
+}
+
+function orderSelectedTransportsToUnload() {
+    const selectedTransports = units.filter(u => u.selected && u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0);
+    if (selectedTransports.length === 0) return;
+
+    selectedTransports.forEach(transport => {
+        const count = transport.garrisoned.length;
+        transport.garrisoned.forEach((passenger, idx) => {
+            passenger.garrisonedIn = null;
+            passenger.mesh.visible = true;
+            const ang = (idx / count) * Math.PI * 2;
+            const dropDist = (transport.radius || 1.4) + 2.4;
+            const dropX = transport.mesh.position.x + Math.cos(ang) * dropDist;
+            const dropZ = transport.mesh.position.z + Math.sin(ang) * dropDist;
+            passenger.mesh.position.set(dropX, getTerrainHeight(dropX, dropZ), dropZ);
+            passenger.targetPosition.copy(passenger.mesh.position);
+            passenger.taskState = 'Idle';
+        });
+        transport.garrisoned = [];
+    });
+    showNotification('Garrisoned infantry disembarked from transport.', 'info');
+    updateSidebar();
+}
+
+function orderUnitsHalt() {
+    units.forEach(u => {
+        if (u.selected) {
+            u.targetPosition.copy(u.mesh.position);
+            u.combatTarget = null;
+            u.taskState = 'Idle';
+            if (u.type === 'truck' || u.type === 'worker') u.aiState = 'Idle';
+        }
+    });
+    playUSASound('acknowledge');
+    showNotification('Unit movement halted.', 'info');
+}
+
+function orderSelectedHarvestersToGather() {
+    const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
+    if (harvesters.length === 0) {
+        showNotification('Select a Supply Truck or Worker first.', 'info');
+        return;
+    }
+    const targetSp = selectedSupplyPoint || findNearestSupplyPoint(harvesters[0].mesh.position);
+    if (!targetSp) {
+        showNotification('No active supply field found nearby.', 'error');
+        return;
+    }
+    harvesters.forEach(h => {
+        h.supplyTarget = targetSp;
+        h.aiState = 'MovingToDock';
+        h.taskState = 'Idle';
+        h.combatTarget = null;
+        h.targetPosition.copy(targetSp.position);
+    });
+    showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies.`, 'success');
+}
+
+function orderAllHarvestersToTargetSupply() {
+    if (!selectedSupplyPoint) return;
+    const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker');
+    if (harvesters.length === 0) {
+        showNotification('No harvesters available! Build Supply Trucks or Workers.', 'error');
+        return;
+    }
+    harvesters.forEach(h => {
+        h.supplyTarget = selectedSupplyPoint;
+        h.aiState = 'MovingToDock';
+        h.taskState = 'Idle';
+        h.combatTarget = null;
+        h.targetPosition.copy(selectedSupplyPoint.position);
+    });
+    showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies ($${selectedSupplyPoint.stock} left).`, 'success');
+    updateSidebar();
+}
+
+function recenterBase() {
+    const hq = structures.find(s => s.type === 'center' && s.health > 0) || structures[0];
+    if (hq) {
+        cameraTarget.x = hq.position.x;
+        cameraTarget.z = hq.position.z;
+        updateCameraPosition();
+        playUSASound('radio_chirp');
+    }
+}
+
+function repairStructure(structure) {
+    if (!structure || structure.health >= structure.maxHealth) {
+        showNotification('Structure is at 100% integrity.', 'info');
+        return;
+    }
+    const fee = Math.min(50, Math.ceil((structure.maxHealth - structure.health) * 0.1));
+    if (playerResources < fee) {
+        showNotification(`Insufficient funds to repair ($${fee} needed).`, 'error');
+        return;
+    }
+    playerResources -= fee;
+    structure.health = structure.maxHealth;
+    playUSASound('construction');
+    showNotification('Structure fully repaired.', 'success');
+    updateSidebar();
+}
+
+function sellStructure(structure) {
+    if (!structure) return;
+    const cost = getStructureCost(structure.type) || 500;
+    const refund = Math.floor(cost * 0.5);
+    playerResources += refund;
+
+    scene.remove(structure.mesh);
+    const idx = structures.indexOf(structure);
+    if (idx !== -1) structures.splice(idx, 1);
+    if (selectedStructure === structure) selectedStructure = null;
+
+    showNotification(`Demolished ${structure.type}. +$${refund} refunded.`, 'info');
+    updateSidebar();
+}
+
+function produceUnit(type) {
+    const spec = unitRoster[type];
+    if (!spec) return;
+
+    if (playerResources < spec.cost) {
+        showNotification(`Insufficient funds to train ${spec.name} ($${spec.cost} required).`, 'error');
+        return;
+    }
+
+    const techReq = getUnitTechPrerequisite(type);
+    if (techReq && !hasCompletedStructure(techReq.building, techReq.altBuilding)) {
+        showNotification(`Production blocked: Requires operational ${techReq.name}!`, 'error');
+        return;
+    }
+
+    const fac = structures.find(s => {
+        if (s.isBuilding || s.health <= 0) return false;
+        if (spec.building === 'commandCenter' && s.type === 'center') return true;
+        if (s.type === spec.building) return true;
+        if (s.type === 'supplyCenter' && type === 'truck') return true;
+        if (s.type === 'supplyStash' && type === 'worker') return true;
+        if (s.type === 'factory' && type === 'truck' && selectedFaction !== 'gla') return true;
+        return false;
+    });
+
+    if (!fac) {
+        showNotification(`Production halted: No operational production facility available!`, 'error');
+        return;
+    }
+
+    playerResources -= spec.cost;
+    const spawnPos = fac.position.clone().add(new THREE.Vector3(fac.radius + 3.5, 0, fac.radius + 3.5));
+    spawnPos.y = getTerrainHeight(spawnPos.x, spawnPos.z);
+
+    const newUnit = spawnUnit(type, spawnPos);
+    const rallyTarget = spawnPos.clone().add(new THREE.Vector3(5, 0, 5));
+    newUnit.targetPosition.copy(rallyTarget);
+
+    playUSASound('construction');
+    showNotification(`Unit deployed: ${spec.name}`, 'success');
+    updateSidebar();
+}
+
+function useStructureAbility(action) {
+    const structure = selectedStructure;
+    if (!structure || structure.isBuilding) return;
+
+    if (action === 'upgradePower') {
+        if (structure.powerUpgraded) return;
+        if (playerResources < 300) { showNotification('Insufficient resources for control rods.', 'error'); return; }
+        playerResources -= 300;
+        structure.powerUpgraded = true;
+        structure.powerOutput = 10;
+        showNotification('Control rods installed: Cold Fusion power doubled (+100%).', 'success');
+    } else if (action === 'overcharge') {
+        structure.overcharged = !structure.overcharged;
+        showNotification(`Nuclear Reactor overcharge ${structure.overcharged ? 'ACTIVATED (+50% PWR)' : 'DEACTIVATED'}.`, 'info');
+    } else if (action === 'planHold') {
+        battlePlan = 'hold';
+        showNotification('Strategy Center: Battle plan Hold the Line active (+20% armor).', 'info');
+    } else if (action === 'planSearch') {
+        battlePlan = 'search';
+        showNotification('Strategy Center: Battle plan Search & Destroy active (+20% range & sight).', 'info');
+    } else if (action === 'planBombard') {
+        battlePlan = 'bombard';
+        showNotification('Strategy Center: Battle plan Bombardment active (+20% firepower).', 'info');
+    } else if (action === 'compositeArmor') {
+        if (playerResources < 1200) { showNotification('Need $1200 for Composite Armor.', 'error'); return; }
+        playerResources -= 1200;
+        researchedTechs.add('compositeArmor');
+        units.filter(u => u.type === 'tank' || u.type === 'paladin').forEach(u => { u.health += 100; u.maxHealth += 100; });
+        showNotification('Composite Armor researched: Tanks gained +25% HP!', 'success');
+    } else if (action === 'nationalism') {
+        if (playerResources < 1000) { showNotification('Need $1000 for Nationalism.', 'error'); return; }
+        playerResources -= 1000;
+        researchedTechs.add('nationalism');
+        showNotification('Nationalism researched: Chinese troops fire +25% faster!', 'success');
+    } else if (action === 'subliminal') {
+        if (playerResources < 800) { showNotification('Need $800 for Subliminal Messaging.', 'error'); return; }
+        playerResources -= 800;
+        researchedTechs.add('subliminal');
+        showNotification('Subliminal Messaging researched: Healing recovery doubled!', 'success');
+    } else if (action === 'anthraxBeta') {
+        if (playerResources < 1200) { showNotification('Need $1200 for Anthrax Beta.', 'error'); return; }
+        playerResources -= 1200;
+        researchedTechs.add('anthraxBeta');
+        showNotification('Anthrax Beta researched: Toxin weapons deal +25% damage!', 'success');
+    } else if (action === 'armTheMob') {
+        if (playerResources < 1000) { showNotification('Need $1000 for Arm the Mob.', 'error'); return; }
+        playerResources -= 1000;
+        researchedTechs.add('armTheMob');
+        showNotification('Arm the Mob researched: Mobs equipped with AK-47 assault rifles!', 'success');
+    } else if (action === 'captureBuilding') {
+        if (playerResources < 1000) { showNotification('Need $1000 for Capture Building.', 'error'); return; }
+        playerResources -= 1000;
+        researchedTechs.add('captureBuilding');
+        showNotification('Capture Building researched: Infantry can now capture enemy tech!', 'success');
+    } else if (action === 'superweapon') {
+        if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Superweapon is recharging.', 'error'); return; }
+        pendingSuperweapon = structure;
+        showNotification(`Click map to target ${structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Strike' : 'SCUD Storm'}. Right-click to cancel.`, 'info');
+    }
+
+    updateSidebar();
+}
+
+function strikeWithSuperweapon(structure, targetPosition) {
+    const sType = structure.type;
+    if (sType === 'particleCannon') {
+        animateParticleCannonStrike(targetPosition);
+    } else if (sType === 'nukeSilo') {
+        animateNukeStrike(structure.position, targetPosition);
+    } else if (sType === 'scudStorm') {
+        animateScudStormStrike(structure.position, targetPosition);
+    } else {
+        createImpactExplosion(targetPosition);
+    }
+    structure.lastFired = buildingTick;
+    structure.cooldownUntil = buildingTick + 1800;
+    pendingSuperweapon = null;
+    showNotification('Superweapon strike confirmed on target coordinates!', 'info');
+}
+
+function renderStructureMenu(structure) {
+    selectedStructure = structure;
+    updateSidebar();
+}
+
+function updateHUD() {
+    updateSidebar();
+}
 
         function processBuildingFunctions() {
             buildingTick++;

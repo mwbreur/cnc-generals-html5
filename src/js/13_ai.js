@@ -87,7 +87,7 @@ function processEnemyAIEngine() {
 }
 
         function onPointerDown(e) {
-            if (e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.tagName === 'BUTTON') return;
+            if (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.tagName === 'BUTTON') return;
 
             if (e.button === 0) {
                 if (choosingBaseLocation) {
@@ -279,7 +279,7 @@ function processEnemyAIEngine() {
         function issueMoveCommand(e) {
             if (units.some(u => u.selected)) playUSASound('acknowledge');
             // Ignore if clicking inside UI elements
-            if (e.target && (e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
+            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
                 return;
             }
 
@@ -552,7 +552,7 @@ function processEnemyAIEngine() {
         }
 
         function evaluateClickSelection(e) {
-            if (e.target && (e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.closest('#tactical-tooltip'))) {
+            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.closest('#tactical-tooltip'))) {
                 return;
             }
             units.forEach(unit => { unit.selected = false; removeSelectionCircle(unit); });

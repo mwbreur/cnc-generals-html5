@@ -414,15 +414,37 @@ function animate() {
                     return; // Skip ground obstacles/sliding
                 }
 
-                if (unit.combatTarget) {
-                    const dxT = unit.combatTarget.mesh.position.x - unit.mesh.position.x;
-                    const dzT = unit.combatTarget.mesh.position.z - unit.mesh.position.z;
-                    const distToTarget = Math.hypot(dxT, dzT);
-                    if (distToTarget <= unit.scanRange) {
-                        unit.targetPosition.x = unit.mesh.position.x;
-                        unit.targetPosition.z = unit.mesh.position.z;
-                        return;
+                // --- MOVE-AND-SHOOT: Authentic C&C Generals Fire-On-The-Move ---
+                // Only halt movement if the player explicitly ordered an attack on a specific target ('MovingToAttack')
+                // If on a move/patrol order, the unit drives continuously toward targetPosition while firing on the move!
+                if (unit.taskState === 'MovingToAttack' && unit.combatTarget) {
+                    const targetMesh = unit.combatTarget.mesh;
+                    if (targetMesh && unit.combatTarget.health > 0) {
+                        const dxT = targetMesh.position.x - unit.mesh.position.x;
+                        const dzT = targetMesh.position.z - unit.mesh.position.z;
+                        const distToTarget = Math.hypot(dxT, dzT);
+                        const targetRadius = unit.combatTarget.radius || 0;
+                        if (distToTarget <= (unit.scanRange + targetRadius - 1.5)) {
+                            // In effective weapon range: halt chassis and open fire
+                            unit.targetPosition.x = unit.mesh.position.x;
+                            unit.targetPosition.z = unit.mesh.position.z;
+                            return;
+                        } else {
+                            // Target moved out of range: pursue target
+                            unit.targetPosition.x = targetMesh.position.x;
+                            unit.targetPosition.z = targetMesh.position.z;
+                        }
+                    } else {
+                        // Target destroyed or lost: resume idle
+                        unit.combatTarget = null;
+                        unit.taskState = 'Idle';
                     }
+                }
+
+                // Smoothly return turret forward if no active combat target
+                const idleTurret = unit.mesh.getObjectByName("turretSystem");
+                if (idleTurret && !unit.combatTarget) {
+                    idleTurret.rotation.y += (0 - idleTurret.rotation.y) * 0.1;
                 }
 
                 const stopBuffer = unit.taskState === 'MovingToBuild' && unit.targetStructure
@@ -592,6 +614,7 @@ function animate() {
                 }
             }
 
+            if (typeof renderRadarMinimap === 'function') renderRadarMinimap();
             renderer.render(scene, camera);
         }
 function processEnemyMovement() {
