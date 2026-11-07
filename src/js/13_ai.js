@@ -2,6 +2,113 @@
         let isRightDragging = false;
         let rightDragStart = null;
         let lastRightPointerPos = { x: 0, y: 0 };
+
+// =========================================================================
+// ADVANCED AI COMMANDER ENGINE: FOG OF WAR, RECON SCOUTS, TEAM INTELLIGENCE
+// =========================================================================
+let aiCommanders = {};
+
+function initAICommanders() {
+    aiCommanders = {};
+    const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 800);
+    const env = (typeof activeTheme !== 'undefined' ? activeTheme : 'desert');
+    const allSpawns = (typeof getSpawnPointsForMap === 'function') ? getSpawnPointsForMap(mapSize, env, null) : [];
+    const activeAISlots = (typeof spSlots !== 'undefined' ? spSlots : []).filter(s => s.active && !s.isPlayer);
+
+    if (activeAISlots.length === 0) {
+        // Collect unique ownerIds from enemyStructures
+        const owners = new Set();
+        enemyStructures.forEach(es => { if (es.ownerId) owners.add(es.ownerId); });
+        owners.forEach(ownerId => {
+            const sample = enemyStructures.find(es => es.ownerId === ownerId);
+            createCommanderState(ownerId, sample ? sample.teamId : 2, sample ? sample.faction : 'china', sample ? sample.position : new THREE.Vector3(20, 0, -20));
+        });
+        return;
+    }
+
+    activeAISlots.forEach(slot => {
+        const ownerId = 'ai_' + slot.id;
+        const mySpawn = allSpawns.find(sp => sp.id === slot.spawnId);
+        const myBasePos = mySpawn ? new THREE.Vector3(mySpawn.x, 0, mySpawn.z) : new THREE.Vector3(20, 0, -20);
+        createCommanderState(ownerId, slot.team, slot.faction, myBasePos, slot.difficulty || 'medium', slot.spawnId);
+    });
+
+    function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0) {
+        const candidateWaypoints = [];
+        allSpawns.forEach(sp => {
+            if (sp.id !== spawnId) {
+                candidateWaypoints.push(new THREE.Vector3(sp.x, 0, sp.z));
+            }
+        });
+        if (candidateWaypoints.length === 0) {
+            const half = mapSize * 0.32;
+            candidateWaypoints.push(
+                new THREE.Vector3(-half, 0, -half),
+                new THREE.Vector3(half, 0, -half),
+                new THREE.Vector3(-half, 0, half),
+                new THREE.Vector3(half, 0, half)
+            );
+        }
+        // Shuffle waypoints so each AI scout takes a unique reconnaissance path
+        for (let i = candidateWaypoints.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = candidateWaypoints[i]; candidateWaypoints[i] = candidateWaypoints[j]; candidateWaypoints[j] = tmp;
+        }
+
+        aiCommanders[ownerId] = {
+            ownerId: ownerId,
+            teamId: teamId,
+            faction: faction,
+            difficulty: difficulty,
+            basePos: basePos.clone(),
+            rallyPoint: basePos.clone().add(new THREE.Vector3(14, 0, 14)),
+            
+            // Fog of War / Scouting State (No advance omniscience!)
+            unexploredWaypoints: candidateWaypoints,
+            scoutNetIds: new Set(),
+            discoveredEnemyBases: [],    // Array of { position: Vector3, faction: string, teamId: number }
+            discoveredEnemyTargets: [],  // Array of { netId, position: Vector3, type, teamId, isStructure }
+            hasSightedEnemy: false,
+            
+            // Production & tactical timers
+            productionTimer: 0,
+            attackWaveTimer: 0
+        };
+    }
+}
+
+// Shared Team Intelligence: Allies broadcast reconnaissance discoveries to each other
+function shareTeamDiscovery(teamId, entity, isBase = false) {
+    if (!entity) return;
+    const ePos = entity.position || (entity.mesh && entity.mesh.position);
+    if (!ePos) return;
+
+    Object.values(aiCommanders).forEach(cmd => {
+        if (cmd.teamId === teamId) {
+            if (entity.netId && !cmd.discoveredEnemyTargets.some(t => t.netId === entity.netId)) {
+                cmd.discoveredEnemyTargets.push({
+                    netId: entity.netId,
+                    position: ePos.clone(),
+                    type: entity.type,
+                    teamId: entity.teamId,
+                    isStructure: isBase || !!entity.radius
+                });
+            }
+            if (isBase) {
+                const alreadyKnown = cmd.discoveredEnemyBases.some(b => b.position.distanceTo(ePos) < 25);
+                if (!alreadyKnown) {
+                    cmd.discoveredEnemyBases.push({
+                        position: ePos.clone(),
+                        faction: entity.faction || 'enemy',
+                        teamId: entity.teamId
+                    });
+                    cmd.hasSightedEnemy = true;
+                }
+            }
+        }
+    });
+}
+
 function processEnemyAIEngine() {
     if (isMultiplayerActive) return;
     aiDecisionTimer++;
@@ -10,83 +117,204 @@ function processEnemyAIEngine() {
     if (aiDecisionTimer < tickRate) return;
     aiDecisionTimer = 0;
 
-    // AI Production Engine: Builds waves of combat units from enemy War Factory & Barracks!
-    aiProductionTick++;
-    const prodInterval = aiDifficultyLevel === 'hard' ? 8 : aiDifficultyLevel === 'easy' ? 24 : 14;
-    if (aiProductionTick % prodInterval === 0 && enemyUnits.length < (aiDifficultyLevel === 'hard' ? 24 : aiDifficultyLevel === 'easy' ? 8 : 14)) {
-        const fac = enemyStructures.find(es => es.type === 'factory' && es.health > 0);
-        if (fac) {
-            const spawnPos = fac.position.clone().add(new THREE.Vector3(12 + Math.random() * 4, 0, 8 + Math.random() * 4));
-            spawnPos.y = getTerrainHeight(spawnPos.x, spawnPos.z);
-            let uType = 'tank';
-            if (fac.faction === 'china') {
-                uType = (aiDifficultyLevel === 'hard' && Math.random() < 0.45) ? 'overlord' : (Math.random() < 0.35 ? 'gatling' : 'battlemaster');
-            } else if (fac.faction === 'gla') {
-                uType = (aiDifficultyLevel === 'hard' && Math.random() < 0.45) ? 'marauder' : (Math.random() < 0.4 ? 'buggy' : 'scorpion');
-            } else {
-                uType = (aiDifficultyLevel === 'hard' && Math.random() < 0.45) ? 'paladin' : (Math.random() < 0.35 ? 'humvee' : 'tank');
-            }
-            spawnEnemyUnit(uType, spawnPos);
-        }
+    // Ensure AI commanders initialized
+    if (Object.keys(aiCommanders).length === 0 && enemyStructures.length > 0) {
+        initAICommanders();
     }
 
-    enemyUnits.forEach(enemy => {
-        if (enemy.health <= 0) return;
+    const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 800);
+    const allUnits = [...units, ...enemyUnits];
+    const allStructures = [...structures, ...enemyStructures];
 
-        // If the enemy is already locked in a firefight with a valid target, keep pursuing
-        if (enemy.combatTarget && enemy.combatTarget.health > 0) {
-            const currentDist = enemy.mesh.position.distanceTo(enemy.combatTarget.mesh.position);
-            if (currentDist > enemy.scanRange) {
-                // If the player asset slips outside firing range, move closer to chase
-                enemy.targetPosition.copy(enemy.combatTarget.mesh.position);
+    // Evaluate each AI Commander independently
+    Object.values(aiCommanders).forEach(cmd => {
+        const myUnits = enemyUnits.filter(e => e.ownerId === cmd.ownerId && e.health > 0);
+        const myStructures = enemyStructures.filter(s => s.ownerId === cmd.ownerId && s.health > 0);
+
+        if (myStructures.length === 0 && myUnits.length === 0) return; // Commander eliminated
+
+        // --- 1. AI Production Engine (From Commander's Own Facilities) ---
+        cmd.productionTimer++;
+        const prodInterval = cmd.difficulty === 'hard' ? 8 : cmd.difficulty === 'easy' ? 24 : 14;
+        const maxUnits = cmd.difficulty === 'hard' ? 20 : cmd.difficulty === 'easy' ? 8 : 12;
+
+        if (cmd.productionTimer % prodInterval === 0 && myUnits.length < maxUnits) {
+            const fac = myStructures.find(es => es.type === 'factory' && es.health > 0) ||
+                        myStructures.find(es => es.type === 'barracks' && es.health > 0);
+            if (fac) {
+                const spawnPos = fac.position.clone().add(new THREE.Vector3(10 + Math.random() * 4, 0, 8 + Math.random() * 4));
+                spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
+                let uType = 'tank';
+                if (fac.faction === 'china') {
+                    uType = (cmd.difficulty === 'hard' && Math.random() < 0.45) ? 'overlord' : (Math.random() < 0.35 ? 'gatling' : 'battlemaster');
+                } else if (fac.faction === 'gla') {
+                    uType = (cmd.difficulty === 'hard' && Math.random() < 0.45) ? 'marauder' : (Math.random() < 0.4 ? 'buggy' : 'scorpion');
+                } else {
+                    uType = (cmd.difficulty === 'hard' && Math.random() < 0.45) ? 'paladin' : (Math.random() < 0.35 ? 'humvee' : 'tank');
+                }
+                const eu = spawnEnemyUnit(uType, spawnPos);
+                if (eu) {
+                    eu.teamId = cmd.teamId;
+                    eu.ownerId = cmd.ownerId;
+                    eu.isAI = true;
+                    eu.difficulty = cmd.difficulty;
+                }
             }
-            return; 
         }
 
-        // --- Target Acquisition Pass ---
-        let closestTarget = null;
-        let minimumDistance = Infinity;
+        // --- 2. Reconnaissance & Scout Allocation ---
+        // Clean up dead scouts
+        for (let sId of cmd.scoutNetIds) {
+            if (!myUnits.some(u => u.netId === sId)) cmd.scoutNetIds.delete(sId);
+        }
 
-        // 1. Scan for nearby friendly Player Units
-        units.forEach(playerUnit => {
-            if (playerUnit.health > 0 && !playerUnit.garrisonedIn) {
-                const distance = enemy.mesh.position.distanceTo(playerUnit.mesh.position);
-                if (distance < minimumDistance) {
-                    minimumDistance = distance;
-                    closestTarget = playerUnit;
+        // Designate up to 2 active scout units
+        if (cmd.scoutNetIds.size < (cmd.difficulty === 'easy' ? 1 : 2) && myUnits.length > 0) {
+            const candidateScout = myUnits.find(u => !u.combatTarget && !cmd.scoutNetIds.has(u.netId));
+            if (candidateScout) {
+                candidateScout.isScout = true;
+                cmd.scoutNetIds.add(candidateScout.netId);
+            }
+        }
+
+        // Direct scouts to explore candidate quadrants
+        cmd.scoutNetIds.forEach(scoutNetId => {
+            const scout = myUnits.find(u => u.netId === scoutNetId);
+            if (!scout) return;
+
+            const distToGoal = scout.mesh.position.distanceTo(scout.targetPosition);
+            if (distToGoal < 16.0 || scout.targetPosition.distanceTo(cmd.basePos) < 2.0) {
+                if (cmd.unexploredWaypoints.length > 0) {
+                    const nextWp = cmd.unexploredWaypoints.shift();
+                    scout.targetPosition.copy(nextWp);
+                } else {
+                    // All initial quadrant spawns explored! Patrol perimeter or random map quadrants
+                    const half = mapSize * 0.35;
+                    const rx = (Math.random() * 2 - 1) * half;
+                    const rz = (Math.random() * 2 - 1) * half;
+                    scout.targetPosition.set(rx, typeof getTerrainHeight === 'function' ? getTerrainHeight(rx, rz) : 0, rz);
                 }
             }
         });
 
-        // 2. Scan for Player Base Structures if no units are close
-                    structures.forEach(struct => {
-            if (struct.buildProgress >= 100 && struct.health > 0) { // Only attack completed base layouts
-                const distance = enemy.mesh.position.distanceTo(struct.position);
-                if (distance < minimumDistance) {
-                    minimumDistance = distance;
-                    closestTarget = struct;
-                }
-            }
-        });
+        // --- 3. Line-of-Sight & Recon Detection Pass (NO OMNISCIENCE!) ---
+        // Senses enemy assets ONLY when within visual range of commander's units or base
+        const hostileUnits = allUnits.filter(u => u.health > 0 && !isFriendly(cmd, u));
+        const hostileStructures = allStructures.filter(s => s.health > 0 && !isFriendly(cmd, s));
 
-        // --- Execute Tactical AI Order ---
-        if (closestTarget) {
-            enemy.combatTarget = closestTarget;
-            const targetPos = closestTarget.position || closestTarget.mesh.position;
+        myUnits.forEach(u => {
+            const sightRange = (u.isScout ? 36 : 28);
             
-            // Move toward the target, but drop into standard firing formation right at weapon range
-            if (minimumDistance > enemy.scanRange) {
-                const approachDir = new THREE.Vector3().subVectors(targetPos, enemy.mesh.position).normalize();
-                enemy.targetPosition.copy(targetPos).addScaledVector(approachDir, -(enemy.scanRange - 3));
-            } else {
-                enemy.targetPosition.copy(enemy.mesh.position); // Already in range, halt and open fire
+            // Sighting hostile structures
+            hostileStructures.forEach(struct => {
+                const sPos = struct.position || (struct.mesh && struct.mesh.position);
+                if (sPos && u.mesh.position.distanceTo(sPos) <= (sightRange + (struct.radius || 8))) {
+                    const wasKnown = cmd.discoveredEnemyBases.some(b => b.position.distanceTo(sPos) < 25);
+                    shareTeamDiscovery(cmd.teamId, struct, true);
+                    if (!wasKnown) {
+                        if (cmd.teamId === playerTeamId) {
+                            showNotification(`Allied Recon: Hostile enemy base sighted at sector [${Math.round(sPos.x)}, ${Math.round(sPos.z)}]!`, 'info');
+                            if (typeof playUSASound === 'function') playUSASound('radio_chirp');
+                        } else if (structures.includes(struct) || units.includes(struct)) {
+                            showNotification(`Radar Alert: Hostile reconnaissance detected our perimeter!`, 'warning');
+                        }
+                    }
+                }
+            });
+
+            // Sighting hostile units
+            hostileUnits.forEach(hu => {
+                if (hu.mesh && u.mesh.position.distanceTo(hu.mesh.position) <= sightRange) {
+                    shareTeamDiscovery(cmd.teamId, hu, false);
+                }
+            });
+        });
+
+        // --- 4. Tactical AI Order Pass (Based strictly on discovered intel!) ---
+        // Clean up eradicated targets
+        cmd.discoveredEnemyTargets = cmd.discoveredEnemyTargets.filter(t => {
+            const aliveUnit = hostileUnits.find(hu => hu.netId === t.netId);
+            const aliveStruct = hostileStructures.find(hs => hs.netId === t.netId);
+            return (aliveUnit && aliveUnit.health > 0) || (aliveStruct && aliveStruct.health > 0);
+        });
+
+        cmd.discoveredEnemyBases = cmd.discoveredEnemyBases.filter(b => {
+            return hostileStructures.some(hs => (hs.position || hs.mesh.position).distanceTo(b.position) < 35);
+        });
+
+        myUnits.forEach(enemy => {
+            if (enemy.isScout && !enemy.combatTarget) return; // Scouts focus on reconnaissance traversal
+
+            // If unit is already engaged in active combat with valid hostile target, pursue
+            if (enemy.combatTarget && enemy.combatTarget.health > 0 && !isFriendly(enemy, enemy.combatTarget)) {
+                const targetPos = enemy.combatTarget.position || enemy.combatTarget.mesh.position;
+                if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
+                    enemy.targetPosition.copy(targetPos);
+                }
+                return;
+            } else if (enemy.combatTarget) {
+                enemy.combatTarget = null;
             }
-        } else {
-            // No player targets left on map, return to baseline patrol stance
-            if (enemy.targetPosition.distanceTo(enemy.mesh.position) < 2.0) {
-                enemy.targetPosition.set(20 + (Math.random() * 20 - 10), 0, -20 + (Math.random() * 20 - 10));
+
+            // A. If NO enemy assets have been sighted yet: Hold defensive base perimeter!
+            if (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0) {
+                // Defend base perimeter from intruders
+                let localIntruder = null;
+                let minDist = 30; // Base defense radius
+                hostileUnits.forEach(hu => {
+                    const d = enemy.mesh.position.distanceTo(hu.mesh.position);
+                    if (d < minDist) { minDist = d; localIntruder = hu; }
+                });
+                if (localIntruder) {
+                    enemy.combatTarget = localIntruder;
+                    enemy.targetPosition.copy(localIntruder.mesh.position);
+                } else {
+                    // Hold defensive rally zone around own Command Center
+                    if (enemy.mesh.position.distanceTo(cmd.basePos) > 32) {
+                        enemy.targetPosition.copy(cmd.rallyPoint);
+                    }
+                }
+                return;
             }
-        }
+
+            // B. Enemies HAVE been discovered! Launch attack waves on known coordinates!
+            let closestKnown = null;
+            let minDistance = Infinity;
+
+            // Target known discovered hostile units
+            cmd.discoveredEnemyTargets.forEach(dt => {
+                const liveObj = hostileUnits.find(hu => hu.netId === dt.netId) || hostileStructures.find(hs => hs.netId === dt.netId);
+                if (liveObj && liveObj.health > 0) {
+                    const objPos = liveObj.position || liveObj.mesh.position;
+                    const d = enemy.mesh.position.distanceTo(objPos);
+                    if (d < minDistance) {
+                        minDistance = d;
+                        closestKnown = liveObj;
+                    }
+                }
+            });
+
+            // Target known enemy bases
+            if (!closestKnown && cmd.discoveredEnemyBases.length > 0) {
+                const targetBase = cmd.discoveredEnemyBases[0];
+                const d = enemy.mesh.position.distanceTo(targetBase.position);
+                if (d > enemy.scanRange) {
+                    enemy.targetPosition.copy(targetBase.position);
+                }
+                return;
+            }
+
+            if (closestKnown) {
+                enemy.combatTarget = closestKnown;
+                const targetPos = closestKnown.position || closestKnown.mesh.position;
+                if (minDistance > enemy.scanRange) {
+                    const approachDir = new THREE.Vector3().subVectors(targetPos, enemy.mesh.position).normalize();
+                    enemy.targetPosition.copy(targetPos).addScaledVector(approachDir, -(enemy.scanRange - 3));
+                } else {
+                    enemy.targetPosition.copy(enemy.mesh.position);
+                }
+            }
+        });
     });
 }
 
@@ -347,12 +575,29 @@ function processEnemyAIEngine() {
 
                 const targetedEnemy = enemyUnits.find(enemy => enemy.mesh === hitEnemyObj) ||
                                       enemyStructures.find(struct => struct.mesh === hitEnemyObj);
-                if (targetedEnemy && typeof spawnWaypointMarker === 'function') {
-                    const tPos = targetedEnemy.mesh ? targetedEnemy.mesh.position : hitEnemyObj.position;
-                    spawnWaypointMarker(tPos, 'attack');
-                }
 
                 if (targetedEnemy) {
+                    const firstSelected = units.find(u => u.selected) || { teamId: playerTeamId };
+                    if (isFriendly(firstSelected, targetedEnemy)) {
+                        // Friendly ally clicked! Move to support / guard / rendezvous without attacking!
+                        const tPos = targetedEnemy.mesh ? targetedEnemy.mesh.position : hitEnemyObj.position;
+                        if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(tPos, 'move');
+                        units.forEach(unit => {
+                            if (unit.selected) {
+                                unit.combatTarget = null;
+                                unit.taskState = 'Idle';
+                                unit.targetPosition.copy(tPos);
+                            }
+                        });
+                        showNotification(`Support order: Rendezvous with allied ${targetedEnemy.type || 'unit'}`, 'info');
+                        return;
+                    }
+
+                    if (typeof spawnWaypointMarker === 'function') {
+                        const tPos = targetedEnemy.mesh ? targetedEnemy.mesh.position : hitEnemyObj.position;
+                        spawnWaypointMarker(tPos, 'attack');
+                    }
+
                     const targetPos = (targetedEnemy.position || targetedEnemy.mesh.position).clone();
                     const targetRadius = targetedEnemy.radius || 4;
 

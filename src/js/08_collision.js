@@ -206,7 +206,10 @@
                 radius: getStructureFootprint(type).radius,
                 isBuilding: !instant, buildProgress: instant ? 100 : 0, dozerRef: null,
                 health: 1200, maxHealth: 1200,
-                netId: structNetId
+                netId: structNetId,
+                teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
+                ownerId: 'player',
+                isAI: false
             };
 
             if (isMultiplayerActive && netConn && netConn.open) {
@@ -255,12 +258,17 @@
             scene.add(mesh);
 
             const enemyNetId = arguments[2] || ((isMultiplayerActive ? (isMultiplayerHost ? 'C_' : 'H_') : 'E_') + (++netIdSequence));
-            enemyUnits.push({
+            const enemyObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: mesh.position.clone(),
                 speed: speed, radius: radius, health: health, maxHealth: health,
                 scanRange: scanRange, attackCooldown: 0, combatTarget: null,
-                netId: enemyNetId
-            });
+                netId: enemyNetId,
+                teamId: 2,
+                ownerId: 'ai_1',
+                isAI: true
+            };
+            enemyUnits.push(enemyObj);
+            return enemyObj;
         }
 
         function createImpactExplosion(position) {

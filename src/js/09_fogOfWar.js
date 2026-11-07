@@ -59,10 +59,12 @@
                 if (fogGrid[i] === 2) fogGrid[i] = 1;
             }
 
-            // 2. Mark cells currently in line of sight of any friendly unit or structure
+            // 2. Mark cells currently in line of sight of any friendly unit or structure (including Allied AI!)
             const visionSources = [
                 ...units.filter(u => u.health > 0 && !u.garrisonedIn),
-                ...structures.filter(s => s.health > 0 && !s.isBuilding)
+                ...structures.filter(s => s.health > 0 && !s.isBuilding),
+                ...enemyUnits.filter(u => u.health > 0 && !u.garrisonedIn && isFriendly({ teamId: playerTeamId }, u)),
+                ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
             ];
 
             visionSources.forEach(src => {
@@ -126,9 +128,13 @@
 
             fogTexture.needsUpdate = true;
 
-            // 5. Hide Enemy Units & Enemy Structures when out of direct Line of Sight!
+            // 5. Hide Hostile Units & Hostile Structures when out of direct Line of Sight! (Allies stay visible)
             enemyUnits.forEach(enemy => {
                 if (!enemy.mesh) return;
+                if (isFriendly({ teamId: playerTeamId }, enemy)) {
+                    enemy.mesh.visible = true;
+                    return;
+                }
                 const cx = Math.floor(((enemy.mesh.position.x + halfMap) / mapSize) * FOG_RES);
                 const cy = Math.floor(((enemy.mesh.position.z + halfMap) / mapSize) * FOG_RES);
                 const isVisible = (cx >= 0 && cx < FOG_RES && cy >= 0 && cy < FOG_RES)
@@ -139,6 +145,10 @@
 
             enemyStructures.forEach(es => {
                 if (!es.mesh) return;
+                if (isFriendly({ teamId: playerTeamId }, es)) {
+                    es.mesh.visible = true;
+                    return;
+                }
                 const cx = Math.floor(((es.position.x + halfMap) / mapSize) * FOG_RES);
                 const cy = Math.floor(((es.position.z + halfMap) / mapSize) * FOG_RES);
                 const isVisible = (cx >= 0 && cx < FOG_RES && cy >= 0 && cy < FOG_RES)
@@ -721,9 +731,15 @@
         // --- TEAM FRIENDLY / HOSTILE RESOLUTION ---
         function isFriendly(assetA, assetB) {
             if (!assetA || !assetB) return false;
-            const teamA = assetA.teamId !== undefined ? assetA.teamId : (assetA.isAI !== undefined ? (assetA.isAI ? 2 : playerTeamId) : (units.includes(assetA) || structures.includes(assetA) ? playerTeamId : 2));
-            const teamB = assetB.teamId !== undefined ? assetB.teamId : (assetB.isAI !== undefined ? (assetB.isAI ? 2 : playerTeamId) : (units.includes(assetB) || structures.includes(assetB) ? playerTeamId : 2));
-            return teamA === teamB;
+            const getTeam = (a) => {
+                if (a.teamId !== undefined) return a.teamId;
+                if (a.team !== undefined) return a.team;
+                if (typeof units !== 'undefined' && units.includes(a)) return (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+                if (typeof structures !== 'undefined' && structures.includes(a)) return (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+                if (a.isAI) return 2;
+                return (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+            };
+            return getTeam(assetA) === getTeam(assetB);
         }
 
         // --- SPAWN POINTS DISTRIBUTION (Small: 4, Medium: 6, Large: 8) ---

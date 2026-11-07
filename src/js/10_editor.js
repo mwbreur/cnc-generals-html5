@@ -555,6 +555,7 @@
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Theater Initialized: ${activeSlots.length} Commanders deployed. Good luck, General!`, 'success');
         }

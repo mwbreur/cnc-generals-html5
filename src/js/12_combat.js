@@ -27,12 +27,17 @@ function processCombatScanning() {
                     }
                 }
 
-                // Auto-Scan fallback loop if completely idle
+                // If combat target is friendly ally, clear immediately
+                if (unit.combatTarget && isFriendly(unit, unit.combatTarget)) {
+                    unit.combatTarget = null;
+                }
+
+                // Auto-Scan fallback loop if completely idle (Only engage hostile targets!)
                 if (!unit.combatTarget) {
-                    // 1. Scan for nearest hostile units
+                    // 1. Scan for nearest hostile units (Skip friendly allies!)
                     if (enemyUnits.length > 0) {
                         for (let enemy of enemyUnits) {
-                            if (enemy.health > 0 && enemy.mesh) {
+                            if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
                                 const dist = unit.mesh.position.distanceTo(enemy.mesh.position);
                                 if (dist <= unit.scanRange) {
                                     unit.combatTarget = enemy;
@@ -45,7 +50,7 @@ function processCombatScanning() {
                     // 2. If no hostile units in range, auto-target nearest hostile structures
                     if (!unit.combatTarget && enemyStructures.length > 0) {
                         for (let struct of enemyStructures) {
-                            if (struct.health > 0 && struct.mesh) {
+                            if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
                                 const sPos = struct.position || struct.mesh.position;
                                 const dist = unit.mesh.position.distanceTo(sPos);
                                 if (dist <= (unit.scanRange + (struct.radius || 6))) {
@@ -61,6 +66,11 @@ function processCombatScanning() {
         }
 
         function executeWeaponFire(attacker, target) {
+            // Never fire weapon or deal damage to friendly teammates / allies!
+            if (!attacker || !target || isFriendly(attacker, target)) {
+                if (attacker && attacker.combatTarget === target) attacker.combatTarget = null;
+                return;
+            }
             // Authentic Command & Conquer: Generals Weapon Reload Rates (60 ticks = 1.0s)
             const cncCooldowns = {
                 // Main Battle & Heavy Tanks (~3.0s - 4.0s)

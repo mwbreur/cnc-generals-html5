@@ -142,10 +142,16 @@ function renderRadarMinimap() {
         }
     });
 
-    // Draw Enemy Structures (Solid Crimson Red Squares)
-    ctx.fillStyle = '#e74c3c';
+    // Draw Enemy & Allied AI Structures
     enemyStructures.forEach(es => {
         if (es.health > 0) {
+            const isAlly = isFriendly({ teamId: playerTeamId }, es);
+            if (isAlly) {
+                ctx.fillStyle = '#00cec9'; // Cyan for Allied AI base
+            } else {
+                if (es.mesh && !es.mesh.visible) return; // Hidden under fog/shroud
+                ctx.fillStyle = '#e74c3c'; // Crimson for Hostile enemy
+            }
             const rx = toRX(es.position.x);
             const rz = toRZ(es.position.z);
             const sz = Math.max(4, (es.radius || 4) / mapSize * w * 2.2);
@@ -153,7 +159,7 @@ function renderRadarMinimap() {
         }
     });
 
-    // Draw Friendly Units (Bright Neon Green Dots, Selected = Pulsing White)
+    // Draw Friendly Player Units (Bright Neon Green Dots, Selected = Pulsing White)
     units.forEach(u => {
         if (u.health > 0 && u.mesh && !u.garrisonedIn) {
             const rx = toRX(u.mesh.position.x);
@@ -168,10 +174,16 @@ function renderRadarMinimap() {
         }
     });
 
-    // Draw Enemy Units (Bright Crimson Red Dots)
-    ctx.fillStyle = '#ff4757';
+    // Draw Enemy & Allied AI Units
     enemyUnits.forEach(eu => {
         if (eu.health > 0 && eu.mesh) {
+            const isAlly = isFriendly({ teamId: playerTeamId }, eu);
+            if (isAlly) {
+                ctx.fillStyle = '#81ecec'; // Light Cyan for Allied AI units
+            } else {
+                if (!eu.mesh.visible) return; // Hidden under fog of war
+                ctx.fillStyle = '#ff4757'; // Crimson Red for Hostile enemies
+            }
             const rx = toRX(eu.mesh.position.x);
             const rz = toRZ(eu.mesh.position.z);
             ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);

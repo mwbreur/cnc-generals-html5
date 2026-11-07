@@ -457,6 +457,7 @@
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Deployment Complete. Command Center operational!`, 'success');
         }
@@ -525,17 +526,15 @@
                     def.attackCooldown = Math.max(0, def.attackCooldown - combatDeltaScale);
                 }
 
-                const isPlayer = structures.includes(def);
-                const hostileUnits = isPlayer ? enemyUnits : units;
-                const hostileStructures = isPlayer ? enemyStructures : structures;
+                const allLivingUnits = [...units, ...enemyUnits];
+                const allLivingStructures = [...structures, ...enemyStructures];
 
-                // Acquire closest target within defense range (34 units)
-                // Prioritize hostile units; if none in range, target forward hostile structures
+                // Acquire closest target within defense range (34 units) strictly filtering !isFriendly
                 if (def.attackCooldown === 0) {
                     let closestEnemy = null;
                     let closestDist = 34;
-                    for (let target of hostileUnits) {
-                        if (target.health > 0 && !target.garrisonedIn && target.mesh) {
+                    for (let target of allLivingUnits) {
+                        if (target.health > 0 && !target.garrisonedIn && target.mesh && !isFriendly(def, target)) {
                             const d = (def.position || def.mesh.position).distanceTo(target.mesh.position);
                             if (d < closestDist) {
                                 closestDist = d;
@@ -545,8 +544,8 @@
                     }
 
                     if (!closestEnemy) {
-                        for (let struct of hostileStructures) {
-                            if (struct.health > 0 && struct.mesh) {
+                        for (let struct of allLivingStructures) {
+                            if (struct.health > 0 && struct.mesh && !isFriendly(def, struct)) {
                                 const sPos = struct.position || struct.mesh.position;
                                 const d = (def.position || def.mesh.position).distanceTo(sPos);
                                 if (d < (34 + (struct.radius || 0))) {

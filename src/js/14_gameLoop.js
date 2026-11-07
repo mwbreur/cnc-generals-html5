@@ -113,7 +113,8 @@ function animate() {
                             unit.health = Math.min(unit.maxHealth, unit.health + 3);
                         }
                         if (drone.timer % 40 === 0) {
-                            const enemyInf = enemyUnits.find(e => e.health > 0 && !e.isAir && e.mesh.position.distanceTo(dMesh.position) <= 16.0);
+                            const allLivingUnits = [...units, ...enemyUnits];
+                            const enemyInf = allLivingUnits.find(e => e.health > 0 && !e.isAir && !isFriendly(unit, e) && e.mesh.position.distanceTo(dMesh.position) <= 16.0);
                             if (enemyInf) {
                                 spawnBulletTracer(dMesh.position, enemyInf.mesh.position, 0x00d2d3, 1.5);
                                 playAudio('machine_gun');
@@ -125,7 +126,8 @@ function animate() {
                     // Hellfire Drone: Launches mini-Hellfire rockets at hostile armor
                     if (drone.type === 'hellfire') {
                         if (drone.timer % 90 === 0) {
-                            const enemyArmor = enemyUnits.find(e => e.health > 0 && !e.isAir && e.mesh.position.distanceTo(dMesh.position) <= 22.0);
+                            const allLivingUnits = [...units, ...enemyUnits];
+                            const enemyArmor = allLivingUnits.find(e => e.health > 0 && !e.isAir && !isFriendly(unit, e) && e.mesh.position.distanceTo(dMesh.position) <= 22.0);
                             if (enemyArmor) {
                                 spawnRocketProjectile(dMesh.position, enemyArmor.mesh.position, false, false);
                                 playAudio('missile_launch');
@@ -141,7 +143,8 @@ function animate() {
 
                     // Overlord Bunker: 2 troops shoot 360 degrees
                     if (unit.overlordUpgrade === 'bunker' && unit.upgTimer % 45 === 0) {
-                        const target = enemyUnits.find(e => e.health > 0 && e.mesh.position.distanceTo(unit.mesh.position) <= 18.0);
+                        const allLivingUnits = [...units, ...enemyUnits];
+                        const target = allLivingUnits.find(e => e.health > 0 && !isFriendly(unit, e) && e.mesh.position.distanceTo(unit.mesh.position) <= 18.0);
                         if (target) {
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf39c12, 2.5);
                             playAudio('china_cannon', {}, 'china');
@@ -151,7 +154,8 @@ function animate() {
 
                     // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret
                     if (unit.overlordUpgrade === 'gatling' && unit.upgTimer % 12 === 0) {
-                        const target = enemyUnits.find(e => e.health > 0 && e.mesh.position.distanceTo(unit.mesh.position) <= 20.0);
+                        const allLivingUnits = [...units, ...enemyUnits];
+                        const target = allLivingUnits.find(e => e.health > 0 && !isFriendly(unit, e) && e.mesh.position.distanceTo(unit.mesh.position) <= 20.0);
                         if (target) {
                             spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
@@ -665,18 +669,23 @@ function animate() {
             });
             if (units.length !== previousUnitCount) updateHUD();
 
-            // Tactical Mission Victory / Defeat Objective Check
+            // Tactical Mission Victory / Defeat Objective Check (Total Annihilation of Hostile Forces)
             if (isMatchActive && hasSpawnedInitialEnemyBase) {
-                if (enemyStructures.length === 0 && enemyUnits.length === 0) {
+                const remainingHostileStructures = [...structures, ...enemyStructures].filter(s => s.health > 0 && !isFriendly({ teamId: playerTeamId }, s));
+                const remainingHostileCombatUnits = [...units, ...enemyUnits].filter(u => u.health > 0 && !isFriendly({ teamId: playerTeamId }, u) && !['truck', 'worker', 'dozer'].includes(u.type));
+                const remainingFriendlyStructures = [...structures, ...enemyStructures].filter(s => s.health > 0 && isFriendly({ teamId: playerTeamId }, s));
+                const remainingFriendlyUnits = [...units, ...enemyUnits].filter(u => u.health > 0 && isFriendly({ teamId: playerTeamId }, u));
+
+                if (remainingHostileStructures.length === 0 && remainingHostileCombatUnits.length === 0) {
                     isMatchActive = false;
-                    showNotification("MISSION ACCOMPLISHED: ALL HOSTILE BUILDINGS & UNITS ELIMINATED!", "success");
+                    showNotification("MISSION ACCOMPLISHED: ALL HOSTILE FORCES ELIMINATED!", "success");
                     const ticker = document.getElementById('tactical-message');
-                    if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: Operational theater secured. All enemy structures neutralized!</strong>';
-                } else if (structures.length === 0 && units.length === 0) {
+                    if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: Operational theater secured. All hostile forces destroyed!</strong>';
+                } else if (remainingFriendlyStructures.length === 0 && remainingFriendlyUnits.length === 0) {
                     isMatchActive = false;
                     showNotification("MISSION FAILED: ALL STRATEGIC ASSETS LOST!", "error");
                     const ticker = document.getElementById('tactical-message');
-                    if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">CRITICAL DEFEAT: Command Center and all forward forces destroyed.</strong>';
+                    if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">CRITICAL DEFEAT: Command Center and all friendly forces destroyed.</strong>';
                 }
             }
 
@@ -719,7 +728,7 @@ function processEnemyCombat() {
         if (enemy.attackCooldown > 0) enemy.attackCooldown = Math.max(0, enemy.attackCooldown - combatDeltaScale);
 
         const target = enemy.combatTarget;
-        if (!target || target.health <= 0) {
+        if (!target || target.health <= 0 || isFriendly(enemy, target)) {
             enemy.combatTarget = null;
             return;
         }
