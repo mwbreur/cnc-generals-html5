@@ -260,6 +260,7 @@
 
             [spSelect, mpSelect].forEach(sel => {
                 if (!sel) return;
+                const prevVal = sel.value;
                 sel.innerHTML = `
                     <option value="desert" selected>Desert Canyon (Middle East) - Dunes, mesas, oasis</option>
                     <option value="jungle">Tropical Jungle (Mekong Basin) - River, lush hills, canopy</option>
@@ -273,6 +274,9 @@
                     opt.innerText = `🗺️ ${map.name} (${map.theme.toUpperCase()} ${map.size}x${map.size})`;
                     sel.appendChild(opt);
                 });
+                if (prevVal && sel.querySelector(`option[value="${prevVal}"]`)) {
+                    sel.value = prevVal;
+                }
             });
         }
 
@@ -444,6 +448,8 @@
             const dockObj = {
                 mesh: field,
                 position: pos.clone(),
+                stock: 8000,
+                maxStock: 8000,
                 remaining: 8000,
                 maxSupplies: 8000,
                 crystals: crystals

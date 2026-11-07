@@ -2584,6 +2584,8 @@ body {
         
         let supplyCenterPos = new THREE.Vector3(-30, 0, -20);
         const supplyPoints = [];
+        let activeCustomMap = null;
+        let savedCustomMaps = {};
 
         let currentWaterLevel = -1.2;
         const mapBridges = []; // Array of bridge bounding areas: { position, width, length, rotationY, deckY }
@@ -7792,6 +7794,7 @@ function playUSASound(type, options = {}) {
 
         // Mathematical Heightmap Generator
         function getCustomMapHeight(x, z) {
+            if (!activeCustomMap || !activeCustomMap.heightGrid || activeCustomMap.heightGrid.length === 0) return 2.5;
             const size = currentMapSize;
             const half = size * 0.5;
             const u = Math.max(0, Math.min(1, (x + half) / size));
@@ -7905,6 +7908,184 @@ function playUSASound(type, options = {}) {
             return 2.0;
         }
 
+        // Procedural Texture Generator for Custom Maps (Height-aware splat texturing)
+        function createCustomTerrainTexture(customMap) {
+            const width = 1024;
+            const height = 1024;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.createImageData(width, height);
+            const data = imgData.data;
+
+            const res = 32;
+            const grid = (customMap && customMap.heightGrid && customMap.heightGrid.length === res * res)
+                ? customMap.heightGrid
+                : null;
+            const waterLevel = (customMap && customMap.waterLevel !== undefined) ? Number(customMap.waterLevel) : -1.0;
+            const theme = (customMap && customMap.theme) ? customMap.theme : 'desert';
+
+            for (let py = 0; py < height; py++) {
+                const gyFloat = (py / (height - 1)) * (res - 1);
+                const gy0 = Math.floor(gyFloat);
+                const gy1 = Math.min(res - 1, gy0 + 1);
+                const fy = gyFloat - gy0;
+
+                for (let px = 0; px < width; px++) {
+                    const gxFloat = (px / (width - 1)) * (res - 1);
+                    const gx0 = Math.floor(gxFloat);
+                    const gx1 = Math.min(res - 1, gx0 + 1);
+                    const fx = gxFloat - gx0;
+
+                    let h = 2.5;
+                    let slope = 0;
+
+                    if (grid) {
+                        const h00 = grid[gy0 * res + gx0] !== undefined ? grid[gy0 * res + gx0] : 2.5;
+                        const h10 = grid[gy0 * res + gx1] !== undefined ? grid[gy0 * res + gx1] : 2.5;
+                        const h01 = grid[gy1 * res + gx0] !== undefined ? grid[gy1 * res + gx0] : 2.5;
+                        const h11 = grid[gy1 * res + gx1] !== undefined ? grid[gy1 * res + gx1] : 2.5;
+
+                        const topH = h00 * (1 - fx) + h10 * fx;
+                        const botH = h01 * (1 - fx) + h11 * fx;
+                        h = topH * (1 - fy) + botH * fy;
+
+                        const dHx = Math.abs((h10 - h00) * (1 - fy) + (h11 - h01) * fy);
+                        const dHy = Math.abs((h01 - h00) * (1 - fx) + (h11 - h10) * fx);
+                        slope = dHx + dHy;
+                    }
+
+                    // Pseudo-random high-frequency surface noise (-10 to +10)
+                    const nHash = ((px * 1664525 + py * 1013904223) ^ (px >> 2)) & 0xff;
+                    const noise = (nHash - 128) * 0.08;
+
+                    let r = 180, g = 160, b = 120;
+
+                    if (theme === 'desert') {
+                        if (h <= waterLevel + 0.35) {
+                            // Shoreline damp silt & alluvial mud
+                            r = 122 + noise * 0.6;
+                            g = 102 + noise * 0.5;
+                            b = 72 + noise * 0.4;
+                        } else if (slope > 0.40) {
+                            // Canyon sandstone cliff face with rock strata
+                            const strata = Math.sin(h * 3.8 + px * 0.02) * 16;
+                            r = 150 + strata + noise;
+                            g = 100 + strata * 0.7 + noise;
+                            b = 65 + strata * 0.5 + noise;
+                        } else if (h > 5.5) {
+                            // Elevated mesa limestone plateau
+                            r = 218 + noise;
+                            g = 196 + noise;
+                            b = 156 + noise;
+                        } else {
+                            // Rolling desert dunes with subtle ripples
+                            const ripple = Math.sin(px * 0.08 + py * 0.04) * 6;
+                            r = 202 + ripple + noise;
+                            g = 176 + ripple * 0.85 + noise;
+                            b = 132 + ripple * 0.65 + noise;
+                        }
+                    } else if (theme === 'jungle') {
+                        if (h <= waterLevel + 0.35) {
+                            // Muddy riverbed & wetland silt
+                            r = 75 + noise * 0.6;
+                            g = 65 + noise * 0.5;
+                            b = 48 + noise * 0.4;
+                        } else if (slope > 0.40) {
+                            // Volcanic basalt cliff face
+                            const strata = Math.sin(h * 3.0) * 10;
+                            r = 68 + strata + noise;
+                            g = 75 + strata + noise;
+                            b = 66 + strata + noise;
+                        } else if (h > 5.5) {
+                            // Upland savanna ridges
+                            r = 92 + noise;
+                            g = 128 + noise;
+                            b = 62 + noise;
+                        } else {
+                            // Lush tropical grass & foliage
+                            const turf = Math.sin(px * 0.06 - py * 0.05) * 8;
+                            r = 58 + turf * 0.5 + noise;
+                            g = 110 + turf + noise;
+                            b = 45 + turf * 0.4 + noise;
+                        }
+                    } else if (theme === 'snow') {
+                        if (h <= waterLevel + 0.35) {
+                            // Icy slush & permafrost
+                            r = 140 + noise;
+                            g = 158 + noise;
+                            b = 180 + noise;
+                        } else if (slope > 0.40) {
+                            // Dark Siberian granite crags
+                            const strata = Math.sin(h * 3.2) * 12;
+                            r = 78 + strata + noise;
+                            g = 88 + strata + noise;
+                            b = 102 + strata + noise;
+                        } else if (h > 5.5) {
+                            // Packed glacial blue ice
+                            r = 232 + noise * 0.5;
+                            g = 245 + noise * 0.5;
+                            b = 255;
+                        } else {
+                            // Powder snow drifts
+                            const drift = Math.sin(px * 0.05 + py * 0.05) * 6;
+                            r = 235 + drift + noise;
+                            g = 242 + drift + noise;
+                            b = 250 + drift + noise;
+                        }
+                    } else if (theme === 'city') {
+                        if (h <= waterLevel + 0.35) {
+                            // Canal bed / concrete basin
+                            r = 44 + noise * 0.5;
+                            g = 48 + noise * 0.5;
+                            b = 54 + noise * 0.5;
+                        } else if (slope > 0.40) {
+                            // Retaining wall / foundations
+                            const strata = Math.sin(h * 4.0) * 10;
+                            r = 82 + strata + noise;
+                            g = 86 + strata + noise;
+                            b = 92 + strata + noise;
+                        } else if (h > 5.5) {
+                            // Elevated urban plaza
+                            r = 98 + noise;
+                            g = 104 + noise;
+                            b = 112 + noise;
+                        } else {
+                            // Asphalt streets and urban blocks
+                            const isRoadGrid = (px % 64 < 10) || (py % 64 < 10);
+                            if (isRoadGrid) {
+                                r = 40 + noise * 0.5;
+                                g = 42 + noise * 0.5;
+                                b = 46 + noise * 0.5;
+                            } else {
+                                r = 68 + noise;
+                                g = 73 + noise;
+                                b = 78 + noise;
+                            }
+                        }
+                    }
+
+                    const idx = (py * width + px) * 4;
+                    data[idx] = Math.max(0, Math.min(255, Math.round(r)));
+                    data[idx + 1] = Math.max(0, Math.min(255, Math.round(g)));
+                    data[idx + 2] = Math.max(0, Math.min(255, Math.round(b)));
+                    data[idx + 3] = 255;
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+            texture.repeat.set(1, 1);
+            texture.minFilter = THREE.LinearMipmapLinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.generateMipmaps = true;
+            texture.needsUpdate = true;
+            return texture;
+        }
+
         // Procedural Texture Generator per Environment
         function createTerrainTextureForMap(mapType) {
             const canvas = document.createElement('canvas');
@@ -7965,6 +8146,29 @@ function playUSASound(type, options = {}) {
                     ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
                 }
                 ctx.setLineDash([]);
+            } else if (mapType === 'random') {
+                ctx.fillStyle = '#4a5d38'; // Warzone olive earth
+                ctx.fillRect(0, 0, 512, 512);
+                const patches = ['#3a482b', '#5c6f44', '#6b5c42', '#333f25', '#73634a', '#857252'];
+                for (let i = 0; i < 1300; i++) {
+                    ctx.fillStyle = patches[i % patches.length];
+                    ctx.globalAlpha = 0.14 + Math.random() * 0.18;
+                    ctx.beginPath();
+                    ctx.ellipse(Math.random() * 512, Math.random() * 512, 4 + Math.random() * 24, 3 + Math.random() * 16, Math.random() * Math.PI, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else {
+                // Guaranteed safety fallback for any custom or unrecognized map type - never render black!
+                ctx.fillStyle = '#bfa87a';
+                ctx.fillRect(0, 0, 512, 512);
+                const patches = ['#a89265', '#cbba8d', '#8c7750', '#d9cca6', '#7a6744'];
+                for (let i = 0; i < 1100; i++) {
+                    ctx.fillStyle = patches[i % patches.length];
+                    ctx.globalAlpha = 0.12 + Math.random() * 0.15;
+                    ctx.beginPath();
+                    ctx.ellipse(Math.random() * 512, Math.random() * 512, 4 + Math.random() * 22, 2 + Math.random() * 14, Math.random() * Math.PI, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
             ctx.globalAlpha = 1.0;
 
@@ -7976,8 +8180,27 @@ function playUSASound(type, options = {}) {
 
         // Build Terrain, Water, and Props for the selected Map
         function setupMapEnvironment(mapType = 'desert', mapSize = 800) {
+            // 0. Resolve activeCustomMap if mapType starts with custom_
+            if (mapType && mapType.startsWith('custom_')) {
+                if (!activeCustomMap || activeCustomMap.id !== mapType) {
+                    if (typeof savedCustomMaps !== 'undefined' && savedCustomMaps[mapType]) {
+                        activeCustomMap = savedCustomMaps[mapType];
+                    }
+                }
+            } else {
+                activeCustomMap = null;
+            }
+
+            if (activeCustomMap && activeCustomMap.size) {
+                mapSize = Number(activeCustomMap.size);
+            }
+
             currentMapType = mapType;
             currentMapSize = mapSize;
+
+            const effectiveTheme = (activeCustomMap && activeCustomMap.theme)
+                ? activeCustomMap.theme
+                : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city'].includes(mapType) ? mapType : 'desert'));
 
             // Clear previous terrain, water, props, and supply points
             if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh = null; }
@@ -7991,18 +8214,21 @@ function playUSASound(type, options = {}) {
             scene.add(mapPropsGroup);
 
             // 1. Atmosphere Lighting & Fog
-            if (mapType === 'desert') {
+            if (effectiveTheme === 'desert') {
                 scene.background.setHex(0x1a150e);
                 scene.fog = new THREE.FogExp2(0x1a150e, 0.0025);
-            } else if (mapType === 'jungle') {
+            } else if (effectiveTheme === 'jungle') {
                 scene.background.setHex(0x0e1811);
                 scene.fog = new THREE.FogExp2(0x0e1811, 0.0028);
-            } else if (mapType === 'snow') {
+            } else if (effectiveTheme === 'snow') {
                 scene.background.setHex(0x121a22);
                 scene.fog = new THREE.FogExp2(0x121a22, 0.0022);
-            } else if (mapType === 'city') {
+            } else if (effectiveTheme === 'city') {
                 scene.background.setHex(0x111317);
                 scene.fog = new THREE.FogExp2(0x111317, 0.0024);
+            } else {
+                scene.background.setHex(0x1a150e);
+                scene.fog = new THREE.FogExp2(0x1a150e, 0.0025);
             }
 
             // 2. Procedural Displaced Terrain Mesh
@@ -8018,10 +8244,15 @@ function playUSASound(type, options = {}) {
             }
             geo.computeVertexNormals();
 
+            const isCustom = Boolean(activeCustomMap || (mapType && mapType.startsWith('custom_')));
+            const terrainTexture = isCustom
+                ? createCustomTerrainTexture(activeCustomMap)
+                : createTerrainTextureForMap(mapType);
+
             const terrainMat = new THREE.MeshStandardMaterial({
-                map: createTerrainTextureForMap(mapType),
-                roughness: mapType === 'snow' ? 0.75 : 0.95,
-                metalness: mapType === 'snow' ? 0.2 : 0.05
+                map: terrainTexture,
+                roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.95,
+                metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
             });
             terrainMesh = new THREE.Mesh(geo, terrainMat);
             terrainMesh.receiveShadow = true;
@@ -8031,15 +8262,21 @@ function playUSASound(type, options = {}) {
             mapBridges.length = 0; // Clear previous bridges
             let waterLevel = -1.0;
             let waterColor = 0x0984e3;
-            let waterOpacity = 0.8;
-            if (mapType === 'desert') { waterColor = 0x0abde3; waterLevel = -1.0; waterOpacity = 0.82; }
-            else if (mapType === 'jungle') { waterColor = 0x00cec9; waterLevel = -1.0; waterOpacity = 0.85; }
-            else if (mapType === 'snow') { waterColor = 0x74b9ff; waterLevel = -1.0; waterOpacity = 0.88; }
-            else if (mapType === 'city') { waterColor = 0x2d3436; waterLevel = -1.0; waterOpacity = 0.88; }
-            else if (mapType === 'random') {
+            let waterOpacity = 0.82;
+
+            if (effectiveTheme === 'desert') { waterColor = 0x0abde3; waterOpacity = 0.82; }
+            else if (effectiveTheme === 'jungle') { waterColor = 0x00cec9; waterOpacity = 0.85; }
+            else if (effectiveTheme === 'snow') { waterColor = 0x74b9ff; waterOpacity = 0.88; }
+            else if (effectiveTheme === 'city') { waterColor = 0x2d3436; waterOpacity = 0.88; }
+
+            if (mapType === 'random') {
                 randomMapSeed = Math.random() * 100;
                 randomMapRiverFreq = 0.012 + Math.random() * 0.008;
-                waterColor = 0x1b7094; waterLevel = -1.0; waterOpacity = 0.86;
+                waterColor = 0x1b7094; waterOpacity = 0.86;
+            }
+
+            if (activeCustomMap && activeCustomMap.waterLevel !== undefined) {
+                waterLevel = Number(activeCustomMap.waterLevel);
             }
             currentWaterLevel = waterLevel;
 
@@ -8055,7 +8292,7 @@ function playUSASound(type, options = {}) {
             scene.add(waterMesh);
 
             // 4. Procedural Trees, Rocks & City Buildings
-            spawnMapProps(mapType, mapSize);
+            spawnMapProps(effectiveTheme, mapSize);
 
             // 5. Distributed Supply Fields
             createSupplyFieldsForMap(mapSize);
@@ -8204,8 +8441,47 @@ function playUSASound(type, options = {}) {
         }
 
         // Spawn Map Props (Trees, Rocks, Palms, City Buildings)
-        function spawnMapProps(mapType, mapSize) {
-            const count = mapSize > 1000 ? 110 : mapSize > 600 ? 75 : 45;
+        function spawnMapProps(theme, mapSize) {
+            // 1. If custom map has explicit bridges, spawn them
+            if (activeCustomMap && activeCustomMap.bridges && activeCustomMap.bridges.length > 0) {
+                activeCustomMap.bridges.forEach(b => {
+                    const by = (activeCustomMap.waterLevel !== undefined ? Number(activeCustomMap.waterLevel) : -1.0) + 1.8;
+                    spawnBridge(b.x, by, b.z, b.angle || 0, b.width || 20, b.length || 60);
+                });
+            }
+
+            // 2. If custom map has explicit props, spawn them
+            if (activeCustomMap && activeCustomMap.props && activeCustomMap.props.length > 0) {
+                activeCustomMap.props.forEach(p => {
+                    const py = getTerrainHeight(p.x, p.z);
+                    if (theme === 'desert') {
+                        const palm = createPalmTreeMesh();
+                        palm.position.set(p.x, py, p.z);
+                        mapPropsGroup.add(palm);
+                        mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 1.8 });
+                    } else if (theme === 'jungle') {
+                        const tree = createJungleTreeMesh();
+                        tree.position.set(p.x, py, p.z);
+                        mapPropsGroup.add(tree);
+                        mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 2.4 });
+                    } else if (theme === 'snow') {
+                        const pine = createSnowPineMesh();
+                        pine.position.set(p.x, py, p.z);
+                        mapPropsGroup.add(pine);
+                        mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 2.0 });
+                    } else if (theme === 'city') {
+                        const building = createCitySkyscraperMesh();
+                        building.position.set(p.x, py, p.z);
+                        mapPropsGroup.add(building);
+                        mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 5.5 });
+                    }
+                });
+            }
+
+            // 3. Ambient thematic props
+            const count = activeCustomMap
+                ? Math.min(32, Math.floor(mapSize * 0.035))
+                : (mapSize > 1000 ? 110 : mapSize > 600 ? 75 : 45);
             const bound = mapSize * 0.42;
 
             for (let i = 0; i < count; i++) {
@@ -8213,12 +8489,14 @@ function playUSASound(type, options = {}) {
                 const z = (Math.random() - 0.5) * 2 * bound;
                 const y = getTerrainHeight(x, z);
 
-                // Do not spawn in water channels
-                if (y < -0.4 && mapType !== 'city') continue;
+                // Do not spawn in water
+                if (y < currentWaterLevel + 0.4 && theme !== 'city') continue;
                 // Leave base centers clear
                 if (Math.hypot(x, z) < 45) continue;
+                // Avoid blocking bridges
+                if (mapBridges.some(br => Math.hypot(x - br.position.x, z - br.position.z) < br.width + 6)) continue;
 
-                if (mapType === 'desert') {
+                if (theme === 'desert') {
                     const roll = Math.random();
                     if (roll > 0.6) {
                         const palm = createPalmTreeMesh();
@@ -8242,7 +8520,7 @@ function playUSASound(type, options = {}) {
                         mapPropsGroup.add(pipe);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 3.5 });
                     }
-                } else if (mapType === 'jungle') {
+                } else if (theme === 'jungle') {
                     const roll = Math.random();
                     if (roll > 0.45) {
                         const tree = createJungleTreeMesh();
@@ -8263,7 +8541,7 @@ function playUSASound(type, options = {}) {
                         mapPropsGroup.add(rock);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
                     }
-                } else if (mapType === 'snow') {
+                } else if (theme === 'snow') {
                     const roll = Math.random();
                     if (roll > 0.45) {
                         const pine = createSnowPineMesh();
@@ -8281,7 +8559,7 @@ function playUSASound(type, options = {}) {
                         mapPropsGroup.add(rock);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
                     }
-                } else if (mapType === 'city') {
+                } else if (theme === 'city') {
                     const roll = Math.random();
                     if (Math.abs(x - mapSize * 0.06) > 35) {
                         if (roll > 0.4) {
@@ -8301,65 +8579,44 @@ function playUSASound(type, options = {}) {
                             mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.5 });
                         }
                     }
-                } else if (mapType === 'random') {
-                    // Procedural Warzone blend of rocks, trees, and outpost defenses
-                    const roll = Math.random();
-                    if (roll > 0.5) {
-                        const tree = createJungleTreeMesh();
-                        tree.position.set(x, y, z);
-                        mapPropsGroup.add(tree);
-                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
-                    } else if (roll > 0.2) {
-                        const rock = createRockMesh(0x7f8c8d);
-                        rock.position.set(x, y + 0.4, z);
-                        mapPropsGroup.add(rock);
-                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
-                    } else {
-                        const fern = createFernMesh();
-                        fern.position.set(x, y, z);
-                        mapPropsGroup.add(fern);
-                    }
                 }
             }
 
-            // Bridges for River, Canal, and Lake Crossings
-            if (mapType === 'jungle') {
-                // 3 Wide highway bridges across the river channel (West, Center, East)
-                const x1 = -mapSize * 0.24;
-                const z1 = Math.sin(x1 * 0.012) * (mapSize * 0.09);
-                spawnBridge(x1, 1.0, z1, 0, 20, 60);
+            // 4. Default Bridges for Preset Maps (only if not a custom map)
+            if (!activeCustomMap) {
+                if (currentMapType === 'jungle') {
+                    const x1 = -mapSize * 0.24;
+                    const z1 = Math.sin(x1 * 0.012) * (mapSize * 0.09);
+                    spawnBridge(x1, 1.0, z1, 0, 20, 60);
 
-                const x2 = 0;
-                const z2 = Math.sin(x2 * 0.012) * (mapSize * 0.09);
-                spawnBridge(x2, 1.0, z2, 0, 20, 60);
+                    const x2 = 0;
+                    const z2 = Math.sin(x2 * 0.012) * (mapSize * 0.09);
+                    spawnBridge(x2, 1.0, z2, 0, 20, 60);
 
-                const x3 = mapSize * 0.24;
-                const z3 = Math.sin(x3 * 0.012) * (mapSize * 0.09);
-                spawnBridge(x3, 1.0, z3, 0, 20, 60);
-            } else if (mapType === 'city') {
-                // 3 Urban concrete highway bridges crossing the canal (North, Center, South)
-                spawnBridge(mapSize * 0.05, 1.0, -mapSize * 0.24, Math.PI / 2, 20, 56);
-                spawnBridge(mapSize * 0.05, 1.0, 0, Math.PI / 2, 20, 56);
-                spawnBridge(mapSize * 0.05, 1.0, mapSize * 0.24, Math.PI / 2, 20, 56);
-            } else if (mapType === 'snow') {
-                // Steel highway bridge crossing the frozen lake
-                spawnBridge(0, 1.0, 0, 0, 20, 64);
-            } else if (mapType === 'desert') {
-                // Suspension bridge spanning across the oasis depression
-                spawnBridge(mapSize * 0.20, 1.0, mapSize * 0.20, Math.PI / 4, 18, 56);
-            } else if (mapType === 'random') {
-                // 3 Procedural bridges across the winding river (West, Center, East)
-                const rx1 = -mapSize * 0.24;
-                const rz1 = Math.sin(rx1 * 0.014 + randomMapSeed) * (mapSize * 0.10);
-                spawnBridge(rx1, 1.0, rz1, 0, 20, 60);
+                    const x3 = mapSize * 0.24;
+                    const z3 = Math.sin(x3 * 0.012) * (mapSize * 0.09);
+                    spawnBridge(x3, 1.0, z3, 0, 20, 60);
+                } else if (currentMapType === 'city') {
+                    spawnBridge(mapSize * 0.05, 1.0, -mapSize * 0.24, Math.PI / 2, 20, 56);
+                    spawnBridge(mapSize * 0.05, 1.0, 0, Math.PI / 2, 20, 56);
+                    spawnBridge(mapSize * 0.05, 1.0, mapSize * 0.24, Math.PI / 2, 20, 56);
+                } else if (currentMapType === 'snow') {
+                    spawnBridge(0, 1.0, 0, 0, 20, 64);
+                } else if (currentMapType === 'desert') {
+                    spawnBridge(mapSize * 0.20, 1.0, mapSize * 0.20, Math.PI / 4, 18, 56);
+                } else if (currentMapType === 'random') {
+                    const rx1 = -mapSize * 0.24;
+                    const rz1 = Math.sin(rx1 * 0.014 + randomMapSeed) * (mapSize * 0.10);
+                    spawnBridge(rx1, 1.0, rz1, 0, 20, 60);
 
-                const rx2 = 0;
-                const rz2 = Math.sin(randomMapSeed) * (mapSize * 0.10);
-                spawnBridge(rx2, 1.0, rz2, 0, 20, 60);
+                    const rx2 = 0;
+                    const rz2 = Math.sin(randomMapSeed) * (mapSize * 0.10);
+                    spawnBridge(rx2, 1.0, rz2, 0, 20, 60);
 
-                const rx3 = mapSize * 0.24;
-                const rz3 = Math.sin(rx3 * 0.014 + randomMapSeed) * (mapSize * 0.10);
-                spawnBridge(rx3, 1.0, rz3, 0, 20, 60);
+                    const rx3 = mapSize * 0.24;
+                    const rz3 = Math.sin(rx3 * 0.014 + randomMapSeed) * (mapSize * 0.10);
+                    spawnBridge(rx3, 1.0, rz3, 0, 20, 60);
+                }
             }
         }
 
@@ -8523,51 +8780,69 @@ function playUSASound(type, options = {}) {
             return g;
         }
 
-        // Supply Fields distribution across map size
-        function createSupplyFieldsForMap(mapSize) {
-            const step = mapSize > 1000 ? 240 : mapSize > 600 ? 170 : 120;
-            const bound = mapSize * 0.36;
-
+        function spawnSingleSupplyDockAt(pos, stock = 8800) {
             const crystalMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.5, metalness: 0.2 });
             const crateMat = new THREE.MeshStandardMaterial({ color: 0x7f5539, roughness: 0.9 });
             const padMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.95 });
 
+            const field = new THREE.Group();
+            const pad = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 7.2, 0.25, 16), padMat);
+            pad.position.y = 0.12; field.add(pad);
+
+            const crystals = [];
+            for (let i = 0; i < 7; i++) {
+                const angle = i * 2.4;
+                const crystal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.95 + (i % 3) * 0.2, 0), crystalMat);
+                crystal.position.set(Math.cos(angle) * (2.2 + (i % 2)), 0.75 + (i % 3) * 0.15, Math.sin(angle) * (2.2 + (i % 2)));
+                crystal.scale.y = 1.45;
+                crystal.castShadow = true; field.add(crystal);
+                crystals.push(crystal);
+            }
+
+            for (let i = 0; i < 2; i++) {
+                const crate = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.2, 1.3), crateMat);
+                crate.position.set(i ? -4.2 : 4.0, 0.65, i ? 2.5 : -2.5);
+                crate.castShadow = true; field.add(crate);
+            }
+
+            field.position.copy(pos);
+            scene.add(field);
+            supplyPoints.push({
+                position: pos.clone(),
+                mesh: field,
+                crystals: crystals,
+                stock: stock,
+                maxStock: stock,
+                remaining: stock,
+                maxSupplies: stock
+            });
+        }
+
+        // Supply Fields distribution across map size
+        function createSupplyFieldsForMap(mapSize) {
+            if (activeCustomMap && activeCustomMap.supplies && activeCustomMap.supplies.length > 0) {
+                activeCustomMap.supplies.forEach(s => {
+                    const y = getTerrainHeight(s.x, s.z);
+                    const pos = new THREE.Vector3(s.x, y, s.z);
+                    spawnSingleSupplyDockAt(pos, s.amount || 8800);
+                });
+                return;
+            }
+
+            const step = mapSize > 1000 ? 240 : mapSize > 600 ? 170 : 120;
+            const bound = mapSize * 0.36;
+
             for (let x = -bound; x <= bound; x += step) {
                 for (let z = -bound; z <= bound; z += step) {
                     const y = getTerrainHeight(x, z);
-                    if (y < -0.4) continue; // Don't spawn in water
+                    if (y < currentWaterLevel + 0.4) continue; // Don't spawn in water
 
                     const position = new THREE.Vector3(x, y, z);
-                    const field = new THREE.Group();
-
-                    const pad = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 7.2, 0.25, 16), padMat);
-                    pad.position.y = 0.12; field.add(pad);
-
-                    const crystals = [];
-                    for (let i = 0; i < 7; i++) {
-                        const angle = i * 2.4;
-                        const crystal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.95 + (i % 3) * 0.2, 0), crystalMat);
-                        crystal.position.set(Math.cos(angle) * (2.2 + (i % 2)), 0.75 + (i % 3) * 0.15, Math.sin(angle) * (2.2 + (i % 2)));
-                        crystal.scale.y = 1.45;
-                        crystal.castShadow = true; field.add(crystal);
-                        crystals.push(crystal);
-                    }
-
-                    for (let i = 0; i < 2; i++) {
-                        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.2, 1.3), crateMat);
-                        crate.position.set(i ? -4.2 : 4.0, 0.65, i ? 2.5 : -2.5);
-                        crate.castShadow = true; field.add(crate);
-                    }
-
-                    field.position.copy(position);
-                    scene.add(field);
-                    supplyPoints.push({ position, mesh: field, crystals, stock: 8800, maxStock: 8800 }); // 4x supplies per depot
+                    spawnSingleSupplyDockAt(position, 8800);
                 }
             }
         }
 
-
-        // =========================================================================
         
 
 // --- MODULE: 08_collision.js ---
@@ -9596,8 +9871,7 @@ function playUSASound(type, options = {}) {
         let matchStartTime = 0;
         let hasSpawnedInitialEnemyBase = false;
         let playerTeamId = 1;
-        let activeCustomMap = null;
-        let savedCustomMaps = {};
+        // activeCustomMap & savedCustomMaps declared in 01_core.js
         let focusedSlotIdx = 0;
 
         // --- SKIRMISH & MULTIPLAYER LOBBY SLOTS STATE ---
@@ -10257,6 +10531,7 @@ function playUSASound(type, options = {}) {
 
             [spSelect, mpSelect].forEach(sel => {
                 if (!sel) return;
+                const prevVal = sel.value;
                 sel.innerHTML = `
                     <option value="desert" selected>Desert Canyon (Middle East) - Dunes, mesas, oasis</option>
                     <option value="jungle">Tropical Jungle (Mekong Basin) - River, lush hills, canopy</option>
@@ -10270,6 +10545,9 @@ function playUSASound(type, options = {}) {
                     opt.innerText = `🗺️ ${map.name} (${map.theme.toUpperCase()} ${map.size}x${map.size})`;
                     sel.appendChild(opt);
                 });
+                if (prevVal && sel.querySelector(`option[value="${prevVal}"]`)) {
+                    sel.value = prevVal;
+                }
             });
         }
 
@@ -10441,6 +10719,8 @@ function playUSASound(type, options = {}) {
             const dockObj = {
                 mesh: field,
                 position: pos.clone(),
+                stock: 8000,
+                maxStock: 8000,
                 remaining: 8000,
                 maxSupplies: 8000,
                 crystals: crystals

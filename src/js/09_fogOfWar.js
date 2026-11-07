@@ -737,8 +737,7 @@
         let matchStartTime = 0;
         let hasSpawnedInitialEnemyBase = false;
         let playerTeamId = 1;
-        let activeCustomMap = null;
-        let savedCustomMaps = {};
+        // activeCustomMap & savedCustomMaps declared in 01_core.js
         let focusedSlotIdx = 0;
 
         // --- SKIRMISH & MULTIPLAYER LOBBY SLOTS STATE ---

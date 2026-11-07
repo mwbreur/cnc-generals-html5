@@ -9,6 +9,8 @@
         
         let supplyCenterPos = new THREE.Vector3(-30, 0, -20);
         const supplyPoints = [];
+        let activeCustomMap = null;
+        let savedCustomMaps = {};
 
         let currentWaterLevel = -1.2;
         const mapBridges = []; // Array of bridge bounding areas: { position, width, length, rotationY, deckY }
