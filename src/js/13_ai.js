@@ -489,7 +489,7 @@ function processEnemyAIEngine() {
 
         function onWindowWheel(e) {
             e.preventDefault(); cameraRadius += e.deltaY * 0.04 * zoomSpeed;
-            cameraRadius = Math.max(25, Math.min(300, cameraRadius)); updateCameraPosition();
+            cameraRadius = Math.max(35, Math.min(360, cameraRadius)); updateCameraPosition();
         }
 
         // River Crossing Bridge Waypoint Finder: detects if straight path hits water and routes via bridge

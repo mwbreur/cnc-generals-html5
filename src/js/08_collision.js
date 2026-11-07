@@ -198,6 +198,7 @@
                 group = f === 'china' ? createChinaCommandCenter() : f === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
             }
 
+            group.scale.set(1.35, 1.35, 1.35);
             group.position.copy(pos);
             
             const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
@@ -254,6 +255,10 @@
             } else {
                 mesh = createBattlemasterTankMesh(true);
             }
+            mesh.scale.set(1.35, 1.35, 1.35);
+            radius *= 1.35;
+            scanRange *= 1.35;
+            speed *= 1.15;
             mesh.position.copy(position);
             scene.add(mesh);
 

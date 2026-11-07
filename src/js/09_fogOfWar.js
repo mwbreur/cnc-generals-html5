@@ -32,7 +32,19 @@
             fogTexture.minFilter = THREE.LinearFilter;
             fogTexture.magFilter = THREE.LinearFilter;
 
-            const fogGeo = new THREE.PlaneGeometry(mapSize * 1.02, mapSize * 1.02);
+            // Subdivided terrain-hugging mesh: contours smoothly over hills, dunes, mesas and valleys
+            const segments = 64;
+            const fogGeo = new THREE.PlaneGeometry(mapSize * 1.02, mapSize * 1.02, segments, segments);
+            fogGeo.rotateX(-Math.PI / 2);
+            const posAttr = fogGeo.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                const vx = posAttr.getX(i);
+                const vz = posAttr.getZ(i);
+                const th = typeof getTerrainHeight === 'function' ? getTerrainHeight(vx, vz) : 0;
+                posAttr.setY(i, th + 1.2);
+            }
+            fogGeo.computeVertexNormals();
+
             const fogMat = new THREE.MeshBasicMaterial({
                 map: fogTexture,
                 transparent: true,
@@ -40,8 +52,7 @@
                 depthWrite: false
             });
             fogMesh = new THREE.Mesh(fogGeo, fogMat);
-            fogMesh.rotation.x = -Math.PI / 2;
-            fogMesh.position.y = 2.4;
+            fogMesh.position.set(0, 0, 0);
             fogMesh.renderOrder = 99;
             scene.add(fogMesh);
         }
@@ -365,7 +376,11 @@
                 tunnel: [8, 4, 8], stingerSite: [6, 6, 6], demoTrap: [4, 1.5, 4], palace: [12, 7, 10],
                 fakeBarracks: [8, 5.5, 7], fakeArmsDealer: [12, 5, 9], scudStorm: [12, 9, 12]
             };
-            const [width, height, depth] = sizes[type] || [8, 5, 8];
+            const [baseW, baseH, baseD] = sizes[type] || [8, 5, 8];
+            const scale = 1.35;
+            const width = baseW * scale;
+            const height = baseH * scale;
+            const depth = baseD * scale;
             return { width, height, depth, radius: Math.max(width, depth) * 0.55 };
         }
 

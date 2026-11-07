@@ -940,8 +940,8 @@ body {
 
 /* 1. BOTTOM-LEFT: RADAR MINIMAP BOX */
 #cb-radar-box {
-    width: 220px;
-    height: 160px;
+    width: 230px;
+    height: 165px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -997,8 +997,8 @@ body {
 
 /* 2. BOTTOM-CENTER: PRODUCTION & COMMAND CONSOLE */
 #cb-center-console {
-    width: 540px;
-    height: 140px;
+    width: 720px;
+    height: 165px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1089,20 +1089,20 @@ body {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     grid-template-rows: repeat(2, 1fr);
-    gap: 5px;
+    gap: 6px;
 }
 
 .cb-production-grid .grid-slot-btn {
     position: relative;
-    background: linear-gradient(180deg, #232e36 0%, #12181d 100%);
-    border: 1px solid #3c4e5c;
+    background: linear-gradient(180deg, #1e2930 0%, #10161a 100%);
+    border: 1.5px solid #3c5261;
     border-radius: 3px;
     color: #e0ecf5;
-    padding: 4px;
+    padding: 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: stretch;
     cursor: pointer;
     transition: all 0.15s ease;
     box-sizing: border-box;
@@ -1111,8 +1111,9 @@ body {
 
 .cb-production-grid .grid-slot-btn:hover:not([disabled]) {
     border-color: #00ffcc;
-    background: linear-gradient(180deg, #30414e 0%, #182229 100%);
-    box-shadow: 0 0 10px rgba(0,255,204,0.35);
+    background: linear-gradient(180deg, #2b3a44 0%, #161e24 100%);
+    box-shadow: 0 0 10px rgba(0,255,204,0.45);
+    transform: translateY(-1px);
 }
 
 .cb-production-grid .grid-slot-btn[disabled] {
@@ -1125,55 +1126,109 @@ body {
     border-color: #f1c40f;
     background: linear-gradient(180deg, #3b351d 0%, #1e1b0c 100%);
 }
+.cb-production-grid .grid-slot-btn.slot-rally:hover:not([disabled]) {
+    border-color: #ffd700;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+}
+
 .cb-production-grid .grid-slot-btn.slot-sell {
     border-color: #2ecc71;
     background: linear-gradient(180deg, #1c3826 0%, #0d1e13 100%);
 }
+.cb-production-grid .grid-slot-btn.slot-sell:hover:not([disabled]) {
+    border-color: #55efc4;
+    box-shadow: 0 0 12px rgba(85, 239, 196, 0.5);
+}
 
-.grid-key-badge {
+.slot-art-wrap {
     position: absolute;
-    top: 2px;
-    right: 4px;
-    font-size: 9px;
-    font-weight: bold;
-    color: #55efc4;
-    font-family: monospace;
-}
-
-.grid-slot-name {
-    font-size: 10px;
-    font-weight: bold;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 90%;
-    margin-top: 1px;
-}
-
-.grid-slot-footer {
+    inset: 0;
     display: flex;
-    justify-content: space-between;
-    width: 100%;
-    font-size: 9px;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
 }
 
-.grid-slot-cost {
-    color: #55efc4;
-    font-weight: bold;
-    font-family: monospace;
+.slot-art-wrap .slot-cameo-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.cb-production-grid .grid-slot-btn:hover:not([disabled]) .slot-art-wrap .slot-cameo-svg {
+    transform: scale(1.05);
+    filter: brightness(1.2) contrast(1.1);
+}
+
+.slot-overlay-top {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    padding: 2px 3px 0 3px;
+    pointer-events: none;
 }
 
 .grid-slot-badge {
     font-size: 8px;
-    font-weight: bold;
-    color: #c5b98e;
+    font-weight: 800;
+    font-family: 'Consolas', monospace;
+    color: #55efc4;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 0 4px;
+    border-radius: 2px;
+    border: 1px solid rgba(85, 239, 196, 0.35);
+}
+
+.badge-locked {
+    color: #ff7675 !important;
+    border-color: rgba(255, 118, 117, 0.4) !important;
+}
+
+.badge-funds {
+    color: #ffd86b !important;
+    border-color: rgba(255, 216, 107, 0.4) !important;
+}
+
+.slot-overlay-bottom {
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    padding: 2px 4px 3px 4px;
+    background: linear-gradient(180deg, rgba(8, 13, 16, 0) 0%, rgba(8, 13, 16, 0.88) 35%, rgba(4, 7, 9, 0.98) 100%);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 3px;
+    pointer-events: none;
+}
+
+.grid-slot-name {
+    font-size: 9px;
+    font-weight: 800;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    text-shadow: 0 1px 3px #000, 0 0 2px #000;
+    letter-spacing: 0.3px;
+}
+
+.grid-slot-cost {
+    font-size: 9.5px;
+    font-weight: 900;
+    color: #55efc4;
+    font-family: 'Consolas', monospace;
+    text-shadow: 0 0 6px rgba(85, 239, 196, 0.6);
+    white-space: nowrap;
 }
 
 /* 3. BOTTOM-RIGHT: INSPECTOR & TRAINING QUEUE (WIDE: 340px) */
 #cb-inspector-box {
-    width: 340px;
-    height: 140px;
+    width: 360px;
+    height: 165px;
     display: flex;
     flex-direction: column;
     padding: 4px 6px;

@@ -916,16 +916,20 @@ function createOverlordTankMesh(isEnemy = false) {
 
     // Rooftop command cupola / bunker with red flag & searchlight
     const cupola = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 0.45, 12), trimMat);
+    cupola.name = "commandCupola";
     cupola.position.set(0, 1.05, -0.45); turretSys.add(cupola);
 
     const searchlight = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8), matWindowGlow);
+    searchlight.name = "cupolaSearchlight";
     searchlight.rotation.x = Math.PI / 2; searchlight.position.set(0.65, 1.1, 0.8); turretSys.add(searchlight);
 
     // PLA Red Banner Flag on mast
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.0, 6), matGunmetal);
+    mast.name = "flagMast";
     mast.position.set(0, 1.8, -0.45); turretSys.add(mast);
 
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.45, 0.04), matRedStar);
+    flag.name = "plaFlag";
     flag.position.set(0.42, 2.4, -0.45); turretSys.add(flag);
 
     // Dual smoking exhaust stacks on rear hull

@@ -28,7 +28,7 @@
 
 
         let cameraTarget = new THREE.Vector3(0, 0, 0);
-        let cameraRadius = 95;
+        let cameraRadius = 135;
         let cameraAlpha = -Math.PI / 4; 
         let cameraBeta = Math.PI / 3;  
         const panSpeed = 0.7;

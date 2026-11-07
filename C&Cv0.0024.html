@@ -947,8 +947,8 @@ body {
 
 /* 1. BOTTOM-LEFT: RADAR MINIMAP BOX */
 #cb-radar-box {
-    width: 220px;
-    height: 160px;
+    width: 230px;
+    height: 165px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1004,8 +1004,8 @@ body {
 
 /* 2. BOTTOM-CENTER: PRODUCTION & COMMAND CONSOLE */
 #cb-center-console {
-    width: 540px;
-    height: 140px;
+    width: 720px;
+    height: 165px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1096,20 +1096,20 @@ body {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     grid-template-rows: repeat(2, 1fr);
-    gap: 5px;
+    gap: 6px;
 }
 
 .cb-production-grid .grid-slot-btn {
     position: relative;
-    background: linear-gradient(180deg, #232e36 0%, #12181d 100%);
-    border: 1px solid #3c4e5c;
+    background: linear-gradient(180deg, #1e2930 0%, #10161a 100%);
+    border: 1.5px solid #3c5261;
     border-radius: 3px;
     color: #e0ecf5;
-    padding: 4px;
+    padding: 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: stretch;
     cursor: pointer;
     transition: all 0.15s ease;
     box-sizing: border-box;
@@ -1118,8 +1118,9 @@ body {
 
 .cb-production-grid .grid-slot-btn:hover:not([disabled]) {
     border-color: #00ffcc;
-    background: linear-gradient(180deg, #30414e 0%, #182229 100%);
-    box-shadow: 0 0 10px rgba(0,255,204,0.35);
+    background: linear-gradient(180deg, #2b3a44 0%, #161e24 100%);
+    box-shadow: 0 0 10px rgba(0,255,204,0.45);
+    transform: translateY(-1px);
 }
 
 .cb-production-grid .grid-slot-btn[disabled] {
@@ -1132,55 +1133,109 @@ body {
     border-color: #f1c40f;
     background: linear-gradient(180deg, #3b351d 0%, #1e1b0c 100%);
 }
+.cb-production-grid .grid-slot-btn.slot-rally:hover:not([disabled]) {
+    border-color: #ffd700;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+}
+
 .cb-production-grid .grid-slot-btn.slot-sell {
     border-color: #2ecc71;
     background: linear-gradient(180deg, #1c3826 0%, #0d1e13 100%);
 }
+.cb-production-grid .grid-slot-btn.slot-sell:hover:not([disabled]) {
+    border-color: #55efc4;
+    box-shadow: 0 0 12px rgba(85, 239, 196, 0.5);
+}
 
-.grid-key-badge {
+.slot-art-wrap {
     position: absolute;
-    top: 2px;
-    right: 4px;
-    font-size: 9px;
-    font-weight: bold;
-    color: #55efc4;
-    font-family: monospace;
-}
-
-.grid-slot-name {
-    font-size: 10px;
-    font-weight: bold;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 90%;
-    margin-top: 1px;
-}
-
-.grid-slot-footer {
+    inset: 0;
     display: flex;
-    justify-content: space-between;
-    width: 100%;
-    font-size: 9px;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
 }
 
-.grid-slot-cost {
-    color: #55efc4;
-    font-weight: bold;
-    font-family: monospace;
+.slot-art-wrap .slot-cameo-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.cb-production-grid .grid-slot-btn:hover:not([disabled]) .slot-art-wrap .slot-cameo-svg {
+    transform: scale(1.05);
+    filter: brightness(1.2) contrast(1.1);
+}
+
+.slot-overlay-top {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    padding: 2px 3px 0 3px;
+    pointer-events: none;
 }
 
 .grid-slot-badge {
     font-size: 8px;
-    font-weight: bold;
-    color: #c5b98e;
+    font-weight: 800;
+    font-family: 'Consolas', monospace;
+    color: #55efc4;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 0 4px;
+    border-radius: 2px;
+    border: 1px solid rgba(85, 239, 196, 0.35);
+}
+
+.badge-locked {
+    color: #ff7675 !important;
+    border-color: rgba(255, 118, 117, 0.4) !important;
+}
+
+.badge-funds {
+    color: #ffd86b !important;
+    border-color: rgba(255, 216, 107, 0.4) !important;
+}
+
+.slot-overlay-bottom {
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    padding: 2px 4px 3px 4px;
+    background: linear-gradient(180deg, rgba(8, 13, 16, 0) 0%, rgba(8, 13, 16, 0.88) 35%, rgba(4, 7, 9, 0.98) 100%);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 3px;
+    pointer-events: none;
+}
+
+.grid-slot-name {
+    font-size: 9px;
+    font-weight: 800;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    text-shadow: 0 1px 3px #000, 0 0 2px #000;
+    letter-spacing: 0.3px;
+}
+
+.grid-slot-cost {
+    font-size: 9.5px;
+    font-weight: 900;
+    color: #55efc4;
+    font-family: 'Consolas', monospace;
+    text-shadow: 0 0 6px rgba(85, 239, 196, 0.6);
+    white-space: nowrap;
 }
 
 /* 3. BOTTOM-RIGHT: INSPECTOR & TRAINING QUEUE (WIDE: 340px) */
 #cb-inspector-box {
-    width: 340px;
-    height: 140px;
+    width: 360px;
+    height: 165px;
     display: flex;
     flex-direction: column;
     padding: 4px 6px;
@@ -2047,7 +2102,7 @@ body {
 
 
         let cameraTarget = new THREE.Vector3(0, 0, 0);
-        let cameraRadius = 95;
+        let cameraRadius = 135;
         let cameraAlpha = -Math.PI / 4; 
         let cameraBeta = Math.PI / 3;  
         const panSpeed = 0.7;
@@ -3555,16 +3610,20 @@ function createOverlordTankMesh(isEnemy = false) {
 
     // Rooftop command cupola / bunker with red flag & searchlight
     const cupola = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 0.45, 12), trimMat);
+    cupola.name = "commandCupola";
     cupola.position.set(0, 1.05, -0.45); turretSys.add(cupola);
 
     const searchlight = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.15, 8), matWindowGlow);
+    searchlight.name = "cupolaSearchlight";
     searchlight.rotation.x = Math.PI / 2; searchlight.position.set(0.65, 1.1, 0.8); turretSys.add(searchlight);
 
     // PLA Red Banner Flag on mast
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.0, 6), matGunmetal);
+    mast.name = "flagMast";
     mast.position.set(0, 1.8, -0.45); turretSys.add(mast);
 
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.45, 0.04), matRedStar);
+    flag.name = "plaFlag";
     flag.position.set(0.42, 2.4, -0.45); turretSys.add(flag);
 
     // Dual smoking exhaust stacks on rear hull
@@ -6662,60 +6721,145 @@ function playUSASound(type, options = {}) {
         // =========================================================================
 
         function attachOverlordUpgrade(tank, upgradeType) {
+            if (!tank || !tank.mesh) return;
+            const turretSys = tank.mesh.getObjectByName("turretSystem") || tank.mesh;
+
+            // Remove any existing superstructure upgrade
             if (tank.overlordUpgradeMesh) {
-                tank.mesh.remove(tank.overlordUpgradeMesh);
-                tank.overlordUpgradeMesh.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+                if (tank.overlordUpgradeMesh.parent) {
+                    tank.overlordUpgradeMesh.parent.remove(tank.overlordUpgradeMesh);
+                } else {
+                    turretSys.remove(tank.overlordUpgradeMesh);
+                    tank.mesh.remove(tank.overlordUpgradeMesh);
+                }
+                tank.overlordUpgradeMesh.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) {
+                        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                        else c.material.dispose();
+                    }
+                });
+                tank.overlordUpgradeMesh = null;
             }
+
+            // Hide the default command cupola and flag mast so they do not overlap the superstructure
+            const cupola = tank.mesh.getObjectByName("commandCupola");
+            if (cupola) cupola.visible = false;
+            const mast = tank.mesh.getObjectByName("flagMast");
+            if (mast) mast.visible = false;
+            const flag = tank.mesh.getObjectByName("plaFlag");
+            if (flag) flag.visible = false;
+            const searchlight = tank.mesh.getObjectByName("cupolaSearchlight");
+            if (searchlight) searchlight.visible = false;
 
             const group = new THREE.Group();
             group.name = "overlordUpgrade";
-            group.position.set(0, 1.8, -0.4);
+            // Mount directly onto the turret roof at the cupola mount position!
+            group.position.set(0, 0.95, -0.45);
 
             if (upgradeType === 'bunker') {
-                // Fortified hexagonal pillbox with sandbags
-                const bGeo = new THREE.CylinderGeometry(0.9, 1.05, 0.65, 6);
-                const bMat = new THREE.MeshStandardMaterial({ color: 0x535c68, roughness: 0.8 });
+                // Fortified hexagonal bunker pillbox with vision slits & firing embrasures
+                const bGeo = new THREE.CylinderGeometry(0.95, 1.15, 0.7, 6);
+                const bMat = new THREE.MeshStandardMaterial({ color: 0x47535e, roughness: 0.75, metalness: 0.3 });
                 const b = new THREE.Mesh(bGeo, bMat);
+                b.castShadow = true;
                 group.add(b);
 
-                // Mini infantry helmets inside bunker
-                const hMat = new THREE.MeshStandardMaterial({ color: 0x222f3e });
-                [-0.35, 0.35].forEach(x => {
-                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 6), hMat);
-                    h.position.set(x, 0.42, 0);
+                // Armored top rim / parapet
+                const rimGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.15, 6);
+                const rimMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.6 });
+                const rim = new THREE.Mesh(rimGeo, rimMat);
+                rim.position.y = 0.35;
+                group.add(rim);
+
+                // Vision / firing slits
+                for (let a = 0; a < 6; a++) {
+                    const slitGeo = new THREE.BoxGeometry(0.35, 0.12, 0.15);
+                    const slitMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+                    const slit = new THREE.Mesh(slitGeo, slitMat);
+                    const ang = (a * Math.PI) / 3;
+                    slit.position.set(Math.cos(ang) * 0.98, 0.15, Math.sin(ang) * 0.98);
+                    slit.rotation.y = -ang + Math.PI / 2;
+                    group.add(slit);
+                }
+
+                // Mini infantry helmet heads inside open hatch
+                const hMat = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
+                [-0.3, 0.3].forEach(x => {
+                    const h = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), hMat);
+                    h.position.set(x, 0.45, 0);
                     group.add(h);
                 });
             } else if (upgradeType === 'gatling') {
-                // Dual 20mm rotary Gatling turret
-                const baseGeo = new THREE.CylinderGeometry(0.7, 0.8, 0.4, 8);
-                const baseMat = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, metalness: 0.7 });
+                // Raised motorized rotary turret base
+                const baseGeo = new THREE.CylinderGeometry(0.75, 0.85, 0.4, 10);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, metalness: 0.7, roughness: 0.4 });
                 const base = new THREE.Mesh(baseGeo, baseMat);
+                base.castShadow = true;
                 group.add(base);
 
-                const bGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 6);
-                bGeo.rotateX(Math.PI / 2);
-                const bMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 });
-                const bL = new THREE.Mesh(bGeo, bMat); bL.position.set(-0.2, 0.25, 0.6); group.add(bL);
-                const bR = new THREE.Mesh(bGeo, bMat); bR.position.set(0.2, 0.25, 0.6); group.add(bR);
-            } else if (upgradeType === 'propaganda') {
-                // Miniature Speaker Tower with 4 loud megaphones
-                const mastGeo = new THREE.CylinderGeometry(0.12, 0.16, 1.4, 6);
-                const mastMat = new THREE.MeshStandardMaterial({ color: 0xb71540 });
-                const mast = new THREE.Mesh(mastGeo, mastMat);
-                mast.position.y = 0.7; group.add(mast);
+                // Dual elevated 6-barrel rotary Gatling clusters
+                const mountGeo = new THREE.BoxGeometry(0.7, 0.35, 0.5);
+                const mountMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+                const mount = new THREE.Mesh(mountGeo, mountMat);
+                mount.position.set(0, 0.3, 0.1);
+                group.add(mount);
 
+                [-0.24, 0.24].forEach(bx => {
+                    // Twin long heavy Gatling barrel assemblies
+                    const bGeo = new THREE.CylinderGeometry(0.09, 0.09, 1.5, 8);
+                    bGeo.rotateX(Math.PI / 2);
+                    const bMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.2 });
+                    const bMesh = new THREE.Mesh(bGeo, bMat);
+                    bMesh.position.set(bx, 0.35, 0.75);
+                    bMesh.castShadow = true;
+                    group.add(bMesh);
+
+                    // Muzzle flash arrestor rings
+                    const ringGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.15, 8);
+                    ringGeo.rotateX(Math.PI / 2);
+                    const ringMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8 });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.position.set(bx, 0.35, 1.45);
+                    group.add(ring);
+                });
+
+                // Rear Ammo feed box
+                const ammoGeo = new THREE.BoxGeometry(0.65, 0.3, 0.4);
+                const ammoMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.6 });
+                const ammo = new THREE.Mesh(ammoGeo, ammoMat);
+                ammo.position.set(0, 0.35, -0.3);
+                group.add(ammo);
+            } else if (upgradeType === 'propaganda') {
+                // Sturdy speaker mast tower with crimson beacon and 4 gold megaphone horns
+                const mastGeo = new THREE.CylinderGeometry(0.14, 0.22, 1.6, 6);
+                const mastMat = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 });
+                const mast = new THREE.Mesh(mastGeo, mastMat);
+                mast.position.y = 0.8;
+                mast.castShadow = true;
+                group.add(mast);
+
+                // Flashing red propaganda beacon sphere
+                const beaconGeo = new THREE.SphereGeometry(0.2, 8, 8);
+                const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+                const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+                beacon.position.y = 1.65;
+                group.add(beacon);
+
+                // 4 heavy megaphone horn cones facing N, S, E, W
                 for (let a = 0; a < 4; a++) {
-                    const hornGeo = new THREE.ConeGeometry(0.24, 0.5, 8);
+                    const hornGeo = new THREE.ConeGeometry(0.26, 0.6, 8);
                     hornGeo.rotateX(Math.PI / 2);
-                    const hornMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f });
+                    const hornMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.4, metalness: 0.5 });
                     const horn = new THREE.Mesh(hornGeo, hornMat);
-                    horn.position.set(Math.cos(a * Math.PI / 2) * 0.4, 1.2, Math.sin(a * Math.PI / 2) * 0.4);
-                    horn.lookAt(new THREE.Vector3(horn.position.x * 2, 1.2, horn.position.z * 2));
+                    const ang = (a * Math.PI) / 2;
+                    horn.position.set(Math.cos(ang) * 0.45, 1.3, Math.sin(ang) * 0.45);
+                    horn.lookAt(new THREE.Vector3(horn.position.x * 2, 1.3, horn.position.z * 2));
                     group.add(horn);
                 }
             }
 
-            tank.mesh.add(group);
+            turretSys.add(group);
             tank.overlordUpgradeMesh = group;
             tank.overlordUpgrade = upgradeType;
 
@@ -7797,6 +7941,7 @@ function playUSASound(type, options = {}) {
                 group = f === 'china' ? createChinaCommandCenter() : f === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
             }
 
+            group.scale.set(1.35, 1.35, 1.35);
             group.position.copy(pos);
             
             const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
@@ -7853,6 +7998,10 @@ function playUSASound(type, options = {}) {
             } else {
                 mesh = createBattlemasterTankMesh(true);
             }
+            mesh.scale.set(1.35, 1.35, 1.35);
+            radius *= 1.35;
+            scanRange *= 1.35;
+            speed *= 1.15;
             mesh.position.copy(position);
             scene.add(mesh);
 
@@ -7912,7 +8061,19 @@ function playUSASound(type, options = {}) {
             fogTexture.minFilter = THREE.LinearFilter;
             fogTexture.magFilter = THREE.LinearFilter;
 
-            const fogGeo = new THREE.PlaneGeometry(mapSize * 1.02, mapSize * 1.02);
+            // Subdivided terrain-hugging mesh: contours smoothly over hills, dunes, mesas and valleys
+            const segments = 64;
+            const fogGeo = new THREE.PlaneGeometry(mapSize * 1.02, mapSize * 1.02, segments, segments);
+            fogGeo.rotateX(-Math.PI / 2);
+            const posAttr = fogGeo.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                const vx = posAttr.getX(i);
+                const vz = posAttr.getZ(i);
+                const th = typeof getTerrainHeight === 'function' ? getTerrainHeight(vx, vz) : 0;
+                posAttr.setY(i, th + 1.2);
+            }
+            fogGeo.computeVertexNormals();
+
             const fogMat = new THREE.MeshBasicMaterial({
                 map: fogTexture,
                 transparent: true,
@@ -7920,8 +8081,7 @@ function playUSASound(type, options = {}) {
                 depthWrite: false
             });
             fogMesh = new THREE.Mesh(fogGeo, fogMat);
-            fogMesh.rotation.x = -Math.PI / 2;
-            fogMesh.position.y = 2.4;
+            fogMesh.position.set(0, 0, 0);
             fogMesh.renderOrder = 99;
             scene.add(fogMesh);
         }
@@ -8245,7 +8405,11 @@ function playUSASound(type, options = {}) {
                 tunnel: [8, 4, 8], stingerSite: [6, 6, 6], demoTrap: [4, 1.5, 4], palace: [12, 7, 10],
                 fakeBarracks: [8, 5.5, 7], fakeArmsDealer: [12, 5, 9], scudStorm: [12, 9, 12]
             };
-            const [width, height, depth] = sizes[type] || [8, 5, 8];
+            const [baseW, baseH, baseD] = sizes[type] || [8, 5, 8];
+            const scale = 1.35;
+            const width = baseW * scale;
+            const height = baseH * scale;
+            const depth = baseD * scale;
             return { width, height, depth, radius: Math.max(width, depth) * 0.55 };
         }
 
@@ -9544,71 +9708,76 @@ function playUSASound(type, options = {}) {
             // Enemy Command Center
             const ccType = 'center';
             const ccGroup = faction === 'china' ? createChinaCommandCenter() : faction === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
+            ccGroup.scale.set(1.35, 1.35, 1.35);
             ccGroup.position.copy(pos);
             ccGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(ccGroup);
             enemyStructures.push({
                 type: ccType, faction: faction, position: pos.clone(), mesh: ccGroup,
-                health: 2200, maxHealth: 2200, radius: 11, buildProgress: 100, isBuilding: false,
+                health: 2200, maxHealth: 2200, radius: 11 * 1.35, buildProgress: 100, isBuilding: false,
                 netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
             });
 
             // Enemy Power / Reactor / Supply Stash
-            const pwrPos = pos.clone().add(new THREE.Vector3(faction === 'gla' ? -18 : -20, 0, -18));
+            const pwrPos = pos.clone().add(new THREE.Vector3(faction === 'gla' ? -22 : -25, 0, -22));
             pwrPos.y = getTerrainHeight(pwrPos.x, pwrPos.z);
             let pwrGroup;
             if (faction === 'china') pwrGroup = createChinaNuclearReactor();
             else if (faction === 'gla') pwrGroup = createGLASupplyStash();
             else pwrGroup = createUSAColdFusionReactor();
+            pwrGroup.scale.set(1.35, 1.35, 1.35);
             pwrGroup.position.copy(pwrPos);
             pwrGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(pwrGroup);
             enemyStructures.push({
                 type: faction === 'gla' ? 'supplyStash' : 'power', faction: faction, position: pwrPos, mesh: pwrGroup,
-                health: 1200, maxHealth: 1200, radius: 8, buildProgress: 100, isBuilding: false,
+                health: 1200, maxHealth: 1200, radius: 8 * 1.35, buildProgress: 100, isBuilding: false,
                 netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
             });
 
             // Enemy War Factory / Arms Dealer
-            const facPos = pos.clone().add(new THREE.Vector3(22, 0, -16));
+            const facPos = pos.clone().add(new THREE.Vector3(26, 0, -20));
             facPos.y = getTerrainHeight(facPos.x, facPos.z);
             const facGroup = faction === 'china' ? createChinaWarFactory() : faction === 'gla' ? createGLAArmsDealer(false) : createUSAWarFactory();
+            facGroup.scale.set(1.35, 1.35, 1.35);
             facGroup.position.copy(facPos);
             facGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(facGroup);
             enemyStructures.push({
                 type: 'factory', faction: faction, position: facPos, mesh: facGroup,
-                health: 1600, maxHealth: 1600, radius: 10, buildProgress: 100, isBuilding: false,
+                health: 1600, maxHealth: 1600, radius: 10 * 1.35, buildProgress: 100, isBuilding: false,
                 netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
             });
 
             // Enemy Barracks
-            const barPos = pos.clone().add(new THREE.Vector3(-18, 0, 18));
+            const barPos = pos.clone().add(new THREE.Vector3(-22, 0, 22));
             barPos.y = getTerrainHeight(barPos.x, barPos.z);
             const barGroup = faction === 'china' ? createChinaBarracks() : faction === 'gla' ? createGLABarracks(false) : createUSABarracks();
+            barGroup.scale.set(1.35, 1.35, 1.35);
             barGroup.position.copy(barPos);
             barGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(barGroup);
             enemyStructures.push({
                 type: 'barracks', faction: faction, position: barPos, mesh: barGroup,
-                health: 1000, maxHealth: 1000, radius: 8, buildProgress: 100, isBuilding: false,
+                health: 1000, maxHealth: 1000, radius: 8 * 1.35, buildProgress: 100, isBuilding: false,
                 netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
             });
 
             // Enemy Perimeter Defense
-            const defPos = pos.clone().add(new THREE.Vector3(14, 0, 22));
+            const defPos = pos.clone().add(new THREE.Vector3(18, 0, 26));
             defPos.y = getTerrainHeight(defPos.x, defPos.z);
             let defGroup;
             if (faction === 'china') defGroup = createChinaGatlingCannon();
             else if (faction === 'gla') defGroup = createGLAStingerSite();
             else defGroup = createUSAPatriotBattery();
+            defGroup.scale.set(1.35, 1.35, 1.35);
             defGroup.position.copy(defPos);
             defGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
             scene.add(defGroup);
             enemyStructures.push({
                 type: faction === 'china' ? 'gatlingCannon' : faction === 'gla' ? 'stingerSite' : 'patriot',
                 faction: faction, position: defPos, mesh: defGroup,
-                health: 900, maxHealth: 900, radius: 5.5, buildProgress: 100, isBuilding: false,
+                health: 900, maxHealth: 900, radius: 5.5 * 1.35, buildProgress: 100, isBuilding: false,
                 netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
             });
             hasSpawnedInitialEnemyBase = true;
@@ -10275,13 +10444,49 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             </div>
         `;
 
-        // 3x4 Grid Slots for Single Unit
-        currentGridSlots = [
-            { name: 'MOVE', badge: 'DIR', action: () => {}, desc: 'Move to coordinates' },
-            { name: 'STOP', badge: 'HALT', action: () => orderUnitsHalt(), desc: 'Halt all movement' },
-            { name: 'GUARD', badge: 'DEF', action: () => showNotification('Unit holding defensive guard posture.', 'info'), desc: 'Guard current sector' },
-            { name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter into spread formation' }
-        ];
+        // 3x4 / 2x6 Grid Slots for Single Unit
+        if (u.type === 'dozer' || u.type === 'worker') {
+            // Direct building blueprints on command bar grid for builder units!
+            const allBuildings = factionBuildings[selectedFaction] || [];
+            currentGridSlots = new Array(12).fill(null);
+            allBuildings.slice(0, 10).forEach(([bType, bName, bCost], bIdx) => {
+                const structReq = getStructureTechPrerequisite(bType);
+                const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
+                const canAfford = playerResources >= bCost;
+                currentGridSlots[bIdx] = {
+                    id: bType,
+                    name: bName.toUpperCase(),
+                    cost: bCost,
+                    badge: hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED',
+                    disabled: !hasTech || !canAfford,
+                    action: () => activateBlueprint(bType),
+                    desc: `Construct ${bName}`
+                };
+            });
+            currentGridSlots[10] = {
+                id: 'stop',
+                name: 'STOP',
+                badge: 'HALT',
+                disabled: false,
+                action: () => orderUnitsHalt(),
+                desc: 'Halt builder actions'
+            };
+            currentGridSlots[11] = {
+                id: 'guard',
+                name: 'GUARD',
+                badge: 'DEF',
+                disabled: false,
+                action: () => showNotification('Builder holding defensive repair posture.', 'info'),
+                desc: 'Hold position'
+            };
+        } else {
+            currentGridSlots = [
+                { id: 'move', name: 'MOVE', badge: 'DIR', action: () => {}, desc: 'Move to coordinates' },
+                { id: 'stop', name: 'STOP', badge: 'HALT', action: () => orderUnitsHalt(), desc: 'Halt all movement' },
+                { id: 'guard', name: 'GUARD', badge: 'DEF', action: () => showNotification('Unit holding defensive guard posture.', 'info'), desc: 'Guard current sector' },
+                { id: 'scatter', name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter into spread formation' }
+            ];
+        }
 
         // Vehicle Upgrades & Drones
         if (['crusader', 'paladin', 'humvee'].includes(u.type)) {
@@ -10609,6 +10814,280 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
     }
 }
 
+// =========================================================================
+// C&C GENERALS "CONTROL BAR PRO" SVG CAMEO VECTOR ARTWORK LIBRARY
+// Authentic portraits, cameos, icons and thumbnails for units, upgrades & commands
+// =========================================================================
+
+function getCameoSVG(id, faction = 'usa', name = '') {
+    const key = (id || name || '').toLowerCase();
+
+    const wrap = (content) =>
+        `<svg class="slot-cameo-svg" viewBox="0 0 64 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="42" rx="3" fill="#0c1318"/>
+            <rect x="0.5" y="0.5" width="63" height="41" rx="2.5" stroke="#253846" stroke-opacity="0.6"/>
+            ${content}
+        </svg>`;
+
+    // 1. RALLY POINT (Golden Banner Flag)
+    if (key.includes('rally')) {
+        return wrap(`
+            <path d="M12 36 L12 6" stroke="#c0d4e3" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="12" cy="5" r="2.2" fill="#ffd700"/>
+            <path d="M13 7 L48 15 L13 24 Z" fill="url(#cbGoldGrad)" stroke="#b8860b" stroke-width="1"/>
+            <path d="M13 10 L44 15 L13 21 Z" fill="#ffd700" opacity="0.4"/>
+            <ellipse cx="12" cy="36" rx="5" ry="2" fill="#555"/>
+            <defs>
+                <linearGradient id="cbGoldGrad" x1="13" y1="7" x2="48" y2="24" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#fff275"/>
+                    <stop offset="0.5" stop-color="#f1c40f"/>
+                    <stop offset="1" stop-color="#d35400"/>
+                </linearGradient>
+            </defs>
+        `);
+    }
+
+    // 2. SELL STRUCTURE (Dollar Banknotes & Green Cash Sign)
+    if (key.includes('sell')) {
+        return wrap(`
+            <rect x="8" y="14" width="48" height="22" rx="2" fill="#1b4d2e" stroke="#2ecc71" stroke-width="1.2"/>
+            <rect x="12" y="10" width="40" height="22" rx="2" fill="#27ae60" stroke="#a8e6cf" stroke-width="1"/>
+            <circle cx="32" cy="21" r="7" fill="#1e824c" stroke="#ffd700" stroke-width="1.2"/>
+            <text x="32" y="26" font-family="'Impact', 'Arial Black', sans-serif" font-size="16" font-weight="900" fill="#ffd700" text-anchor="middle">$</text>
+        `);
+    }
+
+    // 3. STOP / HALT
+    if (key.includes('stop') || key.includes('halt')) {
+        return wrap(`
+            <polygon points="24,6 40,6 50,16 50,30 40,38 24,38 14,30 14,16" fill="#c0392b" stroke="#e74c3c" stroke-width="1.5"/>
+            <rect x="22" y="14" width="20" height="15" rx="1" fill="#fff"/>
+            <polygon points="20,20 22,14 22,25 20,25" fill="#fff"/>
+        `);
+    }
+
+    // 4. GUARD / DEFENSE POSTURE
+    if (key.includes('guard') || key.includes('def')) {
+        return wrap(`
+            <path d="M32 6 L48 11 C48 24 40 33 32 37 C24 33 16 24 16 11 Z" fill="#2980b9" stroke="#00e5ff" stroke-width="1.5"/>
+            <path d="M32 10 L44 14 C44 24 38 31 32 34 C26 31 20 24 20 14 Z" fill="#1a5276"/>
+            <polygon points="32,15 34,21 40,21 35,25 37,31 32,27 27,31 29,25 24,21 30,21" fill="#ffd700"/>
+        `);
+    }
+
+    // 5. SCATTER / EVADE
+    if (key.includes('scatter') || key.includes('evade')) {
+        return wrap(`
+            <path d="M26 16 L12 8 M12 8 L18 8 M12 8 L12 14" stroke="#e67e22" stroke-width="2" stroke-linecap="round"/>
+            <path d="M38 16 L52 8 M52 8 L46 8 M52 8 L52 14" stroke="#e67e22" stroke-width="2" stroke-linecap="round"/>
+            <path d="M26 26 L12 34 M12 34 L18 34 M12 34 L12 28" stroke="#e67e22" stroke-width="2" stroke-linecap="round"/>
+            <path d="M38 26 L52 34 M52 34 L46 34 M52 34 L52 28" stroke="#e67e22" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="32" cy="21" r="3.5" fill="#f39c12"/>
+        `);
+    }
+
+    // 6. OVERLORD SUPER TANK
+    if (key.includes('overlord')) {
+        return wrap(`
+            <rect x="22" y="4" width="4.5" height="22" fill="#2c3e50" stroke="#7f8c8d" stroke-width="0.8"/>
+            <rect x="37.5" y="4" width="4.5" height="22" fill="#2c3e50" stroke="#7f8c8d" stroke-width="0.8"/>
+            <rect x="20.5" y="2" width="7.5" height="4" fill="#111"/>
+            <rect x="36" y="2" width="7.5" height="4" fill="#111"/>
+            <rect x="6" y="16" width="12" height="22" rx="2" fill="#1c2833" stroke="#95a5a6" stroke-width="1"/>
+            <rect x="46" y="16" width="12" height="22" rx="2" fill="#1c2833" stroke="#95a5a6" stroke-width="1"/>
+            <rect x="15" y="18" width="34" height="20" rx="3" fill="#27ae60" stroke="#2ecc71" stroke-width="1.2"/>
+            <rect x="20" y="17" width="24" height="15" rx="2" fill="#1e824c" stroke="#52be80" stroke-width="1"/>
+            <polygon points="32,20 33.5,23.5 37,23.5 34,25.5 35.5,29 32,27 28.5,29 30,25.5 27,23.5 30.5,23.5" fill="#e74c3c"/>
+        `);
+    }
+
+    // 7. RANGER / INFANTRY
+    if (key.includes('ranger') || key.includes('infantry') || key.includes('redguard') || key.includes('rebel')) {
+        const isChina = key.includes('redguard') || faction === 'china';
+        const isGLA = key.includes('rebel') || faction === 'gla';
+        const hatColor = isChina ? '#922b21' : isGLA ? '#7d6608' : '#27ae60';
+        return wrap(`
+            <ellipse cx="32" cy="16" rx="14" ry="10" fill="${hatColor}" stroke="#1e272c" stroke-width="1.2"/>
+            <rect x="23" y="19" width="18" height="10" rx="2" fill="#d4ac0d"/>
+            ${isGLA ? '<path d="M20 23 Q32 28 44 23 L42 35 L22 35 Z" fill="#d5dbdb"/>' : '<rect x="24" y="19" width="16" height="5" rx="2" fill="#2c3e50" stroke="#00e5ff" stroke-width="0.8"/>'}
+            <path d="M16 38 C16 31 22 28 32 28 C42 28 48 31 48 38 Z" fill="#34495e" stroke="#1e272c" stroke-width="1"/>
+            ${isChina ? '<polygon points="32,10 33,13 36,13 33.5,15 34.5,18 32,16 29.5,18 30.5,15 28,13 31,13" fill="#f1c40f"/>' : ''}
+            <rect x="42" y="24" width="16" height="4" rx="1" fill="#111"/>
+            <rect x="52" y="22" width="2" height="8" fill="#555"/>
+        `);
+    }
+
+    // 8. MISSILE DEFENDER / TANK HUNTER / RPG
+    if (key.includes('rocket') || key.includes('defender') || key.includes('tankhunter') || key.includes('rpg')) {
+        return wrap(`
+            <rect x="8" y="11" width="48" height="9" rx="2.5" fill="#2d572c" stroke="#52be80" stroke-width="1"/>
+            <polygon points="56,15.5 50,11 50,20" fill="#e74c3c"/>
+            <circle cx="10" cy="15.5" r="3.5" fill="#111" stroke="#2d572c" stroke-width="1"/>
+            <rect x="26" y="7" width="8" height="4" rx="1" fill="#111"/>
+            <circle cx="30" cy="9" r="1.5" fill="#00ffcc"/>
+            <ellipse cx="26" cy="24" rx="9" ry="7" fill="#1e824c"/>
+            <path d="M16 40 C16 32 20 29 28 29 C36 29 40 32 40 40 Z" fill="#2c3e50"/>
+        `);
+    }
+
+    // 9. COLONEL BURTON
+    if (key.includes('burton')) {
+        return wrap(`
+            <circle cx="32" cy="18" r="11" fill="#d4ac0d"/>
+            <path d="M21 13 Q32 8 43 13 L43 17 Q32 12 21 17 Z" fill="#e74c3c"/>
+            <path d="M42 16 L52 20 L48 24 L41 18 Z" fill="#c0392b"/>
+            <rect x="25" y="16" width="6" height="4" rx="1" fill="#111"/>
+            <rect x="33" y="16" width="6" height="4" rx="1" fill="#111"/>
+            <line x1="31" y1="18" x2="33" y2="18" stroke="#111" stroke-width="1.2"/>
+            <path d="M18 40 C18 31 23 27 32 27 C41 27 46 31 46 40 Z" fill="#2e4053"/>
+            <path d="M46 34 L58 16 L56 14 L44 30 Z" fill="#bdc3c7" stroke="#7f8c8d" stroke-width="0.8"/>
+            <rect x="42" y="30" width="4" height="6" rx="1" fill="#78281f"/>
+        `);
+    }
+
+    // 10. PATHFINDER / SNIPER
+    if (key.includes('pathfinder') || key.includes('jarmen') || key.includes('sniper')) {
+        return wrap(`
+            <path d="M18 38 C18 20 22 10 32 10 C42 10 46 20 46 38 Z" fill="#4d5656" stroke="#229954" stroke-width="1" stroke-dasharray="3,2"/>
+            <circle cx="44" cy="20" r="14" fill="#0b1b16" fill-opacity="0.8" stroke="#00ffcc" stroke-width="1.5"/>
+            <circle cx="44" cy="20" r="9" stroke="#00ffcc" stroke-width="0.8" stroke-dasharray="2,2"/>
+            <line x1="44" y1="4" x2="44" y2="36" stroke="#ff3838" stroke-width="1"/>
+            <line x1="28" y1="20" x2="60" y2="20" stroke="#ff3838" stroke-width="1"/>
+            <circle cx="44" cy="20" r="1.5" fill="#ff3838"/>
+            <rect x="10" y="24" width="30" height="3" fill="#111"/>
+        `);
+    }
+
+    // 11. CRUSADER / BATTLEMASTER / TANKS
+    if (key.includes('crusader') || key.includes('tank') || key.includes('battlemaster') || key.includes('scorpion') || key.includes('marauder') || key.includes('paladin')) {
+        const isLaser = key.includes('paladin');
+        return wrap(`
+            <rect x="2" y="17" width="32" height="4" rx="1" fill="#34495e" stroke="#1b2631" stroke-width="0.8"/>
+            <rect x="2" y="16" width="6" height="6" rx="1" fill="#111"/>
+            ${isLaser ? '<line x1="4" y1="19" x2="0" y2="19" stroke="#00e5ff" stroke-width="2"/>' : ''}
+            <rect x="14" y="23" width="46" height="15" rx="3" fill="#17202a" stroke="#5d6d7e" stroke-width="1"/>
+            <circle cx="20" cy="30" r="4.5" fill="#2c3e50" stroke="#7f8c8d" stroke-width="1"/>
+            <circle cx="31" cy="30" r="4.5" fill="#2c3e50" stroke="#7f8c8d" stroke-width="1"/>
+            <circle cx="42" cy="30" r="4.5" fill="#2c3e50" stroke="#7f8c8d" stroke-width="1"/>
+            <circle cx="53" cy="30" r="4.5" fill="#2c3e50" stroke="#7f8c8d" stroke-width="1"/>
+            <polygon points="24,12 48,12 52,22 22,22" fill="#2e4053" stroke="#85929e" stroke-width="1"/>
+            ${isLaser ? '<circle cx="44" cy="9" r="3.5" fill="#00e5ff" stroke="#fff" stroke-width="1"/>' : '<rect x="42" y="9" width="6" height="3" fill="#111"/>'}
+        `);
+    }
+
+    // 12. HUMVEE / TECHNICAL / BUGGY
+    if (key.includes('humvee') || key.includes('technical') || key.includes('buggy') || key.includes('quad')) {
+        return wrap(`
+            <path d="M10 28 L14 20 L24 16 L44 16 L52 22 L56 28 Z" fill="#27ae60" stroke="#1e824c" stroke-width="1.2"/>
+            <polygon points="25,18 34,18 34,23 23,23" fill="#1b2631" stroke="#5dade2" stroke-width="0.8"/>
+            <polygon points="36,18 43,18 45,23 36,23" fill="#1b2631" stroke="#5dade2" stroke-width="0.8"/>
+            <rect x="31" y="9" width="18" height="3" fill="#111"/>
+            <circle cx="18" cy="30" r="7" fill="#17202a" stroke="#7f8c8d" stroke-width="1.5"/>
+            <circle cx="48" cy="30" r="7" fill="#17202a" stroke="#7f8c8d" stroke-width="1.5"/>
+        `);
+    }
+
+    // 13. DOZER / WORKER
+    if (key.includes('dozer') || key.includes('worker') || key.includes('build')) {
+        return wrap(`
+            <path d="M6 34 L12 16 L17 18 L12 34 Z" fill="#f39c12" stroke="#d68910" stroke-width="1.2"/>
+            <rect x="16" y="16" width="36" height="15" rx="2" fill="#f1c40f" stroke="#b7950b" stroke-width="1.2"/>
+            <rect x="30" y="8" width="16" height="10" rx="2" fill="#2c3e50" stroke="#f1c40f" stroke-width="1"/>
+            <rect x="18" y="27" width="38" height="10" rx="3" fill="#1c2833" stroke="#7f8c8d" stroke-width="1"/>
+            <circle cx="24" cy="32" r="3" fill="#7f8c8d"/>
+            <circle cx="34" cy="32" r="3" fill="#7f8c8d"/>
+            <circle cx="44" cy="32" r="3" fill="#7f8c8d"/>
+        `);
+    }
+
+    // 14. HELICOPTER / AIRCRAFT
+    if (key.includes('comanche') || key.includes('chinook') || key.includes('raptor') || key.includes('mig') || key.includes('aurora') || key.includes('air')) {
+        const isHeli = key.includes('comanche') || key.includes('chinook');
+        if (isHeli) {
+            return wrap(`
+                <line x1="8" y1="6" x2="56" y2="6" stroke="#bdc3c7" stroke-width="2.2" stroke-linecap="round"/>
+                <circle cx="32" cy="6" r="3" fill="#111"/>
+                <ellipse cx="32" cy="20" rx="20" ry="8" fill="#2c3e50" stroke="#5dade2" stroke-width="1"/>
+                <path d="M38 16 Q48 18 48 22 Q40 24 36 22 Z" fill="#00e5ff" opacity="0.8"/>
+                <path d="M16 20 L4 18 L2 10 L8 18 Z" fill="#1b2631"/>
+            `);
+        } else {
+            return wrap(`
+                <polygon points="32,4 42,32 32,28 22,32" fill="#34495e" stroke="#5dade2" stroke-width="1"/>
+                <polygon points="32,14 60,32 52,35 32,26" fill="#2c3e50" stroke="#7f8c8d" stroke-width="0.8"/>
+                <polygon points="32,14 4,32 12,35 32,26" fill="#2c3e50" stroke="#7f8c8d" stroke-width="0.8"/>
+                <ellipse cx="28" cy="33" rx="2.5" ry="4" fill="#e74c3c"/>
+                <ellipse cx="36" cy="33" rx="2.5" ry="4" fill="#e74c3c"/>
+            `);
+        }
+    }
+
+    // 15. NUKE CANNON / ARTILLERY
+    if (key.includes('nuke') || key.includes('inferno') || key.includes('tomahawk') || key.includes('scud')) {
+        return wrap(`
+            <line x1="8" y1="8" x2="38" y2="22" stroke="#2c3e50" stroke-width="5" stroke-linecap="round"/>
+            <line x1="8" y1="8" x2="38" y2="22" stroke="#7f8c8d" stroke-width="2.5" stroke-linecap="round"/>
+            <rect x="16" y="24" width="44" height="14" rx="2" fill="#1a252f" stroke="#27ae60" stroke-width="1"/>
+            <circle cx="48" cy="18" r="8" fill="#f1c40f" stroke="#111" stroke-width="1"/>
+            <circle cx="48" cy="18" r="2.5" fill="#111"/>
+            <path d="M48 10 L45 15 L51 15 Z" fill="#111"/>
+            <path d="M42 22 L46 19 L44 24 Z" fill="#111"/>
+            <path d="M54 22 L52 24 L50 19 Z" fill="#111"/>
+        `);
+    }
+
+    // 16. DRONES
+    if (key.includes('drone')) {
+        const isHellfire = key.includes('hellfire');
+        const isScout = key.includes('scout');
+        const glow = isHellfire ? '#e74c3c' : isScout ? '#00e5ff' : '#2ecc71';
+        return wrap(`
+            <line x1="16" y1="12" x2="48" y2="28" stroke="#7f8c8d" stroke-width="2"/>
+            <line x1="16" y1="28" x2="48" y2="12" stroke="#7f8c8d" stroke-width="2"/>
+            <ellipse cx="16" cy="12" rx="7" ry="2.5" fill="#bdc3c7" stroke="#34495e" stroke-width="1"/>
+            <ellipse cx="48" cy="12" rx="7" ry="2.5" fill="#bdc3c7" stroke="#34495e" stroke-width="1"/>
+            <ellipse cx="16" cy="28" rx="7" ry="2.5" fill="#bdc3c7" stroke="#34495e" stroke-width="1"/>
+            <ellipse cx="48" cy="28" rx="7" ry="2.5" fill="#bdc3c7" stroke="#34495e" stroke-width="1"/>
+            <circle cx="32" cy="20" r="7" fill="#2c3e50" stroke="#95a5a6" stroke-width="1.2"/>
+            <circle cx="32" cy="20" r="3.5" fill="${glow}"/>
+        `);
+    }
+
+    // 17. OVERLORD UPGRADE TOWERS
+    if (key.includes('bunker')) {
+        return wrap(`
+            <polygon points="20,12 44,12 52,28 12,28" fill="#5d6d7e" stroke="#2c3e50" stroke-width="1.5"/>
+            <rect x="22" y="16" width="6" height="3" fill="#111"/>
+            <rect x="36" y="16" width="6" height="3" fill="#111"/>
+            <rect x="18" y="26" width="28" height="10" rx="2" fill="#2c3e50"/>
+        `);
+    }
+    if (key.includes('gatling')) {
+        return wrap(`
+            <rect x="24" y="6" width="4" height="20" fill="#111" stroke="#555" stroke-width="0.8"/>
+            <rect x="36" y="6" width="4" height="20" fill="#111" stroke="#555" stroke-width="0.8"/>
+            <circle cx="26" cy="6" r="3" fill="#e67e22"/>
+            <circle cx="38" cy="6" r="3" fill="#e67e22"/>
+            <rect x="20" y="24" width="24" height="12" rx="3" fill="#2c3e50" stroke="#7f8c8d" stroke-width="1"/>
+        `);
+    }
+    if (key.includes('propaganda')) {
+        return wrap(`
+            <rect x="30" y="10" width="4" height="26" fill="#922b21"/>
+            <circle cx="32" cy="8" r="3.5" fill="#ff2222" stroke="#fff" stroke-width="1"/>
+            <polygon points="20,10 30,14 30,18 20,22" fill="#f1c40f" stroke="#b7950b" stroke-width="0.8"/>
+            <polygon points="44,10 34,14 34,18 44,22" fill="#f1c40f" stroke="#b7950b" stroke-width="0.8"/>
+            <rect x="22" y="34" width="20" height="5" rx="1" fill="#2c3e50"/>
+        `);
+    }
+
+    // 18. DEFAULT GENERIC MILITARY CAMEO
+    return wrap(`
+        <circle cx="32" cy="21" r="14" fill="#1f2c35" stroke="#3d576a" stroke-width="1.5"/>
+        <polygon points="32,10 35,17 42,17 36,22 38,29 32,25 26,29 28,22 22,17 29,17" fill="#55efc4"/>
+    `);
+}
+
 function renderCommandGrid(container, slots) {
     if (!container) return;
     let html = '';
@@ -10618,17 +11097,25 @@ function renderCommandGrid(container, slots) {
             const isRally = s.badge && s.badge.includes('RALLY');
             const isSell = s.badge && s.badge.includes('SELL');
             const specialClass = isRally ? 'slot-rally' : isSell ? 'slot-sell' : '';
-            const costStr = s.cost ? ('$' + s.cost) : '';
+            const costStr = s.cost ? (String.fromCharCode(36) + s.cost) : '';
             const badgeStr = s.badge || '';
-            const idStr = s.id || '';
+            const idStr = s.id || s.name || '';
             const disabledAttr = s.disabled ? 'disabled' : '';
-            html += '<button class="grid-slot-btn ' + specialClass + '" onclick="currentGridSlots[' + i + '].action()" onmouseenter="showTacticalTooltip(event, \'' + idStr + '\')" onmouseleave="hideTacticalTooltip()" ' + disabledAttr + '>' +
-                '<span class="grid-slot-name">' + s.name + '</span>' +
-                '<div class="grid-slot-footer">' +
-                    '<span class="grid-slot-cost">' + costStr + '</span>' +
-                    '<span class="grid-slot-badge badge-ready">' + badgeStr + '</span>' +
-                '</div>' +
-            '</button>';
+            const cameoSvg = getCameoSVG(s.id, selectedFaction, s.name);
+            const cleanBadge = isRally ? 'RALLY' : isSell ? 'SELL' : badgeStr;
+
+            html += `<button class="grid-slot-btn ${specialClass}" onclick="currentGridSlots[${i}].action()" onmouseenter="showTacticalTooltip(event, '${idStr}')" onmouseleave="hideTacticalTooltip()" ${disabledAttr}>
+                <div class="slot-art-wrap">
+                    ${cameoSvg}
+                </div>
+                <div class="slot-overlay-top">
+                    <span class="grid-slot-badge ${s.disabled ? 'badge-locked' : 'badge-ready'}">${cleanBadge}</span>
+                </div>
+                <div class="slot-overlay-bottom">
+                    <span class="grid-slot-name" title="${s.name}">${s.name}</span>
+                    ${costStr ? `<span class="grid-slot-cost">${costStr}</span>` : ''}
+                </div>
+            </button>`;
         } else {
             html += '<div class="grid-slot-btn empty"></div>';
         }
@@ -11315,6 +11802,12 @@ function updateHUD() {
                 mesh = selectedFaction === 'china' ? createBattlemasterTankMesh(false) : selectedFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);
             }
 
+            // 1.35x Scale Boost for high visual fidelity & detail
+            mesh.scale.set(1.35, 1.35, 1.35);
+            radius *= 1.35;
+            scanRange *= 1.35;
+            speed *= 1.15;
+
             if (!position) {
                 const angle = units.length * 2.4;
                 const spawnRadius = 4 + Math.floor(units.length / 8) * 2;
@@ -11885,213 +12378,6 @@ function updateHUD() {
         }
 
         
-        function createFactionUnitMesh(type) {
-            return createCrusaderTankMesh(false);
-        }
-
-        function spawnUnit(type, position = null) {
-            let mesh; let radius = 1.2; let speed = 0.14;
-            let health = 400; let scanRange = 22; let isAir = false;
-            let capacity = 0; let garrisoned = [];
-
-            // USA Forces
-            if (type === 'tank' || type === 'crusader') { mesh = createCrusaderTankMesh(false); radius = 1.35; speed = 0.15; health = 480; scanRange = 24; }
-            else if (type === 'paladin') { mesh = createPaladinTankMesh(false); radius = 1.35; speed = 0.14; health = 550; scanRange = 26; }
-            else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 1.1; speed = 0.22; health = 280; scanRange = 26; capacity = 5; garrisoned = []; }
-            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 1.1; speed = 0.18; health = 220; scanRange = 15; }
-            else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 1.3; speed = 0.11; health = 220; scanRange = 38; }
-            else if (type === 'dozer') { mesh = createUSADozerMesh(); radius = 1.3; speed = 0.10; health = 300; }
-            else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 1.2; speed = 0.13; health = 260; }
-            else if (type === 'chinook') { mesh = createChinookMesh(); radius = 1.6; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
-            else if (type === 'comanche') { mesh = createComancheMesh(); radius = 1.4; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
-            else if (type === 'raptor') { mesh = createRaptorMesh(); radius = 1.5; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
-            else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(); radius = 1.4; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
-            else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 1.6; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
-            else if (type === 'infantry') { mesh = createRangerMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
-            else if (type === 'rocket') { mesh = createMissileDefenderMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
-            else if (type === 'pathfinder') { mesh = createRangerMesh(); radius = 0.5; speed = 0.09; health = 120; scanRange = 32; }
-            else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.6; speed = 0.10; health = 350; scanRange = 24; }
-
-            // China Forces
-            else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(false); radius = 1.35; speed = 0.15; health = 460; scanRange = 24; }
-            else if (type === 'overlord') { mesh = createOverlordTankMesh(false); radius = 2.1; speed = 0.09; health = 1100; scanRange = 28; capacity = 5; garrisoned = []; }
-            else if (type === 'gatling') { mesh = createGatlingTankMesh(false); radius = 1.3; speed = 0.16; health = 400; scanRange = 22; }
-            else if (type === 'dragon') { mesh = createDragonTankMesh(false); radius = 1.3; speed = 0.15; health = 450; scanRange = 18; }
-            else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 1.4; speed = 0.15; health = 480; scanRange = 20; capacity = 8; garrisoned = []; }
-            else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 1.3; speed = 0.10; health = 220; scanRange = 36; }
-            else if (type === 'nukecannon') { mesh = createNukeCannonMesh(); radius = 1.6; speed = 0.08; health = 260; scanRange = 42; }
-            else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
-            else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
-            else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.5; speed = 0.07; health = 100; }
-            else if (type === 'blacklotus') { mesh = createBlackLotusMesh(); radius = 0.5; speed = 0.10; health = 250; }
-
-            // GLA Forces
-            else if (type === 'worker') { mesh = createGLAWorkerMesh(); radius = 0.5; speed = 0.10; health = 150; }
-            else if (type === 'technical') { mesh = createTechnicalMesh(false); radius = 1.1; speed = 0.22; health = 240; scanRange = 22; capacity = 5; garrisoned = []; }
-            else if (type === 'scorpion') { mesh = createScorpionTankMesh(false); radius = 1.25; speed = 0.16; health = 360; scanRange = 22; }
-            else if (type === 'marauder') { mesh = createMarauderTankMesh(false); radius = 1.35; speed = 0.13; health = 520; scanRange = 24; }
-            else if (type === 'buggy') { mesh = createRocketBuggyMesh(false); radius = 1.1; speed = 0.22; health = 160; scanRange = 30; }
-            else if (type === 'quad') { mesh = createQuadCannonMesh(false); radius = 1.2; speed = 0.17; health = 300; scanRange = 24; }
-            else if (type === 'toxintractor') { mesh = createToxinTractorMesh(false); radius = 1.2; speed = 0.14; health = 360; scanRange = 20; }
-            else if (type === 'bombtruck') { mesh = createBombTruckMesh(false); radius = 1.2; speed = 0.18; health = 220; scanRange = 14; }
-            else if (type === 'scud') { mesh = createScudLauncherMesh(false); radius = 1.4; speed = 0.10; health = 240; scanRange = 40; }
-            else if (type === 'radarvan') { mesh = createRadarVanMesh(); radius = 1.1; speed = 0.16; health = 220; }
-            else if (type === 'rebel') { mesh = createRebelMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
-            else if (type === 'rpg') { mesh = createRPGTrooperMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
-            else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.5; speed = 0.12; health = 80; scanRange = 8; }
-            else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 0.8; speed = 0.08; health = 280; scanRange = 18; }
-            else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.5; speed = 0.11; health = 120; }
-            else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.5; speed = 0.09; health = 220; scanRange = 34; }
-            else {
-                mesh = selectedFaction === 'china' ? createBattlemasterTankMesh(false) : selectedFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);
-            }
-
-            if (!position) {
-                const angle = units.length * 2.4;
-                const spawnRadius = 4 + Math.floor(units.length / 8) * 2;
-                position = new THREE.Vector3(Math.cos(angle) * spawnRadius, 0, Math.sin(angle) * spawnRadius);
-            }
-            mesh.position.copy(position);
-            if (isAir) {
-                const groundY = getTerrainHeight(position.x, position.z);
-                const isSpawnLanded = position && Math.abs(position.y - groundY) < 1.5;
-                if (!isSpawnLanded) {
-                    mesh.position.y = mesh.userData.flightAltitude || 8.5;
-                }
-            }
-            scene.add(mesh);
-
-            const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
-            const newUnitObj = {
-                type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
-                speed: speed, radius: radius, selectionCircle: null, taskState: 'Idle',
-                aiState: (type === 'truck' || type === 'worker') ? 'MovingToDock' : 'Idle',
-                cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
-                health: health, maxHealth: health, scanRange: scanRange, netId: myNetId,
-                attackCooldown: 0, combatTarget: null, isAir: isAir,
-                airState: isAir ? (position && Math.abs(position.y - getTerrainHeight(position.x, position.z)) < 1.5 ? 'landed' : 'circling') : 'none',
-                patrolCenter: position ? position.clone() : new THREE.Vector3(),
-                circleAngle: Math.random() * Math.PI * 2, circleRadius: 15.0,
-                capacity: capacity || 0, garrisoned: garrisoned || [], waypoints: []
-            };
-            newUnitObj.teamId = playerTeamId;
-            newUnitObj.ownerId = 'player';
-            newUnitObj.isAI = false;
-            units.push(newUnitObj);
-            if (isMultiplayerActive && netConn && netConn.open) {
-                broadcastNetPacket({
-                    type: 'spawn_unit',
-                    unitType: type,
-                    position: { x: position.x, y: position.y, z: position.z },
-                    netId: myNetId
-                });
-            }
-            updateHUD();
-            return newUnitObj;
-        }
-
-        function addSelectionCircle(unit) {
-            if (unit.selectionCircle) return;
-            const r = unit.radius * 1.45;
-            const group = new THREE.Group();
-            group.name = "selectionReticle";
-            group.position.y = 0.05;
-
-            const factionColor = (typeof selectedFaction !== 'undefined' && selectedFaction === 'china') ? 0xff4757 : 
-                                 (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla') ? 0xffa502 : 0x00ffcc;
-
-            // 1. High-contrast ground circle
-            const ringGeo = new THREE.RingGeometry(r - 0.08, r, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: factionColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = -Math.PI / 2;
-            group.add(ring);
-
-            // 2. Four distinct L-shaped corner brackets [ ]
-            const bMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
-            const bOffset = r * 1.15;
-            const bArm = r * 0.45;
-
-            // Corner 1 (+X, +Z)
-            const c1Geo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(bOffset - bArm, 0.02, bOffset),
-                new THREE.Vector3(bOffset, 0.02, bOffset),
-                new THREE.Vector3(bOffset, 0.02, bOffset - bArm)
-            ]);
-            group.add(new THREE.Line(c1Geo, bMat));
-
-            // Corner 2 (-X, +Z)
-            const c2Geo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(-bOffset + bArm, 0.02, bOffset),
-                new THREE.Vector3(-bOffset, 0.02, bOffset),
-                new THREE.Vector3(-bOffset, 0.02, bOffset - bArm)
-            ]);
-            group.add(new THREE.Line(c2Geo, bMat));
-
-            // Corner 3 (-X, -Z)
-            const c3Geo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(-bOffset + bArm, 0.02, -bOffset),
-                new THREE.Vector3(-bOffset, 0.02, -bOffset),
-                new THREE.Vector3(-bOffset, 0.02, -bOffset + bArm)
-            ]);
-            group.add(new THREE.Line(c3Geo, bMat));
-
-            // Corner 4 (+X, -Z)
-            const c4Geo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(bOffset - bArm, 0.02, -bOffset),
-                new THREE.Vector3(bOffset, 0.02, -bOffset),
-                new THREE.Vector3(bOffset, 0.02, -bOffset + bArm)
-            ]);
-            group.add(new THREE.Line(c4Geo, bMat));
-
-            unit.mesh.add(group);
-            unit.selectionCircle = group;
-            playUSASound('radio_chirp');
-        }
-
-        function removeSelectionCircle(unit) {
-            if (unit.selectionCircle) {
-                unit.mesh.remove(unit.selectionCircle);
-                unit.selectionCircle.traverse(c => {
-                    if (c.geometry) c.geometry.dispose();
-                    if (c.material) c.material.dispose();
-                });
-                unit.selectionCircle = null;
-            }
-            if (unit.trajectoryLine) {
-                scene.remove(unit.trajectoryLine);
-                if (unit.trajectoryLine.geometry) unit.trajectoryLine.geometry.dispose();
-                if (unit.trajectoryLine.material) unit.trajectoryLine.material.dispose();
-                unit.trajectoryLine = null;
-            }
-        }
-
-        function updateCameraPosition() {
-            const maxCam = (currentMapSize || 800) * 0.45;
-            cameraTarget.x = THREE.MathUtils.clamp(cameraTarget.x, -maxCam, maxCam);
-            cameraTarget.z = THREE.MathUtils.clamp(cameraTarget.z, -maxCam, maxCam);
-            const x = cameraTarget.x + cameraRadius * Math.sin(cameraBeta) * Math.sin(cameraAlpha);
-            const y = cameraTarget.y + cameraRadius * Math.cos(cameraBeta);
-            const z = cameraTarget.z + cameraRadius * Math.sin(cameraBeta) * Math.cos(cameraAlpha);
-            camera.position.set(x, y, z); camera.lookAt(cameraTarget);
-        }
-
-        function processCameraKeyboardPanning() {
-            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); forward.y = 0; forward.normalize();
-            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); right.y = 0; right.normalize();
-            if (keysPressed['w'] || keysPressed['arrowup']) cameraTarget.addScaledVector(forward, panSpeed);
-            if (keysPressed['s'] || keysPressed['arrowdown']) cameraTarget.addScaledVector(forward, -panSpeed);
-            if (keysPressed['a'] || keysPressed['arrowleft']) cameraTarget.addScaledVector(right, -panSpeed);
-            if (keysPressed['d'] || keysPressed['arrowright']) cameraTarget.addScaledVector(right, panSpeed);
-            if (keysPressed['w'] || keysPressed['arrowup'] || keysPressed['s'] || keysPressed['arrowdown'] || 
-                keysPressed['a'] || keysPressed['arrowleft'] || keysPressed['d'] || keysPressed['arrowright']) updateCameraPosition();
-        }
-
-        function processCameraScreenEdgePanning(clientX, clientY) {
-            // Disabled: Camera movement via screen edges removed per user request.
-            // Players pan using WASD / Arrow keys or middle-mouse drag.
-        }
-
 
 // --- MODULE: 12_combat.js ---
 function processCombatScanning() {
@@ -12990,7 +13276,7 @@ function processEnemyAIEngine() {
 
         function onWindowWheel(e) {
             e.preventDefault(); cameraRadius += e.deltaY * 0.04 * zoomSpeed;
-            cameraRadius = Math.max(25, Math.min(300, cameraRadius)); updateCameraPosition();
+            cameraRadius = Math.max(35, Math.min(360, cameraRadius)); updateCameraPosition();
         }
 
         // River Crossing Bridge Waypoint Finder: detects if straight path hits water and routes via bridge
@@ -13824,7 +14110,7 @@ function animate() {
                                 ally.health = Math.min(ally.maxHealth, ally.health + 4);
                             }
                         });
-                        playAudio('propaganda_drone', {}, 'china');
+                        // Propaganda drone loop silenced per user request
                     }
                 }
             });

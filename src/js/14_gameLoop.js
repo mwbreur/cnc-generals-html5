@@ -171,7 +171,7 @@ function animate() {
                                 ally.health = Math.min(ally.maxHealth, ally.health + 4);
                             }
                         });
-                        playAudio('propaganda_drone', {}, 'china');
+                        // Propaganda drone loop silenced per user request
                     }
                 }
             });
