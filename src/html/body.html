@@ -1,5 +1,42 @@
 <div id="start-menu">
+        <!-- AUTHENTIC ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica) -->
+        <div id="ingame-pause-modal" class="pause-dialog" style="display: none;">
+            <div class="pause-watermark-container">
+                <div class="pause-watermark-title">C&amp;C Generals Zero Hour</div>
+                <div class="pause-watermark-pro">Control Bar Pro</div>
+                <div class="pause-watermark-hd">+ Control Bar HD</div>
+                <div class="pause-watermark-gentool">+ GenTool</div>
+            </div>
+
+            <div class="pause-table-container">
+                <table class="pause-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">Mute</th>
+                            <th>Player Name</th>
+                            <th>Army</th>
+                            <th>Team</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pause-players-list">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pause-actions-bar">
+                <div class="pause-left-actions">
+                    <button class="rts-btn pause-sub-btn" onclick="openSkirmishSetupFromGame()">⚙️ SETUP &amp; OPTIONS</button>
+                    <button class="rts-btn pause-sub-btn" onclick="restartCurrentMatch()">🔄 RESTART MATCH</button>
+                    <button class="rts-btn pause-sub-btn pause-surrender-btn" onclick="surrenderMatch()">🏳️ SURRENDER</button>
+                </div>
+                <button class="rts-btn pause-back-btn" onclick="resumeGame()">BACK</button>
+            </div>
+        </div>
+
         <div id="start-card">
+            <button id="resume-game-btn" class="rts-btn resume-banner-btn" style="display: none;" onclick="resumeGame()">▶ RESUME CURRENT MATCH (ESC)</button>
             <h1>Command Setup</h1>
 
             <!-- Game Mode Switcher Tabs (Single Player, Multiplayer, Map Editor) -->
@@ -331,6 +368,7 @@
                 <span class="hud-ticker-prefix">[COMMAND]</span>
                 <span id="tactical-message">Command Center Online. Awaiting tactical orders.</span>
             </div>
+            <div id="match-clock" class="hud-match-clock" title="Mission Elapsed Time">00:00:00</div>
             <button id="in-game-menu-btn" class="hud-menu-btn" onclick="toggleInGameMenu()">⚙ MENU</button>
         </div>
     </div>

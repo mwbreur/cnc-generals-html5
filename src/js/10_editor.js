@@ -555,6 +555,8 @@
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            matchStartTime = Date.now();
+            matchStartTime = Date.now();
             if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Theater Initialized: ${activeSlots.length} Commanders deployed. Good luck, General!`, 'success');
@@ -638,6 +640,7 @@
             });
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            matchStartTime = Date.now();
 
             // Spawn Initial Guard units for AI
             const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'tank';

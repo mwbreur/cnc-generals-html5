@@ -12,6 +12,19 @@ function animate() {
             
             updateFXEngine();
 
+            // Update Top-Right Match Clock (Zero Hour style)
+            if (typeof isMatchActive !== 'undefined' && isMatchActive && typeof matchStartTime !== 'undefined' && matchStartTime > 0) {
+                const totalSec = Math.floor((Date.now() - matchStartTime) / 1000);
+                if (window._lastClockSec !== totalSec) {
+                    window._lastClockSec = totalSec;
+                    const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+                    const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+                    const secs = String(totalSec % 60).padStart(2, '0');
+                    const clockEl = document.getElementById('match-clock');
+                    if (clockEl) clockEl.textContent = `${hrs}:${mins}:${secs}`;
+                }
+            }
+
             // =========================================================
             // 0. ACTIVE SELECTION VISUALS & DYNAMIC TRAJECTORY LINES
             // =========================================================

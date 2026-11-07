@@ -734,6 +734,7 @@
         let aiFactionChosen = 'random';
         let enemyStructures = [];
         let isMatchActive = false;
+        let matchStartTime = 0;
         let hasSpawnedInitialEnemyBase = false;
         let playerTeamId = 1;
         let activeCustomMap = null;
@@ -762,6 +763,8 @@
             { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'usa', spawnId: 7, difficulty: 'medium' },
             { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, isHost: false, active: false, team: 4, faction: 'china', spawnId: 8, difficulty: 'medium' }
         ];
+        window.spSlots = spSlots;
+        window.mpSlots = mpSlots;
 
         // --- TEAM FRIENDLY / HOSTILE RESOLUTION ---
         function isFriendly(assetA, assetB) {

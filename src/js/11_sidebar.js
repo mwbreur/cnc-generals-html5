@@ -241,11 +241,117 @@ function toggleSellMode() {
     showNotification(isSellMode ? '💰 SELL MODE: Click any structure to demolish for 50% refund' : 'Sell mode deactivated.', 'info');
 }
 
+function resumeGame() {
+    const menu = document.getElementById('start-menu');
+    if (menu) menu.style.display = 'none';
+    const pauseModal = document.getElementById('ingame-pause-modal');
+    if (pauseModal) pauseModal.style.display = 'none';
+    const startCard = document.getElementById('start-card');
+    if (startCard) startCard.style.display = 'none';
+}
+
+function showInGamePauseModal() {
+    const menu = document.getElementById('start-menu');
+    const pauseModal = document.getElementById('ingame-pause-modal');
+    const startCard = document.getElementById('start-card');
+    if (!menu) return;
+
+    menu.style.display = 'flex';
+    if (startCard) startCard.style.display = 'none';
+    if (pauseModal) {
+        pauseModal.style.display = 'flex';
+        updatePauseModalPlayerList();
+    }
+}
+
+function showStartSetupCard() {
+    const menu = document.getElementById('start-menu');
+    const pauseModal = document.getElementById('ingame-pause-modal');
+    const startCard = document.getElementById('start-card');
+    const resumeBtn = document.getElementById('resume-game-btn');
+    if (!menu) return;
+
+    menu.style.display = 'flex';
+    if (pauseModal) pauseModal.style.display = 'none';
+    if (startCard) {
+        startCard.style.display = 'block';
+        if (resumeBtn) {
+            resumeBtn.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'block' : 'none';
+        }
+    }
+}
+
 function toggleInGameMenu() {
     const menu = document.getElementById('start-menu');
-    if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+    if (!menu) return;
+    const isVisible = menu.style.display !== 'none';
+    if (isVisible) {
+        resumeGame();
+    } else {
+        if (typeof isMatchActive !== 'undefined' && isMatchActive) {
+            showInGamePauseModal();
+        } else {
+            showStartSetupCard();
+        }
     }
+}
+
+function updatePauseModalPlayerList() {
+    const listBody = document.getElementById('pause-players-list');
+    if (!listBody) return;
+
+    const slots = (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive) ? (window.mpSlots || []) : (window.spSlots || []);
+    const activeSlots = slots.filter(s => s && s.active);
+
+    let html = '';
+    activeSlots.forEach(s => {
+        let isAlive = true;
+        if (s.isPlayer) {
+            const hasAliveStruct = typeof structures !== 'undefined' && structures.some(st => st.health > 0);
+            const hasAliveUnit = typeof units !== 'undefined' && units.some(u => u.health > 0);
+            isAlive = hasAliveStruct || hasAliveUnit;
+        } else {
+            const ownerId = 'ai_' + s.id;
+            const hasAliveStruct = typeof enemyStructures !== 'undefined' && enemyStructures.some(st => (st.ownerId === ownerId || st.teamId === s.team) && st.health > 0);
+            const hasAliveUnit = typeof enemyUnits !== 'undefined' && enemyUnits.some(u => (u.ownerId === ownerId || u.teamId === s.team) && u.health > 0);
+            isAlive = hasAliveStruct || hasAliveUnit;
+        }
+
+        const teamLabel = s.team ? `Team ${s.team}` : 'None';
+        const armyLabel = (s.faction || 'USA').toUpperCase();
+        const statusHtml = isAlive ? `<span style="color:#2ed573; font-weight:bold;">Playing</span>` : `<span style="color:#ff4757; font-weight:bold;">Defeated</span>`;
+        const nameColor = s.isPlayer ? '#2ed573' : (isFriendly(s, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) }) ? '#70a1ff' : '#e0e6ed');
+
+        html += `<tr>
+            <td style="text-align:center;"><input type="checkbox" style="cursor:pointer;" title="Mute Tactical Audio"></td>
+            <td style="color:${nameColor}; font-weight:bold;">${s.name || 'Commander'}</td>
+            <td style="color:#eccc68; font-weight:600;">${armyLabel}</td>
+            <td style="color:#a4b0be;">${teamLabel}</td>
+            <td>${statusHtml}</td>
+        </tr>`;
+    });
+
+    listBody.innerHTML = html;
+}
+
+function restartCurrentMatch() {
+    resumeGame();
+    if (typeof startGame === 'function') {
+        startGame();
+        if (typeof showNotification === 'function') showNotification('Restarting Skirmish battle...', 'info');
+    }
+}
+
+function openSkirmishSetupFromGame() {
+    showStartSetupCard();
+}
+
+function surrenderMatch() {
+    if (typeof isMatchActive !== 'undefined') isMatchActive = false;
+    resumeGame();
+    if (typeof showNotification === 'function') showNotification('MISSION TERMINATED: Tactical forces ordered to surrender.', 'error');
+    const ticker = document.getElementById('tactical-message');
+    if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">SURRENDER: Operational theater yielded.</strong>';
 }
 
 function switchGridCategory(cat) {
@@ -1227,8 +1333,20 @@ window.addEventListener('keydown', e => {
     const isShift = e.shiftKey;
     const now = Date.now();
 
-    // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all
+    // TAB: Toggle In-Game Diplomacy & Match Objectives Menu (Official Zero Hour shortcut)
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        toggleInGameMenu();
+        return;
+    }
+
+    // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all / toggle menu
     if (e.key === 'Escape' || k === 'escape') {
+        const menu = document.getElementById('start-menu');
+        if (menu && menu.style.display !== 'none') {
+            resumeGame();
+            return;
+        }
         if (blueprintMesh) {
             scene.remove(blueprintMesh);
             blueprintMesh = null;
@@ -1241,13 +1359,24 @@ window.addEventListener('keydown', e => {
             showNotification('Targeting cancelled.', 'info');
             return;
         }
+        if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+            activeGeneralPower = null;
+            showNotification('Power cancelled.', 'info');
+            return;
+        }
         if (attackMoveMode || guardModeActive) {
             attackMoveMode = false;
             guardModeActive = false;
             showNotification('Command cancelled.', 'info');
             return;
         }
-        deselectAll();
+        const hasSelected = units.some(u => u.selected) || selectedStructure || selectedSupplyPoint;
+        if (hasSelected) {
+            deselectAll();
+            return;
+        }
+        // When completely idle: Open in-game menu!
+        toggleInGameMenu();
         return;
     }
 

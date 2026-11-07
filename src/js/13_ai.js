@@ -7,9 +7,11 @@
 // ADVANCED AI COMMANDER ENGINE: FOG OF WAR, RECON SCOUTS, TEAM INTELLIGENCE
 // =========================================================================
 let aiCommanders = {};
+window.aiCommanders = aiCommanders;
 
 function initAICommanders() {
     aiCommanders = {};
+    window.aiCommanders = aiCommanders;
     const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 800);
     const env = (typeof activeTheme !== 'undefined' ? activeTheme : 'desert');
     const allSpawns = (typeof getSpawnPointsForMap === 'function') ? getSpawnPointsForMap(mapSize, env, null) : [];
@@ -72,7 +74,9 @@ function initAICommanders() {
             
             // Production & tactical timers
             productionTimer: 0,
-            attackWaveTimer: 0
+            attackWaveTimer: 0,
+            matchStartTime: (typeof matchStartTime !== 'undefined' && matchStartTime > 0) ? matchStartTime : Date.now(),
+            hasAnnouncedOffensive: false
         };
     }
 }
@@ -242,34 +246,60 @@ function processEnemyAIEngine() {
             return hostileStructures.some(hs => (hs.position || hs.mesh.position).distanceTo(b.position) < 35);
         });
 
+        // AI Attack Grace Period check based on chosen difficulty:
+        // Easy AI: 5 minutes (300s)
+        // Medium AI: 3 minutes (180s)
+        // Hard AI: 2 minutes (120s)
+        const elapsedSec = (Date.now() - (cmd.matchStartTime || (typeof matchStartTime !== 'undefined' ? matchStartTime : Date.now()))) / 1000;
+        const attackDelays = { easy: 300, medium: 180, hard: 120 };
+        const attackDelaySec = attackDelays[cmd.difficulty] || 180;
+        const canLaunchOffensive = elapsedSec >= attackDelaySec;
+
+        if (canLaunchOffensive && !cmd.hasAnnouncedOffensive) {
+            cmd.hasAnnouncedOffensive = true;
+            if (typeof isFriendly === 'function' && !isFriendly(cmd, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) })) {
+                if (typeof showNotification === 'function') {
+                    showNotification(`Tactical Alert: Hostile AI Commander (${(cmd.faction || 'OPFOR').toUpperCase()} - ${(cmd.difficulty || 'medium').toUpperCase()}) has mobilized offensive strike forces!`, 'warning');
+                }
+                if (typeof playUSASound === 'function') playUSASound('radio_chirp');
+            }
+        }
+
         myUnits.forEach(enemy => {
             if (enemy.isScout && !enemy.combatTarget) return; // Scouts focus on reconnaissance traversal
 
-            // If unit is already engaged in active combat with valid hostile target, pursue
+            // If unit is already engaged in active combat with valid hostile target:
             if (enemy.combatTarget && enemy.combatTarget.health > 0 && !isFriendly(enemy, enemy.combatTarget)) {
                 const targetPos = enemy.combatTarget.position || enemy.combatTarget.mesh.position;
-                if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
-                    enemy.targetPosition.copy(targetPos);
+                // During grace period, disengage if target retreats far beyond AI base perimeter
+                if (!canLaunchOffensive && targetPos && enemy.mesh.position.distanceTo(cmd.basePos) > 40) {
+                    enemy.combatTarget = null;
+                } else {
+                    if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
+                        enemy.targetPosition.copy(targetPos);
+                    }
+                    return;
                 }
-                return;
             } else if (enemy.combatTarget) {
                 enemy.combatTarget = null;
             }
 
-            // A. If NO enemy assets have been sighted yet: Hold defensive base perimeter!
-            if (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0) {
-                // Defend base perimeter from intruders
+            // A. If offensive NOT yet permitted OR no enemy assets discovered yet: Hold defensive base perimeter!
+            if (!canLaunchOffensive || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
+                // Defend base perimeter from close intruders
                 let localIntruder = null;
-                let minDist = 30; // Base defense radius
+                let minDist = 35; // Base defense perimeter radius
                 hostileUnits.forEach(hu => {
-                    const d = enemy.mesh.position.distanceTo(hu.mesh.position);
-                    if (d < minDist) { minDist = d; localIntruder = hu; }
+                    if (hu.mesh) {
+                        const d = enemy.mesh.position.distanceTo(hu.mesh.position);
+                        if (d < minDist) { minDist = d; localIntruder = hu; }
+                    }
                 });
                 if (localIntruder) {
                     enemy.combatTarget = localIntruder;
                     enemy.targetPosition.copy(localIntruder.mesh.position);
                 } else {
-                    // Hold defensive rally zone around own Command Center
+                    // Station at defensive rally zone around own Command Center
                     if (enemy.mesh.position.distanceTo(cmd.basePos) > 32) {
                         enemy.targetPosition.copy(cmd.rallyPoint);
                     }
@@ -277,7 +307,7 @@ function processEnemyAIEngine() {
                 return;
             }
 
-            // B. Enemies HAVE been discovered! Launch attack waves on known coordinates!
+            // B. Attack Grace Expired AND Enemies HAVE been discovered! Launch attack waves on known coordinates!
             let closestKnown = null;
             let minDistance = Infinity;
 

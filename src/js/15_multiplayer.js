@@ -457,6 +457,7 @@
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            matchStartTime = Date.now();
             if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Deployment Complete. Command Center operational!`, 'success');

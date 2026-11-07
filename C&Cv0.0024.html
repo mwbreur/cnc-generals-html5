@@ -1702,13 +1702,200 @@ body {
     z-index: 2;
 }
 
+/* ========================================================================= */
+/* ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica)       */
+/* ========================================================================= */
+.pause-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: min(720px, calc(100vw - 28px));
+    min-height: 400px;
+    background: rgba(10, 14, 12, 0.92);
+    background-image: 
+        linear-gradient(rgba(46, 61, 49, 0.35) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(46, 61, 49, 0.35) 1px, transparent 1px);
+    background-size: 24px 24px;
+    border: 2px solid #5a543e;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.95), inset 0 0 24px rgba(0, 0, 0, 0.6);
+    border-radius: 2px;
+    padding: 24px 28px 18px 28px;
+    display: flex;
+    flex-direction: column;
+}
+
+.pause-watermark-container {
+    position: absolute;
+    top: -62px;
+    left: 4px;
+    line-height: 1.25;
+    pointer-events: none;
+    font-family: 'Arial', sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px #000;
+}
+.pause-watermark-title { color: #f1f2f6; }
+.pause-watermark-pro { color: #2ed573; }
+.pause-watermark-hd { color: #ffa502; }
+.pause-watermark-gentool { color: #ff4757; }
+
+.pause-table-container {
+    flex: 1;
+    width: 100%;
+    margin-top: 10px;
+    min-height: 240px;
+    border: 1px solid rgba(90, 84, 62, 0.5);
+    background: rgba(4, 8, 6, 0.55);
+    border-radius: 2px;
+    overflow-y: auto;
+}
+
+.pause-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: 'Consolas', 'Segoe UI', Tahoma, sans-serif;
+}
+
+.pause-table th {
+    text-align: left;
+    padding: 10px 14px;
+    color: #e5e0ce;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(90, 84, 62, 0.6);
+    background: rgba(20, 26, 22, 0.85);
+    letter-spacing: 0.5px;
+}
+
+.pause-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(46, 61, 49, 0.35);
+    color: #ced6e0;
+}
+
+.pause-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 18px;
+    padding-top: 10px;
+}
+
+.pause-left-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.pause-sub-btn {
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.pause-surrender-btn {
+    border-color: #ff4757 !important;
+    color: #ff6b81 !important;
+}
+.pause-surrender-btn:hover {
+    background: rgba(255, 71, 87, 0.25) !important;
+}
+
+.pause-back-btn {
+    min-width: 110px;
+    padding: 8px 26px;
+    font-size: 13px;
+    font-weight: bold;
+    background: #1e2022 !important;
+    border: 1px solid #57606f !important;
+    color: #f1f2f6 !important;
+    letter-spacing: 1px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    transition: all 0.15s ease;
+}
+.pause-back-btn:hover {
+    background: #2f3542 !important;
+    border-color: #a4b0be !important;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+}
+
+.resume-banner-btn {
+    width: 100%;
+    margin-bottom: 14px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    background: linear-gradient(180deg, #10ac84 0%, #006266 100%) !important;
+    border-color: #55efc4 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 16px rgba(85, 239, 196, 0.3);
+}
+.resume-banner-btn:hover {
+    background: linear-gradient(180deg, #1dd1a1 0%, #10ac84 100%) !important;
+    box-shadow: 0 0 24px rgba(85, 239, 196, 0.6);
+}
+
+/* Authentic Top Right Match Clock */
+.hud-match-clock {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: bold;
+    color: #e5e0ce;
+    letter-spacing: 1.5px;
+    background: rgba(10, 16, 12, 0.85);
+    border: 1px solid #4a5a4a;
+    padding: 3px 8px;
+    border-radius: 2px;
+    text-shadow: 0 0 6px rgba(85, 239, 196, 0.45);
+    display: inline-flex;
+    align-items: center;
+}
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 <div id="start-menu">
+        <!-- AUTHENTIC ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL (Control Bar Pro replica) -->
+        <div id="ingame-pause-modal" class="pause-dialog" style="display: none;">
+            <div class="pause-watermark-container">
+                <div class="pause-watermark-title">C&amp;C Generals Zero Hour</div>
+                <div class="pause-watermark-pro">Control Bar Pro</div>
+                <div class="pause-watermark-hd">+ Control Bar HD</div>
+                <div class="pause-watermark-gentool">+ GenTool</div>
+            </div>
+
+            <div class="pause-table-container">
+                <table class="pause-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">Mute</th>
+                            <th>Player Name</th>
+                            <th>Army</th>
+                            <th>Team</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pause-players-list">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pause-actions-bar">
+                <div class="pause-left-actions">
+                    <button class="rts-btn pause-sub-btn" onclick="openSkirmishSetupFromGame()">⚙️ SETUP &amp; OPTIONS</button>
+                    <button class="rts-btn pause-sub-btn" onclick="restartCurrentMatch()">🔄 RESTART MATCH</button>
+                    <button class="rts-btn pause-sub-btn pause-surrender-btn" onclick="surrenderMatch()">🏳️ SURRENDER</button>
+                </div>
+                <button class="rts-btn pause-back-btn" onclick="resumeGame()">BACK</button>
+            </div>
+        </div>
+
         <div id="start-card">
+            <button id="resume-game-btn" class="rts-btn resume-banner-btn" style="display: none;" onclick="resumeGame()">▶ RESUME CURRENT MATCH (ESC)</button>
             <h1>Command Setup</h1>
 
             <!-- Game Mode Switcher Tabs (Single Player, Multiplayer, Map Editor) -->
@@ -2040,6 +2227,7 @@ body {
                 <span class="hud-ticker-prefix">[COMMAND]</span>
                 <span id="tactical-message">Command Center Online. Awaiting tactical orders.</span>
             </div>
+            <div id="match-clock" class="hud-match-clock" title="Mission Elapsed Time">00:00:00</div>
             <button id="in-game-menu-btn" class="hud-menu-btn" onclick="toggleInGameMenu()">⚙ MENU</button>
         </div>
     </div>
@@ -9075,6 +9263,7 @@ function playUSASound(type, options = {}) {
         let aiFactionChosen = 'random';
         let enemyStructures = [];
         let isMatchActive = false;
+        let matchStartTime = 0;
         let hasSpawnedInitialEnemyBase = false;
         let playerTeamId = 1;
         let activeCustomMap = null;
@@ -9103,6 +9292,8 @@ function playUSASound(type, options = {}) {
             { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'usa', spawnId: 7, difficulty: 'medium' },
             { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, isHost: false, active: false, team: 4, faction: 'china', spawnId: 8, difficulty: 'medium' }
         ];
+        window.spSlots = spSlots;
+        window.mpSlots = mpSlots;
 
         // --- TEAM FRIENDLY / HOSTILE RESOLUTION ---
         function isFriendly(assetA, assetB) {
@@ -10031,6 +10222,8 @@ function playUSASound(type, options = {}) {
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            matchStartTime = Date.now();
+            matchStartTime = Date.now();
             if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Theater Initialized: ${activeSlots.length} Commanders deployed. Good luck, General!`, 'success');
@@ -10114,6 +10307,7 @@ function playUSASound(type, options = {}) {
             });
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            matchStartTime = Date.now();
 
             // Spawn Initial Guard units for AI
             const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'tank';
@@ -10533,11 +10727,117 @@ function toggleSellMode() {
     showNotification(isSellMode ? '💰 SELL MODE: Click any structure to demolish for 50% refund' : 'Sell mode deactivated.', 'info');
 }
 
+function resumeGame() {
+    const menu = document.getElementById('start-menu');
+    if (menu) menu.style.display = 'none';
+    const pauseModal = document.getElementById('ingame-pause-modal');
+    if (pauseModal) pauseModal.style.display = 'none';
+    const startCard = document.getElementById('start-card');
+    if (startCard) startCard.style.display = 'none';
+}
+
+function showInGamePauseModal() {
+    const menu = document.getElementById('start-menu');
+    const pauseModal = document.getElementById('ingame-pause-modal');
+    const startCard = document.getElementById('start-card');
+    if (!menu) return;
+
+    menu.style.display = 'flex';
+    if (startCard) startCard.style.display = 'none';
+    if (pauseModal) {
+        pauseModal.style.display = 'flex';
+        updatePauseModalPlayerList();
+    }
+}
+
+function showStartSetupCard() {
+    const menu = document.getElementById('start-menu');
+    const pauseModal = document.getElementById('ingame-pause-modal');
+    const startCard = document.getElementById('start-card');
+    const resumeBtn = document.getElementById('resume-game-btn');
+    if (!menu) return;
+
+    menu.style.display = 'flex';
+    if (pauseModal) pauseModal.style.display = 'none';
+    if (startCard) {
+        startCard.style.display = 'block';
+        if (resumeBtn) {
+            resumeBtn.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'block' : 'none';
+        }
+    }
+}
+
 function toggleInGameMenu() {
     const menu = document.getElementById('start-menu');
-    if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+    if (!menu) return;
+    const isVisible = menu.style.display !== 'none';
+    if (isVisible) {
+        resumeGame();
+    } else {
+        if (typeof isMatchActive !== 'undefined' && isMatchActive) {
+            showInGamePauseModal();
+        } else {
+            showStartSetupCard();
+        }
     }
+}
+
+function updatePauseModalPlayerList() {
+    const listBody = document.getElementById('pause-players-list');
+    if (!listBody) return;
+
+    const slots = (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive) ? (window.mpSlots || []) : (window.spSlots || []);
+    const activeSlots = slots.filter(s => s && s.active);
+
+    let html = '';
+    activeSlots.forEach(s => {
+        let isAlive = true;
+        if (s.isPlayer) {
+            const hasAliveStruct = typeof structures !== 'undefined' && structures.some(st => st.health > 0);
+            const hasAliveUnit = typeof units !== 'undefined' && units.some(u => u.health > 0);
+            isAlive = hasAliveStruct || hasAliveUnit;
+        } else {
+            const ownerId = 'ai_' + s.id;
+            const hasAliveStruct = typeof enemyStructures !== 'undefined' && enemyStructures.some(st => (st.ownerId === ownerId || st.teamId === s.team) && st.health > 0);
+            const hasAliveUnit = typeof enemyUnits !== 'undefined' && enemyUnits.some(u => (u.ownerId === ownerId || u.teamId === s.team) && u.health > 0);
+            isAlive = hasAliveStruct || hasAliveUnit;
+        }
+
+        const teamLabel = s.team ? `Team ${s.team}` : 'None';
+        const armyLabel = (s.faction || 'USA').toUpperCase();
+        const statusHtml = isAlive ? `<span style="color:#2ed573; font-weight:bold;">Playing</span>` : `<span style="color:#ff4757; font-weight:bold;">Defeated</span>`;
+        const nameColor = s.isPlayer ? '#2ed573' : (isFriendly(s, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) }) ? '#70a1ff' : '#e0e6ed');
+
+        html += `<tr>
+            <td style="text-align:center;"><input type="checkbox" style="cursor:pointer;" title="Mute Tactical Audio"></td>
+            <td style="color:${nameColor}; font-weight:bold;">${s.name || 'Commander'}</td>
+            <td style="color:#eccc68; font-weight:600;">${armyLabel}</td>
+            <td style="color:#a4b0be;">${teamLabel}</td>
+            <td>${statusHtml}</td>
+        </tr>`;
+    });
+
+    listBody.innerHTML = html;
+}
+
+function restartCurrentMatch() {
+    resumeGame();
+    if (typeof startGame === 'function') {
+        startGame();
+        if (typeof showNotification === 'function') showNotification('Restarting Skirmish battle...', 'info');
+    }
+}
+
+function openSkirmishSetupFromGame() {
+    showStartSetupCard();
+}
+
+function surrenderMatch() {
+    if (typeof isMatchActive !== 'undefined') isMatchActive = false;
+    resumeGame();
+    if (typeof showNotification === 'function') showNotification('MISSION TERMINATED: Tactical forces ordered to surrender.', 'error');
+    const ticker = document.getElementById('tactical-message');
+    if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">SURRENDER: Operational theater yielded.</strong>';
 }
 
 function switchGridCategory(cat) {
@@ -11519,8 +11819,20 @@ window.addEventListener('keydown', e => {
     const isShift = e.shiftKey;
     const now = Date.now();
 
-    // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all
+    // TAB: Toggle In-Game Diplomacy & Match Objectives Menu (Official Zero Hour shortcut)
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        toggleInGameMenu();
+        return;
+    }
+
+    // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all / toggle menu
     if (e.key === 'Escape' || k === 'escape') {
+        const menu = document.getElementById('start-menu');
+        if (menu && menu.style.display !== 'none') {
+            resumeGame();
+            return;
+        }
         if (blueprintMesh) {
             scene.remove(blueprintMesh);
             blueprintMesh = null;
@@ -11533,13 +11845,24 @@ window.addEventListener('keydown', e => {
             showNotification('Targeting cancelled.', 'info');
             return;
         }
+        if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+            activeGeneralPower = null;
+            showNotification('Power cancelled.', 'info');
+            return;
+        }
         if (attackMoveMode || guardModeActive) {
             attackMoveMode = false;
             guardModeActive = false;
             showNotification('Command cancelled.', 'info');
             return;
         }
-        deselectAll();
+        const hasSelected = units.some(u => u.selected) || selectedStructure || selectedSupplyPoint;
+        if (hasSelected) {
+            deselectAll();
+            return;
+        }
+        // When completely idle: Open in-game menu!
+        toggleInGameMenu();
         return;
     }
 
@@ -13363,9 +13686,11 @@ let aiProductionTick = 0;
 // ADVANCED AI COMMANDER ENGINE: FOG OF WAR, RECON SCOUTS, TEAM INTELLIGENCE
 // =========================================================================
 let aiCommanders = {};
+window.aiCommanders = aiCommanders;
 
 function initAICommanders() {
     aiCommanders = {};
+    window.aiCommanders = aiCommanders;
     const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 800);
     const env = (typeof activeTheme !== 'undefined' ? activeTheme : 'desert');
     const allSpawns = (typeof getSpawnPointsForMap === 'function') ? getSpawnPointsForMap(mapSize, env, null) : [];
@@ -13428,7 +13753,9 @@ function initAICommanders() {
             
             // Production & tactical timers
             productionTimer: 0,
-            attackWaveTimer: 0
+            attackWaveTimer: 0,
+            matchStartTime: (typeof matchStartTime !== 'undefined' && matchStartTime > 0) ? matchStartTime : Date.now(),
+            hasAnnouncedOffensive: false
         };
     }
 }
@@ -13598,34 +13925,60 @@ function processEnemyAIEngine() {
             return hostileStructures.some(hs => (hs.position || hs.mesh.position).distanceTo(b.position) < 35);
         });
 
+        // AI Attack Grace Period check based on chosen difficulty:
+        // Easy AI: 5 minutes (300s)
+        // Medium AI: 3 minutes (180s)
+        // Hard AI: 2 minutes (120s)
+        const elapsedSec = (Date.now() - (cmd.matchStartTime || (typeof matchStartTime !== 'undefined' ? matchStartTime : Date.now()))) / 1000;
+        const attackDelays = { easy: 300, medium: 180, hard: 120 };
+        const attackDelaySec = attackDelays[cmd.difficulty] || 180;
+        const canLaunchOffensive = elapsedSec >= attackDelaySec;
+
+        if (canLaunchOffensive && !cmd.hasAnnouncedOffensive) {
+            cmd.hasAnnouncedOffensive = true;
+            if (typeof isFriendly === 'function' && !isFriendly(cmd, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) })) {
+                if (typeof showNotification === 'function') {
+                    showNotification(`Tactical Alert: Hostile AI Commander (${(cmd.faction || 'OPFOR').toUpperCase()} - ${(cmd.difficulty || 'medium').toUpperCase()}) has mobilized offensive strike forces!`, 'warning');
+                }
+                if (typeof playUSASound === 'function') playUSASound('radio_chirp');
+            }
+        }
+
         myUnits.forEach(enemy => {
             if (enemy.isScout && !enemy.combatTarget) return; // Scouts focus on reconnaissance traversal
 
-            // If unit is already engaged in active combat with valid hostile target, pursue
+            // If unit is already engaged in active combat with valid hostile target:
             if (enemy.combatTarget && enemy.combatTarget.health > 0 && !isFriendly(enemy, enemy.combatTarget)) {
                 const targetPos = enemy.combatTarget.position || enemy.combatTarget.mesh.position;
-                if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
-                    enemy.targetPosition.copy(targetPos);
+                // During grace period, disengage if target retreats far beyond AI base perimeter
+                if (!canLaunchOffensive && targetPos && enemy.mesh.position.distanceTo(cmd.basePos) > 40) {
+                    enemy.combatTarget = null;
+                } else {
+                    if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
+                        enemy.targetPosition.copy(targetPos);
+                    }
+                    return;
                 }
-                return;
             } else if (enemy.combatTarget) {
                 enemy.combatTarget = null;
             }
 
-            // A. If NO enemy assets have been sighted yet: Hold defensive base perimeter!
-            if (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0) {
-                // Defend base perimeter from intruders
+            // A. If offensive NOT yet permitted OR no enemy assets discovered yet: Hold defensive base perimeter!
+            if (!canLaunchOffensive || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
+                // Defend base perimeter from close intruders
                 let localIntruder = null;
-                let minDist = 30; // Base defense radius
+                let minDist = 35; // Base defense perimeter radius
                 hostileUnits.forEach(hu => {
-                    const d = enemy.mesh.position.distanceTo(hu.mesh.position);
-                    if (d < minDist) { minDist = d; localIntruder = hu; }
+                    if (hu.mesh) {
+                        const d = enemy.mesh.position.distanceTo(hu.mesh.position);
+                        if (d < minDist) { minDist = d; localIntruder = hu; }
+                    }
                 });
                 if (localIntruder) {
                     enemy.combatTarget = localIntruder;
                     enemy.targetPosition.copy(localIntruder.mesh.position);
                 } else {
-                    // Hold defensive rally zone around own Command Center
+                    // Station at defensive rally zone around own Command Center
                     if (enemy.mesh.position.distanceTo(cmd.basePos) > 32) {
                         enemy.targetPosition.copy(cmd.rallyPoint);
                     }
@@ -13633,7 +13986,7 @@ function processEnemyAIEngine() {
                 return;
             }
 
-            // B. Enemies HAVE been discovered! Launch attack waves on known coordinates!
+            // B. Attack Grace Expired AND Enemies HAVE been discovered! Launch attack waves on known coordinates!
             let closestKnown = null;
             let minDistance = Infinity;
 
@@ -14529,6 +14882,19 @@ function animate() {
             // Update Weapon Effects & Particle System
             
             updateFXEngine();
+
+            // Update Top-Right Match Clock (Zero Hour style)
+            if (typeof isMatchActive !== 'undefined' && isMatchActive && typeof matchStartTime !== 'undefined' && matchStartTime > 0) {
+                const totalSec = Math.floor((Date.now() - matchStartTime) / 1000);
+                if (window._lastClockSec !== totalSec) {
+                    window._lastClockSec = totalSec;
+                    const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+                    const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+                    const secs = String(totalSec % 60).padStart(2, '0');
+                    const clockEl = document.getElementById('match-clock');
+                    if (clockEl) clockEl.textContent = `${hrs}:${mins}:${secs}`;
+                }
+            }
 
             // =========================================================
             // 0. ACTIVE SELECTION VISUALS & DYNAMIC TRAJECTORY LINES
@@ -15899,6 +16265,7 @@ function processScrapCrateCollection() {
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
+            matchStartTime = Date.now();
             if (typeof initAICommanders === 'function') initAICommanders();
             updateSidebar();
             showNotification(`Tactical Deployment Complete. Command Center operational!`, 'success');
