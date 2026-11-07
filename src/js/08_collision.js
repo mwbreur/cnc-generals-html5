@@ -204,7 +204,9 @@
         function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
             const f = selectedFaction;
             const group = createStructureMeshForFaction(type, f);
-            group.scale.set(1.35, 1.35, 1.35);
+            if (!group.userData || !group.userData.isW3D) {
+                group.scale.set(1.35, 1.35, 1.35);
+            }
             group.position.copy(pos);
             group.rotation.y = rotationY || 0;
             
@@ -302,7 +304,9 @@
                 mesh = createBattlemasterTankMesh(true);
             }
 
-            mesh.scale.set(1.35, 1.35, 1.35);
+            if (!mesh.userData || !mesh.userData.isW3D) {
+                mesh.scale.set(1.35, 1.35, 1.35);
+            }
             radius *= 1.35;
             scanRange *= 1.35;
             speed *= 1.15;

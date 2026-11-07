@@ -1,4 +1,7 @@
-function createUSACommandCenter() {
+function createUSACommandCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_commandCenter']) {
+        return createW3DBuildingMesh('usa_commandCenter', isEnemy);
+    }
     const g = new THREE.Group();
     // Heavy reinforced concrete foundation slab with hazard perimeter
     const base = new THREE.Mesh(new THREE.BoxGeometry(13.8, 0.65, 12.8), matConcrete);
@@ -70,7 +73,10 @@ function createUSACommandCenter() {
     return g;
 }
 
-function createUSAColdFusionReactor() {
+function createUSAColdFusionReactor(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_power']) {
+        return createW3DBuildingMesh('usa_power', isEnemy);
+    }
     const g = new THREE.Group();
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 5.2, 0.55, 14), matConcrete);
     pad.position.y = 0.28; pad.receiveShadow = true; g.add(pad);
@@ -108,7 +114,10 @@ function createUSAColdFusionReactor() {
     return g;
 }
 
-function createUSABarracks() {
+function createUSABarracks(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_barracks']) {
+        return createW3DBuildingMesh('usa_barracks', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.48, 8.6), matConcrete);
     slab.position.y = 0.24; slab.receiveShadow = true; g.add(slab);
@@ -141,7 +150,10 @@ function createUSABarracks() {
     return g;
 }
 
-function createUSAWarFactory() {
+function createUSAWarFactory(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_factory']) {
+        return createW3DBuildingMesh('usa_factory', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(13.6, 0.55, 10.6), matConcrete);
     slab.position.y = 0.28; slab.receiveShadow = true; g.add(slab);
@@ -174,7 +186,10 @@ function createUSAWarFactory() {
     return g;
 }
 
-function createUSASupplyCenter() {
+function createUSASupplyCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_supplyCenter']) {
+        return createW3DBuildingMesh('usa_supplyCenter', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(12.8, 0.52, 10.8), matConcrete);
     slab.position.y = 0.26; g.add(slab);
@@ -199,7 +214,10 @@ function createUSASupplyCenter() {
     return g;
 }
 
-function createUSASupplyDropZone() {
+function createUSASupplyDropZone(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_supplyDrop']) {
+        return createW3DBuildingMesh('usa_supplyDrop', isEnemy);
+    }
     const g = new THREE.Group();
     // Large military landing pad with central cross
     const pad = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.38, 11.5), matConcrete);
@@ -225,7 +243,10 @@ function createUSASupplyDropZone() {
     return g;
 }
 
-function createUSAAirfield() {
+function createUSAAirfield(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_airfield']) {
+        return createW3DBuildingMesh('usa_airfield', isEnemy);
+    }
     const g = new THREE.Group();
     // Tarmac runway strip with directional arrows
     const tarmac = new THREE.Mesh(new THREE.BoxGeometry(15.8, 0.28, 13.8), matDarkMetal);
@@ -263,7 +284,10 @@ function createUSAAirfield() {
     return g;
 }
 
-function createUSAStrategyCenter() {
+function createUSAStrategyCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_strategyCenter']) {
+        return createW3DBuildingMesh('usa_strategyCenter', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.8, 0.55, 18), matConcrete);
     slab.position.y = 0.28; g.add(slab);
@@ -286,7 +310,10 @@ function createUSAStrategyCenter() {
     return g;
 }
 
-function createUSAPatriotSystem() {
+function createUSAPatriotSystem(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_patriot']) {
+        return createW3DBuildingMesh('usa_patriot', isEnemy);
+    }
     const g = new THREE.Group();
     // Concrete pad & sandbag revetment
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.9, 3.3, 0.48, 12), matConcrete);
@@ -328,7 +355,10 @@ function createUSAPatriotSystem() {
     return g;
 }
 
-function createUSAParticleCannon() {
+function createUSAParticleCannon(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_particleCannon']) {
+        return createW3DBuildingMesh('usa_particleCannon', isEnemy);
+    }
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(6.6, 7.4, 0.65, 20), matConcrete);
     base.position.y = 0.32; g.add(base);
@@ -354,7 +384,10 @@ function createUSAParticleCannon() {
     return g;
 }
 
-function createUSADetentionCamp() {
+function createUSADetentionCamp(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_detentionCamp']) {
+        return createW3DBuildingMesh('usa_detentionCamp', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.42, 7.8), matConcrete);
     slab.position.y = 0.21; g.add(slab);
@@ -374,7 +407,10 @@ function createUSADetentionCamp() {
 
 // --- CHINA STRUCTURES ---
 
-function createChinaCommandCenter() {
+function createChinaCommandCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_commandCenter']) {
+        return createW3DBuildingMesh('china_commandCenter', isEnemy);
+    }
     const g = new THREE.Group();
     // Heavy concrete citadel foundation
     const base = new THREE.Mesh(new THREE.BoxGeometry(14.0, 0.75, 13.0), matConcrete);
@@ -417,7 +453,10 @@ function createChinaCommandCenter() {
     return g;
 }
 
-function createChinaNuclearReactor() {
+function createChinaNuclearReactor(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_power']) {
+        return createW3DBuildingMesh('china_power', isEnemy);
+    }
     const g = new THREE.Group();
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.8, 0.65, 16), matConcrete);
     pad.position.y = 0.32; pad.receiveShadow = true; g.add(pad);
@@ -448,7 +487,10 @@ function createChinaNuclearReactor() {
     return g;
 }
 
-function createChinaBarracks() {
+function createChinaBarracks(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_barracks']) {
+        return createW3DBuildingMesh('china_barracks', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.52, 8.6), matConcrete);
     slab.position.y = 0.26; g.add(slab);
@@ -472,7 +514,10 @@ function createChinaBarracks() {
     return g;
 }
 
-function createChinaWarFactory() {
+function createChinaWarFactory(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_factory']) {
+        return createW3DBuildingMesh('china_factory', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(13.8, 0.58, 10.8), matConcrete);
     slab.position.y = 0.29; slab.receiveShadow = true; g.add(slab);
@@ -496,7 +541,10 @@ function createChinaWarFactory() {
     return g;
 }
 
-function createChinaGatlingCannon() {
+function createChinaGatlingCannon(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_gatlingCannon']) {
+        return createW3DBuildingMesh('china_gatlingCannon', isEnemy);
+    }
     const g = new THREE.Group();
     // Reinforced hexagonal concrete pillbox base
     const base = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.2, 1.8, 6), matConcrete);
@@ -528,7 +576,10 @@ function createChinaGatlingCannon() {
     return g;
 }
 
-function createChinaBunker() {
+function createChinaBunker(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_bunker']) {
+        return createW3DBuildingMesh('china_bunker', isEnemy);
+    }
     const g = new THREE.Group();
     // Low-profile semi-submerged reinforced concrete pillbox
     const bunker = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 1.6, 8), matConcrete);
@@ -545,7 +596,10 @@ function createChinaBunker() {
     return g;
 }
 
-function createChinaSpeakerTower() {
+function createChinaSpeakerTower(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_speakerTower']) {
+        return createW3DBuildingMesh('china_speakerTower', isEnemy);
+    }
     const g = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 0.4, 8), matConcrete);
     base.position.y = 0.2; g.add(base);
@@ -573,7 +627,10 @@ function createChinaSpeakerTower() {
     return g;
 }
 
-function createChinaNukeSilo() {
+function createChinaNukeSilo(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_nukeSilo']) {
+        return createW3DBuildingMesh('china_nukeSilo', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(13.6, 0.65, 13.6), matConcrete);
     slab.position.y = 0.32; g.add(slab);
@@ -607,7 +664,10 @@ function createChinaNukeSilo() {
     return g;
 }
 
-function createChinaSupplyCenter() {
+function createChinaSupplyCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_supplyCenter']) {
+        return createW3DBuildingMesh('china_supplyCenter', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(12.8, 0.52, 10.8), matConcrete);
     slab.position.y = 0.26; g.add(slab);
@@ -624,7 +684,10 @@ function createChinaSupplyCenter() {
 }
 
 // China Dedicated Airfield (PLA MiG Hangars & Runway)
-function createChinaAirfield() {
+function createChinaAirfield(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_airfield']) {
+        return createW3DBuildingMesh('china_airfield', isEnemy);
+    }
     const g = new THREE.Group();
     // Runway tarmac with red PLA landing stripes
     const tarmac = new THREE.Mesh(new THREE.BoxGeometry(15.8, 0.28, 13.8), matDarkMetal);
@@ -655,7 +718,10 @@ function createChinaAirfield() {
     return g;
 }
 
-function createChinaPropagandaCenter() {
+function createChinaPropagandaCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_propagandaCenter']) {
+        return createW3DBuildingMesh('china_propagandaCenter', isEnemy);
+    }
     const g = new THREE.Group();
     // Monumental neoclassical palace with columns
     const palace = new THREE.Mesh(new THREE.BoxGeometry(11.5, 4.8, 8.8), matChina);
@@ -672,7 +738,10 @@ function createChinaPropagandaCenter() {
     return g;
 }
 
-function createChinaInternetCenter() {
+function createChinaInternetCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_internetCenter']) {
+        return createW3DBuildingMesh('china_internetCenter', isEnemy);
+    }
     const g = new THREE.Group();
     // High-tech cyber warfare bunker
     const base = new THREE.Mesh(new THREE.BoxGeometry(10.8, 4.0, 8.8), matChina);
@@ -690,7 +759,10 @@ function createChinaInternetCenter() {
 
 // --- GLA STRUCTURES ---
 
-function createGLACommandCenter() {
+function createGLACommandCenter(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_commandCenter']) {
+        return createW3DBuildingMesh('gla_commandCenter', isEnemy);
+    }
     const g = new THREE.Group();
     // Weathered sandbag & dirt foundation
     const slab = new THREE.Mesh(new THREE.BoxGeometry(13.5, 0.55, 12.5), matSandbags);
@@ -719,7 +791,10 @@ function createGLACommandCenter() {
     return g;
 }
 
-function createGLABarracks(isFake = false) {
+function createGLABarracks(isFake = false, isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_barracks']) {
+        return createW3DBuildingMesh('gla_barracks', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.42, 7.8), matSandbags);
     slab.position.y = 0.21; g.add(slab);
@@ -738,7 +813,10 @@ function createGLABarracks(isFake = false) {
     return g;
 }
 
-function createGLAArmsDealer(isFake = false) {
+function createGLAArmsDealer(isFake = false, isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_factory']) {
+        return createW3DBuildingMesh('gla_factory', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(13.5, 0.48, 10.5), matSandbags);
     slab.position.y = 0.24; g.add(slab);
@@ -763,7 +841,10 @@ function createGLAArmsDealer(isFake = false) {
     return g;
 }
 
-function createGLASupplyStash() {
+function createGLASupplyStash(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_supplyCenter']) {
+        return createW3DBuildingMesh('gla_supplyCenter', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.42, 8.8), matSandbags);
     slab.position.y = 0.21; g.add(slab);
@@ -784,7 +865,10 @@ function createGLASupplyStash() {
     return g;
 }
 
-function createGLABlackMarket() {
+function createGLABlackMarket(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_blackMarket']) {
+        return createW3DBuildingMesh('gla_blackMarket', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.42, 9.5), matSandbags);
     slab.position.y = 0.21; g.add(slab);
@@ -804,7 +888,10 @@ function createGLABlackMarket() {
     return g;
 }
 
-function createGLATunnelNetwork() {
+function createGLATunnelNetwork(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_tunnel']) {
+        return createW3DBuildingMesh('gla_tunnel', isEnemy);
+    }
     const g = new THREE.Group();
     // Heavy sandbagged circular parapet
     const berm = new THREE.Mesh(new THREE.TorusGeometry(3.8, 0.65, 8, 16), matSandbags);
@@ -826,7 +913,10 @@ function createGLATunnelNetwork() {
     return g;
 }
 
-function createGLAStingerSite() {
+function createGLAStingerSite(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_stingerSite']) {
+        return createW3DBuildingMesh('gla_stingerSite', isEnemy);
+    }
     const g = new THREE.Group();
     const berm = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.58, 6, 14), matSandbags);
     berm.rotation.x = Math.PI / 2; berm.position.y = 0.38; g.add(berm);
@@ -866,7 +956,10 @@ function createGLADemoTrap() {
     return g;
 }
 
-function createGLAPalace() {
+function createGLAPalace(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_palace']) {
+        return createW3DBuildingMesh('gla_palace', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(13.8, 0.55, 11.8), matSandbags);
     slab.position.y = 0.28; g.add(slab);
@@ -888,7 +981,10 @@ function createGLAPalace() {
     return g;
 }
 
-function createGLAScudStorm() {
+function createGLAScudStorm(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_scudStorm']) {
+        return createW3DBuildingMesh('gla_scudStorm', isEnemy);
+    }
     const g = new THREE.Group();
     const slab = new THREE.Mesh(new THREE.BoxGeometry(13.8, 0.65, 13.8), matConcrete);
     slab.position.y = 0.32; g.add(slab);
@@ -937,7 +1033,10 @@ function createGLAScudStorm() {
 // NEUTRAL MAP TECH BUILDINGS & GLA RECONSTRUCTION HOLES
 // =========================================================================
 
-function createTechOilDerrickMesh() {
+function createTechOilDerrickMesh(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['tech_oilDerrick']) {
+        return createW3DBuildingMesh('tech_oilDerrick', isEnemy);
+    }
     const g = new THREE.Group();
     g.name = "techOilDerrick";
     const matConcrete = new THREE.MeshStandardMaterial({ color: 0x4a5559, roughness: 0.85 });
@@ -982,7 +1081,10 @@ function createTechOilDerrickMesh() {
     return g;
 }
 
-function createTechHospitalMesh() {
+function createTechHospitalMesh(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['tech_hospital']) {
+        return createW3DBuildingMesh('tech_hospital', isEnemy);
+    }
     const g = new THREE.Group();
     g.name = "techHospital";
     const matWhite = new THREE.MeshStandardMaterial({ color: 0xf5f6fa, roughness: 0.4 });
@@ -1011,7 +1113,10 @@ function createTechHospitalMesh() {
     return g;
 }
 
-function createTechRefineryMesh() {
+function createTechRefineryMesh(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['tech_refinery']) {
+        return createW3DBuildingMesh('tech_refinery', isEnemy);
+    }
     const g = new THREE.Group();
     g.name = "techRefinery";
     const matSteel = new THREE.MeshStandardMaterial({ color: 0x718093, metalness: 0.8, roughness: 0.35 });
@@ -1041,7 +1146,10 @@ function createTechRefineryMesh() {
     return g;
 }
 
-function createGLAHoleMesh() {
+function createGLAHoleMesh(isEnemy = false) {
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['gla_hole']) {
+        return createW3DBuildingMesh('gla_hole', isEnemy);
+    }
     const g = new THREE.Group();
     g.name = "glaHole";
     const matMud = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.95 });

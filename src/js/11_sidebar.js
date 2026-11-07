@@ -2727,7 +2727,9 @@ function updateHUD() {
             }
 
             // 1.35x Scale Boost for high visual fidelity & detail
-            mesh.scale.set(1.35, 1.35, 1.35);
+            if (!mesh.userData || !mesh.userData.isW3D) {
+                mesh.scale.set(1.35, 1.35, 1.35);
+            }
             radius *= 1.35;
             scanRange *= 1.35;
             speed *= 1.15;
