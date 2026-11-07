@@ -43,7 +43,20 @@ const soundFiles = {
 
     'voice_aurora_select': 'vaursea.wav',
     'voice_aurora_move': 'vaurmoa.wav',
-    'voice_aurora_attack': 'vaurata.wav'
+    'voice_aurora_attack': 'vaurata.wav',
+
+    // USA Dozer, Colonel Burton, Pathfinder
+    'voice_dozer_select': 'vdousea.wav',
+    'voice_dozer_move': 'vdoumoa.wav',
+    'voice_dozer_build': 'vdoubua.wav',
+
+    'voice_burton_select': 'icolsea.wav',
+    'voice_burton_move': 'icolmoa.wav',
+    'voice_burton_attack': 'icolata.wav',
+
+    'voice_pathfinder_select': 'ipatsea.wav',
+    'voice_pathfinder_move': 'ipatmoa.wav',
+    'voice_pathfinder_attack': 'ipatata.wav'
 };
 
 const audioMap = {};
@@ -89,6 +102,9 @@ function playUnitVoice(unitType, action = 'select') {
     else if (t === 'chinook') key = 'voice_chinook_' + (action === 'attack' ? 'move' : action);
     else if (t === 'raptor') key = 'voice_raptor_' + action;
     else if (t === 'aurora') key = 'voice_aurora_' + action;
+    else if (t === 'dozer') key = 'voice_dozer_' + (action === 'attack' ? 'move' : action);
+    else if (t === 'burton') key = 'voice_burton_' + action;
+    else if (t === 'pathfinder') key = 'voice_pathfinder_' + action;
 
     if (key && window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[key]) {
         playOfficialSound(key, 0.85);

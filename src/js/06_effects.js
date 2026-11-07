@@ -1056,6 +1056,15 @@
         // =========================================================================
 
         function createDroneMesh(droneType) {
+            if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA) {
+                const modelKey = (droneType === 'scout') ? 'drone_scout' : 'drone_battle';
+                if (window.W3D_VEHICLE_DATA[modelKey]) {
+                    const droneMesh = createW3DVehicleMesh(modelKey, false);
+                    droneMesh.userData.droneType = droneType;
+                    return droneMesh;
+                }
+            }
+
             const group = new THREE.Group();
             const bodyMat = new THREE.MeshStandardMaterial({
                 color: droneType === 'scout' ? 0x747d8c : droneType === 'hellfire' ? 0x2f3542 : 0x576574,

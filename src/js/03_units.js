@@ -195,7 +195,9 @@ function createPaladinTankMesh(isEnemy = false) {
         if (window.W3D_VEHICLE_DATA['drone_battle']) {
             const drone = createW3DVehicleMesh('drone_battle', isEnemy);
             drone.name = 'paladinBattleDrone';
-            drone.position.set(0, 2.4 / 0.09, -8.0);
+            // Scale appropriately relative to parent paladin tank group (0.075 / 0.09)
+            drone.scale.set(0.833, 0.833, 0.833);
+            drone.position.set(0, 22.0, -10.0);
             root.add(drone);
         }
         return root;
@@ -803,6 +805,16 @@ function createMissileDefenderMesh(isEnemy = false) {
 
     const warhead = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), matHazard);
     warhead.position.set(0.38, 1.2, 0.85); g.add(warhead);
+    return g;
+}
+
+function createPathfinderMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['pathfinder']) {
+        return createW3DInfantryMesh('pathfinder', isEnemy);
+    }
+    const g = createRangerMesh(isEnemy);
+    const ghillie = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.5), new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.9 }));
+    ghillie.position.y = 0.9; g.add(ghillie);
     return g;
 }
 

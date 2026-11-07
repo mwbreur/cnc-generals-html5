@@ -1,6 +1,6 @@
 // MAP ENVIRONMENTS, PROCEDURAL TERRAIN, WATER & PROPS (TREES / CITY)
         // =========================================================================
-        let currentMapType = 'desert';
+        let currentMapType = 'tournament_desert';
         let currentMapSize = 1500;
         let terrainMesh = null;
         let waterMesh = null;
@@ -357,8 +357,9 @@
 
         // Procedural Texture Generator per Environment
         function createTerrainTextureForMap(mapType) {
-            if (mapType === 'tournament_desert' && typeof createTournamentDesertTexture === 'function') {
-                return createTournamentDesertTexture();
+            if ((mapType === 'tournament_desert' || mapType === 'desert') && typeof createTournamentDesertTexture === 'function') {
+                const retailTex = createTournamentDesertTexture();
+                if (retailTex) return retailTex;
             }
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = 512;
@@ -451,7 +452,8 @@
         }
 
         // Build Terrain, Water, and Props for the selected Map
-        function setupMapEnvironment(mapType = 'desert', mapSize = 1500) {
+        function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
+            if (mapType === 'desert') mapType = 'tournament_desert';
             // 0. Resolve activeCustomMap if mapType starts with custom_
             if (mapType && mapType.startsWith('custom_')) {
                 if (!activeCustomMap || activeCustomMap.id !== mapType) {
@@ -1064,6 +1066,7 @@
                 if (window.W3D_BUILDING_DATA['tech_supplyCrates']) {
                     crates = createW3DBuildingMesh('tech_supplyCrates', false);
                     crates.name = 'supplyCrates';
+                    crates.scale.set(1.0, 1.0, 1.0);
                     dockMesh.add(crates);
                 }
             } else {
@@ -1087,6 +1090,7 @@
                 position: pos.clone(),
                 mesh: dockMesh,
                 cratesRef: crates,
+                crystals: [],
                 stock: stock,
                 maxStock: stock,
                 remaining: stock,

@@ -571,6 +571,7 @@ function processEnemyAIEngine() {
                 placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
                 const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
                 playUSASound('construction');
+                if (typeof playUnitVoice === 'function') playUnitVoice('dozer', 'build');
                 scene.remove(blueprintMesh);
                 blueprintMesh = null;
                 activeBlueprintType = null;
@@ -868,8 +869,8 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // If a supply point was targeted and any harvester (truck or worker) is selected:
-            const selectedHarvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
+            // If a supply point was targeted and any harvester (truck, worker, or chinook) is selected:
+            const selectedHarvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook'));
             if (clickedSupplyPoint && selectedHarvesters.length > 0) {
                 selectedHarvesters.forEach(harvester => {
                     harvester.supplyTarget = clickedSupplyPoint;

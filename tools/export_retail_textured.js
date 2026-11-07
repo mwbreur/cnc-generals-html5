@@ -95,24 +95,24 @@ const BUILDING_CONFIG = {
     'tech_refinery':        { file: 'CBOilRfny.W3D',    tex: 'cboilrfny.dds',  scale: 0.260, faction: 'tech' }
 };
 
-// Retail Westwood 3D Infantry Characters (scaled to ~0.80 units tall, realistic human proportions)
+// Retail Westwood 3D Infantry Characters (calibrated to ~0.55 units tall, authentic human-to-tank scale)
 const INFANTRY_CONFIG = {
     // USA
-    'ranger':         { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.080, faction: 'usa' },
-    'missiledefender':{ file: 'NITHNT_SKN.W3D', tex: 'zhca_aimsslguy.tga',  scale: 0.080, faction: 'usa' },
-    'pathfinder':     { file: 'AIPFDR_SKN.W3D', tex: 'zhca_aipthfindr.tga', scale: 0.080, faction: 'usa' },
-    'burton':         { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.082, faction: 'usa' },
+    'ranger':         { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.055, faction: 'usa' },
+    'missiledefender':{ file: 'INF4BRG_SKN.W3D', tex: 'zhca_aimsslguy.tga',  scale: 0.055, faction: 'usa' },
+    'pathfinder':     { file: 'AIPFDR_SKN.W3D', tex: 'zhca_aipthfindr.tga', scale: 0.055, faction: 'usa' },
+    'burton':         { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.058, faction: 'usa' },
     // China
-    'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.080, faction: 'china' },
-    'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.080, faction: 'china' },
-    'hacker':     { file: 'NIHCKR_SKN.W3D', tex: 'zhca_nihacker.tga',   scale: 0.080, faction: 'china' },
-    'lotus':      { file: 'NIHERO_SKN.W3D', tex: 'zhca_niblotus.tga',   scale: 0.078, faction: 'china' },
+    'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.055, faction: 'china' },
+    'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.055, faction: 'china' },
+    'hacker':     { file: 'NIHCKR_SKN.W3D', tex: 'zhca_nihacker.tga',   scale: 0.055, faction: 'china' },
+    'lotus':      { file: 'NIHERO_SKN.W3D', tex: 'zhca_niblotus.tga',   scale: 0.056, faction: 'china' },
     // GLA
-    'rebel':      { file: 'UIRGRD_SKN.W3D', tex: 'zhca_uirguard.tga',   scale: 0.080, faction: 'gla' },
-    'rpg':        { file: 'UISMSD_SKN.W3D', tex: 'zhca_uirstnger.tga',  scale: 0.080, faction: 'gla' },
-    'terrorist':  { file: 'UITRST_SKN.W3D', tex: 'zhca_uiter.tga',      scale: 0.080, faction: 'gla' },
-    'jarmen':     { file: 'UIHERO_SKN.W3D', tex: 'zhca_uihero01.tga',   scale: 0.082, faction: 'gla' },
-    'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.078, faction: 'gla' }
+    'rebel':      { file: 'UIRGRD_SKN.W3D', tex: 'zhca_uirguard.tga',   scale: 0.055, faction: 'gla' },
+    'rpg':        { file: 'UISMSD_SKN.W3D', tex: 'zhca_uirstnger.tga',  scale: 0.055, faction: 'gla' },
+    'terrorist':  { file: 'UITRST_SKN.W3D', tex: 'zhca_uiter.tga',      scale: 0.055, faction: 'gla' },
+    'jarmen':     { file: 'UIHERO_SKN.W3D', tex: 'zhca_uihero01.tga',   scale: 0.058, faction: 'gla' },
+    'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.054, faction: 'gla' }
 };
 
 // Additional architectural and detail textures
@@ -189,19 +189,34 @@ function processModels(map) {
             cleanRogueVertices(filteredMeshes['nvtcrawler.housecolor'], 15);
         } else if (key === 'aurora' && filteredMeshes['avaurora.housecolor01']) {
             cleanRogueVertices(filteredMeshes['avaurora.housecolor01'], 25);
+        } else if (key === 'raptor' && filteredMeshes['avraptor.housecolor01']) {
+            delete filteredMeshes['avraptor.housecolor01'];
         }
 
-        // Canonical 3D Axis Alignment for Aircraft:
-        if (key === 'raptor') {
-            for (const m of Object.values(filteredMeshes)) {
-                for (let i = 0; i < m.v.length; i += 3) {
-                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                    m.v[i] = oz; m.v[i+1] = ox; m.v[i+2] = oy;
+        // Canonical 3D Axis Alignment for Aircraft & Helicopters (+Z forward, +Y up, +X right):
+        if (key === 'comanche' || key === 'chinook') {
+            for (const [mName, m] of Object.entries(filteredMeshes)) {
+                if (!mName.includes('prop')) {
+                    for (let i = 0; i < m.v.length; i += 3) {
+                        const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                        m.v[i] = oy; m.v[i+1] = -ox; m.v[i+2] = oz;
+                    }
                 }
             }
             parsed.pivots.forEach(p => {
                 const ox = p.tx, oy = p.ty, oz = p.tz;
-                p.tx = oz; p.ty = ox; p.tz = oy;
+                p.tx = oy; p.ty = -ox; p.tz = oz;
+            });
+        } else if (key === 'raptor') {
+            for (const m of Object.values(filteredMeshes)) {
+                for (let i = 0; i < m.v.length; i += 3) {
+                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                    m.v[i] = oz; m.v[i+1] = -ox; m.v[i+2] = oy;
+                }
+            }
+            parsed.pivots.forEach(p => {
+                const ox = p.tx, oy = p.ty, oz = p.tz;
+                p.tx = oz; p.ty = -ox; p.tz = oy;
             });
         } else if (key === 'aurora') {
             for (const m of Object.values(filteredMeshes)) {
@@ -236,9 +251,23 @@ function processModels(map) {
             }
         }
 
-        const meshEntries = parsed.hlodSubObjects.length > 0
-            ? parsed.hlodSubObjects.filter(h => filteredMeshes[h.name] !== undefined).map(h => [h.boneIndex, h.name])
-            : Object.keys(filteredMeshes).map(mName => [0, mName]);
+        let meshEntries;
+        if (parsed.hlodSubObjects.length > 0) {
+            meshEntries = parsed.hlodSubObjects.filter(h => filteredMeshes[h.name] !== undefined).map(h => [h.boneIndex, h.name]);
+        } else {
+            meshEntries = Object.keys(filteredMeshes).map(mName => {
+                const upper = mName.toUpperCase();
+                let foundBone = 0;
+                for (let pi = 0; pi < parsed.pivots.length; pi++) {
+                    const pName = parsed.pivots[pi].name.toUpperCase();
+                    if (pName && pName !== 'ROOTTRANSFORM' && (upper.includes(pName) || (upper.split('.')[1] && pName.includes(upper.split('.')[1])))) {
+                        foundBone = pi;
+                        break;
+                    }
+                }
+                return [foundBone, mName];
+            });
+        }
 
         const compactPivots = parsed.pivots.map(p => [
             p.name,
@@ -488,7 +517,7 @@ function getW3dTexture(modelKey) {
                         [r1, g1, b1, 255],
                         c0 > c1 ? [((2*r0 + r1)/3)|0, ((2*g0 + g1)/3)|0, ((2*b0 + b1)/3)|0, 255]
                                 : [((r0 + r1)/2)|0, ((g0 + g1)/2)|0, ((b0 + b1)/2)|0, 255],
-                        c0 > c1 ? [((r0 + 2*r1)/3)|0, ((r0 + 2*g1)/3)|0, ((b0 + 2*b1)/3)|0, 255]
+                        c0 > c1 ? [((r0 + 2*r1)/3)|0, ((g0 + 2*g1)/3)|0, ((b0 + 2*b1)/3)|0, 255]
                                 : [0, 0, 0, 0]
                     ];
 
@@ -642,6 +671,43 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     if (modelKey === 'drone_battle') {
         const fanMesh = root.getObjectByName('avbattledr.fan');
         if (fanMesh) fanMesh.name = 'ductedFan';
+    } else if (modelKey === 'comanche') {
+        const rotor = root.getObjectByName('PROPELLER01') || root.getObjectByName('avcomanche.avcomanche_prop');
+        if (rotor) rotor.name = 'comanche_rotor';
+    } else if (modelKey === 'chinook') {
+        const r1 = root.getObjectByName('PROPELLER01') || root.getObjectByName('avchinook.props01');
+        if (r1) r1.name = 'chinook_rotor1';
+        const r2 = root.getObjectByName('PROPELLER02') || root.getObjectByName('avchinook.props02');
+        if (r2) r2.name = 'chinook_rotor2';
+    }
+
+    const isAirUnit = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig', 'drone_battle', 'drone_scout'].includes(modelKey);
+    if (!isAirUnit) {
+        let minY = 1e9;
+        root.traverse(c => {
+            if (c.isMesh && c.geometry && c.geometry.attributes.position) {
+                const pos = c.geometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const vy = pos.getY(i);
+                    let curY = vy;
+                    let p = c.parent;
+                    while (p && p !== root) {
+                        curY += p.position.y;
+                        p = p.parent;
+                    }
+                    if (curY < minY) minY = curY;
+                }
+            }
+        });
+        if (minY < 1e8 && minY < 0) {
+            const shiftY = -minY;
+            root.children.forEach(child => {
+                child.position.y += shiftY;
+            });
+        }
+    } else {
+        root.userData.isAir = true;
+        root.userData.flightAltitude = (modelKey === 'chinook') ? 8.5 : (modelKey === 'comanche') ? 8.0 : (modelKey === 'raptor' || modelKey === 'aurora') ? 9.5 : 8.5;
     }
 
     root.userData.isW3D = true;
@@ -760,6 +826,15 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         let mat = bldMat;
         if (buildingKey === 'usa_power' && (upper.includes('CYLINDER01') || upper.includes('CYLINDER02') || upper.includes('CYLINDER'))) {
             mat = coldFusionGlowMat;
+        } else if (buildingKey === 'usa_power' && (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2')))) {
+            // Vibrant glowing blue plasma energy conduit connecting cooling towers to power grid
+            mat = new THREE.MeshStandardMaterial({
+                color: 0x00d2ff,
+                emissive: 0x0088ff,
+                emissiveIntensity: 1.6,
+                roughness: 0.2,
+                metalness: 0.5
+            });
         } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
             // Authentic metallic cooling tower finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
@@ -802,15 +877,37 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     }
 
     if (buildingKey === 'usa_power') {
-        const glowLight = new THREE.PointLight(0x00d2ff, 2.2, 40);
-        glowLight.position.set(-11, 18, -7);
-        root.add(glowLight);
+        const glow1 = new THREE.PointLight(0x00d2ff, 2.5, 35);
+        glow1.position.set(-4.65, 18.0, -0.54);
+        root.add(glow1);
 
-        const coreGeom = new THREE.SphereGeometry(3.2, 12, 12);
-        const coreMesh = new THREE.Mesh(coreGeom, coldFusionGlowMat);
-        coreMesh.name = 'fusionCore';
-        coreMesh.position.set(-11, 16.5, -7);
-        root.add(coreMesh);
+        const glow2 = new THREE.PointLight(0x00d2ff, 2.5, 35);
+        glow2.position.set(-17.54, 18.0, -13.16);
+        root.add(glow2);
+    }
+
+    // Align base foundation to y = 0
+    let minBldY = 1e9;
+    root.traverse(c => {
+        if (c.isMesh && c.geometry && c.geometry.attributes.position) {
+            const pos = c.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const vy = pos.getY(i);
+                let curY = vy;
+                let p = c.parent;
+                while (p && p !== root) {
+                    curY += p.position.y;
+                    p = p.parent;
+                }
+                if (curY < minBldY) minBldY = curY;
+            }
+        }
+    });
+    if (minBldY < 1e8 && minBldY < 0) {
+        const shiftY = -minBldY;
+        root.children.forEach(child => {
+            child.position.y += shiftY;
+        });
     }
 
     root.userData.isW3D = true;
@@ -825,7 +922,7 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
     if (!window.W3D_INFANTRY_DATA || !window.W3D_INFANTRY_DATA[infantryKey]) {
         if (typeof fallbackFn === 'function') {
             const fallbackMesh = fallbackFn(isEnemy);
-            fallbackMesh.scale.set(0.52, 0.52, 0.52);
+            fallbackMesh.scale.set(0.38, 0.38, 0.38);
             return fallbackMesh;
         }
         return new THREE.Group();

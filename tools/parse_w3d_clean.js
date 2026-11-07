@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-function isFxGlitchMesh(name) {
-    const n = name.toLowerCase();
-    return /headlight|lightbeam|muzzlefx|turretfx|smokefx|exnk|exhaustfx|treadfx|firepoint|runwaylight|redlight|greenlight|mesh12|mesh78|mesh10|^abarfrccmd\.plane|^abbtcmdhq\.plane|line02/i.test(n);
+function isFxGlitchMesh(name, tex = '') {
+    const n = (name + ' ' + (tex || '')).toLowerCase();
+    return /headlight|lightbeam|muzzlefx|turretfx|smokefx|exnk|exhaustfx|treadfx|firepoint|runwaylight|redlight|greenlight|burnerfx|nvbuggy|cxpolicecar005|weapona\d+|mesh12|mesh78|mesh10|^abarfrccmd\.plane|^abbtcmdhq\.plane|line02|abwarfact\.mesh01|abwarfact\.pyramid|abbtcmdhq\.object17|abbtcmdhq\.object22|extnkmzl/i.test(n);
 }
 
 function parseW3dModel(filePath) {
@@ -176,7 +176,10 @@ function parseW3dModel(filePath) {
                     // Split into submeshes per texture
                     const usedIds = [...new Set(texIds)];
                     usedIds.forEach(id => {
-                        const tName = texNames[id] ? texNames[id].toLowerCase().replace('.tga', '.dds') : 'unknown';
+                        const rawT = texNames[id];
+                        const tName = rawT ? rawT.toLowerCase().replace('.tga', '.dds') : 'unknown';
+                        if (isFxGlitchMesh(fullName, tName)) return;
+
                         const subIndices = [];
                         for (let t = 0; t < texIds.length; t++) {
                             if (texIds[t] === id) {
@@ -205,7 +208,14 @@ function parseW3dModel(filePath) {
                         };
                     });
                 } else {
-                    const tName = texNames[0] ? texNames[0].toLowerCase().replace('.tga', '.dds') : null;
+                    let chosenTex = texNames[0];
+                    const nonEnv = texNames.filter(t => !/lakedusk|clouds|env_|_env/i.test(t));
+                    if (nonEnv.length > 0) chosenTex = nonEnv[0];
+                    const tName = chosenTex ? chosenTex.toLowerCase().replace('.tga', '.dds') : null;
+
+                    if (isFxGlitchMesh(fullName, tName)) return;
+                    if (!tName && indices.length <= 12 && /plane|housecolor|mesh01|quad|object17|object22/i.test(fullName)) return;
+
                     meshes[fullName] = {
                         v: vertices,
                         i: indices,

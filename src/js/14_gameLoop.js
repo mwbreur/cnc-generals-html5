@@ -265,10 +265,12 @@ function animate() {
 
             // Dynamic military & building animations (Authentic C&C Generals building movements)
             scene.traverse(obj => {
-                if (obj.name === "comanche_rotor" || obj.name === "chinook_rotor1") {
+                if (obj.name === "comanche_rotor" || obj.name === "chinook_rotor1" || obj.name.includes("avcomanche_prop") || obj.name.includes("props01") || (obj.name === "PROPELLER01" && obj.parent && (obj.parent.name.includes("comanche") || obj.parent.name.includes("chinook")))) {
                     obj.rotation.y += 0.45;
-                } else if (obj.name === "chinook_rotor2") {
+                } else if (obj.name === "chinook_rotor2" || obj.name.includes("props02") || (obj.name === "PROPELLER02" && obj.parent && obj.parent.name.includes("chinook"))) {
                     obj.rotation.y -= 0.45;
+                } else if (obj.name === "ductedFan" || obj.name === "avbattledr.fan") {
+                    obj.rotation.y += 0.45;
                 } else if (obj.name === "radarDish") {
                     // Continuous radar dish / array rotation
                     obj.rotation.y += 0.025;
@@ -386,7 +388,7 @@ function animate() {
             if (!constructionActive) progressContainer.style.display = 'none';
 
             units.forEach(unit => {
-                if ((unit.type !== 'truck' && unit.type !== 'worker') || unit.taskState !== 'Idle') return;
+                if ((unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'chinook') || unit.taskState !== 'Idle') return;
                 const cargoHold = unit.mesh.getObjectByName("cargoHold");
                 switch (unit.aiState) {
                     case 'MovingToDock':
@@ -396,7 +398,8 @@ function animate() {
                         if (unit.supplyTarget) {
                             unit.targetPosition.copy(unit.supplyTarget.position);
                             const distToDock = Math.hypot(unit.mesh.position.x - unit.supplyTarget.position.x, unit.mesh.position.z - unit.supplyTarget.position.z);
-                            if (distToDock < 11.0) {
+                            const dockDistThreshold = (unit.type === 'chinook') ? 14.0 : 11.0;
+                            if (distToDock < dockDistThreshold) {
                                 unit.aiState = 'Harvesting';
                                 unit.timerState = 0;
                             }
@@ -412,11 +415,18 @@ function animate() {
                         }
                         unit.timerState += 1;
                         if (unit.timerState > 80) {
-                            const loadCap = (unit.type === 'worker') ? 100 : 200;
+                            const loadCap = (unit.type === 'worker') ? 100 : (unit.type === 'chinook' ? 600 : 200);
                             unit.cargoLoaded = Math.min(loadCap, unit.supplyTarget.stock);
                             unit.supplyTarget.stock -= unit.cargoLoaded;
-                            const visibleCrystals = Math.ceil(unit.supplyTarget.stock / unit.supplyTarget.maxStock * unit.supplyTarget.crystals.length);
-                            unit.supplyTarget.crystals.forEach((crystal, index) => crystal.visible = index < visibleCrystals);
+                            if (unit.supplyTarget.crystals && unit.supplyTarget.crystals.length > 0) {
+                                const visibleCrystals = Math.ceil(unit.supplyTarget.stock / unit.supplyTarget.maxStock * unit.supplyTarget.crystals.length);
+                                unit.supplyTarget.crystals.forEach((crystal, index) => crystal.visible = index < visibleCrystals);
+                            }
+                            if (unit.supplyTarget.cratesRef) {
+                                const ratio = Math.max(0.01, unit.supplyTarget.stock / (unit.supplyTarget.maxStock || 30000));
+                                unit.supplyTarget.cratesRef.scale.set(1, ratio, 1);
+                                if (unit.supplyTarget.stock <= 0) unit.supplyTarget.cratesRef.visible = false;
+                            }
                             if (cargoHold) { cargoHold.visible = true; cargoHold.scale.set(1, 1, 1); }
                             unit.aiState = 'MovingToCenter';
                         }
@@ -435,11 +445,12 @@ function animate() {
                     case 'Depositing':
                         unit.timerState += 1;
                         if (unit.timerState > 40) {
-                            playerResources += (unit.cargoLoaded || 200);
+                            const earned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? 100 : 200));
+                            playerResources += earned;
                             unit.cargoLoaded = 0;
                             if (cargoHold) cargoHold.visible = false;
                             document.getElementById('resource-display').innerText = `$${playerResources}`;
-                            showNotification(`Supplies delivered: +$${unit.type === 'worker' ? 100 : 200}`, 'success');
+                            showNotification(`Supplies delivered: +$${earned}`, 'success');
                             updateSidebar();
                             unit.aiState = 'MovingToDock';
                         }
@@ -564,8 +575,14 @@ function animate() {
                             while (diff < -Math.PI) diff += Math.PI * 2;
                             while (diff > Math.PI) diff -= Math.PI * 2;
                             unit.mesh.rotation.y += diff * 0.22;
-                            const maxBank = isHeli ? 0.0 : 0.45;
-                            unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -maxBank, maxBank) - unit.mesh.rotation.z) * 0.15;
+                            if (isHeli) {
+                                unit.mesh.rotation.z = 0;
+                                unit.mesh.rotation.x = 0;
+                            } else {
+                                unit.mesh.rotation.order = 'YXZ';
+                                unit.mesh.rotation.x = 0;
+                                unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -0.45, 0.45) - unit.mesh.rotation.z) * 0.15;
+                            }
 
                             if (distToEnemy <= (unit.type === 'comanche' ? 24 : 28) && unit.attackCooldown === 0) {
                                 executeWeaponFire(unit, unit.combatTarget);
@@ -612,9 +629,14 @@ function animate() {
                             while (diff < -Math.PI) diff += Math.PI * 2;
                             while (diff > Math.PI) diff -= Math.PI * 2;
                             unit.mesh.rotation.y += diff * 0.18;
-
-                            const maxBank = isHeli ? 0.0 : 0.42;
-                            unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.6, -maxBank, maxBank) - unit.mesh.rotation.z) * 0.12;
+                            if (isHeli) {
+                                unit.mesh.rotation.z = 0;
+                                unit.mesh.rotation.x = 0;
+                            } else {
+                                unit.mesh.rotation.order = 'YXZ';
+                                unit.mesh.rotation.x = 0;
+                                unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.6, -0.42, 0.42) - unit.mesh.rotation.z) * 0.12;
+                            }
                         } else {
                             if (unit.waypoints && unit.waypoints.length > 0) {
                                 unit.targetPosition.copy(unit.waypoints.shift());
@@ -658,10 +680,14 @@ function animate() {
                         while (diff < -Math.PI) diff += Math.PI * 2;
                         while (diff > Math.PI) diff -= Math.PI * 2;
                         unit.mesh.rotation.y += diff * 0.16;
-
-                        // Graceful inward banking roll for planes, STRICTLY HORIZONTAL for helicopters
-                        const targetBank = isHeli ? 0.0 : -0.28;
-                        unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.12;
+                        if (isHeli) {
+                            unit.mesh.rotation.z = 0;
+                            unit.mesh.rotation.x = 0;
+                        } else {
+                            unit.mesh.rotation.order = 'YXZ';
+                            unit.mesh.rotation.x = 0;
+                            unit.mesh.rotation.z += (-0.28 - unit.mesh.rotation.z) * 0.12;
+                        }
                     }
 
                     // Maintain flight cruising altitude above ground
@@ -1035,6 +1061,13 @@ function processEnemyMovement() {
             const cruiseAlt = (enemy.mesh.userData && enemy.mesh.userData.flightAltitude) ? enemy.mesh.userData.flightAltitude : 8.5;
             const targetY = (typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0) + cruiseAlt;
             enemy.mesh.position.y += (targetY - enemy.mesh.position.y) * 0.08;
+            if (isHeli) {
+                enemy.mesh.rotation.z = 0;
+                enemy.mesh.rotation.x = 0;
+            } else {
+                enemy.mesh.rotation.order = 'YXZ';
+                enemy.mesh.rotation.x = 0;
+            }
 
             const target = enemy.combatTarget;
             const targetPos = target && (target.position || target.mesh.position);
