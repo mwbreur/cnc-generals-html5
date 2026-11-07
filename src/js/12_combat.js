@@ -208,10 +208,14 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         let hordeCount = 0;
         const aPos = attacker.mesh ? attacker.mesh.position : attacker.position;
         if (aPos) {
+            const aX = aPos.x;
+            const aZ = aPos.z;
             for (let i = 0; i < friendlies.length; i++) {
                 const f = friendlies[i];
                 if (f.health > 0 && f.mesh && (f.type === 'redguard' || f.type === 'battlemaster' || f.type === 'infantry' || f.type === 'tank')) {
-                    if (aPos.distanceTo(f.mesh.position) <= 22) {
+                    const dx = aX - f.mesh.position.x;
+                    const dz = aZ - f.mesh.position.z;
+                    if (dx * dx + dz * dz <= 484) { // 22^2
                         hordeCount++;
                         if (hordeCount >= 5) break;
                     }

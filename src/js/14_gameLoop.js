@@ -121,6 +121,14 @@ function animate() {
             // =========================================================
             // ACTIVE DRONES, OVERLORD UPGRADES & HEROIC VETERANCY REGENERATION
             // =========================================================
+            let cachedLivingUnits = null;
+            const getLivingUnits = () => {
+                if (!cachedLivingUnits) {
+                    cachedLivingUnits = [...units, ...enemyUnits];
+                }
+                return cachedLivingUnits;
+            };
+
             units.forEach(unit => {
                 if (unit.health <= 0) return;
 
@@ -155,8 +163,15 @@ function animate() {
                             unit.health = Math.min(unit.maxHealth, unit.health + 3);
                         }
                         if (drone.timer % 40 === 0) {
-                            const allLivingUnits = [...units, ...enemyUnits];
-                            const enemyInf = allLivingUnits.find(e => e.health > 0 && !e.isAir && !isFriendly(unit, e) && e.mesh.position.distanceTo(dMesh.position) <= 16.0);
+                            const dmX = dMesh.position.x;
+                            const dmZ = dMesh.position.z;
+                            const maxDistSq = 16.0 * 16.0;
+                            const enemyInf = getLivingUnits().find(e => {
+                                if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
+                                const dx = e.mesh.position.x - dmX;
+                                const dz = e.mesh.position.z - dmZ;
+                                return (dx * dx + dz * dz) <= maxDistSq;
+                            });
                             if (enemyInf) {
                                 spawnBulletTracer(dMesh.position, enemyInf.mesh.position, 0x00d2d3, 1.5);
                                 playAudio('machine_gun');
@@ -168,8 +183,15 @@ function animate() {
                     // Hellfire Drone: Launches mini-Hellfire rockets at hostile armor
                     if (drone.type === 'hellfire') {
                         if (drone.timer % 90 === 0) {
-                            const allLivingUnits = [...units, ...enemyUnits];
-                            const enemyArmor = allLivingUnits.find(e => e.health > 0 && !e.isAir && !isFriendly(unit, e) && e.mesh.position.distanceTo(dMesh.position) <= 22.0);
+                            const dmX = dMesh.position.x;
+                            const dmZ = dMesh.position.z;
+                            const maxDistSq = 22.0 * 22.0;
+                            const enemyArmor = getLivingUnits().find(e => {
+                                if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
+                                const dx = e.mesh.position.x - dmX;
+                                const dz = e.mesh.position.z - dmZ;
+                                return (dx * dx + dz * dz) <= maxDistSq;
+                            });
                             if (enemyArmor) {
                                 spawnRocketProjectile(dMesh.position, enemyArmor.mesh.position, false, false);
                                 playAudio('missile_launch');
@@ -182,11 +204,18 @@ function animate() {
                 // 3. China Overlord Upgrades Active Logic
                 if (unit.type === 'overlord' && unit.overlordUpgrade) {
                     unit.upgTimer = (unit.upgTimer || 0) + 1;
+                    const uX = unit.mesh.position.x;
+                    const uZ = unit.mesh.position.z;
 
                     // Overlord Bunker: 2 troops shoot 360 degrees
                     if (unit.overlordUpgrade === 'bunker' && unit.upgTimer % 45 === 0) {
-                        const allLivingUnits = [...units, ...enemyUnits];
-                        const target = allLivingUnits.find(e => e.health > 0 && !isFriendly(unit, e) && e.mesh.position.distanceTo(unit.mesh.position) <= 18.0);
+                        const maxDistSq = 18.0 * 18.0;
+                        const target = getLivingUnits().find(e => {
+                            if (e.health <= 0 || isFriendly(unit, e)) return false;
+                            const dx = e.mesh.position.x - uX;
+                            const dz = e.mesh.position.z - uZ;
+                            return (dx * dx + dz * dz) <= maxDistSq;
+                        });
                         if (target) {
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf39c12, 2.5);
                             playAudio('china_cannon', {}, 'china');
@@ -196,8 +225,13 @@ function animate() {
 
                     // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret
                     if (unit.overlordUpgrade === 'gatling' && unit.upgTimer % 12 === 0) {
-                        const allLivingUnits = [...units, ...enemyUnits];
-                        const target = allLivingUnits.find(e => e.health > 0 && !isFriendly(unit, e) && e.mesh.position.distanceTo(unit.mesh.position) <= 20.0);
+                        const maxDistSq = 20.0 * 20.0;
+                        const target = getLivingUnits().find(e => {
+                            if (e.health <= 0 || isFriendly(unit, e)) return false;
+                            const dx = e.mesh.position.x - uX;
+                            const dz = e.mesh.position.z - uZ;
+                            return (dx * dx + dz * dz) <= maxDistSq;
+                        });
                         if (target) {
                             spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
@@ -208,12 +242,16 @@ function animate() {
 
                     // Overlord Propaganda Tower: Heals nearby allies (+3 HP/s) and pulses soundwaves
                     if (unit.overlordUpgrade === 'propaganda' && unit.upgTimer % 60 === 0) {
+                        const maxDistSq = 18.0 * 18.0;
                         units.forEach(ally => {
-                            if (ally.health > 0 && ally.mesh.position.distanceTo(unit.mesh.position) <= 18.0) {
-                                ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                            if (ally.health > 0) {
+                                const dx = ally.mesh.position.x - uX;
+                                const dz = ally.mesh.position.z - uZ;
+                                if ((dx * dx + dz * dz) <= maxDistSq) {
+                                    ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                                }
                             }
                         });
-                        // Propaganda drone loop silenced per user request
                     }
                 }
             });
@@ -945,6 +983,80 @@ function processEnemyMovement() {
     enemyUnits.forEach(enemy => {
         if (enemy.health <= 0) return;
 
+        // Authentic Aircraft Flight & Holding Pattern Circling
+        if (enemy.isAir) {
+            const isHeli = (enemy.type === 'comanche' || enemy.type === 'chinook');
+            if (!enemy.patrolCenter) enemy.patrolCenter = enemy.mesh.position.clone();
+            if (!enemy.circleRadius) enemy.circleRadius = isHeli ? 11.0 : 15.0;
+            if (enemy.circleAngle === undefined) enemy.circleAngle = Math.random() * Math.PI * 2;
+            if (!enemy.airState) enemy.airState = 'circling';
+
+            const cruiseAlt = (enemy.mesh.userData && enemy.mesh.userData.flightAltitude) ? enemy.mesh.userData.flightAltitude : 8.5;
+            const targetY = (typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0) + cruiseAlt;
+            enemy.mesh.position.y += (targetY - enemy.mesh.position.y) * 0.08;
+
+            const target = enemy.combatTarget;
+            const targetPos = target && (target.position || target.mesh.position);
+
+            // 1. If actively attacking a target
+            if (target && target.health > 0) {
+                const dxT = targetPos.x - enemy.mesh.position.x;
+                const dzT = targetPos.z - enemy.mesh.position.z;
+                const distT = Math.hypot(dxT, dzT);
+                if (distT > (enemy.scanRange || 24) * 0.7) {
+                    const dirX = dxT / distT;
+                    const dirZ = dzT / distT;
+                    enemy.mesh.position.x += dirX * enemy.speed;
+                    enemy.mesh.position.z += dirZ * enemy.speed;
+                    enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                } else {
+                    // Holding circle orbit around hostile target while engaging
+                    enemy.circleAngle += isHeli ? 0.018 : 0.024;
+                    const orbitRadius = (enemy.circleRadius || 12.0) * 0.75;
+                    const cX = targetPos.x + Math.cos(enemy.circleAngle) * orbitRadius;
+                    const cZ = targetPos.z + Math.sin(enemy.circleAngle) * orbitRadius;
+                    enemy.mesh.position.x += (cX - enemy.mesh.position.x) * 0.06;
+                    enemy.mesh.position.z += (cZ - enemy.mesh.position.z) * 0.06;
+                    const fwdX = -Math.sin(enemy.circleAngle);
+                    const fwdZ = Math.cos(enemy.circleAngle);
+                    enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                }
+                return;
+            }
+
+            // 2. Normal commanded flight or patrol
+            const dx = enemy.targetPosition.x - enemy.mesh.position.x;
+            const dz = enemy.targetPosition.z - enemy.mesh.position.z;
+            const distToGoal = Math.hypot(dx, dz);
+
+            if (distToGoal > 3.0) {
+                const dirX = dx / distToGoal;
+                const dirZ = dz / distToGoal;
+                enemy.mesh.position.x += dirX * enemy.speed;
+                enemy.mesh.position.z += dirZ * enemy.speed;
+                enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                enemy.patrolCenter.copy(enemy.targetPosition);
+            } else {
+                // Smooth holding orbit circling around patrolCenter
+                enemy.circleAngle += isHeli ? 0.015 : 0.022;
+                const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * enemy.circleRadius;
+                const tZ = enemy.patrolCenter.z + Math.sin(enemy.circleAngle) * enemy.circleRadius;
+                const cDx = tX - enemy.mesh.position.x;
+                const cDz = tZ - enemy.mesh.position.z;
+                const cDist = Math.hypot(cDx, cDz);
+                if (cDist > 0.1) {
+                    const cSpeed = enemy.speed * 0.85;
+                    enemy.mesh.position.x += (cDx / cDist) * cSpeed;
+                    enemy.mesh.position.z += (cDz / cDist) * cSpeed;
+                    const fwdX = -Math.sin(enemy.circleAngle);
+                    const fwdZ = Math.cos(enemy.circleAngle);
+                    enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                }
+            }
+            return;
+        }
+
+        // Ground vehicle and infantry movement
         const target = enemy.combatTarget;
         const targetPos = target && (target.position || target.mesh.position);
         const targetRadius = target ? (target.radius || 0) : 0;
@@ -989,7 +1101,7 @@ function processEnemyMovement() {
         }
 
         // Match enemy ground height on hills & resolve obstacle collisions
-        enemy.mesh.position.y = getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z);
+        enemy.mesh.position.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0;
         resolveObstacleCollisions(enemy);
     });
 }

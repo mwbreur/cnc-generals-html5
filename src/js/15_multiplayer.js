@@ -296,6 +296,11 @@
                     if (ids.has(enemy.netId)) {
                         enemy.targetPosition.copy(targetPos);
                         enemy.combatTarget = null;
+                        if (enemy.isAir) {
+                            enemy.airState = 'flying';
+                            if (!enemy.patrolCenter) enemy.patrolCenter = new THREE.Vector3();
+                            enemy.patrolCenter.copy(targetPos);
+                        }
                     }
                 });
             }
@@ -327,7 +332,7 @@
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
                 const spawnTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
                 const isAlly = (spawnTeam === playerTeamId);
-                const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId);
+                const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId, packet.faction);
                 unit.teamId = spawnTeam;
                 unit.ownerId = isAlly ? 'ally' : 'challenger';
                 unit.isAI = false;
@@ -335,28 +340,16 @@
             }
             else if (packet.type === 'build_structure') {
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
-                const foeFaction = isMultiplayerHost ? mpOpponentFaction : 'usa';
-                let group;
-                if (packet.structType === 'power') {
-                    group = (foeFaction === 'china') ? createChinaNuclearReactor() : (foeFaction === 'gla') ? createGLASupplyStash() : createUSAColdFusionReactor();
-                } else if (packet.structType === 'factory') {
-                    group = (foeFaction === 'china') ? createChinaWarFactory() : (foeFaction === 'gla') ? createGLAArmsDealer(false) : createUSAWarFactory();
-                } else if (packet.structType === 'barracks') {
-                    group = (foeFaction === 'china') ? createChinaBarracks() : (foeFaction === 'gla') ? createGLABarracks(false) : createUSABarracks();
-                } else if (packet.structType === 'gatlingCannon') {
-                    group = createChinaGatlingCannon();
-                } else if (packet.structType === 'stingerSite') {
-                    group = createGLAStingerSite();
-                } else if (packet.structType === 'patriot') {
-                    group = createUSAPatriotBattery();
-                } else {
-                    group = (foeFaction === 'china') ? createChinaWarFactory() : createUSAWarFactory();
-                }
-                group.position.copy(pos);
-                scene.add(group);
                 const structTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
                 const isAlly = (structTeam === playerTeamId);
+                const foeFaction = packet.faction || (isMultiplayerHost ? mpOpponentFaction : 'usa');
+                const group = (typeof createStructureMeshForFaction === 'function') 
+                    ? createStructureMeshForFaction(packet.structType, foeFaction)
+                    : createChinaWarFactory();
+                group.scale.set(1.35, 1.35, 1.35);
+                group.position.copy(pos);
                 if (packet.position && packet.position.rotationY) group.rotation.y = packet.position.rotationY;
+                scene.add(group);
                 enemyStructures.push({
                     type: packet.structType,
                     faction: foeFaction,
@@ -364,7 +357,7 @@
                     mesh: group,
                     health: 1200,
                     maxHealth: 1200,
-                    radius: 8,
+                    radius: (typeof getStructureFootprint === 'function') ? getStructureFootprint(packet.structType).radius : 8,
                     buildProgress: 100,
                     isBuilding: false,
                     netId: packet.netId,
@@ -559,6 +552,10 @@
                 ...structures.filter(s => ['patriot', 'gatlingCannon', 'stingerSite'].includes(s.type) && s.health > 0 && !s.isBuilding),
                 ...enemyStructures.filter(es => ['patriot', 'gatlingCannon', 'stingerSite'].includes(es.type) && es.health > 0 && !es.isBuilding)
             ];
+            if (allDefenses.length === 0) return;
+
+            const allLivingUnits = [...units, ...enemyUnits];
+            const allLivingStructures = [...structures, ...enemyStructures];
 
             allDefenses.forEach(def => {
                 if (def.attackCooldown === undefined) def.attackCooldown = 0;
@@ -566,18 +563,18 @@
                     def.attackCooldown = Math.max(0, def.attackCooldown - combatDeltaScale);
                 }
 
-                const allLivingUnits = [...units, ...enemyUnits];
-                const allLivingStructures = [...structures, ...enemyStructures];
-
                 // Acquire closest target within defense range (34 units) strictly filtering !isFriendly
                 if (def.attackCooldown === 0) {
                     let closestEnemy = null;
-                    let closestDist = 34;
+                    let closestDistSq = 34 * 34; // Fast squared distance
+                    const defCenter = def.position || def.mesh.position;
                     for (let target of allLivingUnits) {
                         if (target.health > 0 && !target.garrisonedIn && target.mesh && !isFriendly(def, target)) {
-                            const d = (def.position || def.mesh.position).distanceTo(target.mesh.position);
-                            if (d < closestDist) {
-                                closestDist = d;
+                            const dx = defCenter.x - target.mesh.position.x;
+                            const dz = defCenter.z - target.mesh.position.z;
+                            const dSq = dx * dx + dz * dz;
+                            if (dSq < closestDistSq) {
+                                closestDistSq = dSq;
                                 closestEnemy = target;
                             }
                         }
@@ -587,9 +584,12 @@
                         for (let struct of allLivingStructures) {
                             if (struct.health > 0 && struct.mesh && !isFriendly(def, struct)) {
                                 const sPos = struct.position || struct.mesh.position;
-                                const d = (def.position || def.mesh.position).distanceTo(sPos);
-                                if (d < (34 + (struct.radius || 0))) {
-                                    closestDist = d;
+                                const maxRange = 34 + (struct.radius || 0);
+                                const dx = defCenter.x - sPos.x;
+                                const dz = defCenter.z - sPos.z;
+                                const dSq = dx * dx + dz * dz;
+                                if (dSq < maxRange * maxRange) {
+                                    closestDistSq = dSq;
                                     closestEnemy = struct;
                                     break;
                                 }

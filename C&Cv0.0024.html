@@ -9010,10 +9010,10 @@ function playUSASound(type, options = {}) {
             return null;
         }
 
-        function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
+        function createStructureMeshForFaction(type, faction = 'usa') {
             let group;
-            const f = selectedFaction;
-            if (type === 'center') {
+            const f = faction || 'usa';
+            if (type === 'center' || type === 'commandCenter') {
                 group = f === 'china' ? createChinaCommandCenter() : f === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
             } else if (type === 'power' || type === 'nuclearReactor') {
                 group = (f === 'china' || type === 'nuclearReactor') ? createChinaNuclearReactor() : createUSAColdFusionReactor();
@@ -9068,7 +9068,13 @@ function playUSASound(type, options = {}) {
             } else {
                 group = f === 'china' ? createChinaCommandCenter() : f === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
             }
+            return group;
+        }
+        window.createStructureMeshForFaction = createStructureMeshForFaction;
 
+        function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
+            const f = selectedFaction;
+            const group = createStructureMeshForFaction(type, f);
             group.scale.set(1.35, 1.35, 1.35);
             group.position.copy(pos);
             group.rotation.y = rotationY || 0;
@@ -9091,7 +9097,9 @@ function playUSASound(type, options = {}) {
                     type: 'build_structure',
                     structType: type,
                     position: { x: pos.x, y: pos.y, z: pos.z, rotationY: rotationY || 0 },
-                    netId: structNetId
+                    netId: structNetId,
+                    teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
+                    faction: selectedFaction
                 });
             }
 
@@ -9109,33 +9117,75 @@ function playUSASound(type, options = {}) {
             return structObj;
         }
 
-        function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25)) {
-            let mesh; let radius = 1.35; let speed = 0.14; let health = 450; let scanRange = 24;
-            if (type === 'tank' || type === 'crusader') {
-                mesh = createCrusaderTankMesh(true);
-            } else if (type === 'battlemaster') {
-                mesh = createBattlemasterTankMesh(true);
-            } else if (type === 'overlord') {
-                mesh = createOverlordTankMesh(true); radius = 2.0; health = 1000;
-            } else if (type === 'gatling') {
-                mesh = createGatlingTankMesh(true);
-            } else if (type === 'quad') {
-                mesh = createQuadCannonMesh(true);
-            } else if (type === 'buggy') {
-                mesh = createRocketBuggyMesh(true);
-            } else if (type === 'humvee') {
-                mesh = createHumveeMesh(true);
-            } else {
+        function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25), netId = null, faction = null) {
+            let mesh; let radius = 1.2; let speed = 0.14; let health = 450; let scanRange = 22; let isAir = false;
+
+            // USA Forces
+            if (type === 'tank' || type === 'crusader') { mesh = createCrusaderTankMesh(true); radius = 1.35; speed = 0.15; health = 480; scanRange = 24; }
+            else if (type === 'paladin') { mesh = createPaladinTankMesh(true); radius = 1.35; speed = 0.14; health = 550; scanRange = 26; }
+            else if (type === 'humvee') { mesh = createHumveeMesh(true); radius = 1.1; speed = 0.22; health = 280; scanRange = 26; }
+            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 1.1; speed = 0.18; health = 220; scanRange = 15; }
+            else if (type === 'tomahawk') { mesh = createTomahawkMesh(true); radius = 1.3; speed = 0.11; health = 220; scanRange = 38; }
+            else if (type === 'dozer') { mesh = createUSADozerMesh(); radius = 1.3; speed = 0.10; health = 300; scanRange = 18; }
+            else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 1.2; speed = 0.13; health = 260; scanRange = 16; }
+            else if (type === 'chinook') { mesh = createChinookMesh(); radius = 1.6; speed = 0.22; health = 550; scanRange = 22; isAir = true; }
+            else if (type === 'comanche') { mesh = createComancheMesh(); radius = 1.4; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
+            else if (type === 'raptor' || type === 'mig') { mesh = createRaptorMesh(); radius = 1.5; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
+            else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(); radius = 1.4; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
+            else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 1.6; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
+            else if (type === 'infantry' || type === 'ranger') { mesh = createRangerMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
+            else if (type === 'rocket' || type === 'missiledefender') { mesh = createMissileDefenderMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
+            else if (type === 'pathfinder') { mesh = createRangerMesh(); radius = 0.5; speed = 0.09; health = 120; scanRange = 32; }
+            else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.6; speed = 0.10; health = 350; scanRange = 24; }
+
+            // China Forces
+            else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(true); radius = 1.35; speed = 0.15; health = 460; scanRange = 24; }
+            else if (type === 'overlord') { mesh = createOverlordTankMesh(true); radius = 2.1; speed = 0.09; health = 1100; scanRange = 28; }
+            else if (type === 'gatling') { mesh = createGatlingTankMesh(true); radius = 1.3; speed = 0.16; health = 400; scanRange = 22; }
+            else if (type === 'dragon') { mesh = createDragonTankMesh(true); radius = 1.3; speed = 0.15; health = 450; scanRange = 18; }
+            else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 1.4; speed = 0.15; health = 480; scanRange = 20; }
+            else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 1.3; speed = 0.10; health = 220; scanRange = 36; }
+            else if (type === 'nukecannon') { mesh = createNukeCannonMesh(); radius = 1.6; speed = 0.08; health = 260; scanRange = 42; }
+            else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
+            else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
+            else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.5; speed = 0.07; health = 100; scanRange = 14; }
+            else if (type === 'blacklotus') { mesh = createBlackLotusMesh(); radius = 0.5; speed = 0.10; health = 250; scanRange = 24; }
+
+            // GLA Forces
+            else if (type === 'worker') { mesh = createGLAWorkerMesh(); radius = 0.5; speed = 0.10; health = 150; scanRange = 16; }
+            else if (type === 'technical') { mesh = createTechnicalMesh(true); radius = 1.1; speed = 0.22; health = 240; scanRange = 22; }
+            else if (type === 'scorpion') { mesh = createScorpionTankMesh(true); radius = 1.25; speed = 0.16; health = 360; scanRange = 22; }
+            else if (type === 'marauder') { mesh = createMarauderTankMesh(true); radius = 1.35; speed = 0.13; health = 520; scanRange = 24; }
+            else if (type === 'buggy') { mesh = createRocketBuggyMesh(true); radius = 1.1; speed = 0.22; health = 160; scanRange = 30; }
+            else if (type === 'quad') { mesh = createQuadCannonMesh(true); radius = 1.2; speed = 0.17; health = 300; scanRange = 24; }
+            else if (type === 'toxintractor') { mesh = createToxinTractorMesh(true); radius = 1.2; speed = 0.14; health = 360; scanRange = 20; }
+            else if (type === 'bombtruck') { mesh = createBombTruckMesh(true); radius = 1.2; speed = 0.18; health = 220; scanRange = 14; }
+            else if (type === 'scud') { mesh = createScudLauncherMesh(true); radius = 1.4; speed = 0.10; health = 240; scanRange = 40; }
+            else if (type === 'radarvan') { mesh = createRadarVanMesh(); radius = 1.1; speed = 0.16; health = 220; scanRange = 20; }
+            else if (type === 'rebel') { mesh = createRebelMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
+            else if (type === 'rpg') { mesh = createRPGTrooperMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
+            else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.5; speed = 0.12; health = 80; scanRange = 8; }
+            else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 0.8; speed = 0.08; health = 280; scanRange = 18; }
+            else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.5; speed = 0.11; health = 120; scanRange = 16; }
+            else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.5; speed = 0.09; health = 220; scanRange = 34; }
+            else {
                 mesh = createBattlemasterTankMesh(true);
             }
+
             mesh.scale.set(1.35, 1.35, 1.35);
             radius *= 1.35;
             scanRange *= 1.35;
             speed *= 1.15;
             mesh.position.copy(position);
+
+            if (isAir) {
+                const cruiseAlt = (mesh.userData && mesh.userData.flightAltitude) ? mesh.userData.flightAltitude : 8.5;
+                const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(position.x, position.z) : 0;
+                mesh.position.y = groundY + cruiseAlt;
+            }
             scene.add(mesh);
 
-            const enemyNetId = arguments[2] || ((isMultiplayerActive ? (isMultiplayerHost ? 'C_' : 'H_') : 'E_') + (++netIdSequence));
+            const enemyNetId = netId || ((isMultiplayerActive ? (isMultiplayerHost ? 'C_' : 'H_') : 'E_') + (++netIdSequence));
             const enemyObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: mesh.position.clone(),
                 speed: speed, radius: radius, health: health, maxHealth: health,
@@ -9143,7 +9193,10 @@ function playUSASound(type, options = {}) {
                 netId: enemyNetId,
                 teamId: 2,
                 ownerId: 'ai_1',
-                isAI: true
+                isAI: true,
+                isAir: isAir,
+                airState: isAir ? 'circling' : 'none',
+                patrolCenter: mesh.position.clone()
             };
             enemyUnits.push(enemyObj);
             return enemyObj;
@@ -11323,128 +11376,6 @@ function playUSASound(type, options = {}) {
                 const eu = spawnEnemyUnit(tankType, uPos);
                 if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
             }
-        }
-
-        function produceUnit(type) {
-            const unitSpec = unitRoster[type];
-            if (!unitSpec) return;
-
-            // 1. Tech Prerequisite Validation
-            const techReq = getUnitTechPrerequisite(type);
-            if (techReq) {
-                const hasTech = structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
-                if (!hasTech) {
-                    showNotification(`Locked: Build a ${techReq.name} first!`, 'error');
-                    return;
-                }
-            }
-
-            // 2. Resource Validation
-            if (playerResources < unitSpec.cost) {
-                showNotification(`Insufficient funds! Need $${unitSpec.cost}.`, 'error');
-                return;
-            }
-
-            // 3. Find facility
-            const reqBldg = unitSpec.building;
-            const actualBldg = reqBldg === 'commandCenter' ? 'center' : reqBldg;
-            let facility = null;
-
-            if (selectedStructure && (
-                selectedStructure.type === actualBldg ||
-                (type === 'truck' && ['supplyCenter', 'factory'].includes(selectedStructure.type)) ||
-                (type === 'worker' && ['center', 'supplyStash'].includes(selectedStructure.type))
-            )) {
-                if (selectedStructure.isBuilding) {
-                    showNotification(`Selected building is still under construction!`, 'error');
-                    return;
-                }
-                facility = selectedStructure;
-            } else {
-                facility = structures.find(s => !s.isBuilding && s.health > 0 && (
-                    s.type === actualBldg ||
-                    (type === 'truck' && (s.type === 'supplyCenter' || s.type === 'factory')) ||
-                    (type === 'worker' && (s.type === 'center' || s.type === 'supplyStash'))
-                ));
-            }
-
-            if (!facility) {
-                const nameMap = {
-                    barracks: 'Barracks', factory: selectedFaction === 'gla' ? 'Arms Dealer' : 'War Factory',
-                    airfield: 'Air Field', center: 'Command Center', supplyCenter: 'Supply Center', supplyStash: 'Supply Stash'
-                };
-                showNotification(`Build a ${nameMap[actualBldg] || actualBldg} first!`, 'error');
-                return;
-            }
-
-            playerResources -= unitSpec.cost;
-            document.getElementById('resource-display').innerText = `$${playerResources}`;
-
-            const angle = units.length * 2.4;
-            const spawnDist = facility.radius + 3.5;
-            let spawnPos = facility.position.clone().add(new THREE.Vector3(Math.cos(angle) * spawnDist, 0, Math.sin(angle) * spawnDist));
-            const isAircraft = ['raptor', 'mig', 'stealthfighter', 'aurora', 'comanche', 'chinook'].includes(type);
-
-            if (isAircraft && actualBldg === 'airfield') {
-                const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
-                spawnPos.y = groundY + 8.5;
-                const newU = spawnUnit(type, spawnPos);
-                if (newU) {
-                    newU.homeAirfield = facility;
-                    newU.circleRadius = (type === 'comanche' || type === 'chinook') ? 11.0 : 15.0;
-                    if (facility.rallyPoint) {
-                        newU.targetPosition.copy(facility.rallyPoint);
-                        newU.patrolCenter.copy(facility.rallyPoint);
-                        newU.airState = 'flying';
-                        newU.taskState = 'Moving';
-                    } else {
-                        newU.targetPosition.copy(spawnPos);
-                        newU.patrolCenter.copy(spawnPos);
-                        newU.airState = 'circling';
-                        newU.taskState = 'Idle';
-                    }
-                }
-                showNotification(`Assembled: ${unitSpec.name} (Airborne)`, 'success');
-                updateSidebar();
-                return;
-            }
-
-            spawnUnit(type, spawnPos);
-            showNotification(`Training: ${unitSpec.name}`, 'success');
-            updateSidebar();
-        }
-
-        function repairStructure(structure) {
-            if (!structure || structure.health >= structure.maxHealth) {
-                showNotification('Structure is at 100% integrity.', 'info');
-                return;
-            }
-            const fee = Math.min(50, Math.ceil((structure.maxHealth - structure.health) * 0.1));
-            if (playerResources < fee) {
-                showNotification(`Insufficient funds to repair ($${fee} needed).`, 'error');
-                return;
-            }
-            playerResources -= fee;
-            structure.health = structure.maxHealth;
-            document.getElementById('resource-display').innerText = `$${playerResources}`;
-            showNotification(`Structure fully repaired.`, 'success');
-            updateSidebar();
-        }
-
-        function sellStructure(structure) {
-            if (!structure) return;
-            const cost = getStructureCost(structure.type) || 500;
-            const refund = Math.floor(cost * 0.5);
-            playerResources += refund;
-            document.getElementById('resource-display').innerText = `$${playerResources}`;
-
-            scene.remove(structure.mesh);
-            const idx = structures.indexOf(structure);
-            if (idx !== -1) structures.splice(idx, 1);
-            if (selectedStructure === structure) selectedStructure = null;
-
-            showNotification(`Demolished ${structure.type}. +$${refund} refunded.`, 'info');
-            updateSidebar();
         }
 
         function orderSelectedHarvestersToGather() {
@@ -14267,7 +14198,9 @@ function updateHUD() {
                     type: 'spawn_unit',
                     unitType: type,
                     position: { x: position.x, y: position.y, z: position.z },
-                    netId: myNetId
+                    netId: myNetId,
+                    teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
+                    faction: selectedFaction
                 });
             }
             updateHUD();
@@ -14808,10 +14741,14 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         let hordeCount = 0;
         const aPos = attacker.mesh ? attacker.mesh.position : attacker.position;
         if (aPos) {
+            const aX = aPos.x;
+            const aZ = aPos.z;
             for (let i = 0; i < friendlies.length; i++) {
                 const f = friendlies[i];
                 if (f.health > 0 && f.mesh && (f.type === 'redguard' || f.type === 'battlemaster' || f.type === 'infantry' || f.type === 'tank')) {
-                    if (aPos.distanceTo(f.mesh.position) <= 22) {
+                    const dx = aX - f.mesh.position.x;
+                    const dz = aZ - f.mesh.position.z;
+                    if (dx * dx + dz * dz <= 484) { // 22^2
                         hordeCount++;
                         if (hordeCount >= 5) break;
                     }
@@ -16814,6 +16751,14 @@ function animate() {
             // =========================================================
             // ACTIVE DRONES, OVERLORD UPGRADES & HEROIC VETERANCY REGENERATION
             // =========================================================
+            let cachedLivingUnits = null;
+            const getLivingUnits = () => {
+                if (!cachedLivingUnits) {
+                    cachedLivingUnits = [...units, ...enemyUnits];
+                }
+                return cachedLivingUnits;
+            };
+
             units.forEach(unit => {
                 if (unit.health <= 0) return;
 
@@ -16848,8 +16793,15 @@ function animate() {
                             unit.health = Math.min(unit.maxHealth, unit.health + 3);
                         }
                         if (drone.timer % 40 === 0) {
-                            const allLivingUnits = [...units, ...enemyUnits];
-                            const enemyInf = allLivingUnits.find(e => e.health > 0 && !e.isAir && !isFriendly(unit, e) && e.mesh.position.distanceTo(dMesh.position) <= 16.0);
+                            const dmX = dMesh.position.x;
+                            const dmZ = dMesh.position.z;
+                            const maxDistSq = 16.0 * 16.0;
+                            const enemyInf = getLivingUnits().find(e => {
+                                if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
+                                const dx = e.mesh.position.x - dmX;
+                                const dz = e.mesh.position.z - dmZ;
+                                return (dx * dx + dz * dz) <= maxDistSq;
+                            });
                             if (enemyInf) {
                                 spawnBulletTracer(dMesh.position, enemyInf.mesh.position, 0x00d2d3, 1.5);
                                 playAudio('machine_gun');
@@ -16861,8 +16813,15 @@ function animate() {
                     // Hellfire Drone: Launches mini-Hellfire rockets at hostile armor
                     if (drone.type === 'hellfire') {
                         if (drone.timer % 90 === 0) {
-                            const allLivingUnits = [...units, ...enemyUnits];
-                            const enemyArmor = allLivingUnits.find(e => e.health > 0 && !e.isAir && !isFriendly(unit, e) && e.mesh.position.distanceTo(dMesh.position) <= 22.0);
+                            const dmX = dMesh.position.x;
+                            const dmZ = dMesh.position.z;
+                            const maxDistSq = 22.0 * 22.0;
+                            const enemyArmor = getLivingUnits().find(e => {
+                                if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
+                                const dx = e.mesh.position.x - dmX;
+                                const dz = e.mesh.position.z - dmZ;
+                                return (dx * dx + dz * dz) <= maxDistSq;
+                            });
                             if (enemyArmor) {
                                 spawnRocketProjectile(dMesh.position, enemyArmor.mesh.position, false, false);
                                 playAudio('missile_launch');
@@ -16875,11 +16834,18 @@ function animate() {
                 // 3. China Overlord Upgrades Active Logic
                 if (unit.type === 'overlord' && unit.overlordUpgrade) {
                     unit.upgTimer = (unit.upgTimer || 0) + 1;
+                    const uX = unit.mesh.position.x;
+                    const uZ = unit.mesh.position.z;
 
                     // Overlord Bunker: 2 troops shoot 360 degrees
                     if (unit.overlordUpgrade === 'bunker' && unit.upgTimer % 45 === 0) {
-                        const allLivingUnits = [...units, ...enemyUnits];
-                        const target = allLivingUnits.find(e => e.health > 0 && !isFriendly(unit, e) && e.mesh.position.distanceTo(unit.mesh.position) <= 18.0);
+                        const maxDistSq = 18.0 * 18.0;
+                        const target = getLivingUnits().find(e => {
+                            if (e.health <= 0 || isFriendly(unit, e)) return false;
+                            const dx = e.mesh.position.x - uX;
+                            const dz = e.mesh.position.z - uZ;
+                            return (dx * dx + dz * dz) <= maxDistSq;
+                        });
                         if (target) {
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf39c12, 2.5);
                             playAudio('china_cannon', {}, 'china');
@@ -16889,8 +16855,13 @@ function animate() {
 
                     // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret
                     if (unit.overlordUpgrade === 'gatling' && unit.upgTimer % 12 === 0) {
-                        const allLivingUnits = [...units, ...enemyUnits];
-                        const target = allLivingUnits.find(e => e.health > 0 && !isFriendly(unit, e) && e.mesh.position.distanceTo(unit.mesh.position) <= 20.0);
+                        const maxDistSq = 20.0 * 20.0;
+                        const target = getLivingUnits().find(e => {
+                            if (e.health <= 0 || isFriendly(unit, e)) return false;
+                            const dx = e.mesh.position.x - uX;
+                            const dz = e.mesh.position.z - uZ;
+                            return (dx * dx + dz * dz) <= maxDistSq;
+                        });
                         if (target) {
                             spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
@@ -16901,12 +16872,16 @@ function animate() {
 
                     // Overlord Propaganda Tower: Heals nearby allies (+3 HP/s) and pulses soundwaves
                     if (unit.overlordUpgrade === 'propaganda' && unit.upgTimer % 60 === 0) {
+                        const maxDistSq = 18.0 * 18.0;
                         units.forEach(ally => {
-                            if (ally.health > 0 && ally.mesh.position.distanceTo(unit.mesh.position) <= 18.0) {
-                                ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                            if (ally.health > 0) {
+                                const dx = ally.mesh.position.x - uX;
+                                const dz = ally.mesh.position.z - uZ;
+                                if ((dx * dx + dz * dz) <= maxDistSq) {
+                                    ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                                }
                             }
                         });
-                        // Propaganda drone loop silenced per user request
                     }
                 }
             });
@@ -17638,6 +17613,80 @@ function processEnemyMovement() {
     enemyUnits.forEach(enemy => {
         if (enemy.health <= 0) return;
 
+        // Authentic Aircraft Flight & Holding Pattern Circling
+        if (enemy.isAir) {
+            const isHeli = (enemy.type === 'comanche' || enemy.type === 'chinook');
+            if (!enemy.patrolCenter) enemy.patrolCenter = enemy.mesh.position.clone();
+            if (!enemy.circleRadius) enemy.circleRadius = isHeli ? 11.0 : 15.0;
+            if (enemy.circleAngle === undefined) enemy.circleAngle = Math.random() * Math.PI * 2;
+            if (!enemy.airState) enemy.airState = 'circling';
+
+            const cruiseAlt = (enemy.mesh.userData && enemy.mesh.userData.flightAltitude) ? enemy.mesh.userData.flightAltitude : 8.5;
+            const targetY = (typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0) + cruiseAlt;
+            enemy.mesh.position.y += (targetY - enemy.mesh.position.y) * 0.08;
+
+            const target = enemy.combatTarget;
+            const targetPos = target && (target.position || target.mesh.position);
+
+            // 1. If actively attacking a target
+            if (target && target.health > 0) {
+                const dxT = targetPos.x - enemy.mesh.position.x;
+                const dzT = targetPos.z - enemy.mesh.position.z;
+                const distT = Math.hypot(dxT, dzT);
+                if (distT > (enemy.scanRange || 24) * 0.7) {
+                    const dirX = dxT / distT;
+                    const dirZ = dzT / distT;
+                    enemy.mesh.position.x += dirX * enemy.speed;
+                    enemy.mesh.position.z += dirZ * enemy.speed;
+                    enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                } else {
+                    // Holding circle orbit around hostile target while engaging
+                    enemy.circleAngle += isHeli ? 0.018 : 0.024;
+                    const orbitRadius = (enemy.circleRadius || 12.0) * 0.75;
+                    const cX = targetPos.x + Math.cos(enemy.circleAngle) * orbitRadius;
+                    const cZ = targetPos.z + Math.sin(enemy.circleAngle) * orbitRadius;
+                    enemy.mesh.position.x += (cX - enemy.mesh.position.x) * 0.06;
+                    enemy.mesh.position.z += (cZ - enemy.mesh.position.z) * 0.06;
+                    const fwdX = -Math.sin(enemy.circleAngle);
+                    const fwdZ = Math.cos(enemy.circleAngle);
+                    enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                }
+                return;
+            }
+
+            // 2. Normal commanded flight or patrol
+            const dx = enemy.targetPosition.x - enemy.mesh.position.x;
+            const dz = enemy.targetPosition.z - enemy.mesh.position.z;
+            const distToGoal = Math.hypot(dx, dz);
+
+            if (distToGoal > 3.0) {
+                const dirX = dx / distToGoal;
+                const dirZ = dz / distToGoal;
+                enemy.mesh.position.x += dirX * enemy.speed;
+                enemy.mesh.position.z += dirZ * enemy.speed;
+                enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                enemy.patrolCenter.copy(enemy.targetPosition);
+            } else {
+                // Smooth holding orbit circling around patrolCenter
+                enemy.circleAngle += isHeli ? 0.015 : 0.022;
+                const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * enemy.circleRadius;
+                const tZ = enemy.patrolCenter.z + Math.sin(enemy.circleAngle) * enemy.circleRadius;
+                const cDx = tX - enemy.mesh.position.x;
+                const cDz = tZ - enemy.mesh.position.z;
+                const cDist = Math.hypot(cDx, cDz);
+                if (cDist > 0.1) {
+                    const cSpeed = enemy.speed * 0.85;
+                    enemy.mesh.position.x += (cDx / cDist) * cSpeed;
+                    enemy.mesh.position.z += (cDz / cDist) * cSpeed;
+                    const fwdX = -Math.sin(enemy.circleAngle);
+                    const fwdZ = Math.cos(enemy.circleAngle);
+                    enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                }
+            }
+            return;
+        }
+
+        // Ground vehicle and infantry movement
         const target = enemy.combatTarget;
         const targetPos = target && (target.position || target.mesh.position);
         const targetRadius = target ? (target.radius || 0) : 0;
@@ -17682,7 +17731,7 @@ function processEnemyMovement() {
         }
 
         // Match enemy ground height on hills & resolve obstacle collisions
-        enemy.mesh.position.y = getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z);
+        enemy.mesh.position.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0;
         resolveObstacleCollisions(enemy);
     });
 }
@@ -18125,6 +18174,11 @@ function processScrapCrateCollection() {
                     if (ids.has(enemy.netId)) {
                         enemy.targetPosition.copy(targetPos);
                         enemy.combatTarget = null;
+                        if (enemy.isAir) {
+                            enemy.airState = 'flying';
+                            if (!enemy.patrolCenter) enemy.patrolCenter = new THREE.Vector3();
+                            enemy.patrolCenter.copy(targetPos);
+                        }
                     }
                 });
             }
@@ -18156,7 +18210,7 @@ function processScrapCrateCollection() {
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
                 const spawnTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
                 const isAlly = (spawnTeam === playerTeamId);
-                const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId);
+                const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId, packet.faction);
                 unit.teamId = spawnTeam;
                 unit.ownerId = isAlly ? 'ally' : 'challenger';
                 unit.isAI = false;
@@ -18164,28 +18218,16 @@ function processScrapCrateCollection() {
             }
             else if (packet.type === 'build_structure') {
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
-                const foeFaction = isMultiplayerHost ? mpOpponentFaction : 'usa';
-                let group;
-                if (packet.structType === 'power') {
-                    group = (foeFaction === 'china') ? createChinaNuclearReactor() : (foeFaction === 'gla') ? createGLASupplyStash() : createUSAColdFusionReactor();
-                } else if (packet.structType === 'factory') {
-                    group = (foeFaction === 'china') ? createChinaWarFactory() : (foeFaction === 'gla') ? createGLAArmsDealer(false) : createUSAWarFactory();
-                } else if (packet.structType === 'barracks') {
-                    group = (foeFaction === 'china') ? createChinaBarracks() : (foeFaction === 'gla') ? createGLABarracks(false) : createUSABarracks();
-                } else if (packet.structType === 'gatlingCannon') {
-                    group = createChinaGatlingCannon();
-                } else if (packet.structType === 'stingerSite') {
-                    group = createGLAStingerSite();
-                } else if (packet.structType === 'patriot') {
-                    group = createUSAPatriotBattery();
-                } else {
-                    group = (foeFaction === 'china') ? createChinaWarFactory() : createUSAWarFactory();
-                }
-                group.position.copy(pos);
-                scene.add(group);
                 const structTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
                 const isAlly = (structTeam === playerTeamId);
+                const foeFaction = packet.faction || (isMultiplayerHost ? mpOpponentFaction : 'usa');
+                const group = (typeof createStructureMeshForFaction === 'function') 
+                    ? createStructureMeshForFaction(packet.structType, foeFaction)
+                    : createChinaWarFactory();
+                group.scale.set(1.35, 1.35, 1.35);
+                group.position.copy(pos);
                 if (packet.position && packet.position.rotationY) group.rotation.y = packet.position.rotationY;
+                scene.add(group);
                 enemyStructures.push({
                     type: packet.structType,
                     faction: foeFaction,
@@ -18193,7 +18235,7 @@ function processScrapCrateCollection() {
                     mesh: group,
                     health: 1200,
                     maxHealth: 1200,
-                    radius: 8,
+                    radius: (typeof getStructureFootprint === 'function') ? getStructureFootprint(packet.structType).radius : 8,
                     buildProgress: 100,
                     isBuilding: false,
                     netId: packet.netId,
@@ -18388,6 +18430,10 @@ function processScrapCrateCollection() {
                 ...structures.filter(s => ['patriot', 'gatlingCannon', 'stingerSite'].includes(s.type) && s.health > 0 && !s.isBuilding),
                 ...enemyStructures.filter(es => ['patriot', 'gatlingCannon', 'stingerSite'].includes(es.type) && es.health > 0 && !es.isBuilding)
             ];
+            if (allDefenses.length === 0) return;
+
+            const allLivingUnits = [...units, ...enemyUnits];
+            const allLivingStructures = [...structures, ...enemyStructures];
 
             allDefenses.forEach(def => {
                 if (def.attackCooldown === undefined) def.attackCooldown = 0;
@@ -18395,18 +18441,18 @@ function processScrapCrateCollection() {
                     def.attackCooldown = Math.max(0, def.attackCooldown - combatDeltaScale);
                 }
 
-                const allLivingUnits = [...units, ...enemyUnits];
-                const allLivingStructures = [...structures, ...enemyStructures];
-
                 // Acquire closest target within defense range (34 units) strictly filtering !isFriendly
                 if (def.attackCooldown === 0) {
                     let closestEnemy = null;
-                    let closestDist = 34;
+                    let closestDistSq = 34 * 34; // Fast squared distance
+                    const defCenter = def.position || def.mesh.position;
                     for (let target of allLivingUnits) {
                         if (target.health > 0 && !target.garrisonedIn && target.mesh && !isFriendly(def, target)) {
-                            const d = (def.position || def.mesh.position).distanceTo(target.mesh.position);
-                            if (d < closestDist) {
-                                closestDist = d;
+                            const dx = defCenter.x - target.mesh.position.x;
+                            const dz = defCenter.z - target.mesh.position.z;
+                            const dSq = dx * dx + dz * dz;
+                            if (dSq < closestDistSq) {
+                                closestDistSq = dSq;
                                 closestEnemy = target;
                             }
                         }
@@ -18416,9 +18462,12 @@ function processScrapCrateCollection() {
                         for (let struct of allLivingStructures) {
                             if (struct.health > 0 && struct.mesh && !isFriendly(def, struct)) {
                                 const sPos = struct.position || struct.mesh.position;
-                                const d = (def.position || def.mesh.position).distanceTo(sPos);
-                                if (d < (34 + (struct.radius || 0))) {
-                                    closestDist = d;
+                                const maxRange = 34 + (struct.radius || 0);
+                                const dx = defCenter.x - sPos.x;
+                                const dz = defCenter.z - sPos.z;
+                                const dSq = dx * dx + dz * dz;
+                                if (dSq < maxRange * maxRange) {
+                                    closestDistSq = dSq;
                                     closestEnemy = struct;
                                     break;
                                 }

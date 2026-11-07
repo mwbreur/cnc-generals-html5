@@ -2769,7 +2769,9 @@ function updateHUD() {
                     type: 'spawn_unit',
                     unitType: type,
                     position: { x: position.x, y: position.y, z: position.z },
-                    netId: myNetId
+                    netId: myNetId,
+                    teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
+                    faction: selectedFaction
                 });
             }
             updateHUD();
