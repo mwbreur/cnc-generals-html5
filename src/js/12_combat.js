@@ -182,6 +182,13 @@ function getArmorCategory(target) {
 
 function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR_PIERCING') {
     if (!target || target.health <= 0) return;
+
+    // Aircraft Defensive Flare Countermeasures: 40% chance to deflect missile/anti-air damage
+    if (typeof units !== 'undefined' && units.includes(target) && typeof researchedTechs !== 'undefined' && researchedTechs.has('countermeasures') && target.isAir && Math.random() < 0.40) {
+        if (target.mesh && typeof spawnSmokePuff === 'function') spawnSmokePuff(target.mesh.position, 0xffd700, 0.4);
+        return; // Deflected!
+    }
+
     const cat = getArmorCategory(target);
     const mult = (ARMOR_COEFFICIENTS[cat] && ARMOR_COEFFICIENTS[cat][damageType] !== undefined)
         ? ARMOR_COEFFICIENTS[cat][damageType]
@@ -193,7 +200,7 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     if (typeof battlePlan !== 'undefined' && battlePlan === 'bombard' && typeof units !== 'undefined' && units.includes(attacker)) {
         finalDmg = Math.round(finalDmg * 1.20);
     }
-    // China Horde Bonus: 5+ friendly horde units (Red Guard, Battlemaster) within 22m grant +20% damage
+    // China Horde Bonus: 5+ friendly horde units (Red Guard, Battlemaster) within 22m grant +20% damage (+35% with Nationalism)
     if (attacker && (attacker.type === 'redguard' || attacker.type === 'battlemaster' || attacker.type === 'infantry' || attacker.type === 'tank') && (attacker.faction === 'china' || attacker.isChina || (typeof selectedFaction !== 'undefined' && selectedFaction === 'china' && units.includes(attacker)))) {
         const friendlies = (typeof units !== 'undefined' && units.includes(attacker)) ? units : (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
         let hordeCount = 0;
@@ -210,18 +217,64 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
             }
         }
         if (hordeCount >= 5) {
-            finalDmg = Math.round(finalDmg * 1.20);
+            const hordeFactor = (typeof researchedTechs !== 'undefined' && researchedTechs.has('nationalism')) ? 1.35 : 1.20;
+            finalDmg = Math.round(finalDmg * hordeFactor);
             attacker.isHordeActive = true;
         } else {
             attacker.isHordeActive = false;
         }
     }
+
+    // Additional Tech Munition Buffs (Attacker)
+    if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined') {
+        if (researchedTechs.has('laserMissiles') && ['raptor', 'comanche', 'stealthfighter'].includes(attacker.type)) {
+            finalDmg = Math.round(finalDmg * 1.25);
+        }
+        if (researchedTechs.has('blackNapalm') && (damageType === 'FIRE' || damageType === 'FLAME' || ['dragon', 'inferno'].includes(attacker.type))) {
+            finalDmg = Math.round(finalDmg * 1.30);
+        }
+        if (researchedTechs.has('anthraxBeta') && (damageType === 'TOXIN' || ['toxintractor', 'scud'].includes(attacker.type))) {
+            finalDmg = Math.round(finalDmg * 1.25);
+        }
+        if (researchedTechs.has('armTheMob') && attacker.type === 'mob') {
+            finalDmg = Math.round(finalDmg * 2.0);
+        }
+        if (researchedTechs.has('apBullets') && ['rebel', 'technical', 'quad'].includes(attacker.type)) {
+            finalDmg = Math.round(finalDmg * 1.25);
+        }
+        if (researchedTechs.has('apRockets') && ['rpg', 'scorpion', 'buggy'].includes(attacker.type)) {
+            finalDmg = Math.round(finalDmg * 1.25);
+        }
+        if (researchedTechs.has('chainGuns') && (attacker.type === 'gatling' || attacker.type === 'gatlingCannon')) {
+            finalDmg = Math.round(finalDmg * 1.25);
+        }
+        if (researchedTechs.has('uraniumShells') && (attacker.type === 'battlemaster' || attacker.type === 'overlord')) {
+            finalDmg = Math.round(finalDmg * 1.25);
+        }
+    }
+
     // Target defensive upgrade buffs (USA Strategy Center Hold the Line: +20% armor / -20% damage taken)
     if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(target)) {
         finalDmg = Math.max(1, Math.round(finalDmg * 0.80));
     }
     if (target.salvageLevel >= 2) finalDmg = Math.max(1, Math.round(finalDmg * 0.8)); // GLA Level 2 Scrap Armor
     if (target.compositeArmor) finalDmg = Math.max(1, Math.round(finalDmg * 0.85)); // USA Composite Armor
+
+    // Target Tech Protection Buffs
+    if (typeof researchedTechs !== 'undefined') {
+        if (researchedTechs.has('chemicalSuits') && typeof units !== 'undefined' && units.includes(target) && (damageType === 'TOXIN' || damageType === 'RADIATION')) {
+            finalDmg = Math.max(1, Math.round(finalDmg * 0.50)); // -50% chemical & radiation damage
+        }
+        if (researchedTechs.has('droneArmor') && (target.type === 'drone' || target.drone)) {
+            finalDmg = Math.max(1, Math.round(finalDmg * 0.75));
+        }
+        if (researchedTechs.has('fortifiedStructures') && typeof structures !== 'undefined' && structures.includes(target)) {
+            finalDmg = Math.max(1, Math.round(finalDmg * 0.75));
+        }
+        if (researchedTechs.has('migArmor') && typeof units !== 'undefined' && units.includes(target) && target.type === 'raptor' && (target.faction === 'china' || target.isChina || selectedFaction === 'china')) {
+            finalDmg = Math.max(1, Math.round(finalDmg * 0.75));
+        }
+    }
 
     target.health = Math.max(0, target.health - finalDmg);
 
@@ -243,7 +296,12 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
 
 function checkVeterancyPromotion(unit) {
     if (!unit || unit.health <= 0) return;
-    if (unit.kills >= 2 && (!unit.veterancy || unit.veterancy < 1)) {
+    const reqFactor = (typeof researchedTechs !== 'undefined' && (researchedTechs.has('advancedTraining') || unit.advancedTraining)) ? 0.5 : 1.0;
+    const v1 = Math.ceil(2 * reqFactor);
+    const v2 = Math.ceil(5 * reqFactor);
+    const v3 = Math.ceil(10 * reqFactor);
+
+    if (unit.kills >= v1 && (!unit.veterancy || unit.veterancy < 1)) {
         unit.veterancy = 1; // Veteran (+20% HP)
         const oldMax = unit.maxHealth;
         unit.maxHealth = Math.floor(unit.maxHealth * 1.2);
@@ -251,7 +309,7 @@ function checkVeterancyPromotion(unit) {
         if (typeof showNotification === 'function') {
             showNotification(`★ ${unit.type.toUpperCase()} promoted to VETERAN! (+20% HP, +2 HP/s Heal)`, 'info');
         }
-    } else if (unit.kills >= 5 && (!unit.veterancy || unit.veterancy < 2)) {
+    } else if (unit.kills >= v2 && (!unit.veterancy || unit.veterancy < 2)) {
         unit.veterancy = 2; // Elite (+40% HP from base, +25% Fire Rate)
         const oldMax = unit.maxHealth;
         unit.maxHealth = Math.floor(unit.maxHealth * (1.4 / 1.2));
@@ -259,7 +317,7 @@ function checkVeterancyPromotion(unit) {
         if (typeof showNotification === 'function') {
             showNotification(`★★ ${unit.type.toUpperCase()} promoted to ELITE! (+40% HP, +25% ROF, +4 HP/s Heal)`, 'info');
         }
-    } else if (unit.kills >= 10 && (!unit.veterancy || unit.veterancy < 3)) {
+    } else if (unit.kills >= v3 && (!unit.veterancy || unit.veterancy < 3)) {
         unit.veterancy = 3; // Heroic (+60% HP from base, +50% Fire Rate, Heroic Crimson Laser Tracers)
         const oldMax = unit.maxHealth;
         unit.maxHealth = Math.floor(unit.maxHealth * (1.6 / 1.4));
@@ -318,7 +376,12 @@ function executeWeaponFire(attacker, target) {
     attacker.attackCooldown = baseCooldown;
 
     if (attacker.isHordeActive) {
-        attacker.attackCooldown = Math.max(8, Math.floor(attacker.attackCooldown * 0.75)); // China Horde: +25% fire-rate
+        const hordeFactor = (typeof researchedTechs !== 'undefined' && researchedTechs.has('nationalism')) ? 0.60 : 0.75;
+        attacker.attackCooldown = Math.max(6, Math.floor(attacker.attackCooldown * hordeFactor)); // China Horde: +25% fire-rate (+40% with Nationalism)
+    }
+    // China Autoloader Tech: Battlemaster tanks fire +25% faster
+    if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('autoloader') && attacker.type === 'battlemaster') {
+        attacker.attackCooldown = Math.max(6, Math.floor(attacker.attackCooldown * 0.75));
     }
     if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 0.75);
     if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 1.25);
@@ -375,9 +438,10 @@ function executeWeaponFire(attacker, target) {
         spawnToxinSprayBurst(muzzlePos, targetPos);
         applyCalculatedDamage(attacker, target, 32, 'TOXIN');
     } else if (attacker.type === 'buggy') {
-        // Rocket Buggy RIPPLE VOLLEY!
+        // Rocket Buggy RIPPLE VOLLEY! (8 rockets with Buggy Ammo Chains)
         const rDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets')) ? 15 : 12;
-        for (let r = 0; r < 4; r++) {
+        const rCount = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('buggyAmmo')) ? 8 : 4;
+        for (let r = 0; r < rCount; r++) {
             setTimeout(() => {
                 const mPos = getMuzzleWorldPosition(attacker, (r % 2 === 0 ? -0.25 : 0.25));
                 spawnMuzzleFlash(mPos, 0xff9f43, 0.4);
@@ -435,6 +499,9 @@ function executeWeaponFire(attacker, target) {
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.1);
         spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 3.8);
         playAudio('china_cannon', {}, 'china');
+        if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
+            if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
+        }
         const bmDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('uraniumShells')) ? 62 : 48;
         applyCalculatedDamage(attacker, target, bmDmg, 'ARMOR_PIERCING');
     } else if (['gatlingTank', 'gatlingCannon', 'gatling'].includes(attacker.type)) {
@@ -488,6 +555,10 @@ function executeWeaponFire(attacker, target) {
         const mPosR = getMuzzleWorldPosition(attacker, 0.5);
         setTimeout(() => spawnRocketProjectile(mPosL, targetPos, false, false, { attacker, target, damage: 35, damageType: 'EXPLOSIVE' }), 80);
         setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false, { attacker, target, damage: 35, damageType: 'EXPLOSIVE' }), 180);
+        if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('rocketPods')) {
+            setTimeout(() => spawnRocketProjectile(mPosL, targetPos, false, false, { attacker, target, damage: 25, damageType: 'EXPLOSIVE' }), 260);
+            setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false, { attacker, target, damage: 25, damageType: 'EXPLOSIVE' }), 340);
+        }
         playUSASound('machine_gun');
         playUSASound('missile_launch');
         applyCalculatedDamage(attacker, target, 25, 'SMALL_ARMS');
@@ -496,6 +567,9 @@ function executeWeaponFire(attacker, target) {
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
         spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
         playUSASound('cannon');
+        if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
+            if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
+        }
         applyCalculatedDamage(attacker, target, 56, 'ARMOR_PIERCING');
     } else if (attacker.type === 'quad') {
         // Quad Cannon 4x23mm Autocannon Salvo!
@@ -528,6 +602,9 @@ function executeWeaponFire(attacker, target) {
             setTimeout(() => {
                 spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 38, damageType: 'EXPLOSIVE' });
             }, 120);
+        }
+        if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
+            if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
         }
         applyCalculatedDamage(attacker, target, tkDmg, 'ARMOR_PIERCING');
     } else if (attacker.type === 'humvee') {

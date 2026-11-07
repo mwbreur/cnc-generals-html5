@@ -11,6 +11,7 @@
         const supplyPoints = [];
         let activeCustomMap = null;
         let savedCustomMaps = {};
+        let researchedTechs = new Set();
 
         let currentWaterLevel = -1.2;
         const mapBridges = []; // Array of bridge bounding areas: { position, width, length, rotationY, deckY }

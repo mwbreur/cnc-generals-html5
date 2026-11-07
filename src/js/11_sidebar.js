@@ -820,61 +820,119 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         return spec.building === productionType;
     });
 
-    // Populate units into slots 0..4
-    producers.slice(0, 5).forEach(([type, spec], idx) => {
-        const techReq = getUnitTechPrerequisite(type);
-        const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
-        const canAfford = playerResources >= spec.cost;
-        let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
-        currentGridSlots[idx] = {
-            id: type,
-            name: spec.name.toUpperCase(),
-            cost: spec.cost,
-            badge: badge,
-            disabled: !hasTech || !canAfford || isConstructing,
-            action: () => produceUnit(type),
-            desc: spec.role || 'Combat Unit'
-        };
-    });
+    const lookupKey = structure.type === 'center' ? 'commandCenter' : structure.type;
+    const factionUpgs = (buildingUpgradesCatalog && buildingUpgradesCatalog[selectedFaction] && 
+        (buildingUpgradesCatalog[selectedFaction][structure.type] || buildingUpgradesCatalog[selectedFaction][lookupKey])) || [];
 
-    // Slot 5 (Top-Right): RALLY POINT
-    currentGridSlots[5] = {
-        name: 'SET RALLY',
-        cost: '',
-        badge: 'RALLY 🚩',
-        disabled: isConstructing,
-        action: () => triggerRallyPointMode(),
-        desc: 'Set unit deployment rally point'
-    };
+    if (producers.length > 0) {
+        // Populate units into slots 0..4
+        producers.slice(0, 5).forEach(([type, spec], idx) => {
+            const techReq = getUnitTechPrerequisite(type);
+            const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
+            const canAfford = playerResources >= spec.cost;
+            let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
+            currentGridSlots[idx] = {
+                id: type,
+                name: spec.name.toUpperCase(),
+                cost: spec.cost,
+                badge: badge,
+                disabled: !hasTech || !canAfford || isConstructing,
+                action: () => produceUnit(type),
+                desc: spec.role || 'Combat Unit'
+            };
+        });
 
-    // Upgrades for this building in slots 6..9
-    const factionUpgs = (buildingUpgradesCatalog && buildingUpgradesCatalog[selectedFaction] && buildingUpgradesCatalog[selectedFaction][structure.type]) || [];
-    factionUpgs.slice(0, 4).forEach((upg, idx) => {
-        const canAfford = playerResources >= upg.cost;
-        currentGridSlots[6 + idx] = {
-            name: upg.name,
-            cost: upg.cost,
-            badge: canAfford ? 'UPG' : 'FUNDS',
-            disabled: !canAfford || isConstructing,
-            action: () => {
-                if (playerResources < upg.cost) { showNotification('Insufficient funds.', 'error'); return; }
-                playerResources -= upg.cost;
-                showNotification(`Upgrade completed: ${upg.name}`, 'success');
-                playUSASound('construction');
-                updateSidebar();
-            },
-            desc: upg.desc
+        // Slot 5 (Top-Right): RALLY POINT
+        currentGridSlots[5] = {
+            id: 'rally',
+            name: 'SET RALLY',
+            cost: '',
+            badge: 'RALLY 🚩',
+            disabled: isConstructing,
+            action: () => triggerRallyPointMode(),
+            desc: 'Set unit deployment rally point'
         };
-    });
+
+        // Upgrades for this unit-producing building in slots 6..10
+        factionUpgs.slice(0, 5).forEach((upg, idx) => {
+            assignUpgradeToSlot(6 + idx, upg, structure, isConstructing);
+        });
+    } else {
+        // Non-unit producing structure: All slots 0..10 available for upgrades, stances, and abilities!
+        factionUpgs.slice(0, 11).forEach((upg, idx) => {
+            assignUpgradeToSlot(idx, upg, structure, isConstructing);
+        });
+    }
 
     // Slot 11 (Bottom-Right): SELL STRUCTURE
     currentGridSlots[11] = {
+        id: 'sell',
         name: 'SELL ($)',
         cost: '',
         badge: 'SELL 💰',
         disabled: false,
         action: () => sellStructure(selectedStructure),
         desc: 'Demolish structure for 50% refund'
+    };
+}
+
+function assignUpgradeToSlot(slotIndex, upg, structure, isConstructing) {
+    let badge = 'UPG';
+    let disabled = false;
+    let costStr = (upg.cost !== undefined && upg.cost > 0) ? upg.cost : '';
+
+    if (upg.isStance) {
+        const isCurrent = (typeof battlePlan !== 'undefined' && battlePlan === upg.stance);
+        badge = isCurrent ? 'ACTIVE' : 'STANCE';
+        disabled = isConstructing;
+        costStr = '';
+    } else if (upg.isToggle) {
+        const isOvercharged = !!structure.overcharged;
+        badge = isOvercharged ? 'ACTIVE' : 'TOGGLE';
+        disabled = isConstructing;
+        costStr = '';
+    } else if (upg.isAddon) {
+        let isInstalled = false;
+        if (upg.id === 'controlRods') isInstalled = !!structure.powerUpgraded;
+        else if (upg.id === 'mines') isInstalled = !!structure.hasMines;
+        else if (upg.id === 'neutronMines') isInstalled = !!structure.hasNeutronMines;
+        else if (upg.id === 'camoNetting') isInstalled = !!structure.hasCamoNetting;
+        else if (upg.id === 'upgradeToReal') isInstalled = (structure.type !== 'fakeBarracks' && structure.type !== 'fakeArmsDealer');
+
+        if (isInstalled) {
+            badge = 'INSTALLED';
+            disabled = true;
+        } else {
+            const canAfford = playerResources >= upg.cost;
+            badge = canAfford ? 'READY' : 'FUNDS';
+            disabled = !canAfford || isConstructing;
+        }
+    } else if (upg.isAbility) {
+        const onCooldown = structure.abilityCooldownUntil && (typeof buildingTick !== 'undefined') && buildingTick < structure.abilityCooldownUntil;
+        const canAfford = playerResources >= upg.cost;
+        badge = onCooldown ? 'RELOAD' : (canAfford ? 'READY' : 'FUNDS');
+        disabled = !canAfford || onCooldown || isConstructing;
+    } else {
+        // Global tech research
+        const isResearched = (typeof researchedTechs !== 'undefined' && researchedTechs.has(upg.id));
+        if (isResearched) {
+            badge = 'DONE';
+            disabled = true;
+        } else {
+            const canAfford = playerResources >= upg.cost;
+            badge = canAfford ? 'UPG' : 'FUNDS';
+            disabled = !canAfford || isConstructing;
+        }
+    }
+
+    currentGridSlots[slotIndex] = {
+        id: upg.id,
+        name: upg.name,
+        cost: costStr,
+        badge: badge,
+        disabled: disabled,
+        action: () => executeStructureUpgradeOrAction(upg, structure),
+        desc: upg.desc
     };
 }
 
@@ -1262,6 +1320,254 @@ function getCameoSVG(id, faction = 'usa', name = '') {
             <polygon points="20,10 30,14 30,18 20,22" fill="#f1c40f" stroke="#b7950b" stroke-width="0.8"/>
             <polygon points="44,10 34,14 34,18 44,22" fill="#f1c40f" stroke="#b7950b" stroke-width="0.8"/>
             <rect x="22" y="34" width="20" height="5" rx="1" fill="#2c3e50"/>
+        `);
+    }
+
+    // --- UPGRADES & STANCES CAMEO ICONS ---
+    if (key.includes('bombard')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="13" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,2"/>
+            <line x1="32" y1="5" x2="32" y2="37" stroke="#e74c3c" stroke-width="1.2"/>
+            <line x1="16" y1="21" x2="48" y2="21" stroke="#e74c3c" stroke-width="1.2"/>
+            <polygon points="32,13 36,25 28,25" fill="#ff4757"/>
+            <circle cx="32" cy="21" r="2.5" fill="#f1c40f"/>
+        `);
+    }
+    if (key.includes('hold')) {
+        return wrap(`
+            <path d="M32 7 L47 12 C47 25 39 33 32 37 C25 33 17 25 17 12 Z" fill="#1b2a4a" stroke="#00d2d3" stroke-width="1.5"/>
+            <path d="M32 11 L43 15 C43 24 37 30 32 33 C27 30 21 24 21 15 Z" fill="#0f1929"/>
+            <rect x="29" y="16" width="6" height="12" rx="1" fill="#00d2d3"/>
+            <line x1="26" y1="22" x2="38" y2="22" stroke="#00d2d3" stroke-width="2"/>
+        `);
+    }
+    if (key.includes('search')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="14" fill="#0c1815" stroke="#10ac84" stroke-width="1.5"/>
+            <path d="M32 21 L43 11 A14 14 0 0 1 46 21 Z" fill="#1dd1a1" opacity="0.45"/>
+            <circle cx="32" cy="21" r="8" stroke="#10ac84" stroke-width="1" stroke-dasharray="2,2"/>
+            <circle cx="32" cy="21" r="2.5" fill="#1dd1a1"/>
+        `);
+    }
+    if (key.includes('controlrod') || key.includes('upgradePower')) {
+        return wrap(`
+            <rect x="18" y="8" width="8" height="26" rx="2" fill="#0abde3" stroke="#48dbfb" stroke-width="1"/>
+            <rect x="38" y="8" width="8" height="26" rx="2" fill="#0abde3" stroke="#48dbfb" stroke-width="1"/>
+            <path d="M26 16 L38 22 M26 26 L38 18" stroke="#feca57" stroke-width="1.8"/>
+            <circle cx="32" cy="21" r="3.5" fill="#ff9ff3"/>
+        `);
+    }
+    if (key.includes('overcharge')) {
+        return wrap(`
+            <polygon points="32,7 48,34 16,34" fill="#222" stroke="#f39c12" stroke-width="2"/>
+            <circle cx="32" cy="22" r="3" fill="#f1c40f"/>
+            <path d="M32 12 L35 18 L29 18 Z M23 27 L28 23 L25 31 Z M41 27 L36 23 L39 31 Z" fill="#f39c12"/>
+        `);
+    }
+    if (key.includes('mine')) {
+        const isNeutron = key.includes('neutron');
+        return wrap(`
+            <polygon points="32,8 50,33 14,33" fill="#2c2c2c" stroke="${isNeutron ? '#00f2fe' : '#e74c3c'}" stroke-width="1.8"/>
+            <circle cx="32" cy="23" r="5" fill="${isNeutron ? '#00f2fe' : '#e74c3c'}"/>
+            <rect x="30" y="15" width="4" height="2" fill="#fff"/>
+            <circle cx="32" cy="30" r="1.5" fill="#f1c40f"/>
+        `);
+    }
+    if (key.includes('camonetting') || key.includes('camouflage')) {
+        return wrap(`
+            <path d="M12 28 Q32 10 52 28 L48 35 Q32 24 16 35 Z" fill="#3b4d28" stroke="#78e08f" stroke-width="1.2"/>
+            <path d="M20 18 L44 30 M24 30 L40 18" stroke="#222f3e" stroke-width="1" stroke-dasharray="2,2"/>
+            <circle cx="32" cy="18" r="2.5" fill="#78e08f"/>
+        `);
+    }
+    if (key.includes('upgradetoreal')) {
+        return wrap(`
+            <rect x="18" y="14" width="28" height="20" rx="2" fill="#2c3e50" stroke="#f1c40f" stroke-width="1.5"/>
+            <polygon points="16,14 32,5 48,14" fill="#d35400"/>
+            <path d="M28 26 L36 18 M36 18 L36 24 M36 18 L30 18" stroke="#2ecc71" stroke-width="2"/>
+        `);
+    }
+    if (key.includes('spydrone') || key.includes('radarvanscan') || key.includes('radar')) {
+        return wrap(`
+            <circle cx="32" cy="20" r="12" fill="#1b262c" stroke="#3282b8" stroke-width="1.5"/>
+            <ellipse cx="32" cy="20" rx="9" ry="4" stroke="#00d2d3" stroke-width="1.2"/>
+            <circle cx="32" cy="20" r="3" fill="#00f2fe"/>
+            <line x1="32" y1="8" x2="32" y2="4" stroke="#00d2d3" stroke-width="2"/>
+        `);
+    }
+    if (key.includes('emppulse')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="14" stroke="#00f2fe" stroke-width="1.2" stroke-dasharray="3,3"/>
+            <path d="M30 7 L24 21 L32 21 L28 35 L40 19 L32 19 Z" fill="#00f2fe" stroke="#fff" stroke-width="1"/>
+        `);
+    }
+    if (key.includes('sneakattack')) {
+        return wrap(`
+            <path d="M14 26 Q32 14 50 26 L52 36 L12 36 Z" fill="#3d2b1f" stroke="#8b5a2b" stroke-width="1.5"/>
+            <ellipse cx="32" cy="26" rx="9" ry="5" fill="#111"/>
+            <path d="M32 14 L28 22 L36 22 Z" fill="#f39c12"/>
+        `);
+    }
+    if (key.includes('capturebuilding')) {
+        return wrap(`
+            <rect x="18" y="16" width="28" height="18" fill="#34495e" stroke="#7f8c8d" stroke-width="1"/>
+            <line x1="32" y1="6" x2="32" y2="16" stroke="#fff" stroke-width="1.5"/>
+            <polygon points="32,6 44,9 32,13" fill="#2ecc71"/>
+        `);
+    }
+    if (key.includes('flashbang')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="12" fill="#fff" opacity="0.8"/>
+            <polygon points="32,7 35,16 45,17 37,23 40,32 32,27 24,32 27,23 19,17 29,16" fill="#f1c40f"/>
+        `);
+    }
+    if (key.includes('compositearmor') || key.includes('migarmor') || key.includes('fortifiedstructures')) {
+        return wrap(`
+            <rect x="18" y="10" width="28" height="8" rx="1.5" fill="#57606f" stroke="#a4b0be" stroke-width="1"/>
+            <rect x="18" y="20" width="28" height="8" rx="1.5" fill="#2f3542" stroke="#a4b0be" stroke-width="1"/>
+            <rect x="18" y="30" width="28" height="8" rx="1.5" fill="#1e272e" stroke="#00d2d3" stroke-width="1"/>
+            <circle cx="22" cy="14" r="1.5" fill="#fff"/>
+            <circle cx="42" cy="14" r="1.5" fill="#fff"/>
+        `);
+    }
+    if (key.includes('dronearmor')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="12" fill="#222f3e" stroke="#48dbfb" stroke-width="1.5"/>
+            <rect x="26" y="18" width="12" height="6" rx="2" fill="#00d2d3"/>
+            <line x1="20" y1="14" x2="44" y2="28" stroke="#48dbfb" stroke-width="1.2"/>
+            <line x1="20" y1="28" x2="44" y2="14" stroke="#48dbfb" stroke-width="1.2"/>
+        `);
+    }
+    if (key.includes('nationalism')) {
+        return wrap(`
+            <polygon points="20,12 30,8 30,22 20,26" fill="#c0392b" stroke="#e74c3c" stroke-width="1"/>
+            <polygon points="44,12 34,8 34,22 44,26" fill="#c0392b" stroke="#e74c3c" stroke-width="1"/>
+            <circle cx="32" cy="18" r="4" fill="#f1c40f"/>
+            <polygon points="32,15 33,17 35,17 33.5,18.5 34,21 32,19.5 30,21 30.5,18.5 29,17 31,17" fill="#c0392b"/>
+        `);
+    }
+    if (key.includes('subliminal')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="5" fill="#e74c3c"/>
+            <circle cx="32" cy="21" r="9" stroke="#f1c40f" stroke-width="1.5" fill="none" stroke-dasharray="4,2"/>
+            <circle cx="32" cy="21" r="14" stroke="#e67e22" stroke-width="1.5" fill="none" stroke-dasharray="5,3"/>
+        `);
+    }
+    if (key.includes('sathack')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="4" fill="#fff"/>
+            <rect x="14" y="19" width="12" height="4" fill="#3498db" stroke="#2980b9" stroke-width="1"/>
+            <rect x="38" y="19" width="12" height="4" fill="#3498db" stroke="#2980b9" stroke-width="1"/>
+            <path d="M26 28 C28 32 36 32 38 28" stroke="#2ecc71" stroke-width="1.5" fill="none"/>
+            <line x1="32" y1="25" x2="32" y2="35" stroke="#2ecc71" stroke-width="1.2"/>
+        `);
+    }
+    if (key.includes('uraniumshells') || key.includes('apbullets') || key.includes('aprockets')) {
+        return wrap(`
+            <polygon points="48,16 52,21 48,26 18,26 18,16" fill="#2c3e50" stroke="#2ecc71" stroke-width="1.2"/>
+            <polygon points="48,17 54,21 48,25" fill="#2ecc71"/>
+            <line x1="14" y1="21" x2="4" y2="21" stroke="#f1c40f" stroke-width="2"/>
+        `);
+    }
+    if (key.includes('nucleartanks')) {
+        return wrap(`
+            <rect x="16" y="24" width="32" height="8" rx="2" fill="#2f3542" stroke="#2ed573" stroke-width="1"/>
+            <rect x="22" y="16" width="20" height="10" rx="2" fill="#1e272e"/>
+            <circle cx="32" cy="21" r="3" fill="#2ed573"/>
+        `);
+    }
+    if (key.includes('chainguns') || key.includes('autoloader')) {
+        return wrap(`
+            <circle cx="32" cy="21" r="11" fill="#1e272e" stroke="#718093" stroke-width="1.5"/>
+            <circle cx="32" cy="14" r="2.5" fill="#f1c40f"/>
+            <circle cx="38" cy="18" r="2.5" fill="#f1c40f"/>
+            <circle cx="38" cy="24" r="2.5" fill="#f1c40f"/>
+            <circle cx="32" cy="28" r="2.5" fill="#f1c40f"/>
+            <circle cx="26" cy="24" r="2.5" fill="#f1c40f"/>
+            <circle cx="26" cy="18" r="2.5" fill="#f1c40f"/>
+        `);
+    }
+    if (key.includes('blacknapalm')) {
+        return wrap(`
+            <path d="M32 6 C32 6 42 16 42 26 C42 32 37 36 32 36 C27 36 22 32 22 26 C22 16 32 6 32 6 Z" fill="#8e44ad" stroke="#c0392b" stroke-width="1.5"/>
+            <path d="M32 14 C32 14 38 20 38 26 C38 29 35 32 32 32 C29 32 26 29 26 26 C26 20 32 14 32 14 Z" fill="#ff4757"/>
+            <circle cx="32" cy="26" r="3" fill="#ffa502"/>
+        `);
+    }
+    if (key.includes('towmissile') || key.includes('lasermissiles') || key.includes('rocketpods') || key.includes('scorpionrocket') || key.includes('buggyammo')) {
+        return wrap(`
+            <rect x="14" y="12" width="36" height="6" rx="2" fill="#2d3436" stroke="#636e72" stroke-width="1"/>
+            <polygon points="50,15 44,12 44,18" fill="#e74c3c"/>
+            <rect x="14" y="24" width="36" height="6" rx="2" fill="#2d3436" stroke="#636e72" stroke-width="1"/>
+            <polygon points="50,27 44,24 44,30" fill="#e74c3c"/>
+        `);
+    }
+    if (key.includes('countermeasures')) {
+        return wrap(`
+            <path d="M16 21 L36 12 L32 21 L48 21 L32 23 L36 30 Z" fill="#747d8c"/>
+            <circle cx="16" cy="28" r="2.5" fill="#f39c12"/>
+            <circle cx="22" cy="33" r="2" fill="#f1c40f"/>
+            <circle cx="12" cy="34" r="1.5" fill="#ff4757"/>
+        `);
+    }
+    if (key.includes('bunkerbusters')) {
+        return wrap(`
+            <rect x="16" y="24" width="32" height="10" fill="#2c3e50" stroke="#7f8c8d" stroke-width="1"/>
+            <line x1="28" y1="24" x2="36" y2="34" stroke="#e74c3c" stroke-width="2"/>
+            <polygon points="32,6 36,18 28,18" fill="#747d8c" stroke="#111" stroke-width="1"/>
+        `);
+    }
+    if (key.includes('training') || key.includes('redguardtraining')) {
+        return wrap(`
+            <path d="M22 10 L32 18 L42 10" stroke="#f1c40f" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <path d="M22 18 L32 26 L42 18" stroke="#f1c40f" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <polygon points="32,27 34,32 39,32 35,35 37,40 32,37 27,40 29,35 25,32 30,32" fill="#ffd700"/>
+        `);
+    }
+    if (key.includes('chemicalsuits')) {
+        return wrap(`
+            <ellipse cx="32" cy="21" rx="12" ry="14" fill="#2d3436" stroke="#2ed573" stroke-width="1.5"/>
+            <ellipse cx="27" cy="18" rx="3.5" ry="3" fill="#2ed573"/>
+            <ellipse cx="37" cy="18" rx="3.5" ry="3" fill="#2ed573"/>
+            <circle cx="32" cy="27" r="4.5" fill="#111" stroke="#57606f" stroke-width="1"/>
+        `);
+    }
+    if (key.includes('supplylines') || key.includes('workershoes')) {
+        return wrap(`
+            <rect x="20" y="14" width="24" height="20" rx="2" fill="#1e824c" stroke="#2ecc71" stroke-width="1.2"/>
+            <text x="32" y="29" font-family="'Impact', sans-serif" font-size="16" fill="#ffd700" text-anchor="middle">$</text>
+            <path d="M12 24 L20 18 M52 24 L44 18" stroke="#ffd700" stroke-width="2"/>
+        `);
+    }
+    if (key.includes('armthemob')) {
+        return wrap(`
+            <rect x="18" y="20" width="28" height="5" fill="#57606f"/>
+            <polygon points="46,20 54,22.5 46,25" fill="#111"/>
+            <rect x="22" y="25" width="4" height="8" fill="#8b5a2b"/>
+            <rect x="34" y="24" width="5" height="9" fill="#111"/>
+        `);
+    }
+    if (key.includes('toxinshells') || key.includes('anthraxbeta')) {
+        const isCyan = key.includes('anthraxbeta');
+        return wrap(`
+            <path d="M28 8 L36 8 L36 14 L42 28 C42 32 38 35 32 35 C26 35 22 32 22 28 L28 14 Z" fill="#1e272e" stroke="${isCyan ? '#00f2fe' : '#2ed573'}" stroke-width="1.5"/>
+            <ellipse cx="32" cy="28" rx="7" ry="5" fill="${isCyan ? '#00f2fe' : '#2ed573'}"/>
+            <circle cx="32" cy="22" r="1.5" fill="#fff"/>
+        `);
+    }
+    if (key.includes('junkrepair')) {
+        return wrap(`
+            <path d="M18 12 L30 24 M30 24 L26 28 M18 12 L22 8" stroke="#ced6e0" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="38" cy="26" r="6" stroke="#f39c12" stroke-width="2" fill="none" stroke-dasharray="3,2"/>
+            <polygon points="38,23 41,29 35,29" fill="#f1c40f"/>
+        `);
+    }
+    if (key.includes('demolitions') || key.includes('boobytrap')) {
+        return wrap(`
+            <rect x="20" y="14" width="24" height="18" rx="2" fill="#c0392b" stroke="#e74c3c" stroke-width="1.2"/>
+            <rect x="22" y="18" width="20" height="4" fill="#111"/>
+            <line x1="32" y1="14" x2="32" y2="6" stroke="#f1c40f" stroke-width="1.5"/>
+            <circle cx="32" cy="6" r="2.5" fill="#f39c12"/>
         `);
     }
 
@@ -1789,64 +2095,253 @@ function cancelQueuedItem(structure, index) {
 function useStructureAbility(action) {
     const structure = selectedStructure;
     if (!structure || structure.isBuilding) return;
+    executeStructureUpgradeOrAction({ id: action, name: action, cost: 0 }, structure);
+}
 
-    if (action === 'upgradePower') {
-        if (structure.powerUpgraded) return;
-        if (playerResources < 300) { showNotification('Insufficient resources for control rods.', 'error'); return; }
-        playerResources -= 300;
-        structure.powerUpgraded = true;
-        structure.powerOutput = 10;
-        showNotification('Control rods installed: Cold Fusion power doubled (+100%).', 'success');
-    } else if (action === 'overcharge') {
-        structure.overcharged = !structure.overcharged;
-        showNotification(`Nuclear Reactor overcharge ${structure.overcharged ? 'ACTIVATED (+50% PWR)' : 'DEACTIVATED'}.`, 'info');
-    } else if (action === 'planHold') {
-        battlePlan = 'hold';
-        showNotification('Strategy Center: Battle plan Hold the Line active (+20% armor).', 'info');
-    } else if (action === 'planSearch') {
-        battlePlan = 'search';
-        showNotification('Strategy Center: Battle plan Search & Destroy active (+20% range & sight).', 'info');
-    } else if (action === 'planBombard') {
-        battlePlan = 'bombard';
-        showNotification('Strategy Center: Battle plan Bombardment active (+20% firepower).', 'info');
-    } else if (action === 'compositeArmor') {
-        if (playerResources < 1200) { showNotification('Need $1200 for Composite Armor.', 'error'); return; }
-        playerResources -= 1200;
-        researchedTechs.add('compositeArmor');
-        units.filter(u => u.type === 'tank' || u.type === 'paladin').forEach(u => { u.health += 100; u.maxHealth += 100; });
-        showNotification('Composite Armor researched: Tanks gained +25% HP!', 'success');
-    } else if (action === 'nationalism') {
-        if (playerResources < 1000) { showNotification('Need $1000 for Nationalism.', 'error'); return; }
-        playerResources -= 1000;
-        researchedTechs.add('nationalism');
-        showNotification('Nationalism researched: Chinese troops fire +25% faster!', 'success');
-    } else if (action === 'subliminal') {
-        if (playerResources < 800) { showNotification('Need $800 for Subliminal Messaging.', 'error'); return; }
-        playerResources -= 800;
-        researchedTechs.add('subliminal');
-        showNotification('Subliminal Messaging researched: Healing recovery doubled!', 'success');
-    } else if (action === 'anthraxBeta') {
-        if (playerResources < 1200) { showNotification('Need $1200 for Anthrax Beta.', 'error'); return; }
-        playerResources -= 1200;
-        researchedTechs.add('anthraxBeta');
-        showNotification('Anthrax Beta researched: Toxin weapons deal +25% damage!', 'success');
-    } else if (action === 'armTheMob') {
-        if (playerResources < 1000) { showNotification('Need $1000 for Arm the Mob.', 'error'); return; }
-        playerResources -= 1000;
-        researchedTechs.add('armTheMob');
-        showNotification('Arm the Mob researched: Mobs equipped with AK-47 assault rifles!', 'success');
-    } else if (action === 'captureBuilding') {
-        if (playerResources < 1000) { showNotification('Need $1000 for Capture Building.', 'error'); return; }
-        playerResources -= 1000;
-        researchedTechs.add('captureBuilding');
-        showNotification('Capture Building researched: Infantry can now capture enemy tech!', 'success');
-    } else if (action === 'superweapon') {
+function executeStructureUpgradeOrAction(upg, structure) {
+    if (!structure || structure.health <= 0 || structure.isBuilding) return;
+
+    if (upg.isStance) {
+        battlePlan = upg.stance;
+        playUSASound('radio_chirp');
+        const stanceNames = {
+            bombard: 'Bombardment (+20% Firepower)',
+            hold: 'Hold the Line (+20% Armor & Defense)',
+            search: 'Search & Destroy (+20% Sight & Range)'
+        };
+        showNotification(`Strategy Center Directive: ${stanceNames[upg.stance] || upg.name}`, 'info');
+        updateSidebar();
+        return;
+    }
+
+    if (upg.isToggle) {
+        if (upg.id === 'overcharge') {
+            structure.overcharged = !structure.overcharged;
+            structure.powerOutput = structure.overcharged ? 15 : 10;
+            playAudio('construction', {}, 'china');
+            showNotification(`Nuclear Reactor overcharge ${structure.overcharged ? 'ACTIVATED (+50% Power, slow radiation wear)' : 'DEACTIVATED'}.`, structure.overcharged ? 'warning' : 'info');
+            updateSidebar();
+        }
+        return;
+    }
+
+    if (upg.isAddon) {
+        if (playerResources < upg.cost) {
+            showNotification(`Insufficient funds to purchase ${upg.name} ($${upg.cost} required).`, 'error');
+            return;
+        }
+        playerResources -= upg.cost;
+
+        if (upg.id === 'controlRods' || upg.id === 'upgradePower') {
+            structure.powerUpgraded = true;
+            structure.powerOutput = 10;
+            attachControlRodsVisual(structure);
+            showNotification('Control Rods installed: Cold Fusion power doubled (+100%).', 'success');
+        } else if (upg.id === 'mines') {
+            structure.hasMines = true;
+            attachPerimeterMinesVisual(structure, false);
+            showNotification('Perimeter Landmines deployed around structure.', 'success');
+        } else if (upg.id === 'neutronMines') {
+            structure.hasMines = true;
+            structure.hasNeutronMines = true;
+            attachPerimeterMinesVisual(structure, true);
+            showNotification('Neutron Mines armed around perimeter: hostile vehicle crews will be eliminated.', 'success');
+        } else if (upg.id === 'camoNetting') {
+            structure.hasCamoNetting = true;
+            structure.isStealthed = true;
+            attachCamoNettingVisual(structure);
+            showNotification('Camo Netting installed: Structure is now concealed in stealth.', 'success');
+        } else if (upg.id === 'upgradeToReal') {
+            upgradeDecoyToRealStructure(structure);
+        }
+        playAudio('construction', {}, selectedFaction);
+        updateSidebar();
+        return;
+    }
+
+    if (upg.isAbility) {
+        if (structure.abilityCooldownUntil && buildingTick < structure.abilityCooldownUntil) {
+            showNotification('Ability recharging...', 'warning');
+            return;
+        }
+        if (playerResources < upg.cost) {
+            showNotification(`Insufficient funds for ${upg.name} ($${upg.cost} required).`, 'error');
+            return;
+        }
+        playerResources -= upg.cost;
+        structure.abilityCooldownUntil = buildingTick + 900; // 15s cooldown
+
+        if (upg.id === 'spyDrone' || upg.id === 'radarVanScan') {
+            triggerReconnaissanceScan(upg.id);
+        } else if (upg.id === 'empPulse') {
+            triggerEmpPulseDisruption();
+        } else if (upg.id === 'sneakAttack') {
+            triggerSneakAttackTunnel();
+        }
+        updateSidebar();
+        return;
+    }
+
+    if (upg.id === 'superweapon') {
         if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Superweapon is recharging.', 'error'); return; }
         pendingSuperweapon = structure;
         showNotification(`Click map to target ${structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Strike' : 'SCUD Storm'}. Right-click to cancel.`, 'info');
+        return;
+    }
+
+    // Global research
+    if (playerResources < upg.cost) {
+        showNotification(`Insufficient funds to research ${upg.name} ($${upg.cost} required).`, 'error');
+        return;
+    }
+    playerResources -= upg.cost;
+    researchedTechs.add(upg.id);
+    playAudio('construction', {}, selectedFaction);
+
+    // Immediate global stat application
+    if (upg.id === 'compositeArmor') {
+        units.filter(u => u.type === 'tank' || u.type === 'crusader' || u.type === 'paladin').forEach(u => {
+            u.compositeArmor = true;
+            u.maxHealth = Math.floor(u.maxHealth * 1.25);
+            u.health = Math.min(u.maxHealth, u.health + 100);
+        });
+        showNotification('Composite Armor researched: Tanks gained +25% HP and layered armor!', 'success');
+    } else if (upg.id === 'migArmor') {
+        units.filter(u => u.type === 'raptor' && (u.faction === 'china' || u.isChina || selectedFaction === 'china')).forEach(u => {
+            u.maxHealth = Math.floor(u.maxHealth * 1.25);
+            u.health = Math.min(u.maxHealth, u.health + 65);
+        });
+        showNotification('MiG Composite Armor researched: MiGs gained +25% HP!', 'success');
+    } else if (upg.id === 'fortifiedStructures') {
+        structures.forEach(s => {
+            s.maxHealth = Math.floor(s.maxHealth * 1.25);
+            s.health = Math.min(s.maxHealth, s.health + 200);
+        });
+        showNotification('Fortified Structures researched: GLA structures reinforced (+25% HP)!', 'success');
+    } else if (upg.id === 'workerShoes') {
+        units.filter(u => u.type === 'worker').forEach(u => {
+            if (!u.shoesApplied) { u.speed = (u.speed || 0.10) * 1.25; u.shoesApplied = true; }
+        });
+        showNotification('Worker Shoes acquired: Worker movement speed increased by +25%!', 'success');
+    } else if (upg.id === 'nuclearTanks') {
+        units.filter(u => u.type === 'battlemaster' || u.type === 'overlord').forEach(u => {
+            u.speed = (u.speed || 0.15) * 1.25;
+        });
+        showNotification('Nuclear Tanks researched: Battlemaster and Overlord tank speed +25%!', 'success');
+    } else if (upg.id === 'radar') {
+        showNotification('Radar System online: Tactical mini-map telemetry fully active!', 'success');
+    } else {
+        showNotification(`Upgrade completed: ${upg.name}!`, 'success');
     }
 
     updateSidebar();
+}
+
+function attachControlRodsVisual(structure) {
+    if (!structure || !structure.mesh) return;
+    const rodGroup = new THREE.Group();
+    rodGroup.name = "controlRodsAttachment";
+    const rodMat = new THREE.MeshStandardMaterial({ color: 0x00f2fe, emissive: 0x00c6ff, emissiveIntensity: 0.8, metalness: 0.8, roughness: 0.2 });
+    [-1.2, 1.2].forEach(x => {
+        [-1.2, 1.2].forEach(z => {
+            const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.6, 8), rodMat);
+            rod.position.set(x, 3.8, z);
+            rodGroup.add(rod);
+        });
+    });
+    structure.mesh.add(rodGroup);
+}
+
+function attachPerimeterMinesVisual(structure, isNeutron = false) {
+    if (!structure || !structure.mesh) return;
+    const mineGroup = new THREE.Group();
+    mineGroup.name = "perimeterMinesAttachment";
+    const stakeMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+    const flagMat = new THREE.MeshBasicMaterial({ color: isNeutron ? 0x00ffff : 0xff4757 });
+    const r = (structure.radius || 4.0) + 1.2;
+    for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const mx = Math.cos(angle) * r;
+        const mz = Math.sin(angle) * r;
+        const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), stakeMat);
+        stake.position.set(mx, 0.45, mz);
+        const flag = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.02), flagMat);
+        flag.position.set(mx + 0.12, 0.8, mz);
+        mineGroup.add(stake);
+        mineGroup.add(flag);
+    }
+    structure.mesh.add(mineGroup);
+}
+
+function attachCamoNettingVisual(structure) {
+    if (!structure || !structure.mesh) return;
+    const r = (structure.radius || 3.5) * 1.35;
+    const netGeo = new THREE.ConeGeometry(r, 2.5, 8, 1, true);
+    const netMat = new THREE.MeshStandardMaterial({
+        color: 0x5a6848,
+        wireframe: true,
+        roughness: 0.9,
+        transparent: true,
+        opacity: 0.85
+    });
+    const net = new THREE.Mesh(netGeo, netMat);
+    net.position.y = 1.8;
+    net.name = "camoNettingAttachment";
+    structure.mesh.add(net);
+}
+
+function upgradeDecoyToRealStructure(structure) {
+    if (!structure) return;
+    const oldType = structure.type;
+    const newType = (oldType === 'fakeBarracks') ? 'barracks' : 'factory';
+    structure.type = newType;
+    structure.isFake = false;
+    structure.maxHealth = (newType === 'barracks' ? 800 : 1200);
+    structure.health = structure.maxHealth;
+    showNotification(`Decoy converted: Now a fully operational ${newType === 'barracks' ? 'Barracks' : 'Arms Dealer'}!`, 'success');
+}
+
+function triggerReconnaissanceScan(abilityId) {
+    const targetPos = (typeof camera !== 'undefined' && camera.position) ? new THREE.Vector3(camera.position.x, 0, camera.position.z) : new THREE.Vector3(0, 0, 0);
+    if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(targetPos, 45, 900);
+    playUSASound('radio_chirp');
+    showNotification(`${abilityId === 'spyDrone' ? 'Spy Drone' : 'Radar Van'} recon scan active over operational theater!`, 'info');
+}
+
+function triggerEmpPulseDisruption() {
+    const targetPos = (typeof camera !== 'undefined' && camera.position) ? new THREE.Vector3(camera.position.x, 0, camera.position.z) : new THREE.Vector3(0, 0, 0);
+    if (typeof enemyUnits !== 'undefined') {
+        enemyUnits.forEach(eu => {
+            if (eu.health > 0 && eu.mesh && eu.mesh.position.distanceTo(targetPos) < 40) {
+                eu.attackCooldown = 720; // Stunned for 12 seconds
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(eu.mesh.position, 0x00f2fe, 1.5, false);
+            }
+        });
+    }
+    playAudio('construction', {}, 'china');
+    showNotification('EMP Disruption pulse discharged! Hostile systems in sector disabled for 12s.', 'info');
+}
+
+function triggerSneakAttackTunnel() {
+    const targetPos = (typeof camera !== 'undefined' && camera.position) ? new THREE.Vector3(camera.position.x, 0, camera.position.z) : new THREE.Vector3(0, 0, 0);
+    targetPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+    const tunnelMesh = (typeof createGLATunnelMesh === 'function') ? createGLATunnelMesh() : new THREE.Group();
+    tunnelMesh.position.copy(targetPos);
+    scene.add(tunnelMesh);
+    structures.push({
+        type: 'tunnel',
+        mesh: tunnelMesh,
+        position: targetPos,
+        health: 800,
+        maxHealth: 800,
+        radius: 3.5,
+        isBuilding: false,
+        buildProgress: 100,
+        teamId: playerTeamId
+    });
+    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(targetPos, 0x8b5a2b, 2.5, true);
+    playAudio('construction', {}, 'gla');
+    showNotification('Sneak Attack Network breached ground! Underground tunnel network established.', 'success');
 }
 
 function strikeWithSuperweapon(structure, targetPosition) {
@@ -1881,10 +2376,29 @@ function updateHUD() {
             if (buildingTick % 60 !== 0) return;
             const activeStructures = structures.filter(structure => !structure.isBuilding && structure.health > 0);
             activeStructures.forEach(structure => {
-                if (structure.type === 'supplyDrop' && buildingTick % 900 === 0) playerResources += 250;
+                if (structure.type === 'supplyDrop' && buildingTick % 900 === 0) {
+                    const bonus = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines')) ? 275 : 250;
+                    playerResources += bonus;
+                }
                 if (structure.type === 'blackMarket' && buildingTick % 300 === 0) playerResources += 30;
                 if (structure.type === 'internetCenter' && buildingTick % 300 === 0) playerResources += 20;
                 if (structure.type === 'nuclearReactor' && structure.overcharged) structure.health -= 8;
+
+                // Perimeter landmines installed on Chinese/defensive structures
+                if (structure.hasMines && buildingTick % 30 === 0) {
+                    const triggerDist = (structure.radius || 4) + 4.5;
+                    const nearbyEnemies = enemyUnits.filter(e => e.health > 0 && e.mesh && e.mesh.position.distanceTo(structure.position) < triggerDist);
+                    if (nearbyEnemies.length > 0) {
+                        nearbyEnemies.forEach(e => {
+                            const isNeutron = !!structure.hasNeutronMines;
+                            const dmg = isNeutron ? 320 : 180;
+                            e.health = Math.max(0, e.health - dmg);
+                            if (isNeutron && isInfantryType(e.type)) e.health = 0;
+                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(e.mesh.position, isNeutron ? 0x00f2fe : 0xff4757, 1.8, true);
+                        });
+                        showNotification(`Perimeter mine detonated around ${structure.type.toUpperCase()}!`, 'warning');
+                    }
+                }
 
                 if (['patriot', 'gatlingCannon', 'stingerSite'].includes(structure.type) && buildingTick % 45 === 0) {
                     const target = enemyUnits.find(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(structure.position) < 45);
@@ -1909,11 +2423,12 @@ function updateHUD() {
                     }
                 }
 
-                if (['barracks', 'speakerTower'].includes(structure.type)) {
+                if (['barracks', 'speakerTower', 'propagandaCenter'].includes(structure.type)) {
+                    const healMult = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal')) ? 2 : 1;
                     units.forEach(unit => {
                         const infantry = ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker'].includes(unit.type);
-                        if (infantry && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < (structure.type === 'barracks' ? 12 : 24)) {
-                            unit.health = Math.min(unit.maxHealth, unit.health + (structure.type === 'barracks' ? 2 : 1));
+                        if (infantry && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < (structure.type === 'barracks' ? 12 : 26)) {
+                            unit.health = Math.min(unit.maxHealth, unit.health + (structure.type === 'barracks' ? 2 : (2 * healMult)));
                         }
                     });
                 }
@@ -1936,6 +2451,19 @@ function updateHUD() {
                     }
                 }
             });
+
+            // Overlord Propaganda Tower healing
+            units.forEach(u => {
+                if (u.type === 'overlord' && u.overlordUpgrade === 'speaker' && u.health > 0 && u.mesh) {
+                    const ovHeal = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal')) ? 4 : 2;
+                    units.forEach(nearby => {
+                        if (nearby.health > 0 && nearby.health < nearby.maxHealth && nearby.mesh && nearby.mesh.position.distanceTo(u.mesh.position) < 24) {
+                            nearby.health = Math.min(nearby.maxHealth, nearby.health + ovHeal);
+                        }
+                    });
+                }
+            });
+
             landmines.forEach(mine => {
                 if (!mine.active) return;
                 const trigger = enemyUnits.some(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(mine.position) < 3.5);
@@ -1947,13 +2475,20 @@ function updateHUD() {
                     createImpactExplosion(mine.position);
                 }
             });
+
             // Continuous auto-repair from Junk Repair & Battle Drones
             if (buildingTick % 60 === 0) {
-                if (researchedTechs.has('junkRepair') || researchedTechs.has('battleDrone')) {
+                if (typeof researchedTechs !== 'undefined' && (researchedTechs.has('junkRepair') || researchedTechs.has('battleDrone'))) {
                     units.forEach(u => {
                         if (!u.isAir && !isInfantryType(u.type) && u.health > 0 && u.health < u.maxHealth) {
                             u.health = Math.min(u.maxHealth, u.health + 4);
                         }
+                    });
+                }
+                if (typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes')) {
+                    units.filter(u => u.type === 'worker' && !u.shoesApplied).forEach(u => {
+                        u.speed = (u.speed || 0.10) * 1.25;
+                        u.shoesApplied = true;
                     });
                 }
             }
@@ -2043,6 +2578,27 @@ function updateHUD() {
             }
             scene.add(mesh);
 
+            // Apply Tech Upgrades to Newly Spawned Units
+            let initialVeterancy = 0;
+            if (typeof researchedTechs !== 'undefined') {
+                if (researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')) {
+                    health = Math.floor(health * 1.25);
+                }
+                if (researchedTechs.has('migArmor') && type === 'raptor' && (selectedFaction === 'china')) {
+                    health = Math.floor(health * 1.25);
+                }
+                if (researchedTechs.has('redGuardTraining') && type === 'redguard') {
+                    initialVeterancy = 1;
+                    health = Math.floor(health * 1.20);
+                }
+                if (researchedTechs.has('nuclearTanks') && (type === 'battlemaster' || type === 'overlord')) {
+                    speed *= 1.25;
+                }
+                if (researchedTechs.has('workerShoes') && type === 'worker') {
+                    speed *= 1.25;
+                }
+            }
+
             const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
             const newUnitObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
@@ -2054,7 +2610,10 @@ function updateHUD() {
                 airState: isAir ? (position && Math.abs(position.y - getTerrainHeight(position.x, position.z)) < 1.5 ? 'landed' : 'circling') : 'none',
                 patrolCenter: position ? position.clone() : new THREE.Vector3(),
                 circleAngle: Math.random() * Math.PI * 2, circleRadius: 15.0,
-                capacity: capacity || 0, garrisoned: garrisoned || [], waypoints: []
+                capacity: capacity || 0, garrisoned: garrisoned || [], waypoints: [],
+                veterancy: initialVeterancy,
+                compositeArmor: (typeof researchedTechs !== 'undefined' && researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')),
+                shoesApplied: (typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes') && type === 'worker')
             };
             newUnitObj.teamId = playerTeamId;
             newUnitObj.ownerId = 'player';
@@ -2237,380 +2796,6 @@ function renderBuilderPaletteCards() {
 }
 
 
-function isInfantryType(type) {
-    return ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'mob'].includes(type);
-}
-
-function orderSelectedTransportsToUnload() {
-    const selectedTransports = units.filter(u => u.selected && u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0);
-    if (selectedTransports.length === 0) return;
-
-    selectedTransports.forEach(transport => {
-        const count = transport.garrisoned.length;
-        transport.garrisoned.forEach((passenger, idx) => {
-            passenger.garrisonedIn = null;
-            passenger.mesh.visible = true;
-            const ang = (idx / count) * Math.PI * 2;
-            const dropDist = (transport.radius || 1.4) + 2.4;
-            const dropX = transport.mesh.position.x + Math.cos(ang) * dropDist;
-            const dropZ = transport.mesh.position.z + Math.sin(ang) * dropDist;
-            passenger.mesh.position.set(dropX, getTerrainHeight(dropX, dropZ), dropZ);
-            passenger.targetPosition.copy(passenger.mesh.position);
-            passenger.taskState = 'Idle';
-        });
-        transport.garrisoned = [];
-    });
-    showNotification('Garrisoned infantry disembarked from transport.', 'info');
-    updateSidebar();
-}
-
-function orderUnitsHalt() {
-    units.forEach(u => {
-        if (u.selected) {
-            u.targetPosition.copy(u.mesh.position);
-            u.combatTarget = null;
-            u.taskState = 'Idle';
-            if (u.type === 'truck' || u.type === 'worker') u.aiState = 'Idle';
-        }
-    });
-    playUSASound('acknowledge');
-    showNotification('Unit movement halted.', 'info');
-}
-
-function orderSelectedHarvestersToGather() {
-    const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
-    if (harvesters.length === 0) {
-        showNotification('Select a Supply Truck or Worker first.', 'info');
-        return;
-    }
-    const targetSp = selectedSupplyPoint || findNearestSupplyPoint(harvesters[0].mesh.position);
-    if (!targetSp) {
-        showNotification('No active supply field found nearby.', 'error');
-        return;
-    }
-    harvesters.forEach(h => {
-        h.supplyTarget = targetSp;
-        h.aiState = 'MovingToDock';
-        h.taskState = 'Idle';
-        h.combatTarget = null;
-        h.targetPosition.copy(targetSp.position);
-    });
-    showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies.`, 'success');
-}
-
-function orderAllHarvestersToTargetSupply() {
-    if (!selectedSupplyPoint) return;
-    const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker');
-    if (harvesters.length === 0) {
-        showNotification('No harvesters available! Build Supply Trucks or Workers.', 'error');
-        return;
-    }
-    harvesters.forEach(h => {
-        h.supplyTarget = selectedSupplyPoint;
-        h.aiState = 'MovingToDock';
-        h.taskState = 'Idle';
-        h.combatTarget = null;
-        h.targetPosition.copy(selectedSupplyPoint.position);
-    });
-    showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies ($${selectedSupplyPoint.stock} left).`, 'success');
-    updateSidebar();
-}
-
-function recenterBase() {
-    const hq = structures.find(s => s.type === 'center' && s.health > 0) || structures[0];
-    if (hq) {
-        cameraTarget.x = hq.position.x;
-        cameraTarget.z = hq.position.z;
-        updateCameraPosition();
-        playUSASound('radio_chirp');
-    }
-}
-
-function repairStructure(structure) {
-    if (!structure || structure.health >= structure.maxHealth) {
-        showNotification('Structure is at 100% integrity.', 'info');
-        return;
-    }
-    const fee = Math.min(50, Math.ceil((structure.maxHealth - structure.health) * 0.1));
-    if (playerResources < fee) {
-        showNotification(`Insufficient funds to repair ($${fee} needed).`, 'error');
-        return;
-    }
-    playerResources -= fee;
-    structure.health = structure.maxHealth;
-    playUSASound('construction');
-    showNotification('Structure fully repaired.', 'success');
-    updateSidebar();
-}
-
-function sellStructure(structure) {
-    if (!structure) return;
-    const cost = getStructureCost(structure.type) || 500;
-    const refund = Math.floor(cost * 0.5);
-    playerResources += refund;
-
-    scene.remove(structure.mesh);
-    const idx = structures.indexOf(structure);
-    if (idx !== -1) structures.splice(idx, 1);
-    if (selectedStructure === structure) selectedStructure = null;
-
-    showNotification(`Demolished ${structure.type}. +$${refund} refunded.`, 'info');
-    updateSidebar();
-}
-
-function getEffectiveUnitCost(type) {
-    const spec = unitRoster[type];
-    if (!spec) return 0;
-    let cost = spec.cost;
-    const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
-    const hasRefinery = allTechs.some(s => s.type === 'techRefinery' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
-    if (hasRefinery && !isInfantryType(type)) {
-        cost = Math.round(cost * 0.90); // 10% vehicle & aircraft discount!
-    }
-    return cost;
-}
-
-function produceUnit(type) {
-    const spec = unitRoster[type];
-    if (!spec) return;
-
-    const effCost = getEffectiveUnitCost(type);
-    if (playerResources < effCost) {
-        showNotification(`Insufficient funds to train ${spec.name} ($${effCost} required).`, 'error');
-        return;
-    }
-
-    const techReq = getUnitTechPrerequisite(type);
-    if (techReq && !hasCompletedStructure(techReq.building, techReq.altBuilding)) {
-        showNotification(`Production blocked: Requires operational ${techReq.name}!`, 'error');
-        return;
-    }
-
-    // Prioritize selected structure if it can build this unit!
-    let fac = null;
-    if (selectedStructure && !selectedStructure.isBuilding && selectedStructure.health > 0) {
-        if (spec.building === 'commandCenter' && selectedStructure.type === 'center') fac = selectedStructure;
-        else if (selectedStructure.type === spec.building) fac = selectedStructure;
-    }
-    if (!fac) {
-        fac = structures.find(s => {
-            if (s.isBuilding || s.health <= 0) return false;
-            if (spec.building === 'commandCenter' && s.type === 'center') return true;
-            if (s.type === spec.building) return true;
-            return false;
-        });
-    }
-
-    if (!fac) {
-        showNotification(`Production halted: No operational production facility available!`, 'error');
-        return;
-    }
-
-    if (!fac.productionQueue) fac.productionQueue = [];
-    if (fac.productionQueue.length >= 5) {
-        showNotification('Production queue full (max 5 units).', 'warning');
-        return;
-    }
-
-    playerResources -= effCost;
-    fac.productionQueue.push({
-        type: type,
-        name: spec.name,
-        cost: effCost,
-        progress: 0,
-        buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
-    });
-
-    playUSASound('radio_chirp');
-    showNotification(`Queued: ${spec.name}${effCost < spec.cost ? ' (10% Refinery Discount)' : ''}`, 'info');
-    updateSidebar();
-}
-
-function cancelQueuedItem(structure, index) {
-    if (!structure || !structure.productionQueue || !structure.productionQueue[index]) return;
-    const item = structure.productionQueue[index];
-    playerResources += item.cost;
-    structure.productionQueue.splice(index, 1);
-    playUSASound('radio_chirp');
-    showNotification(`Cancelled: ${item.name} (Refunded $${item.cost})`, 'info');
-    updateSidebar();
-}
-
-function useStructureAbility(action) {
-    const structure = selectedStructure;
-    if (!structure || structure.isBuilding) return;
-
-    if (action === 'upgradePower') {
-        if (structure.powerUpgraded) return;
-        if (playerResources < 300) { showNotification('Insufficient resources for control rods.', 'error'); return; }
-        playerResources -= 300;
-        structure.powerUpgraded = true;
-        structure.powerOutput = 10;
-        showNotification('Control rods installed: Cold Fusion power doubled (+100%).', 'success');
-    } else if (action === 'overcharge') {
-        structure.overcharged = !structure.overcharged;
-        showNotification(`Nuclear Reactor overcharge ${structure.overcharged ? 'ACTIVATED (+50% PWR)' : 'DEACTIVATED'}.`, 'info');
-    } else if (action === 'planHold') {
-        battlePlan = 'hold';
-        showNotification('Strategy Center: Battle plan Hold the Line active (+20% armor).', 'info');
-    } else if (action === 'planSearch') {
-        battlePlan = 'search';
-        showNotification('Strategy Center: Battle plan Search & Destroy active (+20% range & sight).', 'info');
-    } else if (action === 'planBombard') {
-        battlePlan = 'bombard';
-        showNotification('Strategy Center: Battle plan Bombardment active (+20% firepower).', 'info');
-    } else if (action === 'compositeArmor') {
-        if (playerResources < 1200) { showNotification('Need $1200 for Composite Armor.', 'error'); return; }
-        playerResources -= 1200;
-        researchedTechs.add('compositeArmor');
-        units.filter(u => u.type === 'tank' || u.type === 'paladin').forEach(u => { u.health += 100; u.maxHealth += 100; });
-        showNotification('Composite Armor researched: Tanks gained +25% HP!', 'success');
-    } else if (action === 'nationalism') {
-        if (playerResources < 1000) { showNotification('Need $1000 for Nationalism.', 'error'); return; }
-        playerResources -= 1000;
-        researchedTechs.add('nationalism');
-        showNotification('Nationalism researched: Chinese troops fire +25% faster!', 'success');
-    } else if (action === 'subliminal') {
-        if (playerResources < 800) { showNotification('Need $800 for Subliminal Messaging.', 'error'); return; }
-        playerResources -= 800;
-        researchedTechs.add('subliminal');
-        showNotification('Subliminal Messaging researched: Healing recovery doubled!', 'success');
-    } else if (action === 'anthraxBeta') {
-        if (playerResources < 1200) { showNotification('Need $1200 for Anthrax Beta.', 'error'); return; }
-        playerResources -= 1200;
-        researchedTechs.add('anthraxBeta');
-        showNotification('Anthrax Beta researched: Toxin weapons deal +25% damage!', 'success');
-    } else if (action === 'armTheMob') {
-        if (playerResources < 1000) { showNotification('Need $1000 for Arm the Mob.', 'error'); return; }
-        playerResources -= 1000;
-        researchedTechs.add('armTheMob');
-        showNotification('Arm the Mob researched: Mobs equipped with AK-47 assault rifles!', 'success');
-    } else if (action === 'captureBuilding') {
-        if (playerResources < 1000) { showNotification('Need $1000 for Capture Building.', 'error'); return; }
-        playerResources -= 1000;
-        researchedTechs.add('captureBuilding');
-        showNotification('Capture Building researched: Infantry can now capture enemy tech!', 'success');
-    } else if (action === 'superweapon') {
-        if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Superweapon is recharging.', 'error'); return; }
-        pendingSuperweapon = structure;
-        showNotification(`Click map to target ${structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Strike' : 'SCUD Storm'}. Right-click to cancel.`, 'info');
-    }
-
-    updateSidebar();
-}
-
-function strikeWithSuperweapon(structure, targetPosition) {
-    const sType = structure.type;
-    if (sType === 'particleCannon') {
-        animateParticleCannonStrike(targetPosition);
-    } else if (sType === 'nukeSilo') {
-        animateNukeStrike(structure.position, targetPosition);
-    } else if (sType === 'scudStorm') {
-        animateScudStormStrike(structure.position, targetPosition);
-    } else {
-        createImpactExplosion(targetPosition);
-    }
-    structure.lastFired = buildingTick;
-    structure.cooldownUntil = buildingTick + 1800;
-    pendingSuperweapon = null;
-    showNotification('Superweapon strike confirmed on target coordinates!', 'info');
-}
-
-function renderStructureMenu(structure) {
-    selectedStructure = structure;
-    updateSidebar();
-}
-
-function updateHUD() {
-    updateSidebar();
-}
-
-        function processBuildingFunctions() {
-            buildingTick++;
-            if (intelTimer > 0) intelTimer--;
-            if (buildingTick % 60 !== 0) return;
-            const activeStructures = structures.filter(structure => !structure.isBuilding && structure.health > 0);
-            activeStructures.forEach(structure => {
-                if (structure.type === 'supplyDrop' && buildingTick % 900 === 0) playerResources += 250;
-                if (structure.type === 'blackMarket' && buildingTick % 300 === 0) playerResources += 30;
-                if (structure.type === 'internetCenter' && buildingTick % 300 === 0) playerResources += 20;
-                if (structure.type === 'nuclearReactor' && structure.overcharged) structure.health -= 8;
-
-                if (['patriot', 'gatlingCannon', 'stingerSite'].includes(structure.type) && buildingTick % 45 === 0) {
-                    const target = enemyUnits.find(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(structure.position) < 45);
-                    if (target) {
-                        const targetPos = target.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0));
-                        if (structure.type === 'patriot') {
-                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
-                            spawnMuzzleFlash(mPos, 0xff9f43, 0.6);
-                            spawnRocketProjectile(mPos, targetPos, false, false);
-                            target.health -= 45;
-                        } else if (structure.type === 'gatlingCannon') {
-                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.8, 0));
-                            spawnMuzzleFlash(mPos, 0xffa502, 0.5);
-                            spawnBulletTracer(mPos, targetPos, 0xf1c40f, 3);
-                            target.health -= 28;
-                        } else if (structure.type === 'stingerSite') {
-                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 1.4, 0));
-                            spawnMuzzleFlash(mPos, 0x2ed573, 0.5);
-                            spawnRocketProjectile(mPos, targetPos, false, true);
-                            target.health -= 38;
-                        }
-                    }
-                }
-
-                if (['barracks', 'speakerTower'].includes(structure.type)) {
-                    units.forEach(unit => {
-                        const infantry = ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker'].includes(unit.type);
-                        if (infantry && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < (structure.type === 'barracks' ? 12 : 24)) {
-                            unit.health = Math.min(unit.maxHealth, unit.health + (structure.type === 'barracks' ? 2 : 1));
-                        }
-                    });
-                }
-                if (['factory', 'airfield'].includes(structure.type)) {
-                    units.forEach(unit => {
-                        const matchingUnit = structure.type === 'airfield'
-                            ? ['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora'].includes(unit.type)
-                            : !['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'worker', 'dozer'].includes(unit.type);
-                        if (matchingUnit && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < 16) {
-                            unit.health = Math.min(unit.maxHealth, unit.health + 3);
-                        }
-                    });
-                }
-                if (structure.type === 'demoTrap') {
-                    const target = enemyUnits.find(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(structure.position) < 7);
-                    if (target) {
-                        enemyUnits.forEach(enemy => { if (enemy.mesh.position.distanceTo(structure.position) < 16) enemy.health -= 300; });
-                        structure.health = 0;
-                        createImpactExplosion(structure.position);
-                    }
-                }
-            });
-            landmines.forEach(mine => {
-                if (!mine.active) return;
-                const trigger = enemyUnits.some(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(mine.position) < 3.5);
-                if (trigger) {
-                    mine.active = false;
-                    enemyUnits.forEach(enemy => {
-                        if (enemy.mesh.position.distanceTo(mine.position) < 9) enemy.health -= 180;
-                    });
-                    createImpactExplosion(mine.position);
-                }
-            });
-            // Continuous auto-repair from Junk Repair & Battle Drones
-            if (buildingTick % 60 === 0) {
-                if (researchedTechs.has('junkRepair') || researchedTechs.has('battleDrone')) {
-                    units.forEach(u => {
-                        if (!u.isAir && !isInfantryType(u.type) && u.health > 0 && u.health < u.maxHealth) {
-                            u.health = Math.min(u.maxHealth, u.health + 4);
-                        }
-                    });
-                }
-            }
-            document.getElementById('resource-display').textContent = `$${playerResources}`;
-        }
-
-        
 // =========================================================================
 // SQUAD INTERACTION & GENERALS POWERS (Control Bar Pro)
 // =========================================================================

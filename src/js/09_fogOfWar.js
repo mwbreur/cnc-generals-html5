@@ -88,6 +88,24 @@
                 ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
             ];
 
+            // Satellite Hack I: Continuous orbital recon on all enemy Command Centers
+            if (typeof researchedTechs !== 'undefined' && researchedTechs.has('satHack1')) {
+                enemyStructures.forEach(es => {
+                    if (es.health > 0 && (es.type === 'center' || es.type === 'commandCenter')) {
+                        visionSources.push({ position: es.position, scanRange: 24 });
+                    }
+                });
+            }
+            // Satellite Hack II: Full orbital scan of all hostile forces & structures
+            if (typeof researchedTechs !== 'undefined' && researchedTechs.has('satHack2')) {
+                enemyStructures.forEach(es => {
+                    if (es.health > 0) visionSources.push({ position: es.position, scanRange: 18 });
+                });
+                enemyUnits.forEach(eu => {
+                    if (eu.health > 0 && eu.mesh) visionSources.push({ position: eu.mesh.position, scanRange: 14 });
+                });
+            }
+
             for (let i = activeVisionBeacons.length - 1; i >= 0; i--) {
                 const b = activeVisionBeacons[i];
                 b.life--;
@@ -282,41 +300,145 @@
 
         const buildingUpgradesCatalog = {
             usa: {
+                center: [
+                    { id: 'radar', name: 'RADAR SYSTEM', cost: 500, desc: 'Activates tactical mini-map radar telemetry.' },
+                    { id: 'spyDrone', name: 'SPY DRONE SCAN', cost: 200, isAbility: true, desc: 'Deploys an orbital scan over target coordinates, clearing shroud and detecting stealth.' }
+                ],
+                commandCenter: [
+                    { id: 'radar', name: 'RADAR SYSTEM', cost: 500, desc: 'Activates tactical mini-map radar telemetry.' },
+                    { id: 'spyDrone', name: 'SPY DRONE SCAN', cost: 200, isAbility: true, desc: 'Deploys an orbital scan over target coordinates, clearing shroud and detecting stealth.' }
+                ],
+                power: [
+                    { id: 'controlRods', name: 'CONTROL RODS', cost: 300, isAddon: true, desc: 'Installs advanced control rods to permanently double power output (+100%).' }
+                ],
                 barracks: [
-                    { id: 'upg_flashbang', name: 'FLASHBANG GRENADES', cost: 800, desc: 'Equips Rangers with flashbangs to instantly breach & clear garrisons.' },
-                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rangers and infantry to capture hostile structures.' }
+                    { id: 'captureBuilding', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rangers and infantry to capture hostile and neutral structures.' },
+                    { id: 'flashbang', name: 'FLASHBANG GRENADES', cost: 800, desc: 'Equips Rangers with flashbangs to instantly breach & clear garrisons.' },
+                    { id: 'pathfinder', name: 'PATHFINDER SNIPER', cost: 1200, desc: 'Unlocks elite stealth snipers capable of eliminating hostile infantry from long range.' }
                 ],
                 factory: [
-                    { id: 'upg_tow', name: 'TOW MISSILES', cost: 800, desc: 'Equips Humvees with roof-mounted anti-armor TOW missiles.' }
+                    { id: 'towMissile', name: 'TOW MISSILES', cost: 800, desc: 'Equips Humvees with roof-mounted anti-armor TOW missiles (+35 damage).' }
                 ],
                 airfield: [
-                    { id: 'upg_laser_missiles', name: 'LASER GUIDED MISSILES', cost: 1000, desc: 'Increases Raptor and Comanche missile damage by +25%.' },
-                    { id: 'upg_bunker_busters', name: 'BUNKER BUSTERS', cost: 500, desc: 'Equips Aurora Bombers to penetrate & clear fortified bunkers.' }
+                    { id: 'laserMissiles', name: 'LASER-GUIDED MISSILES', cost: 1000, desc: 'Increases Raptor, Comanche, and Stealth Fighter missile damage by +25%.' },
+                    { id: 'rocketPods', name: 'ROCKET PODS', cost: 800, desc: 'Equips Comanche gunships with 40mm rocket pod volleys.' },
+                    { id: 'countermeasures', name: 'COUNTERMEASURES', cost: 1000, desc: 'Aircraft deploy flares to deflect 40% of incoming anti-air missile attacks.' },
+                    { id: 'bunkerBusters', name: 'BUNKER BUSTERS', cost: 500, desc: 'Equips Aurora Bombers to penetrate & destroy fortified bunkers.' }
+                ],
+                strategyCenter: [
+                    { id: 'planBombard', name: 'BOMBARDMENT', cost: 0, isStance: true, stance: 'bombard', desc: 'Strategy Stance: +20% firepower across all player combat forces.' },
+                    { id: 'planHold', name: 'HOLD THE LINE', cost: 0, isStance: true, stance: 'hold', desc: 'Strategy Stance: +20% armor & damage resistance for all units.' },
+                    { id: 'planSearch', name: 'SEARCH & DESTROY', cost: 0, isStance: true, stance: 'search', desc: 'Strategy Stance: +20% sight range and weapon range.' },
+                    { id: 'compositeArmor', name: 'COMPOSITE ARMOR', cost: 1200, desc: 'Increases Crusader and Paladin tank armor and HP by +25% (+100 HP).' },
+                    { id: 'droneArmor', name: 'DRONE ARMOR', cost: 500, desc: 'Increases all vehicle and base drones armor and durability by +25%.' },
+                    { id: 'advancedTraining', name: 'ADVANCED TRAINING', cost: 800, desc: 'Doubles combat experience gain, rapidly promoting units to Veteran rank.' },
+                    { id: 'chemicalSuits', name: 'CHEMICAL SUITS', cost: 800, desc: 'USA forces gain +50% resistance to toxin, anthrax, and radiation damage.' },
+                    { id: 'supplyLines', name: 'SUPPLY LINES', cost: 800, desc: 'USA Supply Trucks and Chinooks bring back +10% extra cash per delivery.' }
                 ]
             },
             china: {
+                center: [
+                    { id: 'radar', name: 'RADAR GRID', cost: 500, desc: 'Activates tactical mini-map radar telemetry.' }
+                ],
+                commandCenter: [
+                    { id: 'radar', name: 'RADAR GRID', cost: 500, desc: 'Activates tactical mini-map radar telemetry.' }
+                ],
+                nuclearReactor: [
+                    { id: 'overcharge', name: 'REACTOR OVERCHARGE', cost: 0, isToggle: true, desc: 'Toggles +50% power output boost (15 PWR) at the cost of slow radiation decay.' },
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the reactor.' }
+                ],
                 barracks: [
-                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Red Guard to capture hostile structures.' },
-                    { id: 'upg_redguard_training', name: 'RED GUARD TRAINING', cost: 800, desc: 'All newly trained Red Guard deploy with Veteran rank.' }
+                    { id: 'captureBuilding', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Red Guard to capture hostile and neutral structures.' },
+                    { id: 'redGuardTraining', name: 'RED GUARD TRAINING', cost: 800, desc: 'All newly trained Red Guard deploy with Veteran rank (★).' },
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the barracks.' }
                 ],
                 factory: [
-                    { id: 'upg_black_napalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Increases Dragon Tank and Inferno Cannon fire damage by +30%.' },
-                    { id: 'upg_chain_guns', name: 'CHAIN GUNS', cost: 1000, desc: 'Equips Gatling Tanks with depleted uranium ammo (+25% damage).' }
+                    { id: 'chainGuns', name: 'CHAIN GUNS', cost: 1000, desc: 'Equips Gatling weapons with high-velocity link barrels (+25% damage).' },
+                    { id: 'blackNapalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Increases Dragon Tank and Inferno Cannon fire damage by +30%.' },
+                    { id: 'autoloader', name: 'AUTOLOADER TECH', cost: 800, desc: 'Increases Battlemaster Tank rate of fire by +25%.' },
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the factory.' }
                 ],
                 airfield: [
-                    { id: 'upg_black_napalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Equips MiG-29s with high-temperature black napalm missiles.' }
+                    { id: 'migArmor', name: 'MIG COMPOSITE ARMOR', cost: 1000, desc: 'Increases MiG-29 armor and maximum HP by +25%.' },
+                    { id: 'blackNapalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Equips MiGs with high-temperature black napalm missiles (+30% damage).' },
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the airfield.' }
+                ],
+                propagandaCenter: [
+                    { id: 'nationalism', name: 'NATIONALISM DOCTRINE', cost: 1000, desc: 'Inspires Red Army with patriotic fervor, increasing Horde bonus (+35% damage, +40% fire rate).' },
+                    { id: 'subliminal', name: 'SUBLIMINAL MESSAGING', cost: 800, desc: 'Doubles Speaker Tower and Propaganda Tower healing rate (6 HP/s) and boosts range.' },
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the propaganda center.' }
+                ],
+                internetCenter: [
+                    { id: 'satHack1', name: 'SATELLITE HACK I', cost: 1000, desc: 'Orbital hack continuously reveals all enemy Command Centers on radar.' },
+                    { id: 'satHack2', name: 'SATELLITE HACK II', cost: 1500, desc: 'Reveals all enemy combat vehicles and structure positions on mini-map.' },
+                    { id: 'empPulse', name: 'EMP SPY DISRUPTION', cost: 500, isAbility: true, desc: 'Discharges an electromagnetic pulse disabling power and vehicles in target sector for 12s.' },
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the internet center.' }
+                ],
+                nukeSilo: [
+                    { id: 'uraniumShells', name: 'URANIUM SHELLS', cost: 1200, desc: 'Grants +25% damage to Battlemaster and Overlord tank cannons.' },
+                    { id: 'nuclearTanks', name: 'NUCLEAR ENGINES', cost: 800, desc: 'Increases Battlemaster and Overlord tank movement speed by +25%.' },
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys a ring of defensive landmines around the silo.' }
+                ],
+                bunker: [
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys perimeter explosive landmines around the bunker.' },
+                    { id: 'neutronMines', name: 'NEUTRON MINES', cost: 500, isAddon: true, desc: 'Zero Hour upgrade: eliminates vehicle crews on contact and destroys infantry.' }
+                ],
+                speakerTower: [
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys perimeter explosive landmines around the speaker tower.' },
+                    { id: 'neutronMines', name: 'NEUTRON MINES', cost: 500, isAddon: true, desc: 'Zero Hour upgrade: eliminates vehicle crews on contact and destroys infantry.' }
+                ],
+                gatlingCannon: [
+                    { id: 'mines', name: 'PERIMETER MINES', cost: 300, isAddon: true, desc: 'Deploys perimeter explosive landmines around the gatling cannon.' },
+                    { id: 'neutronMines', name: 'NEUTRON MINES', cost: 500, isAddon: true, desc: 'Zero Hour upgrade: eliminates vehicle crews on contact and destroys infantry.' }
                 ]
             },
             gla: {
+                center: [
+                    { id: 'radarVanScan', name: 'RADAR VAN SCAN', cost: 200, isAbility: true, desc: 'Uplinks to Radar Van to reveal a targeted sector through fog of war.' },
+                    { id: 'sneakAttack', name: 'SNEAK ATTACK NETWORK', cost: 1000, isAbility: true, desc: 'Erects an instant sneak attack tunnel breach at target coordinates.' }
+                ],
+                commandCenter: [
+                    { id: 'radarVanScan', name: 'RADAR VAN SCAN', cost: 200, isAbility: true, desc: 'Uplinks to Radar Van to reveal a targeted sector through fog of war.' },
+                    { id: 'sneakAttack', name: 'SNEAK ATTACK NETWORK', cost: 1000, isAbility: true, desc: 'Erects an instant sneak attack tunnel breach at target coordinates.' }
+                ],
                 barracks: [
-                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rebels to capture enemy structures.' },
-                    { id: 'upg_camouflage', name: 'CAMOUFLAGE', cost: 1000, desc: 'Grants Rebel infantry permanent stealth while stationary.' }
+                    { id: 'captureBuilding', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rebels to capture enemy and neutral structures.' },
+                    { id: 'boobyTrap', name: 'BOOBY TRAP', cost: 500, desc: 'Enables Rebels to rig structures with lethal explosive charges.' },
+                    { id: 'camouflage', name: 'CAMOUFLAGE REBELS', cost: 1000, desc: 'Grants Rebel infantry permanent stealth while stationary.' }
                 ],
                 factory: [
-                    { id: 'upg_scorpion_rocket', name: 'SCORPION ROCKET', cost: 1000, desc: 'Equips Scorpion Tanks with roof-mounted anti-armor rockets.' },
-                    { id: 'upg_junk_repair', name: 'JUNK REPAIR', cost: 1000, desc: 'Enables all GLA vehicles to automatically auto-regenerate armor.' }
+                    { id: 'scorpionRocket', name: 'SCORPION ROCKET', cost: 1000, desc: 'Equips Scorpion Tanks with roof-mounted anti-armor rockets (+65 damage).' },
+                    { id: 'junkRepair', name: 'JUNK REPAIR', cost: 1000, desc: 'Enables all GLA vehicles to passively auto-repair hull damage (+2 HP/s).' }
                 ],
-                airfield: []
+                palace: [
+                    { id: 'fortifiedStructures', name: 'FORTIFIED STRUCTURES', cost: 1000, desc: 'Increases HP and armor of all GLA buildings and GLA Holes by +25%.' },
+                    { id: 'armTheMob', name: 'ARM THE MOB', cost: 1000, desc: 'Equips Angry Mobs with AK-47 assault rifles (+100% damage output).' },
+                    { id: 'toxinShells', name: 'TOXIN SHELLS', cost: 1000, desc: 'Tank shells release toxic clouds that poison enemy infantry.' },
+                    { id: 'anthraxBeta', name: 'ANTHRAX BETA', cost: 1200, desc: 'Upgrades Anthrax toxin to Beta strain (+25% damage, glowing emerald chemical clouds).' },
+                    { id: 'demolitions', name: 'DEMOLITION SATCHELS', cost: 800, desc: 'Equips combat units with demolition charges allowing manual or death detonation.' }
+                ],
+                blackMarket: [
+                    { id: 'apBullets', name: 'ARMOR-PIERCING BULLETS', cost: 1000, desc: 'Increases bullet damage by +25% for Rebels, Technicals, and Quad Cannons.' },
+                    { id: 'apRockets', name: 'ARMOR-PIERCING ROCKETS', cost: 1200, desc: 'Increases rocket damage by +25% for RPG Troopers, Scorpion Tanks, and Buggies.' },
+                    { id: 'junkRepair', name: 'JUNK REPAIR', cost: 1000, desc: 'Equips all GLA vehicles with passive scrap self-regeneration.' },
+                    { id: 'buggyAmmo', name: 'BUGGY AMMO CHAINS', cost: 800, desc: 'Increases Rocket Buggy rocket salvo capacity by +50% (9 rockets per volley).' },
+                    { id: 'workerShoes', name: 'WORKER SHOES', cost: 500, desc: 'Increases Worker movement speed by +25% and supply harvest rate.' }
+                ],
+                tunnel: [
+                    { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths this Tunnel Network until it engages enemies.' }
+                ],
+                stingerSite: [
+                    { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Permanently stealths this Stinger Site until it fires upon an aircraft.' }
+                ],
+                demoTrap: [
+                    { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Conceals the Demo Trap with stealth netting until detonation.' }
+                ],
+                fakeBarracks: [
+                    { id: 'upgradeToReal', name: 'UPGRADE TO REAL BARRACKS', cost: 200, isAddon: true, desc: 'Converts this decoy fake barracks into a real functional Barracks.' }
+                ],
+                fakeArmsDealer: [
+                    { id: 'upgradeToReal', name: 'UPGRADE TO REAL ARMS DEALER', cost: 350, isAddon: true, desc: 'Converts this decoy fake arms dealer into a real functional Arms Dealer.' }
+                ]
             }
         };
         const factionBuildings = {
@@ -405,7 +527,7 @@
         }
 
         let activeSidebarTab = 'production';
-        let researchedTechs = new Set();
+        // researchedTechs initialized in 01_core.js
 
         function setSidebarTab(tab) {
             activeSidebarTab = tab;
@@ -612,32 +734,64 @@
             detentionCamp: { name: 'Detention Camp', role: 'Military Intelligence Facility', cost: '$900', desc: 'USA interrogation and surveillance facility. Grants radar intelligence sweeps of hostile forces.', req: 'Strategy Center', unlock: 'Hostile Intelligence Sweeps' },
 
             // Upgrades & Abilities
+            radar: { name: 'Radar System', role: 'Telemetry Uplink', cost: '$500', desc: 'Activates tactical mini-map radar telemetry grid.', req: 'Command Center', unlock: 'Tactical Mini-Map Grid' },
             upgradePower: { name: 'Control Rod Upgrade', role: 'Facility Optimization', cost: '$300', desc: 'Installs advanced control rods to permanently double power output (+100%).', req: 'Cold Fusion Reactor', unlock: '+100% Electrical Power' },
+            controlRods: { name: 'Control Rod Upgrade', role: 'Facility Optimization', cost: '$300', desc: 'Installs advanced control rods to permanently double power output (+100%).', req: 'Cold Fusion Reactor', unlock: '+100% Electrical Power' },
             overcharge: { name: 'Reactor Overcharge', role: 'Nuclear Reactor Modulation', cost: 'FREE', desc: 'Overdrives cooling systems to gain +50% power generation at the cost of gradual structural wear.', req: 'Nuclear Reactor', unlock: '+50% Surge Power' },
             planHold: { name: 'Hold the Line', role: 'Strategic Battle Plan', cost: 'FREE', desc: 'Strategy Center directive: troops dig in, boosting defensive armor by +20%.', req: 'Strategy Center', unlock: '+20% Friendly Armor' },
             planSearch: { name: 'Search & Destroy', role: 'Strategic Battle Plan', cost: 'FREE', desc: 'Strategy Center directive: increases weapons range and sensor sight range by +20%.', req: 'Strategy Center', unlock: '+20% Weapon Range & Sight' },
             planBombard: { name: 'Bombardment Plan', role: 'Strategic Battle Plan', cost: 'FREE', desc: 'Strategy Center directive: boosts ordnance explosive yield and firepower by +20%.', req: 'Strategy Center', unlock: '+20% Firepower Damage' },
             compositeArmor: { name: 'Composite Armor', role: 'Vehicle Armor Research', cost: '$1200', desc: 'Reinforces Crusader and Paladin tanks with layered composite plating (+25% HP).', req: 'Strategy Center', unlock: '+25% Tank Durability' },
+            droneArmor: { name: 'Drone Armor', role: 'Robotics Durability', cost: '$500', desc: 'Increases all vehicle and base drones armor and durability by +25%.', req: 'Strategy Center', unlock: '+25% Drone Armor' },
+            advancedTraining: { name: 'Advanced Training', role: 'Doctrine Optimization', cost: '$800', desc: 'Doubles combat experience gain, rapidly promoting units to Veteran rank.', req: 'Strategy Center', unlock: '2x Veterancy Rate' },
+            chemicalSuits: { name: 'Chemical Suits', role: 'NBC Protection', cost: '$800', desc: 'USA forces gain +50% resistance to toxin, anthrax, and radiation damage.', req: 'Strategy Center', unlock: '+50% Toxic/Radiation Resistance' },
+            supplyLines: { name: 'Supply Lines', role: 'Logistics Optimization', cost: '$800', desc: 'USA Supply Trucks and Chinooks bring back +10% extra cash per delivery.', req: 'Strategy Center', unlock: '+10% Harvest Income' },
             nationalism: { name: 'Nationalism Doctrine', role: 'Troop Morale Research', cost: '$1000', desc: 'Inspires Chinese troops with patriotic fervor, increasing fire rate when in horde groups.', req: 'Propaganda Center', unlock: '+25% Horde Firing Rate' },
             subliminal: { name: 'Subliminal Messaging', role: 'Psychological Broadcast', cost: '$800', desc: 'Enhances Speaker Towers and Propaganda Centers to double healing rate (+100%).', req: 'Propaganda Center', unlock: '2x Regeneration Speed' },
             anthraxBeta: { name: 'Anthrax Beta', role: 'Chemical Weapon Research', cost: '$1200', desc: 'Upgrades Anthrax toxin to Beta strain, increasing chemical weapon damage by +25%.', req: 'Palace', unlock: '+25% Toxin Damage' },
             armTheMob: { name: 'Arm the Mob', role: 'Insurgent Weapon Distribution', cost: '$1000', desc: 'Distributes AK-47 assault rifles to Angry Mobs, drastically increasing lethal ranged firepower.', req: 'Palace', unlock: 'Rifles for Mobs' },
             captureBuilding: { name: 'Capture Building', role: 'Infantry Tactics Research', cost: '$1000', desc: 'Trains Rangers, Red Guards, and Rebels in tactical infiltration to capture enemy buildings.', req: 'Barracks', unlock: 'Building Capture' },
+            flashbang: { name: 'Flashbang Grenades', role: 'Infantry Breach Tech', cost: '$800', desc: 'Equips Rangers with flashbangs to instantly breach & clear garrisons.', req: 'Barracks', unlock: 'Garrison Clearance' },
+            laserMissiles: { name: 'Laser-Guided Missiles', role: 'Precision Munition Tech', cost: '$1000', desc: 'Increases Raptor, Comanche, and Stealth Fighter missile damage by +25%.', req: 'Airfield', unlock: '+25% Air-to-Ground Missile Damage' },
+            rocketPods: { name: 'Rocket Pods', role: 'Helicopter Weapon Pods', cost: '$800', desc: 'Equips Comanche gunships with 40mm rocket pod volleys.', req: 'Airfield', unlock: 'Rocket Pod Salvos' },
+            countermeasures: { name: 'Countermeasures Flare Dispenser', role: 'Defensive Avionics', cost: '$1000', desc: 'Aircraft deploy flares to deflect 40% of incoming anti-air missile attacks.', req: 'Airfield', unlock: '40% Missile Deflection Chance' },
+            bunkerBusters: { name: 'Bunker Busters', role: 'Penetration Munition', cost: '$500', desc: 'Equips Aurora Bombers to penetrate & destroy fortified bunkers.', req: 'Airfield', unlock: 'Bunker Demolition' },
             intel: { name: 'Intelligence Sweep', role: 'Satellite Surveillance', cost: 'FREE', desc: 'Sweeps the battlefield to reveal enemy coordinates and status reports.', req: 'Detention Camp', unlock: 'Hostile Asset Recon' },
+            spyDrone: { name: 'Spy Drone Recon', role: 'Orbital Reconnaissance', cost: '$200', desc: 'Deploys an orbital scan over target coordinates, clearing shroud and detecting stealth.', req: 'Command Center', unlock: 'Targeted Shroud Clearance' },
             garrison: { name: 'Garrison Troops', role: 'Fortification Order', cost: 'FREE', desc: 'Commands up to 5 nearby infantry to enter the bunker or structure to fire from safety.', req: 'Operational Facility', unlock: 'Protected Firepoint' },
             ungarrison: { name: 'Evacuate Troops', role: 'Deployment Order', cost: 'FREE', desc: 'Evacuates all garrisoned soldiers to external positions.', req: 'Garrisoned Structure', unlock: 'Infantry Deployment' },
             tunnel: { name: 'Tunnel Transit', role: 'Underground Movement', cost: 'FREE', desc: 'Transports all nearby units instantaneously through underground tunnels to the exit.', req: 'Tunnel Network', unlock: 'Instant Transit' },
             networkHack: { name: 'Satellite Hack', role: 'Cyber Espionage', cost: 'FREE', desc: 'Hacks orbital satellite relay to acquire +$250 cash directly into treasury.', req: 'Internet Center', unlock: '+$250 Cyber Funds' },
             plantMines: { name: 'Deploy Landmines', role: 'Base Security', cost: '$100', desc: 'Deploys explosive perimeter landmines around facility perimeter.', req: 'Structure', unlock: 'Perimeter Defense' },
+            mines: { name: 'Perimeter Landmines', role: 'Base Security', cost: '$300', desc: 'Deploys explosive perimeter landmines around facility perimeter.', req: 'Structure', unlock: 'Perimeter Defense' },
+            neutronMines: { name: 'Neutron Landmines', role: 'Advanced Base Security', cost: '$500', desc: 'Perimeter mines release neutron radiation, neutralizing vehicle drivers and infantry.', req: 'Structure', unlock: 'Neutron Vehicle Decapitation' },
             superweapon: { name: 'Superweapon Strike', role: 'Strategic Armageddon', cost: 'FREE', desc: 'Prepares superweapon for targeting anywhere on the battlefield.', req: 'Superweapon Facility', unlock: 'Devastating Strike' },
             towMissile: { name: 'TOW Missile Tech', role: 'Anti-Armor Enhancement', cost: '$800', desc: 'Mounts wire-guided TOW missile launcher on Humvees (+40% armor damage).', req: 'War Factory', unlock: '+40% Humvee Damage' },
             battleDrone: { name: 'Battle Drone Upgrade', role: 'Autonomous Vehicle Drone', cost: '$400', desc: 'Deploys hovering support drone over tanks for continuous repair & sniper fire.', req: 'War Factory', unlock: 'Auto-Repair, Infantry Defense' },
+            redGuardTraining: { name: 'Red Guard Training', role: 'Elite Drills', cost: '$800', desc: 'All newly trained Red Guard deploy with Veteran rank.', req: 'Barracks', unlock: 'Veteran Red Guard' },
             chainGuns: { name: 'Chain Guns Tech', role: 'Ballistic Optimization', cost: '$1000', desc: 'Upgrades Gatling weapons with high-velocity link barrels (+25% damage & instant spin).', req: 'War Factory', unlock: '+25% Firepower, Instant Spin' },
-            uraniumShells: { name: 'Uranium Shells Tech', role: 'Kinetic Munition', cost: '$1200', desc: 'Depleted uranium penetrators for Battlemaster and Overlord tank cannons (+25% armor piercing).', req: 'Propaganda Center', unlock: '+25% Heavy Armor Piercing' },
+            blackNapalm: { name: 'Black Napalm', role: 'Incendiary Research', cost: '$1000', desc: 'Increases Dragon Tank, Inferno Cannon, and MiG napalm fire damage by +30%.', req: 'War Factory / Airfield', unlock: '+30% Napalm Fire Damage' },
+            autoloader: { name: 'Autoloader Tech', role: 'Ballistic Mechanism', cost: '$800', desc: 'Increases Battlemaster Tank rate of fire by +25%.', req: 'War Factory', unlock: '+25% Tank Fire Rate' },
+            migArmor: { name: 'MiG Armor', role: 'Aircraft Plating', cost: '$1000', desc: 'Increases MiG-29 armor and maximum HP by +25%.', req: 'Airfield', unlock: '+25% MiG HP' },
+            satHack1: { name: 'Satellite Hack I', role: 'Orbital Espionage', cost: '$1000', desc: 'Orbital hack continuously reveals all enemy Command Centers on radar.', req: 'Internet Center', unlock: 'Enemy HQ Radar Detection' },
+            satHack2: { name: 'Satellite Hack II', role: 'Orbital Espionage', cost: '$1500', desc: 'Reveals all enemy combat vehicles and structure positions on mini-map.', req: 'Internet Center', unlock: 'Total Hostile Tracking' },
+            empPulse: { name: 'EMP Spy Disruption', role: 'Electronic Warfare', cost: '$500', desc: 'Discharges an electromagnetic pulse disabling power and vehicles in target sector.', req: 'Internet Center', unlock: 'EMP Disruption Wave' },
+            uraniumShells: { name: 'Uranium Shells Tech', role: 'Kinetic Munition', cost: '$1200', desc: 'Depleted uranium penetrators for Battlemaster and Overlord tank cannons (+25% armor piercing).', req: 'Propaganda Center / Nuke Silo', unlock: '+25% Heavy Armor Piercing' },
+            nuclearTanks: { name: 'Nuclear Tanks', role: 'Propulsion Research', cost: '$1000', desc: 'Equips Battlemaster and Overlord tanks with nuclear engines (+25% speed).', req: 'Nuke Silo', unlock: '+25% Heavy Tank Speed' },
+            radarVanScan: { name: 'Radar Van Scan', role: 'Mobile Surveillance', cost: '$200', desc: 'Uplinks to Radar Van to reveal a targeted sector through fog of war.', req: 'Command Center', unlock: 'Targeted Shroud Clearance' },
+            sneakAttack: { name: 'Sneak Attack Network', role: 'Subterranean Breach', cost: '$1000', desc: 'Erects an instant sneak attack tunnel breach at target coordinates.', req: 'Command Center', unlock: 'Instant Remote Tunnel' },
+            boobyTrap: { name: 'Booby Trap', role: 'Sabotage Tactics', cost: '$500', desc: 'Enables Rebels to rig structures with lethal explosive charges.', req: 'Barracks', unlock: 'Structure Demolition Traps' },
             scorpionRocket: { name: 'Scorpion Rocket Tech', role: 'Heavy Turret Missile', cost: '$1000', desc: 'Mounts high-explosive missile launcher on Scorpion tank turrets.', req: 'Arms Dealer', unlock: 'Turret Rocket Salvo' },
-            apBullets: { name: 'AP Bullets Tech', role: 'Armor Piercing Ammo', cost: '$1000', desc: 'Reinforced tungsten core ammunition for Rebels, Technicals, and Quad Cannons (+25% damage).', req: 'Palace', unlock: '+25% Small Arms Damage' },
-            apRockets: { name: 'AP Rockets Tech', role: 'Shaped Charge Warheads', cost: '$1200', desc: 'High-explosive anti-tank warheads for RPG Troopers and Rocket Buggies (+25% damage).', req: 'Palace', unlock: '+25% Rocket Damage' },
-            junkRepair: { name: 'Junk Repair Tech', role: 'Battlefield Scavenging', cost: '$1000', desc: 'GLA mechanics continuously scavenge battlefield scrap to repair all vehicles (+1 HP/s).', req: 'Palace', unlock: 'Continuous Vehicle Auto-Healing' },
+            fortifiedStructures: { name: 'Fortified Structures', role: 'Masonry Reinforcement', cost: '$1000', desc: 'Increases HP and armor of all GLA buildings and GLA Holes by +25%.', req: 'Palace', unlock: '+25% Building & Hole HP' },
+            toxinShells: { name: 'Toxin Shells', role: 'Chemical Munition', cost: '$1000', desc: 'Tank shells release toxic clouds that poison enemy infantry.', req: 'Palace', unlock: 'Poison Gas Residue' },
+            demolitions: { name: 'Demolition Satchels', role: 'High Explosives', cost: '$800', desc: 'Equips combat units with demolition charges allowing manual or death detonation.', req: 'Palace', unlock: 'Devastating Death Explosions' },
+            apBullets: { name: 'AP Bullets Tech', role: 'Armor Piercing Ammo', cost: '$1000', desc: 'Reinforced tungsten core ammunition for Rebels, Technicals, and Quad Cannons (+25% damage).', req: 'Black Market', unlock: '+25% Small Arms Damage' },
+            apRockets: { name: 'AP Rockets Tech', role: 'Shaped Charge Warheads', cost: '$1200', desc: 'High-explosive anti-tank warheads for RPG Troopers and Rocket Buggies (+25% damage).', req: 'Black Market', unlock: '+25% Rocket Damage' },
+            junkRepair: { name: 'Junk Repair Tech', role: 'Battlefield Scavenging', cost: '$1000', desc: 'GLA mechanics continuously scavenge battlefield scrap to repair all vehicles (+1 HP/s).', req: 'Black Market', unlock: 'Continuous Vehicle Auto-Healing' },
+            buggyAmmo: { name: 'Buggy Ammo Chains', role: 'Ammunition Capacity', cost: '$800', desc: 'Increases Rocket Buggy rocket salvo capacity by +50% (9 rockets per volley).', req: 'Black Market', unlock: '+50% Buggy Salvo Size' },
+            workerShoes: { name: 'Worker Shoes', role: 'Labor Logistics', cost: '$500', desc: 'Increases Worker movement speed by +25% and supply harvest rate.', req: 'Black Market', unlock: '+25% Worker Movement Speed' },
+            camoNetting: { name: 'Camo Netting', role: 'Tactical Camouflage', cost: '$400', desc: 'Permanently stealths this defensive structure until it engages enemies.', req: 'Defensive Structure', unlock: 'Permanent Stealth Concealment' },
+            upgradeToReal: { name: 'Upgrade to Real Structure', role: 'Decoy Conversion', cost: '$200 - $350', desc: 'Converts this decoy fake building into a real functional installation.', req: 'Decoy Structure', unlock: 'Full Operational Conversion' },
             camouflage: { name: 'Camouflage Tech', role: 'Guerilla Concealment', cost: '$1000', desc: 'Desert ghillie camouflage makes Rebels completely invisible when stationary.', req: 'Palace', unlock: 'Permanent Static Stealth' }
         };
 

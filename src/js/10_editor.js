@@ -515,6 +515,7 @@
             const spawns = getSpawnPointsForMap(selectedSize, selectedEnv, activeCustomMap);
 
             // 1. Clear previous battle assets
+            if (typeof researchedTechs !== 'undefined') researchedTechs.clear();
             structures.forEach(s => { if (s.mesh) scene.remove(s.mesh); });
             structures.length = 0;
             units.forEach(u => { if (u.mesh) scene.remove(u.mesh); });
