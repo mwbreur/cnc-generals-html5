@@ -819,15 +819,13 @@ function animate() {
                     if (unit.isAir) {
                         const isHeli = (unit.type === 'comanche' || unit.type === 'chinook');
                         if (!isHeli) {
-                            const targetBank = THREE.MathUtils.clamp(-diff * 1.6, -0.4, 0.4);
+                            const targetBank = THREE.MathUtils.clamp(-diff * 1.6, -0.3, 0.3);
                             unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.12;
                             unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
                         } else {
-                            // Helicopters stay strictly horizontal in roll (no sideways banking)
+                            // Helicopters stay strictly horizontal at all times
                             unit.mesh.rotation.z = 0;
-                            // Pitch slightly forward when flying
-                            const targetPitch = 0.12;
-                            unit.mesh.rotation.x += (targetPitch - unit.mesh.rotation.x) * 0.10;
+                            unit.mesh.rotation.x = 0;
                         }
                     }
                 } else {

@@ -10,3 +10,4 @@ generals_big_files/
 extracted_assets/
 extracted_models/
 *.png
+scratch/

@@ -680,7 +680,11 @@ function processEnemyAIEngine() {
                 }
             }
 
-            if (units.some(u => u.selected)) playUSASound('acknowledge');
+            if (units.some(u => u.selected)) {
+                const sel = units.find(u => u.selected);
+                if (sel && typeof playUnitVoice === 'function') playUnitVoice(sel.type, 'move');
+                else playUSASound('acknowledge');
+            }
             // Ignore if clicking inside UI elements
             if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
                 return;
@@ -730,6 +734,9 @@ function processEnemyAIEngine() {
                     if (typeof spawnWaypointMarker === 'function') {
                         const tPos = targetedEnemy.mesh ? targetedEnemy.mesh.position : hitEnemyObj.position;
                         spawnWaypointMarker(tPos, 'attack');
+                    }
+                    if (firstSelected && typeof playUnitVoice === 'function') {
+                        playUnitVoice(firstSelected.type, 'attack');
                     }
 
                     const targetPos = (targetedEnemy.position || targetedEnemy.mesh.position).clone();
@@ -1061,6 +1068,7 @@ function processEnemyAIEngine() {
                         selectedSupplyPoint = null;
                         unit.selected = true;
                         addSelectionCircle(unit);
+                        if (typeof playUnitVoice === 'function') playUnitVoice(unit.type, 'select');
                     }
                     updateSidebar();
                     updateHUD();

@@ -33,7 +33,58 @@
             return h0 * (1 - fz) + h1 * fz;
         }
 
+        const flattenedFootprints = [];
+
+        function registerFlattenedFootprint(cx, cz, radius, targetY) {
+            flattenedFootprints.push({ cx, cz, radius, targetY });
+            if (terrainMesh && terrainMesh.geometry && terrainMesh.geometry.attributes.position) {
+                const pos = terrainMesh.geometry.attributes.position;
+                const count = pos.count;
+                let modified = false;
+                const rSq = radius * radius;
+                const blendR = radius * 1.35;
+                const blendRSq = blendR * blendR;
+                for (let i = 0; i < count; i++) {
+                    const vx = pos.getX(i);
+                    const vz = pos.getZ(i);
+                    const dx = vx - cx;
+                    const dz = vz - cz;
+                    const dSq = dx * dx + dz * dz;
+                    if (dSq <= rSq) {
+                        pos.setY(i, targetY);
+                        modified = true;
+                    } else if (dSq < blendRSq) {
+                        const dist = Math.sqrt(dSq);
+                        const t = (dist - radius) / (blendR - radius);
+                        const origY = pos.getY(i);
+                        pos.setY(i, targetY * (1 - t) + origY * t);
+                        modified = true;
+                    }
+                }
+                if (modified) {
+                    pos.needsUpdate = true;
+                    terrainMesh.geometry.computeVertexNormals();
+                }
+            }
+        }
+        window.registerFlattenedFootprint = registerFlattenedFootprint;
+
         function getTerrainHeight(x, z) {
+            for (let i = 0; i < flattenedFootprints.length; i++) {
+                const fp = flattenedFootprints[i];
+                const dist = Math.hypot(x - fp.cx, z - fp.cz);
+                if (dist <= fp.radius) {
+                    return fp.targetY;
+                } else if (dist < fp.radius * 1.35) {
+                    const t = (dist - fp.radius) / (fp.radius * 0.35);
+                    const rawH = getRawTerrainHeight(x, z);
+                    return fp.targetY * (1 - t) + rawH * t;
+                }
+            }
+            return getRawTerrainHeight(x, z);
+        }
+
+        function getRawTerrainHeight(x, z) {
             if (currentMapType === 'tournament_desert' && typeof getTournamentDesertHeight === 'function') {
                 return getTournamentDesertHeight(x, z);
             }
@@ -423,6 +474,7 @@
                 ? activeCustomMap.theme
                 : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city', 'tournament_desert'].includes(mapType) ? mapType : 'desert'));
 
+            flattenedFootprints.length = 0;
             // Clear previous terrain, water, props, and supply points
             if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh = null; }
             if (waterMesh) { scene.remove(waterMesh); waterMesh.geometry.dispose(); waterMesh = null; }
@@ -1004,37 +1056,37 @@
             return g;
         }
 
-        function spawnSingleSupplyDockAt(pos, stock = 8800) {
-            const crystalMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.5, metalness: 0.2 });
-            const crateMat = new THREE.MeshStandardMaterial({ color: 0x7f5539, roughness: 0.9 });
-            const padMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.95 });
-
-            const field = new THREE.Group();
-            const pad = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 7.2, 0.25, 16), padMat);
-            pad.position.y = 0.12; field.add(pad);
-
-            const crystals = [];
-            for (let i = 0; i < 7; i++) {
-                const angle = i * 2.4;
-                const crystal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.95 + (i % 3) * 0.2, 0), crystalMat);
-                crystal.position.set(Math.cos(angle) * (2.2 + (i % 2)), 0.75 + (i % 3) * 0.15, Math.sin(angle) * (2.2 + (i % 2)));
-                crystal.scale.y = 1.45;
-                crystal.castShadow = true; field.add(crystal);
-                crystals.push(crystal);
+        function spawnSingleSupplyDockAt(pos, stock = 30000) {
+            let dockMesh;
+            let crates = null;
+            if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['tech_supplyDock']) {
+                dockMesh = createW3DBuildingMesh('tech_supplyDock', false);
+                if (window.W3D_BUILDING_DATA['tech_supplyCrates']) {
+                    crates = createW3DBuildingMesh('tech_supplyCrates', false);
+                    crates.name = 'supplyCrates';
+                    dockMesh.add(crates);
+                }
+            } else {
+                dockMesh = new THREE.Group();
+                const pad = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 7.5, 0.35, 16), new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.95 }));
+                pad.position.y = 0.18; dockMesh.add(pad);
             }
 
-            for (let i = 0; i < 2; i++) {
-                const crate = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.2, 1.3), crateMat);
-                crate.position.set(i ? -4.2 : 4.0, 0.65, i ? 2.5 : -2.5);
-                crate.castShadow = true; field.add(crate);
+            const dockRadius = 7.5;
+            const hCenter = (typeof getRawTerrainHeight === 'function') ? getRawTerrainHeight(pos.x, pos.z) : pos.y;
+            const deckY = hCenter + 0.05;
+            pos.y = deckY;
+            dockMesh.position.copy(pos);
+
+            if (typeof registerFlattenedFootprint === 'function') {
+                registerFlattenedFootprint(pos.x, pos.z, dockRadius * 1.15, deckY);
             }
 
-            field.position.copy(pos);
-            scene.add(field);
+            scene.add(dockMesh);
             supplyPoints.push({
                 position: pos.clone(),
-                mesh: field,
-                crystals: crystals,
+                mesh: dockMesh,
+                cratesRef: crates,
                 stock: stock,
                 maxStock: stock,
                 remaining: stock,
@@ -1048,7 +1100,7 @@
                 activeCustomMap.supplies.forEach(s => {
                     const y = getTerrainHeight(s.x, s.z);
                     const pos = new THREE.Vector3(s.x, y, s.z);
-                    spawnSingleSupplyDockAt(pos, s.amount || 8800);
+                    spawnSingleSupplyDockAt(pos, s.amount || 30000);
                 });
                 return;
             }
@@ -1062,7 +1114,7 @@
                     if (y < currentWaterLevel + 0.4) continue; // Don't spawn in water
 
                     const position = new THREE.Vector3(x, y, z);
-                    spawnSingleSupplyDockAt(position, 8800);
+                    spawnSingleSupplyDockAt(position, 30000);
                 }
             }
         }

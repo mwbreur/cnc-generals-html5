@@ -191,7 +191,14 @@ function createCrusaderTankMesh(isEnemy = false) {
 
 function createPaladinTankMesh(isEnemy = false) {
     if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['paladin']) {
-        return createW3DVehicleMesh('paladin', isEnemy);
+        const root = createW3DVehicleMesh('paladin', isEnemy);
+        if (window.W3D_VEHICLE_DATA['drone_battle']) {
+            const drone = createW3DVehicleMesh('drone_battle', isEnemy);
+            drone.name = 'paladinBattleDrone';
+            drone.position.set(0, 2.4 / 0.09, -8.0);
+            root.add(drone);
+        }
+        return root;
     }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matUSA;
@@ -782,8 +789,11 @@ function createRangerMesh(isEnemy = false) {
     return g;
 }
 
-function createMissileDefenderMesh() {
-    const g = createRangerMesh();
+function createMissileDefenderMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['missiledefender']) {
+        return createW3DInfantryMesh('missiledefender', isEnemy);
+    }
+    const g = createRangerMesh(isEnemy);
     // Shoulder-mounted FIM-92 Stinger / Javelin Missile Launcher
     const launcher = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 1.45, 10), matGunmetal);
     launcher.rotation.x = Math.PI / 2; launcher.position.set(0.38, 1.2, 0.1); launcher.castShadow = true; g.add(launcher);

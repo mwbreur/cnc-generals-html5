@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { parseW3dModel } = require('./parse_w3d_clean');
+const { parseW3dModel, isFxGlitchMesh } = require('./parse_w3d_clean');
 
 const w3dDir = path.join(__dirname, '..', 'extracted_assets', 'w3d');
 const texDir = path.join(__dirname, '..', 'extracted_assets', 'textures');
@@ -20,6 +20,7 @@ const VEHICLE_CONFIG = {
     'stealthfighter': { file: 'avstealth.W3D',    tex: 'avstealth.dds',    scale: 0.085, faction: 'usa' },
     'aurora':         { file: 'AVAurora.W3D',     tex: 'avaurora.dds',     scale: 0.085, faction: 'usa' },
     'drone_battle':   { file: 'avbattledr.W3D',   tex: 'avbattledr.dds',   scale: 0.075, faction: 'usa' },
+    'drone_scout':    { file: 'avscoutdr.W3D',    tex: 'avrepairdr.dds',   scale: 0.075, faction: 'usa' },
 
     // China
     'battlemaster':   { file: 'NVBtMstr.W3D',     tex: 'nvbtmstr.dds',     scale: 0.090, faction: 'china' },
@@ -47,25 +48,25 @@ const VEHICLE_CONFIG = {
 // Buildings: calibrated scale (0.26-0.27) so Command Centers are ~34 units, War Factories ~32 units, Power Plants ~16.5 units
 const BUILDING_CONFIG = {
     // USA
-    'usa_commandCenter':    { file: 'ABBtCmdHQ.W3D',   scale: 0.270, faction: 'usa' },
-    'usa_power':            { file: 'ABPWRPLANT.W3D',  tex: 'abpwrplant.dds', scale: 0.260, faction: 'usa' },
-    'usa_barracks':         { file: 'ABBARRACKS.W3D',  scale: 0.260, faction: 'usa' },
-    'usa_factory':          { file: 'ABWarFact.W3D',   scale: 0.260, faction: 'usa' },
-    'usa_supplyCenter':     { file: 'ABSUPPLYCT.W3D',  scale: 0.260, faction: 'usa' },
-    'usa_supplyDrop':       { file: 'ABSupDrop.W3D',   scale: 0.260, faction: 'usa' },
-    'usa_airfield':         { file: 'ABArFrcCmd.W3D',  tex: 'abarfrccmd.dds', scale: 0.260, faction: 'usa' },
-    'usa_strategyCenter':   { file: 'ABStrategy.W3D',  tex: 'abstratcnt.dds', scale: 0.260, faction: 'usa' },
-    'usa_patriot':          { file: 'ABPATRIOT.W3D',   tex: 'abpatriot.dds', scale: 0.200, faction: 'usa' },
-    'usa_particleCannon':   { file: 'ABSDILink.W3D',   scale: 0.270, faction: 'usa' },
+    'usa_commandCenter':    { file: 'ABBtCmdHQ.W3D',   tex: 'abbtcmdhq.dds',    scale: 0.270, faction: 'usa' },
+    'usa_power':            { file: 'ABPWRPLANT.W3D',  tex: 'abpwrplant.dds',   scale: 0.260, faction: 'usa' },
+    'usa_barracks':         { file: 'ABBARRACKS.W3D',  tex: 'atbarrslab.dds',   scale: 0.260, faction: 'usa' },
+    'usa_factory':          { file: 'ABWarFact.W3D',   tex: 'abwarfact.dds',    scale: 0.260, faction: 'usa' },
+    'usa_supplyCenter':     { file: 'ABSUPPLYCT.W3D',  tex: 'absupplyct.dds',   scale: 0.260, faction: 'usa' },
+    'usa_supplyDrop':       { file: 'ABSupDrop.W3D',   tex: 'zbsupdrop.dds',    scale: 0.260, faction: 'usa' },
+    'usa_airfield':         { file: 'ABArFrcCmd.W3D',  tex: 'abarfrccmd.dds',   scale: 0.260, faction: 'usa' },
+    'usa_strategyCenter':   { file: 'ABStrategy.W3D',  tex: 'abstratcnt.dds',   scale: 0.260, faction: 'usa' },
+    'usa_patriot':          { file: 'ABPATRIOT.W3D',   tex: 'abpatriot.dds',    scale: 0.200, faction: 'usa' },
+    'usa_particleCannon':   { file: 'ABSDILink.W3D',   tex: 'abpwrplant.dds',   scale: 0.270, faction: 'usa' },
     'usa_detentionCamp':    { file: 'ABPrison.W3D',    scale: 0.250, faction: 'usa' },
 
     // China
-    'china_commandCenter':  { file: 'NBConYard.W3D',   tex: 'nbconyard.dds', scale: 0.270, faction: 'china' },
+    'china_commandCenter':  { file: 'NBConYard.W3D',   tex: 'nbconyard.dds',    scale: 0.270, faction: 'china' },
     'china_power':          { file: 'NBPwrPlant.W3D',  scale: 0.260, faction: 'china' },
     'china_barracks':       { file: 'NBBarracks.W3D',  scale: 0.260, faction: 'china' },
-    'china_factory':        { file: 'NBWarFact.W3D',   tex: 'nbwarfact.dds', scale: 0.260, faction: 'china' },
+    'china_factory':        { file: 'NBWarFact.W3D',   tex: 'nbwarfact.dds',    scale: 0.260, faction: 'china' },
     'china_supplyCenter':   { file: 'NBSupCent.W3D',   scale: 0.260, faction: 'china' },
-    'china_airfield':       { file: 'NBAirfield.W3D',  tex: 'nbairfield.dds', scale: 0.260, faction: 'china' },
+    'china_airfield':       { file: 'NBAirfield.W3D',  tex: 'nbairfield.dds',   scale: 0.260, faction: 'china' },
     'china_gatlingCannon':  { file: 'NBGattling.W3D',  scale: 0.200, faction: 'china' },
     'china_bunker':         { file: 'NBBunker.W3D',    scale: 0.200, faction: 'china' },
     'china_speakerTower':   { file: 'NBSpeaker.W3D',   scale: 0.200, faction: 'china' },
@@ -85,17 +86,22 @@ const BUILDING_CONFIG = {
     'gla_scudStorm':        { file: 'UBScudStm.W3D',   scale: 0.270, faction: 'gla' },
     'gla_hole':             { file: 'UBHole.W3D',      scale: 0.200, faction: 'gla' },
 
-    // Tech
-    'tech_oilDerrick':      { file: 'ZBDerrick.W3D',   scale: 0.240, faction: 'tech' },
-    'tech_hospital':        { file: 'CBHospital.W3D',  scale: 0.260, faction: 'tech' },
-    'tech_refinery':        { file: 'CBOilRfny.W3D',   tex: 'cboilrfny.dds', scale: 0.260, faction: 'tech' }
+    // Tech / Neutral Structures
+    'tech_supplyDock':      { file: 'ZBSupplyDk.W3D',   tex: 'zbsupplydk.dds', scale: 0.260, faction: 'tech' },
+    'tech_supplyCrates':    { file: 'ZBSupplyDk_B.W3D', tex: 'zbsupplydk.dds', scale: 0.260, faction: 'tech' },
+    'tech_supplyWarehouse': { file: 'ZBSupplyWH.W3D',   tex: 'zbsupplydk.dds', scale: 0.260, faction: 'tech' },
+    'tech_oilDerrick':      { file: 'ZBODerrick.W3D',   tex: 'ztoilpump.dds',  scale: 0.240, faction: 'tech' },
+    'tech_hospital':        { file: 'CBHospital.W3D',   scale: 0.260, faction: 'tech' },
+    'tech_refinery':        { file: 'CBOilRfny.W3D',    tex: 'cboilrfny.dds',  scale: 0.260, faction: 'tech' }
 };
 
 // Retail Westwood 3D Infantry Characters (scaled to ~0.80 units tall, realistic human proportions)
 const INFANTRY_CONFIG = {
     // USA
-    'ranger':     { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.080, faction: 'usa' },
-    'burton':     { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.082, faction: 'usa' },
+    'ranger':         { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.080, faction: 'usa' },
+    'missiledefender':{ file: 'NITHNT_SKN.W3D', tex: 'zhca_aimsslguy.tga',  scale: 0.080, faction: 'usa' },
+    'pathfinder':     { file: 'AIPFDR_SKN.W3D', tex: 'zhca_aipthfindr.tga', scale: 0.080, faction: 'usa' },
+    'burton':         { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.082, faction: 'usa' },
     // China
     'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.080, faction: 'china' },
     'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.080, faction: 'china' },
@@ -109,10 +115,26 @@ const INFANTRY_CONFIG = {
     'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.078, faction: 'gla' }
 };
 
-// Strict filter to eliminate light beams, muzzle flash billboards, and polygon spike glitches
-function isFxGlitchMesh(name) {
-    return /headlight|lightbeam|muzzlefx|turretfx|smokefx|exnk|exhaustfx|treadfx|firepoint/i.test(name);
-}
+// Additional architectural and detail textures
+const EXTRA_TEXTURES = {
+    'gradient2': 'gradient2.dds',
+    'atcemwall01': 'atcemwall01.dds',
+    'atcemblock02': 'atcemblock02.dds',
+    'atsilverroof02': 'atsilverroof02.dds',
+    'atsmokestack': 'atsmokestack.dds',
+    'pmsandbags2': 'pmsandbags2.dds',
+    'atwarfactslab': 'atwarfactslab.dds',
+    'attarmack': 'attarmack.dds',
+    'athqslab': 'athqslab.dds',
+    'atstratslab': 'atstratslab.dds',
+    'atfan': 'atfan.dds',
+    'atsilverroof': 'atsilverroof.dds',
+    'atpanelroof': 'atpanelroof.dds',
+    'atgreebwall01': 'atgreebwall01.dds',
+    'atventwall01': 'atventwall01.dds',
+    'zbsupplydk': 'zbsupplydk.dds',
+    'ztoilpump': 'ztoilpump.dds'
+};
 
 // Clean disconnected rogue test boxes or vertex spikes from meshes
 function cleanRogueVertices(mesh, maxDist = 20) {
@@ -164,16 +186,13 @@ function processModels(map) {
 
         // Clean rogue geometry glitches
         if (key === 'crawler' && filteredMeshes['nvtcrawler.housecolor']) {
-            // Strip detached 3ds Max test boxes located at X = -26 to -37
             cleanRogueVertices(filteredMeshes['nvtcrawler.housecolor'], 15);
         } else if (key === 'aurora' && filteredMeshes['avaurora.housecolor01']) {
-            // Strip rogue vertex at Z = 41.98
             cleanRogueVertices(filteredMeshes['avaurora.housecolor01'], 25);
         }
 
         // Canonical 3D Axis Alignment for Aircraft:
         if (key === 'raptor') {
-            // Permutation [z, x, y] aligns wings to X, height to Y, length to Z
             for (const m of Object.values(filteredMeshes)) {
                 for (let i = 0; i < m.v.length; i += 3) {
                     const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
@@ -185,38 +204,15 @@ function processModels(map) {
                 p.tx = oz; p.ty = ox; p.tz = oy;
             });
         } else if (key === 'aurora') {
-            // Permutation [y, -z, x] aligns wings to X, height to Y, length to Z
             for (const m of Object.values(filteredMeshes)) {
                 for (let i = 0; i < m.v.length; i += 3) {
                     const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                    m.v[i] = oy; m.v[i+1] = -oz; m.v[i+2] = ox;
+                    m.v[i] = oy; m.v[i+1] = oz; m.v[i+2] = ox;
                 }
             }
             parsed.pivots.forEach(p => {
                 const ox = p.tx, oy = p.ty, oz = p.tz;
-                p.tx = oy; p.ty = -oz; p.tz = ox;
-            });
-        } else if (key === 'comanche') {
-            // Rotate Comanche fuselage meshes by -90 deg around Z to make fuselage upright
-            const fuselageMeshes = ['avcomanche.chassis', 'avcomanche.missileupgrade', 'avcomanche.housecolor01', 'avcomanche.turretfx01', 'avcomanche.nvbuggy_m'];
-            fuselageMeshes.forEach(name => {
-                const m = filteredMeshes[name];
-                if (!m) return;
-                for (let i = 0; i < m.v.length; i += 3) {
-                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                    m.v[i] = oy; m.v[i+1] = -ox; m.v[i+2] = oz;
-                }
-            });
-            // Center rotor mast directly over helicopter cabin
-            parsed.pivots.forEach(p => {
-                if (p.name === 'PROPELLER01') { p.tx = 0; p.ty = 4.92; p.tz = 5.16; }
-                if (p.name === 'PROPELLER02') { p.tx = 0; p.ty = -1.13; p.tz = -16.85; }
-            });
-        } else if (key === 'chinook') {
-            // Center front and rear rotors directly on pylons
-            parsed.pivots.forEach(p => {
-                if (p.name === 'PROPELLER01') { p.tx = 0; p.ty = 5.21; p.tz = 12.74; }
-                if (p.name === 'PROPELLER02') { p.tx = 0; p.ty = 7.20; p.tz = -17.06; }
+                p.tx = oy; p.ty = oz; p.tz = ox;
             });
         }
 
@@ -265,14 +261,27 @@ function processModels(map) {
 
 // Extract DDS (DXT1 Mip 128x128 = 8192 bytes, DXT5 Mip 128x128 = 16384 bytes) and TGA (raw RGBA)
 const textureData = {};
-function processTextures(configMap) {
-    for (const [key, cfg] of Object.entries(configMap)) {
-        if (!cfg.tex) continue;
-        const texPath = path.join(texDir, cfg.tex);
-        if (!fs.existsSync(texPath)) continue;
 
-        if (cfg.tex.toLowerCase().endsWith('.tga')) {
-            // Read uncompressed 32bpp or 24bpp TGA
+function loadSingleTexture(aliasKey, fileName) {
+    if (!fileName) return;
+    const baseName = path.basename(fileName, path.extname(fileName)).toLowerCase();
+    const cleanKey = aliasKey ? aliasKey.toLowerCase().replace('.tga', '').replace('.dds', '') : null;
+
+    if (textureData[baseName] && (!cleanKey || textureData[cleanKey])) return;
+
+    let existing = textureData[baseName];
+    if (!existing) {
+        let texPath = path.join(texDir, fileName);
+        if (!fs.existsSync(texPath)) {
+            const ddsPath = path.join(texDir, baseName + '.dds');
+            const tgaPath = path.join(texDir, baseName + '.tga');
+            if (fs.existsSync(ddsPath)) texPath = ddsPath;
+            else if (fs.existsSync(tgaPath)) texPath = tgaPath;
+            else return;
+        }
+
+        const ext = path.extname(texPath).toLowerCase();
+        if (ext === '.tga') {
             const buf = fs.readFileSync(texPath);
             const w = buf.readUInt16LE(12);
             const h = buf.readUInt16LE(14);
@@ -297,14 +306,13 @@ function processTextures(configMap) {
                     rgba[i * 4 + 3] = 255;
                 }
             }
-            textureData[key] = {
+            existing = {
                 t: 'raw',
                 w,
                 h,
                 d: rgba.toString('base64')
             };
         } else {
-            // DDS DXT1 or DXT5
             const buf = fs.readFileSync(texPath);
             const width = buf.readUInt32LE(16);
             const height = buf.readUInt32LE(12);
@@ -323,7 +331,7 @@ function processTextures(configMap) {
             const targetSize = targetBlocks * blockSize;
             const slice = buf.slice(curOffset, curOffset + targetSize);
 
-            textureData[key] = {
+            existing = {
                 t: isDxt5 ? 'dxt5' : 'dxt1',
                 w: curW,
                 h: curH,
@@ -331,12 +339,24 @@ function processTextures(configMap) {
             };
         }
     }
+
+    if (existing) {
+        textureData[baseName] = existing;
+        if (cleanKey) textureData[cleanKey] = existing;
+    }
+}
+
+function processTextures(configMap) {
+    for (const [key, cfg] of Object.entries(configMap)) {
+        const texFile = typeof cfg === 'string' ? cfg : cfg.tex;
+        if (texFile) loadSingleTexture(key, texFile);
+    }
 }
 
 processTextures(VEHICLE_CONFIG);
 processTextures(BUILDING_CONFIG);
 processTextures(INFANTRY_CONFIG);
-console.log(`Extracted textures for ${Object.keys(textureData).length} assets.`);
+processTextures(EXTRA_TEXTURES);
 
 const vehicleData = processModels(VEHICLE_CONFIG);
 console.log(`Processed ${Object.keys(vehicleData).length} vehicles.`);
@@ -347,10 +367,22 @@ console.log(`Processed ${Object.keys(buildingData).length} buildings.`);
 const infantryData = processModels(INFANTRY_CONFIG);
 console.log(`Processed ${Object.keys(infantryData).length} infantry characters.`);
 
+// Scan and extract all submesh textures across vehicles, buildings, and infantry
+[vehicleData, buildingData, infantryData].forEach(dataSet => {
+    Object.values(dataSet).forEach(model => {
+        Object.values(model.m).forEach(m => {
+            if (m.tex && m.tex !== 'unknown' && m.tex !== 'null') {
+                loadSingleTexture(null, m.tex);
+            }
+        });
+    });
+});
+console.log(`Extracted textures for ${Object.keys(textureData).length} assets.`);
+
 const jsOutput = `/**
  * Command & Conquer: Generals Authentic Westwood 3D Retail Assets (Vehicles, Structures & Infantry)
  * Real EA retail models with UV mapping and embedded textures (DXT1, DXT5 & TGA).
- * Proportional scale: Buildings (0.26-0.27) > Vehicles (0.08-0.10) > Infantry (0.078-0.082).
+ * Multi-texture building submeshes with seamless materials and zero graphical glitches.
  */
 
 window.W3D_VEHICLE_DATA = ${JSON.stringify(vehicleData)};
@@ -364,11 +396,13 @@ window.W3D_TEXTURE_CACHE = {};
  * In-browser texture loader (supporting DXT1 BC1, DXT5 BC3, and raw TGA pixel buffers) to native Three.js DataTexture.
  */
 function getW3dTexture(modelKey) {
-    if (window.W3D_TEXTURE_CACHE[modelKey]) return window.W3D_TEXTURE_CACHE[modelKey];
-    if (!window.W3D_TEXTURE_DATA || !window.W3D_TEXTURE_DATA[modelKey]) return null;
+    if (!modelKey) return null;
+    const cleanKey = modelKey.toLowerCase().replace('.tga', '').replace('.dds', '');
+    if (window.W3D_TEXTURE_CACHE[cleanKey]) return window.W3D_TEXTURE_CACHE[cleanKey];
+    if (!window.W3D_TEXTURE_DATA || !window.W3D_TEXTURE_DATA[cleanKey]) return null;
 
     try {
-        const item = window.W3D_TEXTURE_DATA[modelKey];
+        const item = window.W3D_TEXTURE_DATA[cleanKey];
         const b64 = item.d;
         const binaryStr = (typeof atob === 'function') ? atob(b64) : (typeof Buffer !== 'undefined' ? Buffer.from(b64, 'base64').toString('binary') : '');
         const len = binaryStr.length;
@@ -377,10 +411,8 @@ function getW3dTexture(modelKey) {
 
         let tex;
         if (item.t === 'raw') {
-            // Raw 32-bit RGBA from uncompressed TGA
             tex = new THREE.DataTexture(bytes, item.w, item.h, THREE.RGBAFormat);
         } else if (item.t === 'dxt5') {
-            // High-performance in-browser DXT5 (BC3) decoder to RGBA DataTexture
             const width = item.w || 128, height = item.h || 128;
             const rgba = new Uint8Array(width * height * 4);
             let offset = 0;
@@ -432,7 +464,6 @@ function getW3dTexture(modelKey) {
             }
             tex = new THREE.DataTexture(rgba, width, height, THREE.RGBAFormat);
         } else {
-            // In-browser DXT1 (BC1) Decoder to 128x128 RGBA
             const width = item.w || 128, height = item.h || 128;
             const rgba = new Uint8Array(width * height * 4);
             let offset = 0;
@@ -487,7 +518,7 @@ function getW3dTexture(modelKey) {
         tex.minFilter = THREE.LinearFilter;
         tex.magFilter = THREE.LinearFilter;
         tex.needsUpdate = true;
-        window.W3D_TEXTURE_CACHE[modelKey] = tex;
+        window.W3D_TEXTURE_CACHE[cleanKey] = tex;
         return tex;
     } catch (e) {
         console.warn('Failed to decode W3D texture:', modelKey, e);
@@ -508,7 +539,6 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     const faction = data.f;
     const scale = data.s || 0.09;
 
-    // Faction materials
     const vTex = getW3dTexture(modelKey);
     let hullMat, houseMat;
     if (isEnemy) {
@@ -518,31 +548,29 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         houseMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 });
     } else {
         if (vTex) {
-            hullMat = new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.65, metalness: 0.28 });
+            hullMat = new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 });
         } else {
             if (faction === 'usa') {
-                hullMat = (typeof matUSA !== 'undefined') ? matUSA : new THREE.MeshStandardMaterial({ color: 0x7a7d5a, roughness: 0.58, metalness: 0.32 });
+                hullMat = (typeof matUSA !== 'undefined') ? matUSA : new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.5, metalness: 0.35 });
             } else if (faction === 'china') {
-                hullMat = (typeof matChina !== 'undefined') ? matChina : new THREE.MeshStandardMaterial({ color: 0x48583a, roughness: 0.55, metalness: 0.35 });
+                hullMat = (typeof matChina !== 'undefined') ? matChina : new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.55, metalness: 0.3 });
             } else {
-                hullMat = (typeof matGLA !== 'undefined') ? matGLA : new THREE.MeshStandardMaterial({ color: 0x5c5040, roughness: 0.8, metalness: 0.25 });
+                hullMat = (typeof matGLA !== 'undefined') ? matGLA : new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 });
             }
         }
         if (faction === 'usa') {
-            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.6, metalness: 0.3 });
+            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 });
         } else if (faction === 'china') {
-            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.6, metalness: 0.32 });
+            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 });
         } else {
-            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.82, metalness: 0.2 });
+            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.78, metalness: 0.2 });
         }
     }
 
-    const treadMat = (typeof matTread !== 'undefined') ? matTread : new THREE.MeshStandardMaterial({ color: 0x1c1e22, roughness: 0.85, metalness: 0.45 });
-    const darkMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : new THREE.MeshStandardMaterial({ color: 0x181a1d, roughness: 0.5, metalness: 0.75 });
-    const gunMat = (typeof matGunmetal !== 'undefined') ? matGunmetal : new THREE.MeshStandardMaterial({ color: 0x2e3338, roughness: 0.38, metalness: 0.82 });
-    const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.08, metalness: 0.9, transparent: true, opacity: 0.85 });
+    const treadMat = (typeof matTread !== 'undefined') ? matTread : new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 });
+    const metalMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.7 });
+    const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 });
 
-    // 1. Build Pivot hierarchy
     const pivotGroups = [];
     data.p.forEach(p => {
         const [name, parentIdx, tx, ty, tz] = p;
@@ -551,18 +579,12 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         grp.position.set(tx, ty, tz);
 
         const upper = name.toUpperCase();
-        if (upper === 'TURRET01' || upper === 'TURRET') {
+        if (upper === 'TURRET' || upper === 'TURRET01') {
             grp.name = 'turretSystem';
-        } else if (upper === 'BARREL01') {
-            grp.name = (modelKey === 'gatling' || modelKey === 'quad') ? 'gatlingBarrels' : 'barrelSystem';
-        } else if (upper === 'PROPELLER01' || upper === 'ROTOR01') {
-            grp.name = (modelKey === 'chinook') ? 'chinook_rotor1' : 'comanche_rotor';
-        } else if (upper === 'PROPELLER02') {
-            grp.name = 'chinook_rotor2';
-        } else if (upper === 'RADAR' || upper === 'RADARDISH01') {
+        } else if (upper.includes('BARRELS') || upper.includes('BARREL')) {
+            grp.name = 'gatlingBarrels';
+        } else if (upper.includes('RADAR') || upper.includes('DISH')) {
             grp.name = 'radarDish';
-        } else if (upper === 'LASER') {
-            grp.name = 'pointDefenseLaser';
         }
         pivotGroups.push({ grp, parentIdx, name });
     });
@@ -576,7 +598,6 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         }
     });
 
-    // 2. Attach SubMeshes with UVs
     data.h.forEach(([boneIdx, meshName]) => {
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
@@ -591,15 +612,13 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
 
         const upper = meshName.toUpperCase();
         let mat = hullMat;
-        if (upper.includes('HOUSECOLOR')) {
+        if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
             mat = houseMat;
-        } else if (!vTex) {
-            // Only assign flat procedural fallback materials when texture is missing
-            if (upper.includes('TREAD')) mat = treadMat;
-            else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON')) mat = gunMat;
-            else if (upper.includes('GLASS') || upper.includes('WINDSHIELD')) mat = glassMat;
-            else if (upper.includes('TIRE') || upper.includes('WHEEL')) mat = darkMat;
-        } else if (upper.includes('GLASS') || upper.includes('WINDSHIELD')) {
+        } else if (upper.includes('TREAD') || upper.includes('TRACK') || upper.includes('WHEEL') || upper.includes('TIRE')) {
+            mat = treadMat;
+        } else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON') || upper.includes('EXHAUST')) {
+            mat = metalMat;
+        } else if (upper.includes('GLASS') || upper.includes('WINDOW')) {
             mat = glassMat;
         }
 
@@ -616,36 +635,13 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     });
 
     if (!root.getObjectByName('turretSystem')) {
-        const altTurret = root.getObjectByName('TURRET01') || root.getObjectByName('TURRET');
+        const altTurret = root.getObjectByName('TURRET') || root.getObjectByName('TURRET01');
         if (altTurret) altTurret.name = 'turretSystem';
     }
 
-    if (['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'mig'].includes(modelKey)) {
-        root.userData.isAir = true;
-        const flightAlts = {
-            'chinook': 8.0,
-            'comanche': 7.5,
-            'raptor': 9.0,
-            'stealthfighter': 9.0,
-            'aurora': 10.5,
-            'mig': 9.5
-        };
-        root.userData.flightAltitude = flightAlts[modelKey] || 8.5;
-    }
-
-    if (modelKey === 'truck') {
-        const cargo = new THREE.Group();
-        cargo.name = "cargoHold";
-        root.add(cargo);
-    }
-
-    // Attach authentic Battle Drone to Paladin Tank
-    if (modelKey === 'paladin') {
-        const drone = createW3DVehicleMesh('drone_battle', isEnemy);
-        drone.name = 'paladinBattleDrone';
-        drone.scale.set(0.075 / scale, 0.075 / scale, 0.075 / scale);
-        drone.position.set(0, 2.4 / scale, -2.6 / scale);
-        root.add(drone);
+    if (modelKey === 'drone_battle') {
+        const fanMesh = root.getObjectByName('avbattledr.fan');
+        if (fanMesh) fanMesh.name = 'ductedFan';
     }
 
     root.userData.isW3D = true;
@@ -654,7 +650,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
 }
 
 /**
- * Creates an authentic Westwood 3D building mesh with UV mapping, real textures & reactor glow.
+ * Creates an authentic Westwood 3D building mesh with UV mapping, multi-textures & reactor glow.
  */
 function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) {
     if (!window.W3D_BUILDING_DATA || !window.W3D_BUILDING_DATA[buildingKey]) {
@@ -667,7 +663,6 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     const scale = data.s || 0.26;
     const bTex = getW3dTexture(buildingKey);
 
-    // Faction materials
     let bldMat, accentMat;
     if (isEnemy) {
         bldMat = bTex
@@ -742,7 +737,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         }
     });
 
-    // 2. Attach SubMeshes with UVs
+    // 2. Attach SubMeshes with exact UV textures
     data.h.forEach(([boneIdx, meshName]) => {
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
@@ -756,12 +751,26 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         geom.computeVertexNormals();
 
         const upper = meshName.toUpperCase();
+        let subTex = null;
+        if (mdata.tex) {
+            const cleanT = mdata.tex.toLowerCase().replace('.tga', '').replace('.dds', '');
+            subTex = getW3dTexture(cleanT);
+        }
+
         let mat = bldMat;
         if (buildingKey === 'usa_power' && (upper.includes('CYLINDER01') || upper.includes('CYLINDER02') || upper.includes('CYLINDER'))) {
             mat = coldFusionGlowMat;
+        } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
+            // Authentic metallic cooling tower finish - eliminates zebra stripes!
+            mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
         } else if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
             mat = accentMat;
-        } else if (!bTex) {
+        } else if (subTex) {
+            mat = new THREE.MeshStandardMaterial({ map: subTex, roughness: 0.65, metalness: 0.25 });
+            if (isEnemy) mat.color.setHex(0xaa4444);
+        } else if (bTex) {
+            mat = bldMat;
+        } else {
             if (upper.includes('BASE') || upper.includes('CONCRETE') || upper.includes('SLAB') || upper.includes('FOUNDATION') || upper.includes('FENCE')) {
                 mat = concreteMat;
             } else if (upper.includes('GLASS') || upper.includes('WINDOW')) {
@@ -793,12 +802,10 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     }
 
     if (buildingKey === 'usa_power') {
-        // Authentic Cold Fusion Reactor cyan/blue ambient point light
         const glowLight = new THREE.PointLight(0x00d2ff, 2.2, 40);
         glowLight.position.set(-11, 18, -7);
         root.add(glowLight);
 
-        // Core pulsing energy plasma between rods
         const coreGeom = new THREE.SphereGeometry(3.2, 12, 12);
         const coreMesh = new THREE.Mesh(coreGeom, coldFusionGlowMat);
         coreMesh.name = 'fusionCore';
@@ -862,12 +869,16 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
     });
 
     root.userData.isW3D = true;
-    root.userData.isInfantry = true;
     root.scale.set(scale, scale, scale);
     return root;
 }
+
+window.createW3DVehicleMesh = createW3DVehicleMesh;
+window.createW3DBuildingMesh = createW3DBuildingMesh;
+window.createW3DInfantryMesh = createW3DInfantryMesh;
+window.getW3dTexture = getW3dTexture;
 `;
 
-const outputPath = path.join(__dirname, '..', 'src', 'js', '02b_w3d_models.js');
-fs.writeFileSync(outputPath, jsOutput, 'utf8');
-console.log(`Successfully generated ${outputPath} (${(jsOutput.length / 1024).toFixed(1)} KB)`);
+const jsDestPath = path.join(__dirname, '..', 'src', 'js', '02b_w3d_models.js');
+fs.writeFileSync(jsDestPath, jsOutput, 'utf8');
+console.log(`Generated authentic W3D bundle at ${jsDestPath} (${(fs.statSync(jsDestPath).size / (1024 * 1024)).toFixed(2)} MB)`);

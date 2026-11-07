@@ -1703,6 +1703,69 @@ function getCameoSVG(id, faction = 'usa', name = '') {
     `);
 }
 
+function getCameoImg(id, name) {
+    const rawKey = (id || name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cameoMap = {
+        'crusader': 'crusader',
+        'tank': 'crusader',
+        'paladin': 'paladin',
+        'humvee': 'humvee',
+        'ambulance': 'ambulance',
+        'tomahawk': 'tomahawk',
+        'dozer': 'dozer',
+        'chinook': 'chinook',
+        'comanche': 'comanche',
+        'raptor': 'raptor',
+        'stealthfighter': 'stealthFighter',
+        'stealth': 'stealthFighter',
+        'aurora': 'aurora',
+        'ranger': 'ranger',
+        'infantry': 'ranger',
+        'missiledefender': 'missileDefender',
+        'rocket': 'missileDefender',
+        'burton': 'burton',
+        'colonelburton': 'burton',
+        'battle_drone': 'drone_battle',
+        'battledrone': 'drone_battle',
+        'scout_drone': 'drone_scout',
+        'scoutdrone': 'drone_scout',
+        'center': 'commandCenter',
+        'commandcenter': 'commandCenter',
+        'power': 'power',
+        'barracks': 'barracks',
+        'factory': 'factory',
+        'warfactory': 'factory',
+        'supplycenter': 'supplyCenter',
+        'supply': 'supplyCenter',
+        'airfield': 'airfield',
+        'patriot': 'patriot',
+        'strategy': 'strategyCenter',
+        'strategycenter': 'strategyCenter',
+        'particle': 'particleCannon',
+        'particlecannon': 'particleCannon',
+        'supplydrop': 'supplyDrop',
+        'detention': 'detentionCamp',
+        'detentioncamp': 'detentionCamp',
+        'tech_oilderrick': 'tech_oilDerrick',
+        'oilderrick': 'tech_oilDerrick',
+        'tech_supplydock': 'tech_supplyDock',
+        'supplydock': 'tech_supplyDock'
+    };
+    const resolved = cameoMap[rawKey] || rawKey;
+    if (window.OFFICIAL_CAMEOS && window.OFFICIAL_CAMEOS[resolved]) {
+        return `<img src="${window.OFFICIAL_CAMEOS[resolved]}" class="slot-cameo-img" alt="${name || id}" />`;
+    }
+    return null;
+}
+
+function handleGridSlotClick(idx) {
+    if (typeof playOfficialSound === 'function') playOfficialSound('sfx_click', 0.65);
+    if (currentGridSlots && currentGridSlots[idx] && typeof currentGridSlots[idx].action === 'function') {
+        currentGridSlots[idx].action();
+    }
+}
+window.handleGridSlotClick = handleGridSlotClick;
+
 function renderCommandGrid(container, slots) {
     if (!container) return;
     let html = '';
@@ -1716,10 +1779,10 @@ function renderCommandGrid(container, slots) {
             const badgeStr = s.badge || '';
             const idStr = s.id || s.name || '';
             const disabledAttr = s.disabled ? 'disabled' : '';
-            const cameoSvg = getCameoSVG(s.id, selectedFaction, s.name);
+            const cameoSvg = getCameoImg(s.id, s.name) || getCameoSVG(s.id, selectedFaction, s.name);
             const cleanBadge = isRally ? 'RALLY' : isSell ? 'SELL' : badgeStr;
 
-            html += `<button class="grid-slot-btn ${specialClass}" onclick="currentGridSlots[${i}].action()" onmouseenter="showTacticalTooltip(event, '${idStr}')" onmouseleave="hideTacticalTooltip()" ${disabledAttr}>
+            html += `<button class="grid-slot-btn ${specialClass}" onclick="handleGridSlotClick(${i})" onmouseenter="showTacticalTooltip(event, '${idStr}')" onmouseleave="hideTacticalTooltip()" ${disabledAttr}>
                 <div class="slot-art-wrap">
                     ${cameoSvg}
                 </div>
