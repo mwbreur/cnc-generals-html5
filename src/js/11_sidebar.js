@@ -810,7 +810,6 @@ function renderCommandGrid(container, slots) {
     if (!container) return;
     let html = '';
     for (let i = 0; i < 12; i++) {
-        const key = GRID_HOTKEYS[i];
         const s = slots[i];
         if (s) {
             const isRally = s.badge && s.badge.includes('RALLY');
@@ -821,7 +820,6 @@ function renderCommandGrid(container, slots) {
             const idStr = s.id || '';
             const disabledAttr = s.disabled ? 'disabled' : '';
             html += '<button class="grid-slot-btn ' + specialClass + '" onclick="currentGridSlots[' + i + '].action()" onmouseenter="showTacticalTooltip(event, \'' + idStr + '\')" onmouseleave="hideTacticalTooltip()" ' + disabledAttr + '>' +
-                '<span class="grid-key-badge">' + key + '</span>' +
                 '<span class="grid-slot-name">' + s.name + '</span>' +
                 '<div class="grid-slot-footer">' +
                     '<span class="grid-slot-cost">' + costStr + '</span>' +
@@ -829,34 +827,266 @@ function renderCommandGrid(container, slots) {
                 '</div>' +
             '</button>';
         } else {
-            html += '<div class="grid-slot-btn empty">' +
-                '<span class="grid-key-badge">' + key + '</span>' +
-            '</div>';
+            html += '<div class="grid-slot-btn empty"></div>';
         }
     }
     container.innerHTML = html;
 }
 
+// =========================================================================
+// OFFICIAL C&C: GENERALS & ZERO HOUR CONTROL SYSTEM
+// Reference: https://strategywiki.org/wiki/Command_%26_Conquer:_Generals/Controls
+// =========================================================================
 
-// 3. KEYBOARD HOTKEY LISTENER (Q, W, E, R, A, S, D, F, Z, X, C, V)
-const KEY_SLOT_MAP = {
-    'q': 0, 'w': 1, 'e': 2, 'r': 3,
-    'a': 4, 's': 5, 'd': 6, 'f': 7,
-    'z': 8, 'x': 9, 'c': 10, 'v': 11
-};
+// Control Groups (1-9)
+const controlGroups = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [] };
+const lastGroupTapTime = {};
+let lastQPressTime = 0;
+let lastWPressTime = 0;
+let lastEPressTime = 0;
+let attackMoveMode = false;
+let guardModeActive = false;
+
+function centerCameraOn(pos) {
+    if (!pos) return;
+    cameraTarget.set(pos.x, 0, pos.z);
+    updateCameraPosition();
+}
+
+function isUnitVisibleOnScreen(u) {
+    if (!u.mesh || u.health <= 0) return false;
+    const p = u.mesh.position.clone().project(camera);
+    return (p.x >= -1.05 && p.x <= 1.05 && p.y >= -1.05 && p.y <= 1.05 && p.z >= -1 && p.z <= 1);
+}
+
+function deselectAll() {
+    units.forEach(u => {
+        u.selected = false;
+        removeSelectionCircle(u);
+    });
+    selectedStructure = null;
+    selectedSupplyPoint = null;
+    hideBuilderPalette();
+    updateSidebar();
+    updateHUD();
+}
+
 window.addEventListener('keydown', e => {
+    // Ignore input if typing in chat, text fields, or modal
     if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
     const k = e.key.toLowerCase();
-    if (KEY_SLOT_MAP[k] !== undefined) {
-        const slotIdx = KEY_SLOT_MAP[k];
-        if (currentGridSlots && currentGridSlots[slotIdx] && !currentGridSlots[slotIdx].disabled) {
-            currentGridSlots[slotIdx].action();
-            const btn = document.querySelectorAll('.command-grid-3x4 .grid-slot-btn')[slotIdx];
-            if (btn) {
-                btn.classList.add('hotkey-pulse');
-                setTimeout(() => btn.classList.remove('hotkey-pulse'), 120);
-            }
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const isAlt = e.altKey;
+    const isShift = e.shiftKey;
+    const now = Date.now();
+
+    // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all
+    if (e.key === 'Escape' || k === 'escape') {
+        if (blueprintMesh) {
+            scene.remove(blueprintMesh);
+            blueprintMesh = null;
+            activeBlueprintType = null;
+            showNotification('Construction cancelled.', 'info');
+            return;
         }
+        if (pendingSuperweapon) {
+            pendingSuperweapon = null;
+            showNotification('Targeting cancelled.', 'info');
+            return;
+        }
+        if (attackMoveMode || guardModeActive) {
+            attackMoveMode = false;
+            guardModeActive = false;
+            showNotification('Command cancelled.', 'info');
+            return;
+        }
+        deselectAll();
+        return;
+    }
+
+    // 2. SPACEBAR: Jump camera to Command Center or last radar alert
+    if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        recenterBase();
+        return;
+    }
+
+    // 3. CONTROL GROUPS: 1-9
+    if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
+        const num = parseInt(e.key);
+        if (isCtrl) {
+            // Assign selected units to group
+            const selectedList = units.filter(u => u.selected && u.health > 0);
+            controlGroups[num] = [...selectedList];
+            showNotification(`Group ${num} assigned (${selectedList.length} units).`, 'success');
+            playUSASound('radio_chirp');
+            return;
+        } else if (isAlt) {
+            // Alt + (1-9): View group on screen without selecting
+            const group = controlGroups[num] || [];
+            const valid = group.filter(u => u.health > 0 && u.mesh);
+            if (valid.length > 0) {
+                centerCameraOn(valid[0].mesh.position);
+            }
+            return;
+        } else {
+            // (1-9): Select control group (Double-tap = select + snap camera)
+            const group = (controlGroups[num] || []).filter(u => u.health > 0 && u.mesh);
+            if (group.length > 0) {
+                deselectAll();
+                group.forEach(u => {
+                    u.selected = true;
+                    addSelectionCircle(u);
+                });
+                updateSidebar();
+                updateHUD();
+                playUSASound('radio_chirp');
+
+                if (lastGroupTapTime[num] && (now - lastGroupTapTime[num]) < 380) {
+                    centerCameraOn(group[0].mesh.position);
+                }
+                lastGroupTapTime[num] = now;
+            } else {
+                showNotification(`Group ${num} is empty.`, 'warning');
+            }
+            return;
+        }
+    }
+
+    // 4. MASS SELECTION HOTKEYS (Q, W, E)
+    // Q (Press Once): Select all on-screen combat units | (Double-Press): Select all combat units on map
+    if (k === 'q' && !isCtrl && !isAlt) {
+        const isDouble = (now - lastQPressTime) < 380;
+        lastQPressTime = now;
+        deselectAll();
+        const combatList = units.filter(u => u.health > 0 && !['dozer', 'worker', 'truck'].includes(u.type));
+        const toSelect = isDouble ? combatList : combatList.filter(u => isUnitVisibleOnScreen(u));
+        toSelect.forEach(u => { u.selected = true; addSelectionCircle(u); });
+        updateSidebar();
+        showNotification(isDouble ? `All combat units on map selected (${toSelect.length}).` : `On-screen combat units selected (${toSelect.length}).`, 'info');
+        playUSASound('radio_chirp');
+        return;
+    }
+
+    // W (Zero Hour rule): Select air units (Only if not using WASD camera panning)
+    // If Shift/Ctrl held with W:
+    if (k === 'w' && isCtrl) {
+        const isDouble = (now - lastWPressTime) < 380;
+        lastWPressTime = now;
+        deselectAll();
+        const airList = units.filter(u => u.health > 0 && u.isAir);
+        const toSelect = isDouble ? airList : airList.filter(u => isUnitVisibleOnScreen(u));
+        toSelect.forEach(u => { u.selected = true; addSelectionCircle(u); });
+        updateSidebar();
+        showNotification(isDouble ? `All air units on map selected (${toSelect.length}).` : `On-screen air units selected (${toSelect.length}).`, 'info');
+        playUSASound('radio_chirp');
+        return;
+    }
+
+    // E (Press Once): Select all on-screen units of same type | (Double-Press): Across map
+    if (k === 'e' && !isCtrl && !isAlt) {
+        const selectedFirst = units.find(u => u.selected);
+        if (selectedFirst) {
+            const targetType = selectedFirst.type;
+            const isDouble = (now - lastEPressTime) < 380;
+            lastEPressTime = now;
+            const sameTypeAll = units.filter(u => u.type === targetType && u.health > 0);
+            const toSelect = isDouble ? sameTypeAll : sameTypeAll.filter(u => isUnitVisibleOnScreen(u));
+            deselectAll();
+            toSelect.forEach(u => { u.selected = true; addSelectionCircle(u); });
+            updateSidebar();
+            const typeLabel = unitRoster[targetType] ? unitRoster[targetType].name : targetType.toUpperCase();
+            showNotification(isDouble ? `All ${typeLabel} on map selected (${toSelect.length}).` : `On-screen ${typeLabel} selected (${toSelect.length}).`, 'info');
+            playUSASound('radio_chirp');
+            return;
+        }
+    }
+
+    // 5. COMMAND CENTER & HERO HOTKEYS
+    // H: Jump camera to Command Center
+    if (k === 'h' && !isCtrl) {
+        const cc = structures.find(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0);
+        if (cc) {
+            centerCameraOn(cc.position);
+            showNotification('Camera jumped to Command Center.', 'info');
+        }
+        return;
+    }
+    // Ctrl + H: Jump camera to Hero unit (Burton / Black Lotus / Jarmen Kell)
+    if (k === 'h' && isCtrl) {
+        const heroTypes = ['burton', 'blacklotus', 'jarmen'];
+        const hero = units.find(u => heroTypes.includes(u.type) && u.health > 0);
+        if (hero) {
+            deselectAll();
+            hero.selected = true;
+            addSelectionCircle(hero);
+            centerCameraOn(hero.mesh.position);
+            updateSidebar();
+            showNotification(`Hero selected: ${hero.type.toUpperCase()}`, 'success');
+            playUSASound('radio_chirp');
+        } else {
+            showNotification('No Hero unit currently on the battlefield.', 'warning');
+        }
+        return;
+    }
+
+    // 6. BUILDER CYCLING: Ctrl + Up / Down Arrow
+    if (isCtrl && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        const builders = units.filter(u => (u.type === 'dozer' || u.type === 'worker') && u.health > 0);
+        if (builders.length > 0) {
+            const currentIdx = builders.findIndex(u => u.selected);
+            let nextIdx = 0;
+            if (e.key === 'ArrowDown') nextIdx = (currentIdx + 1) % builders.length;
+            else nextIdx = (currentIdx - 1 + builders.length) % builders.length;
+            deselectAll();
+            builders[nextIdx].selected = true;
+            addSelectionCircle(builders[nextIdx]);
+            centerCameraOn(builders[nextIdx].mesh.position);
+            updateSidebar();
+            showNotification(`Builder selected (${nextIdx + 1}/${builders.length}).`, 'info');
+        }
+        return;
+    }
+
+    // 7. SELECTION CYCLING: Ctrl + Left / Right Arrow
+    if (isCtrl && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        const selectedList = units.filter(u => u.selected && u.health > 0);
+        if (selectedList.length > 1) {
+            const activeUnit = selectedList.shift();
+            selectedList.push(activeUnit);
+            updateSidebar();
+        }
+        return;
+    }
+
+    // 8. COMBAT ORDERS:
+    // S: Stop unit movement immediately (only when units are selected and NOT holding Ctrl/Alt)
+    if (k === 's' && !isCtrl && !isAlt && units.some(u => u.selected)) {
+        orderUnitsHalt();
+        return;
+    }
+
+    // X: Scatter selected infantry away from AOE damage
+    if (k === 'x' && !isCtrl && units.some(u => u.selected)) {
+        scatterSelectedUnits();
+        return;
+    }
+
+    // A + Click mode: Attack-Move
+    if (k === 'a' && !isCtrl && units.some(u => u.selected)) {
+        attackMoveMode = !attackMoveMode;
+        guardModeActive = false;
+        showNotification(attackMoveMode ? 'ATTACK-MOVE: Right-click destination or enemy to attack-move.' : 'Attack-Move cancelled.', 'info');
+        return;
+    }
+
+    // G + Click mode: Guard
+    if (k === 'g' && !isCtrl && units.some(u => u.selected)) {
+        guardModeActive = !guardModeActive;
+        attackMoveMode = false;
+        showNotification(guardModeActive ? 'GUARD MODE: Right-click sector or unit to protect.' : 'Guard cancelled.', 'info');
+        return;
     }
 });
 
@@ -1489,3 +1719,572 @@ function renderBuilderPaletteCards() {
     });
     container.innerHTML = html;
 }
+
+
+function isInfantryType(type) {
+    return ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'mob'].includes(type);
+}
+
+function orderSelectedTransportsToUnload() {
+    const selectedTransports = units.filter(u => u.selected && u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0);
+    if (selectedTransports.length === 0) return;
+
+    selectedTransports.forEach(transport => {
+        const count = transport.garrisoned.length;
+        transport.garrisoned.forEach((passenger, idx) => {
+            passenger.garrisonedIn = null;
+            passenger.mesh.visible = true;
+            const ang = (idx / count) * Math.PI * 2;
+            const dropDist = (transport.radius || 1.4) + 2.4;
+            const dropX = transport.mesh.position.x + Math.cos(ang) * dropDist;
+            const dropZ = transport.mesh.position.z + Math.sin(ang) * dropDist;
+            passenger.mesh.position.set(dropX, getTerrainHeight(dropX, dropZ), dropZ);
+            passenger.targetPosition.copy(passenger.mesh.position);
+            passenger.taskState = 'Idle';
+        });
+        transport.garrisoned = [];
+    });
+    showNotification('Garrisoned infantry disembarked from transport.', 'info');
+    updateSidebar();
+}
+
+function orderUnitsHalt() {
+    units.forEach(u => {
+        if (u.selected) {
+            u.targetPosition.copy(u.mesh.position);
+            u.combatTarget = null;
+            u.taskState = 'Idle';
+            if (u.type === 'truck' || u.type === 'worker') u.aiState = 'Idle';
+        }
+    });
+    playUSASound('acknowledge');
+    showNotification('Unit movement halted.', 'info');
+}
+
+function orderSelectedHarvestersToGather() {
+    const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
+    if (harvesters.length === 0) {
+        showNotification('Select a Supply Truck or Worker first.', 'info');
+        return;
+    }
+    const targetSp = selectedSupplyPoint || findNearestSupplyPoint(harvesters[0].mesh.position);
+    if (!targetSp) {
+        showNotification('No active supply field found nearby.', 'error');
+        return;
+    }
+    harvesters.forEach(h => {
+        h.supplyTarget = targetSp;
+        h.aiState = 'MovingToDock';
+        h.taskState = 'Idle';
+        h.combatTarget = null;
+        h.targetPosition.copy(targetSp.position);
+    });
+    showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies.`, 'success');
+}
+
+function orderAllHarvestersToTargetSupply() {
+    if (!selectedSupplyPoint) return;
+    const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker');
+    if (harvesters.length === 0) {
+        showNotification('No harvesters available! Build Supply Trucks or Workers.', 'error');
+        return;
+    }
+    harvesters.forEach(h => {
+        h.supplyTarget = selectedSupplyPoint;
+        h.aiState = 'MovingToDock';
+        h.taskState = 'Idle';
+        h.combatTarget = null;
+        h.targetPosition.copy(selectedSupplyPoint.position);
+    });
+    showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies ($${selectedSupplyPoint.stock} left).`, 'success');
+    updateSidebar();
+}
+
+function recenterBase() {
+    const hq = structures.find(s => s.type === 'center' && s.health > 0) || structures[0];
+    if (hq) {
+        cameraTarget.x = hq.position.x;
+        cameraTarget.z = hq.position.z;
+        updateCameraPosition();
+        playUSASound('radio_chirp');
+    }
+}
+
+function repairStructure(structure) {
+    if (!structure || structure.health >= structure.maxHealth) {
+        showNotification('Structure is at 100% integrity.', 'info');
+        return;
+    }
+    const fee = Math.min(50, Math.ceil((structure.maxHealth - structure.health) * 0.1));
+    if (playerResources < fee) {
+        showNotification(`Insufficient funds to repair ($${fee} needed).`, 'error');
+        return;
+    }
+    playerResources -= fee;
+    structure.health = structure.maxHealth;
+    playUSASound('construction');
+    showNotification('Structure fully repaired.', 'success');
+    updateSidebar();
+}
+
+function sellStructure(structure) {
+    if (!structure) return;
+    const cost = getStructureCost(structure.type) || 500;
+    const refund = Math.floor(cost * 0.5);
+    playerResources += refund;
+
+    scene.remove(structure.mesh);
+    const idx = structures.indexOf(structure);
+    if (idx !== -1) structures.splice(idx, 1);
+    if (selectedStructure === structure) selectedStructure = null;
+
+    showNotification(`Demolished ${structure.type}. +$${refund} refunded.`, 'info');
+    updateSidebar();
+}
+
+function produceUnit(type) {
+    const spec = unitRoster[type];
+    if (!spec) return;
+
+    if (playerResources < spec.cost) {
+        showNotification(`Insufficient funds to train ${spec.name} ($${spec.cost} required).`, 'error');
+        return;
+    }
+
+    const techReq = getUnitTechPrerequisite(type);
+    if (techReq && !hasCompletedStructure(techReq.building, techReq.altBuilding)) {
+        showNotification(`Production blocked: Requires operational ${techReq.name}!`, 'error');
+        return;
+    }
+
+    // Prioritize selected structure if it can build this unit!
+    let fac = null;
+    if (selectedStructure && !selectedStructure.isBuilding && selectedStructure.health > 0) {
+        if (spec.building === 'commandCenter' && selectedStructure.type === 'center') fac = selectedStructure;
+        else if (selectedStructure.type === spec.building) fac = selectedStructure;
+    }
+    if (!fac) {
+        fac = structures.find(s => {
+            if (s.isBuilding || s.health <= 0) return false;
+            if (spec.building === 'commandCenter' && s.type === 'center') return true;
+            if (s.type === spec.building) return true;
+            return false;
+        });
+    }
+
+    if (!fac) {
+        showNotification(`Production halted: No operational production facility available!`, 'error');
+        return;
+    }
+
+    if (!fac.productionQueue) fac.productionQueue = [];
+    if (fac.productionQueue.length >= 5) {
+        showNotification('Production queue full (max 5 units).', 'warning');
+        return;
+    }
+
+    playerResources -= spec.cost;
+    fac.productionQueue.push({
+        type: type,
+        name: spec.name,
+        cost: spec.cost,
+        progress: 0,
+        buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
+    });
+
+    playUSASound('radio_chirp');
+    showNotification(`Queued: ${spec.name}`, 'info');
+    updateSidebar();
+}
+
+function cancelQueuedItem(structure, index) {
+    if (!structure || !structure.productionQueue || !structure.productionQueue[index]) return;
+    const item = structure.productionQueue[index];
+    playerResources += item.cost;
+    structure.productionQueue.splice(index, 1);
+    playUSASound('radio_chirp');
+    showNotification(`Cancelled: ${item.name} (Refunded $${item.cost})`, 'info');
+    updateSidebar();
+}
+
+function useStructureAbility(action) {
+    const structure = selectedStructure;
+    if (!structure || structure.isBuilding) return;
+
+    if (action === 'upgradePower') {
+        if (structure.powerUpgraded) return;
+        if (playerResources < 300) { showNotification('Insufficient resources for control rods.', 'error'); return; }
+        playerResources -= 300;
+        structure.powerUpgraded = true;
+        structure.powerOutput = 10;
+        showNotification('Control rods installed: Cold Fusion power doubled (+100%).', 'success');
+    } else if (action === 'overcharge') {
+        structure.overcharged = !structure.overcharged;
+        showNotification(`Nuclear Reactor overcharge ${structure.overcharged ? 'ACTIVATED (+50% PWR)' : 'DEACTIVATED'}.`, 'info');
+    } else if (action === 'planHold') {
+        battlePlan = 'hold';
+        showNotification('Strategy Center: Battle plan Hold the Line active (+20% armor).', 'info');
+    } else if (action === 'planSearch') {
+        battlePlan = 'search';
+        showNotification('Strategy Center: Battle plan Search & Destroy active (+20% range & sight).', 'info');
+    } else if (action === 'planBombard') {
+        battlePlan = 'bombard';
+        showNotification('Strategy Center: Battle plan Bombardment active (+20% firepower).', 'info');
+    } else if (action === 'compositeArmor') {
+        if (playerResources < 1200) { showNotification('Need $1200 for Composite Armor.', 'error'); return; }
+        playerResources -= 1200;
+        researchedTechs.add('compositeArmor');
+        units.filter(u => u.type === 'tank' || u.type === 'paladin').forEach(u => { u.health += 100; u.maxHealth += 100; });
+        showNotification('Composite Armor researched: Tanks gained +25% HP!', 'success');
+    } else if (action === 'nationalism') {
+        if (playerResources < 1000) { showNotification('Need $1000 for Nationalism.', 'error'); return; }
+        playerResources -= 1000;
+        researchedTechs.add('nationalism');
+        showNotification('Nationalism researched: Chinese troops fire +25% faster!', 'success');
+    } else if (action === 'subliminal') {
+        if (playerResources < 800) { showNotification('Need $800 for Subliminal Messaging.', 'error'); return; }
+        playerResources -= 800;
+        researchedTechs.add('subliminal');
+        showNotification('Subliminal Messaging researched: Healing recovery doubled!', 'success');
+    } else if (action === 'anthraxBeta') {
+        if (playerResources < 1200) { showNotification('Need $1200 for Anthrax Beta.', 'error'); return; }
+        playerResources -= 1200;
+        researchedTechs.add('anthraxBeta');
+        showNotification('Anthrax Beta researched: Toxin weapons deal +25% damage!', 'success');
+    } else if (action === 'armTheMob') {
+        if (playerResources < 1000) { showNotification('Need $1000 for Arm the Mob.', 'error'); return; }
+        playerResources -= 1000;
+        researchedTechs.add('armTheMob');
+        showNotification('Arm the Mob researched: Mobs equipped with AK-47 assault rifles!', 'success');
+    } else if (action === 'captureBuilding') {
+        if (playerResources < 1000) { showNotification('Need $1000 for Capture Building.', 'error'); return; }
+        playerResources -= 1000;
+        researchedTechs.add('captureBuilding');
+        showNotification('Capture Building researched: Infantry can now capture enemy tech!', 'success');
+    } else if (action === 'superweapon') {
+        if (buildingTick < (structure.cooldownUntil || 0)) { showNotification('Superweapon is recharging.', 'error'); return; }
+        pendingSuperweapon = structure;
+        showNotification(`Click map to target ${structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Strike' : 'SCUD Storm'}. Right-click to cancel.`, 'info');
+    }
+
+    updateSidebar();
+}
+
+function strikeWithSuperweapon(structure, targetPosition) {
+    const sType = structure.type;
+    if (sType === 'particleCannon') {
+        animateParticleCannonStrike(targetPosition);
+    } else if (sType === 'nukeSilo') {
+        animateNukeStrike(structure.position, targetPosition);
+    } else if (sType === 'scudStorm') {
+        animateScudStormStrike(structure.position, targetPosition);
+    } else {
+        createImpactExplosion(targetPosition);
+    }
+    structure.lastFired = buildingTick;
+    structure.cooldownUntil = buildingTick + 1800;
+    pendingSuperweapon = null;
+    showNotification('Superweapon strike confirmed on target coordinates!', 'info');
+}
+
+function renderStructureMenu(structure) {
+    selectedStructure = structure;
+    updateSidebar();
+}
+
+function updateHUD() {
+    updateSidebar();
+}
+
+        function processBuildingFunctions() {
+            buildingTick++;
+            if (intelTimer > 0) intelTimer--;
+            if (buildingTick % 60 !== 0) return;
+            const activeStructures = structures.filter(structure => !structure.isBuilding && structure.health > 0);
+            activeStructures.forEach(structure => {
+                if (structure.type === 'supplyDrop' && buildingTick % 900 === 0) playerResources += 250;
+                if (structure.type === 'blackMarket' && buildingTick % 300 === 0) playerResources += 30;
+                if (structure.type === 'internetCenter' && buildingTick % 300 === 0) playerResources += 20;
+                if (structure.type === 'nuclearReactor' && structure.overcharged) structure.health -= 8;
+
+                if (['patriot', 'gatlingCannon', 'stingerSite'].includes(structure.type) && buildingTick % 45 === 0) {
+                    const target = enemyUnits.find(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(structure.position) < 45);
+                    if (target) {
+                        const targetPos = target.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0));
+                        if (structure.type === 'patriot') {
+                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
+                            spawnMuzzleFlash(mPos, 0xff9f43, 0.6);
+                            spawnRocketProjectile(mPos, targetPos, false, false);
+                            target.health -= 45;
+                        } else if (structure.type === 'gatlingCannon') {
+                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.8, 0));
+                            spawnMuzzleFlash(mPos, 0xffa502, 0.5);
+                            spawnBulletTracer(mPos, targetPos, 0xf1c40f, 3);
+                            target.health -= 28;
+                        } else if (structure.type === 'stingerSite') {
+                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 1.4, 0));
+                            spawnMuzzleFlash(mPos, 0x2ed573, 0.5);
+                            spawnRocketProjectile(mPos, targetPos, false, true);
+                            target.health -= 38;
+                        }
+                    }
+                }
+
+                if (['barracks', 'speakerTower'].includes(structure.type)) {
+                    units.forEach(unit => {
+                        const infantry = ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker'].includes(unit.type);
+                        if (infantry && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < (structure.type === 'barracks' ? 12 : 24)) {
+                            unit.health = Math.min(unit.maxHealth, unit.health + (structure.type === 'barracks' ? 2 : 1));
+                        }
+                    });
+                }
+                if (['factory', 'airfield'].includes(structure.type)) {
+                    units.forEach(unit => {
+                        const matchingUnit = structure.type === 'airfield'
+                            ? ['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora'].includes(unit.type)
+                            : !['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'worker', 'dozer'].includes(unit.type);
+                        if (matchingUnit && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < 16) {
+                            unit.health = Math.min(unit.maxHealth, unit.health + 3);
+                        }
+                    });
+                }
+                if (structure.type === 'demoTrap') {
+                    const target = enemyUnits.find(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(structure.position) < 7);
+                    if (target) {
+                        enemyUnits.forEach(enemy => { if (enemy.mesh.position.distanceTo(structure.position) < 16) enemy.health -= 300; });
+                        structure.health = 0;
+                        createImpactExplosion(structure.position);
+                    }
+                }
+            });
+            landmines.forEach(mine => {
+                if (!mine.active) return;
+                const trigger = enemyUnits.some(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(mine.position) < 3.5);
+                if (trigger) {
+                    mine.active = false;
+                    enemyUnits.forEach(enemy => {
+                        if (enemy.mesh.position.distanceTo(mine.position) < 9) enemy.health -= 180;
+                    });
+                    createImpactExplosion(mine.position);
+                }
+            });
+            // Continuous auto-repair from Junk Repair & Battle Drones
+            if (buildingTick % 60 === 0) {
+                if (researchedTechs.has('junkRepair') || researchedTechs.has('battleDrone')) {
+                    units.forEach(u => {
+                        if (!u.isAir && !isInfantryType(u.type) && u.health > 0 && u.health < u.maxHealth) {
+                            u.health = Math.min(u.maxHealth, u.health + 4);
+                        }
+                    });
+                }
+            }
+            document.getElementById('resource-display').textContent = `$${playerResources}`;
+        }
+
+        
+        function createFactionUnitMesh(type) {
+            return createCrusaderTankMesh(false);
+        }
+
+        function spawnUnit(type, position = null) {
+            let mesh; let radius = 1.2; let speed = 0.14;
+            let health = 400; let scanRange = 22; let isAir = false;
+            let capacity = 0; let garrisoned = [];
+
+            // USA Forces
+            if (type === 'tank' || type === 'crusader') { mesh = createCrusaderTankMesh(false); radius = 1.35; speed = 0.15; health = 480; scanRange = 24; }
+            else if (type === 'paladin') { mesh = createPaladinTankMesh(false); radius = 1.35; speed = 0.14; health = 550; scanRange = 26; }
+            else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 1.1; speed = 0.22; health = 280; scanRange = 26; capacity = 5; garrisoned = []; }
+            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 1.1; speed = 0.18; health = 220; scanRange = 15; }
+            else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 1.3; speed = 0.11; health = 220; scanRange = 38; }
+            else if (type === 'dozer') { mesh = createUSADozerMesh(); radius = 1.3; speed = 0.10; health = 300; }
+            else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 1.2; speed = 0.13; health = 260; }
+            else if (type === 'chinook') { mesh = createChinookMesh(); radius = 1.6; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
+            else if (type === 'comanche') { mesh = createComancheMesh(); radius = 1.4; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
+            else if (type === 'raptor') { mesh = createRaptorMesh(); radius = 1.5; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
+            else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(); radius = 1.4; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
+            else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 1.6; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
+            else if (type === 'infantry') { mesh = createRangerMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
+            else if (type === 'rocket') { mesh = createMissileDefenderMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
+            else if (type === 'pathfinder') { mesh = createRangerMesh(); radius = 0.5; speed = 0.09; health = 120; scanRange = 32; }
+            else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.6; speed = 0.10; health = 350; scanRange = 24; }
+
+            // China Forces
+            else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(false); radius = 1.35; speed = 0.15; health = 460; scanRange = 24; }
+            else if (type === 'overlord') { mesh = createOverlordTankMesh(false); radius = 2.1; speed = 0.09; health = 1100; scanRange = 28; capacity = 5; garrisoned = []; }
+            else if (type === 'gatling') { mesh = createGatlingTankMesh(false); radius = 1.3; speed = 0.16; health = 400; scanRange = 22; }
+            else if (type === 'dragon') { mesh = createDragonTankMesh(false); radius = 1.3; speed = 0.15; health = 450; scanRange = 18; }
+            else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 1.4; speed = 0.15; health = 480; scanRange = 20; capacity = 8; garrisoned = []; }
+            else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 1.3; speed = 0.10; health = 220; scanRange = 36; }
+            else if (type === 'nukecannon') { mesh = createNukeCannonMesh(); radius = 1.6; speed = 0.08; health = 260; scanRange = 42; }
+            else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
+            else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
+            else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.5; speed = 0.07; health = 100; }
+            else if (type === 'blacklotus') { mesh = createBlackLotusMesh(); radius = 0.5; speed = 0.10; health = 250; }
+
+            // GLA Forces
+            else if (type === 'worker') { mesh = createGLAWorkerMesh(); radius = 0.5; speed = 0.10; health = 150; }
+            else if (type === 'technical') { mesh = createTechnicalMesh(false); radius = 1.1; speed = 0.22; health = 240; scanRange = 22; capacity = 5; garrisoned = []; }
+            else if (type === 'scorpion') { mesh = createScorpionTankMesh(false); radius = 1.25; speed = 0.16; health = 360; scanRange = 22; }
+            else if (type === 'marauder') { mesh = createMarauderTankMesh(false); radius = 1.35; speed = 0.13; health = 520; scanRange = 24; }
+            else if (type === 'buggy') { mesh = createRocketBuggyMesh(false); radius = 1.1; speed = 0.22; health = 160; scanRange = 30; }
+            else if (type === 'quad') { mesh = createQuadCannonMesh(false); radius = 1.2; speed = 0.17; health = 300; scanRange = 24; }
+            else if (type === 'toxintractor') { mesh = createToxinTractorMesh(false); radius = 1.2; speed = 0.14; health = 360; scanRange = 20; }
+            else if (type === 'bombtruck') { mesh = createBombTruckMesh(false); radius = 1.2; speed = 0.18; health = 220; scanRange = 14; }
+            else if (type === 'scud') { mesh = createScudLauncherMesh(false); radius = 1.4; speed = 0.10; health = 240; scanRange = 40; }
+            else if (type === 'radarvan') { mesh = createRadarVanMesh(); radius = 1.1; speed = 0.16; health = 220; }
+            else if (type === 'rebel') { mesh = createRebelMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }
+            else if (type === 'rpg') { mesh = createRPGTrooperMesh(); radius = 0.5; speed = 0.08; health = 120; scanRange = 24; }
+            else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.5; speed = 0.12; health = 80; scanRange = 8; }
+            else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 0.8; speed = 0.08; health = 280; scanRange = 18; }
+            else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.5; speed = 0.11; health = 120; }
+            else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.5; speed = 0.09; health = 220; scanRange = 34; }
+            else {
+                mesh = selectedFaction === 'china' ? createBattlemasterTankMesh(false) : selectedFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);
+            }
+
+            if (!position) {
+                const angle = units.length * 2.4;
+                const spawnRadius = 4 + Math.floor(units.length / 8) * 2;
+                position = new THREE.Vector3(Math.cos(angle) * spawnRadius, 0, Math.sin(angle) * spawnRadius);
+            }
+            mesh.position.copy(position);
+            if (isAir) {
+                const groundY = getTerrainHeight(position.x, position.z);
+                const isSpawnLanded = position && Math.abs(position.y - groundY) < 1.5;
+                if (!isSpawnLanded) {
+                    mesh.position.y = mesh.userData.flightAltitude || 8.5;
+                }
+            }
+            scene.add(mesh);
+
+            const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
+            const newUnitObj = {
+                type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
+                speed: speed, radius: radius, selectionCircle: null, taskState: 'Idle',
+                aiState: (type === 'truck' || type === 'worker') ? 'MovingToDock' : 'Idle',
+                cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
+                health: health, maxHealth: health, scanRange: scanRange, netId: myNetId,
+                attackCooldown: 0, combatTarget: null, isAir: isAir,
+                airState: isAir ? (position && Math.abs(position.y - getTerrainHeight(position.x, position.z)) < 1.5 ? 'landed' : 'circling') : 'none',
+                patrolCenter: position ? position.clone() : new THREE.Vector3(),
+                circleAngle: Math.random() * Math.PI * 2, circleRadius: 15.0,
+                capacity: capacity || 0, garrisoned: garrisoned || [], waypoints: []
+            };
+            newUnitObj.teamId = playerTeamId;
+            newUnitObj.ownerId = 'player';
+            newUnitObj.isAI = false;
+            units.push(newUnitObj);
+            if (isMultiplayerActive && netConn && netConn.open) {
+                broadcastNetPacket({
+                    type: 'spawn_unit',
+                    unitType: type,
+                    position: { x: position.x, y: position.y, z: position.z },
+                    netId: myNetId
+                });
+            }
+            updateHUD();
+            return newUnitObj;
+        }
+
+        function addSelectionCircle(unit) {
+            if (unit.selectionCircle) return;
+            const r = unit.radius * 1.45;
+            const group = new THREE.Group();
+            group.name = "selectionReticle";
+            group.position.y = 0.05;
+
+            const factionColor = (typeof selectedFaction !== 'undefined' && selectedFaction === 'china') ? 0xff4757 : 
+                                 (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla') ? 0xffa502 : 0x00ffcc;
+
+            // 1. High-contrast ground circle
+            const ringGeo = new THREE.RingGeometry(r - 0.08, r, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: factionColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            group.add(ring);
+
+            // 2. Four distinct L-shaped corner brackets [ ]
+            const bMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
+            const bOffset = r * 1.15;
+            const bArm = r * 0.45;
+
+            // Corner 1 (+X, +Z)
+            const c1Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(bOffset - bArm, 0.02, bOffset),
+                new THREE.Vector3(bOffset, 0.02, bOffset),
+                new THREE.Vector3(bOffset, 0.02, bOffset - bArm)
+            ]);
+            group.add(new THREE.Line(c1Geo, bMat));
+
+            // Corner 2 (-X, +Z)
+            const c2Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-bOffset + bArm, 0.02, bOffset),
+                new THREE.Vector3(-bOffset, 0.02, bOffset),
+                new THREE.Vector3(-bOffset, 0.02, bOffset - bArm)
+            ]);
+            group.add(new THREE.Line(c2Geo, bMat));
+
+            // Corner 3 (-X, -Z)
+            const c3Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-bOffset + bArm, 0.02, -bOffset),
+                new THREE.Vector3(-bOffset, 0.02, -bOffset),
+                new THREE.Vector3(-bOffset, 0.02, -bOffset + bArm)
+            ]);
+            group.add(new THREE.Line(c3Geo, bMat));
+
+            // Corner 4 (+X, -Z)
+            const c4Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(bOffset - bArm, 0.02, -bOffset),
+                new THREE.Vector3(bOffset, 0.02, -bOffset),
+                new THREE.Vector3(bOffset, 0.02, -bOffset + bArm)
+            ]);
+            group.add(new THREE.Line(c4Geo, bMat));
+
+            unit.mesh.add(group);
+            unit.selectionCircle = group;
+            playUSASound('radio_chirp');
+        }
+
+        function removeSelectionCircle(unit) {
+            if (unit.selectionCircle) {
+                unit.mesh.remove(unit.selectionCircle);
+                unit.selectionCircle.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) c.material.dispose();
+                });
+                unit.selectionCircle = null;
+            }
+            if (unit.trajectoryLine) {
+                scene.remove(unit.trajectoryLine);
+                if (unit.trajectoryLine.geometry) unit.trajectoryLine.geometry.dispose();
+                if (unit.trajectoryLine.material) unit.trajectoryLine.material.dispose();
+                unit.trajectoryLine = null;
+            }
+        }
+
+        function updateCameraPosition() {
+            const maxCam = (currentMapSize || 800) * 0.45;
+            cameraTarget.x = THREE.MathUtils.clamp(cameraTarget.x, -maxCam, maxCam);
+            cameraTarget.z = THREE.MathUtils.clamp(cameraTarget.z, -maxCam, maxCam);
+            const x = cameraTarget.x + cameraRadius * Math.sin(cameraBeta) * Math.sin(cameraAlpha);
+            const y = cameraTarget.y + cameraRadius * Math.cos(cameraBeta);
+            const z = cameraTarget.z + cameraRadius * Math.sin(cameraBeta) * Math.cos(cameraAlpha);
+            camera.position.set(x, y, z); camera.lookAt(cameraTarget);
+        }
+
+        function processCameraKeyboardPanning() {
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); forward.y = 0; forward.normalize();
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); right.y = 0; right.normalize();
+            if (keysPressed['w'] || keysPressed['arrowup']) cameraTarget.addScaledVector(forward, panSpeed);
+            if (keysPressed['s'] || keysPressed['arrowdown']) cameraTarget.addScaledVector(forward, -panSpeed);
+            if (keysPressed['a'] || keysPressed['arrowleft']) cameraTarget.addScaledVector(right, -panSpeed);
+            if (keysPressed['d'] || keysPressed['arrowright']) cameraTarget.addScaledVector(right, panSpeed);
+            if (keysPressed['w'] || keysPressed['arrowup'] || keysPressed['s'] || keysPressed['arrowdown'] || 
+                keysPressed['a'] || keysPressed['arrowleft'] || keysPressed['d'] || keysPressed['arrowright']) updateCameraPosition();
+        }
+
+        function processCameraScreenEdgePanning(clientX, clientY) {
+            // Disabled: Camera movement via screen edges removed per user request.
+            // Players pan using WASD / Arrow keys or middle-mouse drag.
+        }

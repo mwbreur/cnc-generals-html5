@@ -1,3 +1,7 @@
+
+        let isRightDragging = false;
+        let rightDragStart = null;
+        let lastRightPointerPos = { x: 0, y: 0 };
 function processEnemyAIEngine() {
     if (isMultiplayerActive) return;
     aiDecisionTimer++;
@@ -161,12 +165,31 @@ function processEnemyAIEngine() {
             } else if (e.button === 2) { 
                 if (pendingSuperweapon) { pendingSuperweapon = null; return; }
                 if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; activeBlueprintType = null; return; }
-                issueMoveCommand(e); 
+                // Hold Right-Click & Drag to rapidly scroll across map
+                isRightDragging = false;
+                rightDragStart = { x: e.clientX, y: e.clientY };
+                lastRightPointerPos = { x: e.clientX, y: e.clientY };
             }
         }
 
         function onPointerMove(e) {
-            // Screen edge panning removed per request
+            // Hold Right-Click & Drag: Rapidly scroll across the map (Official Generals control)
+            if (rightDragStart) {
+                const dist = Math.hypot(e.clientX - rightDragStart.x, e.clientY - rightDragStart.y);
+                if (dist > 5) {
+                    isRightDragging = true;
+                    const dx = e.clientX - lastRightPointerPos.x;
+                    const dy = e.clientY - lastRightPointerPos.y;
+                    const forward = new THREE.Vector3(-Math.sin(cameraAlpha), 0, -Math.cos(cameraAlpha));
+                    const right = new THREE.Vector3(Math.cos(cameraAlpha), 0, -Math.sin(cameraAlpha));
+                    const scrollFactor = (cameraRadius / 100) * 0.38;
+                    cameraTarget.addScaledVector(right, -dx * scrollFactor);
+                    cameraTarget.addScaledVector(forward, dy * scrollFactor);
+                    updateCameraPosition();
+                    lastRightPointerPos = { x: e.clientX, y: e.clientY };
+                    return;
+                }
+            }
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
@@ -204,6 +227,15 @@ function processEnemyAIEngine() {
 
         function onPointerUp(e) {
             if (e.button === 1) isRotatingCamera = false;
+            if (e.button === 2) {
+                const wasDragging = isRightDragging;
+                isRightDragging = false;
+                rightDragStart = null;
+                if (!wasDragging) {
+                    issueMoveCommand(e);
+                }
+                return;
+            }
             if (e.button !== 0 || !isDragging) return;
             isDragging = false;
 
@@ -457,6 +489,13 @@ function processEnemyAIEngine() {
                 const selectedList = units.filter(u => u.selected);
                 if (selectedList.length === 1) {
                     const unit = selectedList[0];
+                    // Alt + Right-Click: Append waypoint to sequential path queue (Official Generals rule)
+                    if (e.altKey && unit.targetPosition && Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z) > 2.0) {
+                        if (!unit.waypoints) unit.waypoints = [];
+                        unit.waypoints.push(groundHit.clone());
+                        showNotification('Waypoint queued (' + (unit.waypoints.length) + ').', 'info');
+                        return;
+                    }
                     const bridges = !unit.isAir ? findBridgeCrossingsForPath(unit.mesh.position, groundHit) : null;
                     if (bridges) {
                         unit.waypoints = [bridges[0], bridges[1], groundHit.clone()];
@@ -572,12 +611,9 @@ function processEnemyAIEngine() {
         }
 
         function evaluateClickSelection(e) {
-            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.closest('#tactical-tooltip'))) {
+            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.closest('#tactical-tooltip') || e.target.closest('#builder-palette') || e.target.closest('#general-powers-bar'))) {
                 return;
             }
-            units.forEach(unit => { unit.selected = false; removeSelectionCircle(unit); });
-            selectedStructure = null;
-            selectedSupplyPoint = null;
 
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -591,13 +627,30 @@ function processEnemyAIEngine() {
                 while (hit.parent && hit.parent !== scene) hit = hit.parent;
                 const unit = units.find(candidate => candidate.mesh === hit);
                 if (unit && !unit.garrisonedIn) {
-                    unit.selected = true;
-                    addSelectionCircle(unit);
-                    activeSidebarTab = 'production';
+                    if (e.shiftKey) {
+                        // Shift + Click: Add or remove from current selection (Official rule)
+                        unit.selected = !unit.selected;
+                        if (unit.selected) addSelectionCircle(unit);
+                        else removeSelectionCircle(unit);
+                    } else {
+                        // Normal Click: Deselect previous and select this unit
+                        units.forEach(u => { u.selected = false; removeSelectionCircle(u); });
+                        selectedStructure = null;
+                        selectedSupplyPoint = null;
+                        unit.selected = true;
+                        addSelectionCircle(unit);
+                    }
                     updateSidebar();
                     updateHUD();
                     return;
                 }
+            }
+
+            // If not Shift-clicking a unit, clear unit selection for structure click or ground click
+            if (!e.shiftKey) {
+                units.forEach(u => { u.selected = false; removeSelectionCircle(u); });
+                selectedStructure = null;
+                selectedSupplyPoint = null;
             }
 
             // 1b. Proximity fallback: If ray misses small infantry polygons, pick closest unit near clicked ground position!
