@@ -1,3 +1,17 @@
+function getUnitInitials(type) {
+    const map = {
+        infantry: 'RG', rocket: 'MD', pathfinder: 'PF', burton: 'CB',
+        crusader: 'CR', paladin: 'PL', humvee: 'HV', ambulance: 'AM', tomahawk: 'TM',
+        chinook: 'CH', comanche: 'CM', raptor: 'RP', stealthfighter: 'SF', aurora: 'AU',
+        redguard: 'RG', tankhunter: 'TH', hacker: 'HK', blacklotus: 'BL',
+        battlemaster: 'BM', dragon: 'DT', gatling: 'GT', crawler: 'TC', overlord: 'OL', inferno: 'IC', nukecannon: 'NC',
+        rebel: 'RB', rpg: 'RPG', terrorist: 'TR', mob: 'MOB', hijacker: 'HJ', jarmen: 'JK',
+        technical: 'TK', scorpion: 'SC', marauder: 'MR', buggy: 'RB', quad: 'QC', toxintractor: 'TT', bombtruck: 'BT', scud: 'SD', radarvan: 'RV',
+        dozer: 'DZ', worker: 'WK', truck: 'TR'
+    };
+    return map[type] || (type ? type.substring(0, 2).toUpperCase() : '??');
+}
+
 // =========================================================================
 // AUTHENTIC C&C GENERALS COMMAND BAR & RADAR MINIMAP ENGINE
 // =========================================================================
@@ -8,7 +22,7 @@ let isSellMode = false;
 let radarCanvas = null;
 let radarCtx = null;
 let radarSweepAngle = 0;
-const GRID_HOTKEYS = ['Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F', 'Z', 'X', 'C', 'V'];
+const GRID_HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H'];
 let currentGridSlots = [];
 
 // 1. RADAR MINIMAP ENGINE
@@ -387,6 +401,12 @@ function updateSidebar() {
 }
 
 function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
+    const isBuilderSelected = selectedUnits.length === 1 && (selectedUnits[0].type === 'dozer' || selectedUnits[0].type === 'worker');
+    if (isBuilderSelected) {
+        showBuilderPalette();
+    } else {
+        hideBuilderPalette();
+    }
     if (selectedUnits.length === 1) {
         const u = selectedUnits[0];
         const spec = unitRoster[u.type] || { name: u.type.toUpperCase(), role: 'Combat Unit', cost: '' };
@@ -532,10 +552,11 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
 }
 
 function renderStructureInspectorAndGrid(inspector, structure) {
+    hideBuilderPalette();
     const names = {
         center: 'Command Center', power: 'Cold Fusion Reactor', nuclearReactor: 'Nuclear Reactor',
-        factory: selectedFaction === 'gla' ? 'Arms Dealer' : 'War Factory', supplyCenter: 'Supply Center',
-        supplyStash: 'Supply Stash', supplyDrop: 'Supply Drop Zone', airfield: 'Air Field',
+        factory: selectedFaction === 'gla' ? 'Arms Dealer' : 'War Factory',
+        supplyCenter: 'Supply Center', supplyStash: 'Supply Stash', supplyDrop: 'Supply Drop Zone', airfield: 'Air Field',
         strategyCenter: 'Strategy Center', detentionCamp: 'Detention Camp', internetCenter: 'Internet Center',
         propagandaCenter: 'Propaganda Center', bunker: 'Bunker', patriot: 'Patriot Missile System',
         gatlingCannon: 'Gatling Cannon', speakerTower: 'Speaker Tower', particleCannon: 'Particle Cannon',
@@ -547,48 +568,73 @@ function renderStructureInspectorAndGrid(inspector, structure) {
     const hpPct = Math.max(0, Math.min(100, Math.round((structure.health / structure.maxHealth) * 100)));
     const isConstructing = structure.isBuilding;
 
+    // Build Queue Display HTML (matching [MD] [MD] from Control Bar Pro screenshot)
+    let queueHtml = '';
+    if (structure.productionQueue && structure.productionQueue.length > 0) {
+        queueHtml = `
+            <div class="cb-queue-strip">
+                <span class="cb-queue-label">QUEUED:</span>
+                <div class="cb-queue-slots">
+                    ${structure.productionQueue.map((item, idx) => {
+                        const pct = Math.round((item.progress || 0) * 100);
+                        const initials = getUnitInitials(item.type);
+                        return `
+                            <div class="cb-queue-card ${idx === 0 ? 'active' : 'waiting'}" title="${item.name} (${pct}%). Click to cancel." onclick="cancelQueuedItem(selectedStructure, ${idx})">
+                                <span class="cb-qc-tag">${initials}</span>
+                                ${idx === 0 ? `<div class="cb-qc-fill" style="width: ${pct}%;"></div>` : ''}
+                                <span class="cb-qc-x">✕</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     inspector.innerHTML = `
-        <div class="inspector-card">
-            <div class="inspector-info-pane" style="width: 100%;">
-                <div class="inspector-header-row">
-                    <span class="inspector-title">${title}</span>
-                    <span class="inspector-kills-tag">${isConstructing ? '🔨 BUILDING...' : '● OPERATIONAL'}</span>
-                </div>
-                <div class="inspector-sub-role">${structure.isAir ? 'Airfield Operations' : 'Forward Installation'}</div>
-                <div class="inspector-hp-box">
-                    <div class="inspector-hp-label">
-                        <span>STRUCTURAL INTEGRITY</span>
-                        <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP</span>
+        <div class="cb-inspector-pane">
+            ${queueHtml}
+            <div class="inspector-card">
+                <div class="inspector-info-pane" style="width: 100%;">
+                    <div class="inspector-header-row">
+                        <span class="inspector-title">${title}</span>
+                        <span class="inspector-kills-tag">${isConstructing ? '🔨 BUILDING...' : '● ONLINE'}</span>
                     </div>
-                    <div class="inspector-hp-track">
-                        <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                    <div class="inspector-sub-role">${structure.isAir ? 'Airfield Operations' : 'Forward Installation'}</div>
+                    <div class="inspector-hp-box">
+                        <div class="inspector-hp-label">
+                            <span>STRUCTURAL INTEGRITY</span>
+                            <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP</span>
+                        </div>
+                        <div class="inspector-hp-track">
+                            <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                        </div>
                     </div>
-                </div>
-                <div class="inspector-quick-btns">
-                    <button class="quick-army-btn" onclick="repairStructure(selectedStructure)">🔧 Repair ($50)</button>
-                    <button class="quick-army-btn" onclick="sellStructure(selectedStructure)">💰 Demolish / Sell</button>
-                    <button class="quick-army-btn" onclick="selectedStructure = null; updateSidebar();">✕ Deselect</button>
+                    <div class="inspector-quick-btns">
+                        <button class="quick-army-btn" onclick="repairStructure(selectedStructure)">🔧 Repair ($50)</button>
+                        <button class="quick-army-btn" onclick="sellStructure(selectedStructure)">💰 Sell</button>
+                        <button class="quick-army-btn" onclick="triggerRallyPointMode()">🚩 Set Rally</button>
+                    </div>
                 </div>
             </div>
         </div>
     `;
 
-    // 3x4 Grid for Building: Unit Production & Facility Abilities
+    // 2-Row Production Grid (strictly units built by this structure + upgrades + rally + sell)
+    currentGridSlots = new Array(12).fill(null);
+
     const productionType = structure.type === 'center' ? 'commandCenter' : structure.type;
     const producers = Object.entries(unitRoster).filter(([type, spec]) => {
-        if (spec.building === productionType) return true;
-        if (structure.type === 'supplyCenter' && type === 'truck') return true;
-        if (structure.type === 'supplyStash' && type === 'worker') return true;
-        if (structure.type === 'factory' && type === 'truck' && selectedFaction !== 'gla') return true;
-        return false;
+        return spec.building === productionType;
     });
 
-    currentGridSlots = producers.map(([type, spec]) => {
+    // Populate units into slots 0..4
+    producers.slice(0, 5).forEach(([type, spec], idx) => {
         const techReq = getUnitTechPrerequisite(type);
         const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
         const canAfford = playerResources >= spec.cost;
         let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
-        return {
+        currentGridSlots[idx] = {
             id: type,
             name: spec.name.toUpperCase(),
             cost: spec.cost,
@@ -599,17 +645,45 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         };
     });
 
-    const abilityButtons = getBuildingAbilities(structure);
-    abilityButtons.forEach(ab => {
-        currentGridSlots.push({
-            name: ab.label.toUpperCase(),
-            cost: ab.cost || '',
-            badge: ab.badge || 'ACTION',
-            disabled: ab.disabled,
-            action: () => useStructureAbility(ab.action),
-            desc: ab.desc || ''
-        });
+    // Slot 5 (Top-Right): RALLY POINT
+    currentGridSlots[5] = {
+        name: 'SET RALLY',
+        cost: '',
+        badge: 'RALLY 🚩',
+        disabled: isConstructing,
+        action: () => triggerRallyPointMode(),
+        desc: 'Set unit deployment rally point'
+    };
+
+    // Upgrades for this building in slots 6..9
+    const factionUpgs = (buildingUpgradesCatalog && buildingUpgradesCatalog[selectedFaction] && buildingUpgradesCatalog[selectedFaction][structure.type]) || [];
+    factionUpgs.slice(0, 4).forEach((upg, idx) => {
+        const canAfford = playerResources >= upg.cost;
+        currentGridSlots[6 + idx] = {
+            name: upg.name,
+            cost: upg.cost,
+            badge: canAfford ? 'UPG' : 'FUNDS',
+            disabled: !canAfford || isConstructing,
+            action: () => {
+                if (playerResources < upg.cost) { showNotification('Insufficient funds.', 'error'); return; }
+                playerResources -= upg.cost;
+                showNotification(`Upgrade completed: ${upg.name}`, 'success');
+                playUSASound('construction');
+                updateSidebar();
+            },
+            desc: upg.desc
+        };
     });
+
+    // Slot 11 (Bottom-Right): SELL STRUCTURE
+    currentGridSlots[11] = {
+        name: 'SELL ($)',
+        cost: '',
+        badge: 'SELL 💰',
+        disabled: false,
+        action: () => sellStructure(selectedStructure),
+        desc: 'Demolish structure for 50% refund'
+    };
 }
 
 function renderSupplyInspectorAndGrid(inspector, supplyPoint) {
@@ -733,31 +807,36 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
 }
 
 function renderCommandGrid(container, slots) {
+    if (!container) return;
     let html = '';
     for (let i = 0; i < 12; i++) {
         const key = GRID_HOTKEYS[i];
         const s = slots[i];
         if (s) {
-            html += `
-                <button class="grid-slot-btn" onclick="currentGridSlots[${i}].action()" onmouseenter="showTacticalTooltip(event, '${s.id || ''}')" onmouseleave="hideTacticalTooltip()" ${s.disabled ? 'disabled' : ''}>
-                    <span class="grid-key-badge">${key}</span>
-                    <span class="grid-slot-name">${s.name}</span>
-                    <div class="grid-slot-footer">
-                        <span class="grid-slot-cost">${s.cost ? '$' + s.cost : ''}</span>
-                        <span class="grid-slot-badge badge-ready">${s.badge || ''}</span>
-                    </div>
-                </button>
-            `;
+            const isRally = s.badge && s.badge.includes('RALLY');
+            const isSell = s.badge && s.badge.includes('SELL');
+            const specialClass = isRally ? 'slot-rally' : isSell ? 'slot-sell' : '';
+            const costStr = s.cost ? ('$' + s.cost) : '';
+            const badgeStr = s.badge || '';
+            const idStr = s.id || '';
+            const disabledAttr = s.disabled ? 'disabled' : '';
+            html += '<button class="grid-slot-btn ' + specialClass + '" onclick="currentGridSlots[' + i + '].action()" onmouseenter="showTacticalTooltip(event, \'' + idStr + '\')" onmouseleave="hideTacticalTooltip()" ' + disabledAttr + '>' +
+                '<span class="grid-key-badge">' + key + '</span>' +
+                '<span class="grid-slot-name">' + s.name + '</span>' +
+                '<div class="grid-slot-footer">' +
+                    '<span class="grid-slot-cost">' + costStr + '</span>' +
+                    '<span class="grid-slot-badge badge-ready">' + badgeStr + '</span>' +
+                '</div>' +
+            '</button>';
         } else {
-            html += `
-                <div class="grid-slot-btn empty">
-                    <span class="grid-key-badge">${key}</span>
-                </div>
-            `;
+            html += '<div class="grid-slot-btn empty">' +
+                '<span class="grid-key-badge">' + key + '</span>' +
+            '</div>';
         }
     }
     container.innerHTML = html;
 }
+
 
 // 3. KEYBOARD HOTKEY LISTENER (Q, W, E, R, A, S, D, F, Z, X, C, V)
 const KEY_SLOT_MAP = {
@@ -917,31 +996,53 @@ function produceUnit(type) {
         return;
     }
 
-    const fac = structures.find(s => {
-        if (s.isBuilding || s.health <= 0) return false;
-        if (spec.building === 'commandCenter' && s.type === 'center') return true;
-        if (s.type === spec.building) return true;
-        if (s.type === 'supplyCenter' && type === 'truck') return true;
-        if (s.type === 'supplyStash' && type === 'worker') return true;
-        if (s.type === 'factory' && type === 'truck' && selectedFaction !== 'gla') return true;
-        return false;
-    });
+    // Prioritize selected structure if it can build this unit!
+    let fac = null;
+    if (selectedStructure && !selectedStructure.isBuilding && selectedStructure.health > 0) {
+        if (spec.building === 'commandCenter' && selectedStructure.type === 'center') fac = selectedStructure;
+        else if (selectedStructure.type === spec.building) fac = selectedStructure;
+    }
+    if (!fac) {
+        fac = structures.find(s => {
+            if (s.isBuilding || s.health <= 0) return false;
+            if (spec.building === 'commandCenter' && s.type === 'center') return true;
+            if (s.type === spec.building) return true;
+            return false;
+        });
+    }
 
     if (!fac) {
         showNotification(`Production halted: No operational production facility available!`, 'error');
         return;
     }
 
+    if (!fac.productionQueue) fac.productionQueue = [];
+    if (fac.productionQueue.length >= 5) {
+        showNotification('Production queue full (max 5 units).', 'warning');
+        return;
+    }
+
     playerResources -= spec.cost;
-    const spawnPos = fac.position.clone().add(new THREE.Vector3(fac.radius + 3.5, 0, fac.radius + 3.5));
-    spawnPos.y = getTerrainHeight(spawnPos.x, spawnPos.z);
+    fac.productionQueue.push({
+        type: type,
+        name: spec.name,
+        cost: spec.cost,
+        progress: 0,
+        buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
+    });
 
-    const newUnit = spawnUnit(type, spawnPos);
-    const rallyTarget = spawnPos.clone().add(new THREE.Vector3(5, 0, 5));
-    newUnit.targetPosition.copy(rallyTarget);
+    playUSASound('radio_chirp');
+    showNotification(`Queued: ${spec.name}`, 'info');
+    updateSidebar();
+}
 
-    playUSASound('construction');
-    showNotification(`Unit deployed: ${spec.name}`, 'success');
+function cancelQueuedItem(structure, index) {
+    if (!structure || !structure.productionQueue || !structure.productionQueue[index]) return;
+    const item = structure.productionQueue[index];
+    playerResources += item.cost;
+    structure.productionQueue.splice(index, 1);
+    playUSASound('radio_chirp');
+    showNotification(`Cancelled: ${item.name} (Refunded $${item.cost})`, 'info');
     updateSidebar();
 }
 
@@ -1227,17 +1328,77 @@ function updateHUD() {
 
         function addSelectionCircle(unit) {
             if (unit.selectionCircle) return;
-            const r = unit.radius * 1.35;
-            const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.12, r, 32), new THREE.MeshBasicMaterial({ color: 0xe0c46e, side: THREE.DoubleSide }));
-            ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04;
-            unit.mesh.add(ring); unit.selectionCircle = ring;
+            const r = unit.radius * 1.45;
+            const group = new THREE.Group();
+            group.name = "selectionReticle";
+            group.position.y = 0.05;
+
+            const factionColor = (typeof selectedFaction !== 'undefined' && selectedFaction === 'china') ? 0xff4757 : 
+                                 (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla') ? 0xffa502 : 0x00ffcc;
+
+            // 1. High-contrast ground circle
+            const ringGeo = new THREE.RingGeometry(r - 0.08, r, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: factionColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            group.add(ring);
+
+            // 2. Four distinct L-shaped corner brackets [ ]
+            const bMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
+            const bOffset = r * 1.15;
+            const bArm = r * 0.45;
+
+            // Corner 1 (+X, +Z)
+            const c1Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(bOffset - bArm, 0.02, bOffset),
+                new THREE.Vector3(bOffset, 0.02, bOffset),
+                new THREE.Vector3(bOffset, 0.02, bOffset - bArm)
+            ]);
+            group.add(new THREE.Line(c1Geo, bMat));
+
+            // Corner 2 (-X, +Z)
+            const c2Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-bOffset + bArm, 0.02, bOffset),
+                new THREE.Vector3(-bOffset, 0.02, bOffset),
+                new THREE.Vector3(-bOffset, 0.02, bOffset - bArm)
+            ]);
+            group.add(new THREE.Line(c2Geo, bMat));
+
+            // Corner 3 (-X, -Z)
+            const c3Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-bOffset + bArm, 0.02, -bOffset),
+                new THREE.Vector3(-bOffset, 0.02, -bOffset),
+                new THREE.Vector3(-bOffset, 0.02, -bOffset + bArm)
+            ]);
+            group.add(new THREE.Line(c3Geo, bMat));
+
+            // Corner 4 (+X, -Z)
+            const c4Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(bOffset - bArm, 0.02, -bOffset),
+                new THREE.Vector3(bOffset, 0.02, -bOffset),
+                new THREE.Vector3(bOffset, 0.02, -bOffset + bArm)
+            ]);
+            group.add(new THREE.Line(c4Geo, bMat));
+
+            unit.mesh.add(group);
+            unit.selectionCircle = group;
             playUSASound('radio_chirp');
         }
 
         function removeSelectionCircle(unit) {
             if (unit.selectionCircle) {
-                unit.mesh.remove(unit.selectionCircle); unit.selectionCircle.geometry.dispose();
-                unit.selectionCircle.material.dispose(); unit.selectionCircle = null;
+                unit.mesh.remove(unit.selectionCircle);
+                unit.selectionCircle.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) c.material.dispose();
+                });
+                unit.selectionCircle = null;
+            }
+            if (unit.trajectoryLine) {
+                scene.remove(unit.trajectoryLine);
+                if (unit.trajectoryLine.geometry) unit.trajectoryLine.geometry.dispose();
+                if (unit.trajectoryLine.material) unit.trajectoryLine.material.dispose();
+                unit.trajectoryLine = null;
             }
         }
 
@@ -1267,3 +1428,64 @@ function updateHUD() {
             // Players pan using WASD / Arrow keys or middle-mouse drag.
         }
 		
+function triggerRallyPointMode() {
+    if (selectedStructure) {
+        showNotification('Click anywhere on battlefield to set Rally Point.', 'info');
+    } else {
+        showNotification('Select a production building first to set its Rally Point.', 'warning');
+    }
+}
+
+let activeBuilderCategory = 'base';
+
+function showBuilderPalette() {
+    const pal = document.getElementById('builder-palette');
+    if (!pal) return;
+    pal.style.display = 'flex';
+    renderBuilderPaletteCards();
+}
+
+function hideBuilderPalette() {
+    const pal = document.getElementById('builder-palette');
+    if (pal) pal.style.display = 'none';
+}
+
+function switchBuilderCategory(cat) {
+    activeBuilderCategory = cat;
+    document.querySelectorAll('.bp-cat-btn').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.getElementById(cat === 'base' ? 'bp-tab-base' : 'bp-tab-def');
+    if (activeBtn) activeBtn.classList.add('active');
+    renderBuilderPaletteCards();
+}
+
+function renderBuilderPaletteCards() {
+    const container = document.getElementById('bp-cards-grid');
+    if (!container) return;
+
+    const allBuildings = factionBuildings[selectedFaction] || [];
+    const defenseKeys = ['patriot', 'gatlingCannon', 'speakerTower', 'bunker', 'tunnel', 'stingerSite', 'demoTrap', 'particleCannon', 'nukeSilo', 'scudStorm'];
+    
+    const bList = activeBuilderCategory === 'defenses'
+        ? allBuildings.filter(([type]) => defenseKeys.includes(type))
+        : allBuildings.filter(([type]) => !defenseKeys.includes(type));
+
+    let html = '';
+    bList.forEach(([type, name, cost]) => {
+        const structReq = getStructureTechPrerequisite(type);
+        const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
+        const canAfford = playerResources >= cost;
+        const disabled = !hasTech || !canAfford;
+
+        const initials = name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase();
+        html += `
+            <button class="bp-card-btn ${disabled ? 'disabled' : ''}" onclick="activateBlueprint('${type}')" ${disabled ? 'disabled' : ''}>
+                <div class="bp-card-icon">${initials}</div>
+                <div class="bp-card-info">
+                    <span class="bp-card-title">${name}</span>
+                    <span class="bp-card-cost">$${cost}</span>
+                </div>
+            </button>
+        `;
+    });
+    container.innerHTML = html;
+}

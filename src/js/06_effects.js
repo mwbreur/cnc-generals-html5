@@ -1038,3 +1038,65 @@
                 });
             });
         }
+
+        // Tactical Ground Waypoint Marker & Beacon (Move, Attack, Rally)
+        function spawnWaypointMarker(pos, orderType = 'move') {
+            if (!pos) return;
+            const group = new THREE.Group();
+            const yPos = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) + 0.15 : pos.y + 0.15;
+            group.position.set(pos.x, yPos, pos.z);
+
+            const color = orderType === 'attack' ? 0xff2222 : orderType === 'rally' ? 0xf1c40f : 0x00ffcc;
+
+            // 1. Expanding ground ripple ring
+            const ringGeo = new THREE.RingGeometry(0.7, 1.15, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.rotation.x = -Math.PI / 2;
+            group.add(ringMesh);
+
+            // 2. Crosshair reticle ticks
+            const tickGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-1.8, 0.05, 0), new THREE.Vector3(1.8, 0.05, 0),
+                new THREE.Vector3(0, 0.05, -1.8), new THREE.Vector3(0, 0.05, 1.8)
+            ]);
+            const tickMat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.9 });
+            const crosshair = new THREE.LineSegments(tickGeo, tickMat);
+            group.add(crosshair);
+
+            // 3. Vertical beacon light beam shooting upwards
+            const beamGeo = new THREE.CylinderGeometry(0.12, 0.35, 18, 16, 1, true);
+            const beamMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
+            const beamMesh = new THREE.Mesh(beamGeo, beamMat);
+            beamMesh.position.y = 9.0;
+            group.add(beamMesh);
+
+            scene.add(group);
+
+            let life = 0;
+            const maxLife = 40;
+
+            activeFX.push({
+                update() {
+                    life++;
+                    const t = life / maxLife;
+                    ringMesh.scale.addScalar(0.045);
+                    ringMat.opacity = Math.max(0, 0.95 * (1.0 - t));
+                    tickMat.opacity = Math.max(0, 0.9 * (1.0 - t));
+                    beamMat.opacity = Math.max(0, 0.65 * (1.0 - t));
+                    group.position.y += 0.02;
+
+                    if (life >= maxLife) {
+                        scene.remove(group);
+                        ringGeo.dispose();
+                        ringMat.dispose();
+                        tickGeo.dispose();
+                        tickMat.dispose();
+                        beamGeo.dispose();
+                        beamMat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }

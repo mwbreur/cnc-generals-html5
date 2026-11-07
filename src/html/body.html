@@ -335,17 +335,115 @@
         </div>
     </div>
 
+        <!-- ============================================================== -->
+    <!-- FLOATING BUILDER PALETTE (Appears when Dozer / Worker selected)-->
     <!-- ============================================================== -->
-    <!-- C&C GENERALS BOTTOM COMMAND BAR (THE CLASSIC CONTROL CONSOLE)  -->
+    <div id="builder-palette" class="builder-floating-palette" style="display: none;">
+        <div class="bp-header">
+            <span class="bp-title">🏗️ CONSTRUCTION PALETTE</span>
+            <button class="bp-close-btn" onclick="hideBuilderPalette()">✕</button>
+        </div>
+        <div class="bp-category-tabs">
+            <button id="bp-tab-base" class="bp-cat-btn active" onclick="switchBuilderCategory('base')">BASE BUILDINGS</button>
+            <button id="bp-tab-def" class="bp-cat-btn" onclick="switchBuilderCategory('defenses')">DEFENSES</button>
+        </div>
+        <div id="bp-cards-grid" class="bp-cards-grid">
+            <!-- Dynamically populated with buildable structure cards -->
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- FLOATING GENERAL POWERS (Right Edge)                           -->
+    <!-- ============================================================== -->
+    <div id="general-powers-bar" class="general-powers-bar">
+        <button class="gp-power-btn" title="Spy Satellite Radar Scan (S)" onclick="triggerTacticalBeacon()">
+            <span class="gp-icon">🛰️</span>
+            <span class="gp-label">SCAN</span>
+        </button>
+        <button class="gp-power-btn" title="Predator Drone Recon" onclick="showNotification('Predator Drone on patrol.', 'info')">
+            <span class="gp-icon">🛩️</span>
+            <span class="gp-label">DRONE</span>
+        </button>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- C&C GENERALS CONTROL BAR PRO (1:1 Layout from screenshot)      -->
     <!-- ============================================================== -->
     <div id="generals-command-bar" class="theme-usa">
-        <!-- 1. LEFT: Circular / Octagonal Radar Console -->
-        <div id="radar-console" class="cmd-bar-section">
-            <div class="radar-bezel-frame">
-                <canvas id="radar-canvas" width="160" height="160" class="radar-screen"></canvas>
+        <!-- 1. BOTTOM-LEFT: Square Radar Box -->
+        <div id="cb-radar-box" class="cb-panel">
+            <div class="cb-radar-frame">
+                <canvas id="radar-canvas" width="185" height="185" class="radar-screen"></canvas>
                 <div class="radar-sweep-line"></div>
                 <div class="radar-crosshairs"></div>
             </div>
+            <div class="cb-radar-tools">
+                <button class="cb-tool-btn" id="btn-ping" title="Tactical Ping / Beacon (B)" onclick="triggerTacticalBeacon()">
+                    <span>🔔</span><label>PING</label>
+                </button>
+                <button class="cb-tool-btn" id="btn-recenter" title="Recenter Base (Space)" onclick="recenterBase()">
+                    <span>🎯</span><label>BASE</label>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. BOTTOM-CENTER: Production & Command Console -->
+        <div id="cb-center-console" class="cb-panel">
+            <!-- Top Trapezoid Badge: $ Funds -->
+            <div id="cb-funds-badge" class="cb-funds-trapezoid">
+                <span class="cb-funds-dollar">$</span>
+                <span id="resource-display" class="cb-funds-val">43,200</span>
+            </div>
+
+            <div class="cb-center-inner">
+                <!-- Left 3 Utility Buttons Stack -->
+                <div class="cb-left-utilities">
+                    <button class="cb-util-btn" id="util-select-army" title="Select All Combat Units (Q)" onclick="selectUnitsByType('combat')">
+                        <span class="util-icon">🗂️</span>
+                        <span class="util-tag">ARMY</span>
+                    </button>
+                    <button class="cb-util-btn" id="util-repair-wrench" title="Toggle Field Repair Mode (R)" onclick="toggleRepairMode()">
+                        <span class="util-icon">🔧</span>
+                        <span class="util-tag">REPAIR</span>
+                    </button>
+                    <button class="cb-util-btn" id="util-rally-point" title="Set Rally Point (F)" onclick="triggerRallyPointMode()">
+                        <span class="util-icon">🚩</span>
+                        <span class="util-tag">RALLY</span>
+                    </button>
+                </div>
+
+                <!-- 2-Row Grid for Units, Upgrades, Rally Flag, and Sell -->
+                <div class="cb-production-grid" id="command-grid-3x4">
+                    <!-- 12 slots populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. BOTTOM-RIGHT: Inspector & Training Queue Console (Wide ~340px) -->
+        <div id="cb-inspector-box" class="cb-panel">
+            <!-- Top Generals Promotion Stars Bar -->
+            <div class="cb-inspector-stars-bar">
+                <span class="cb-stars-rank-label">RANK</span>
+                <span id="generals-rank" class="cb-stars-icons">★★★☆☆</span>
+            </div>
+
+            <div class="cb-inspector-body">
+                <!-- Main Inspector / Active Training Queue Content -->
+                <div id="inspector-console" class="cb-inspector-content">
+                    <!-- Dynamically populated with active queue cards [MD] [MD] and unit details -->
+                </div>
+
+                <!-- Right Vertical Segmented Power Gauge -->
+                <div class="cb-power-strip" id="power-meter-container" title="Base Power Grid Status">
+                    <div class="cb-power-star">✪</div>
+                    <div class="cb-power-leds" id="cb-power-leds">
+                        <!-- Dynamically filled with glowing green LED notches -->
+                    </div>
+                    <div class="cb-power-num" id="power-nums">10/5</div>
+                </div>
+            </div>
+        </div>
+    </div>
             <div class="radar-bezel-controls">
                 <button class="bezel-btn" id="btn-ping" title="Tactical Ping / Beacon (B)" onclick="triggerTacticalBeacon()">
                     <span>🔔</span><label>PING</label>

@@ -148,24 +148,134 @@
             });
         }
 
-        const factionCatalog = {
+                const factionCatalog = {
             usa: {
                 label: 'USA', builder: 'dozer', starter: ['dozer', 'tank', 'truck'],
-                barracks: { infantry: ['Ranger', 100], rocket: ['Missile Defender', 175], pathfinder: ['Pathfinder', 600], burton: ['Colonel Burton', 1500] },
-                factory: { humvee: ['Humvee', 350], ambulance: ['Ambulance', 300], tank: ['Crusader Tank', 400], paladin: ['Paladin Tank', 600], tomahawk: ['Tomahawk', 900], chinook: ['Chinook', 1200], comanche: ['Comanche', 1000], raptor: ['Raptor', 1100], stealthfighter: ['Stealth Fighter', 1400], aurora: ['Aurora Bomber', 1800] },
+                barracks: {
+                    infantry: ['Ranger', 100, 'Assault rifleman with flashbangs & capture ability.'],
+                    rocket: ['Missile Defender', 175, 'Laser-guided anti-armor & anti-air missile infantry.'],
+                    pathfinder: ['Pathfinder', 600, 'Elite sniper infantry, detects stealth.'],
+                    burton: ['Colonel Burton', 1500, 'Elite commando with C4 charges and combat knife.']
+                },
+                factory: {
+                    crusader: ['Crusader Tank', 400, 'Main battle tank with 105mm cannon.'],
+                    paladin: ['Paladin Tank', 600, 'Advanced battle tank with point-defense laser.'],
+                    humvee: ['Humvee', 350, 'Fast scout transport. Carries 5 infantry.'],
+                    ambulance: ['Ambulance', 300, 'Field medical unit. Cleans toxins & heals nearby troops.'],
+                    tomahawk: ['Tomahawk Missile', 900, 'Long-range cruise missile mobile artillery.']
+                },
+                airfield: {
+                    raptor: ['Raptor', 1100, 'Supersonic strike jet with laser-guided missiles.'],
+                    stealthfighter: ['Stealth Fighter', 1400, 'Radar-invisible ground attack stealth jet.'],
+                    aurora: ['Aurora Bomber', 1800, 'Mach-4 supersonic invincible bomb-run aircraft.'],
+                    comanche: ['Comanche', 1000, 'Attack gunship helicopter with rocket pods.'],
+                    chinook: ['Chinook', 1200, 'Heavy supply and troop transport helicopter.']
+                },
+                supplyCenter: {
+                    truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
+                },
+                commandCenter: {
+                    dozer: ['Construction Dozer', 500, 'Constructs and repairs USA military installations.']
+                },
                 support: ['Construction Dozer', 'Pilot (unbuildable)', 'Scout Drone (attachment)', 'Battle Drone (attachment)']
             },
             china: {
                 label: 'China', builder: 'dozer', starter: ['dozer', 'gatling', 'truck'],
-                barracks: { redguard: ['Red Guard', 80], tankhunter: ['Tank Hunter', 150], hacker: ['Hacker', 600], blacklotus: ['Black Lotus', 1500] },
-                factory: { battlemaster: ['Battle Master Tank', 400], dragon: ['Dragon Tank', 500], gatling: ['Gatling Tank', 500], crawler: ['Troop Crawler', 700], overlord: ['Overlord Tank', 1500], inferno: ['Inferno Cannon', 900], nukecannon: ['Nuke Cannon', 1800] },
+                barracks: {
+                    redguard: ['Red Guard', 80, 'Assault rifle infantry trained in pairs.'],
+                    tankhunter: ['Tank Hunter', 150, 'Anti-armor rocket infantry with TNT charges.'],
+                    hacker: ['Hacker', 600, 'Stealth hacker, disables buildings & drains internet funds.'],
+                    blacklotus: ['Black Lotus', 1500, 'Elite hacker hero, captures structures & disables armor.']
+                },
+                factory: {
+                    battlemaster: ['Battle Master Tank', 400, 'Standard frontline battle tank.'],
+                    dragon: ['Dragon Tank', 500, 'Flamethrower tank, flushes out garrisoned structures.'],
+                    gatling: ['Gatling Tank', 500, 'Twin 20mm rotary anti-air/anti-infantry tank.'],
+                    crawler: ['Troop Crawler', 700, 'Armored personnel carrier with 8 Red Guard soldiers.'],
+                    overlord: ['Overlord Tank', 1500, 'Super-heavy double-barrel dreadnought tank.'],
+                    inferno: ['Inferno Cannon', 900, 'Napalm siege artillery creating firestorms.'],
+                    nukecannon: ['Nuke Cannon', 1800, 'Mobile tactical nuclear siege artillery.']
+                },
+                airfield: {
+                    raptor: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
+                },
+                supplyCenter: {
+                    truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
+                },
+                commandCenter: {
+                    dozer: ['Construction Dozer', 500, 'Constructs and repairs Chinese military installations.']
+                },
                 support: ['Construction Dozer']
             },
             gla: {
                 label: 'GLA', builder: 'worker', starter: ['worker', 'scorpion', 'technical'],
-                barracks: { rebel: ['Rebel', 80], rpg: ['RPG Trooper', 150], terrorist: ['Terrorist', 200], mob: ['Angry Mob', 700], hijacker: ['Hijacker', 800], jarmen: ['Jarmen Kell', 1500] },
-                factory: { radarvan: ['Radar Van', 500], technical: ['Technical', 300], scorpion: ['Scorpion Tank', 450], quad: ['Quad Cannon', 450], toxintractor: ['Toxin Tractor', 650], marauder: ['Marauder Tank', 800], buggy: ['Rocket Buggy', 700], bombtruck: ['Bomb Truck', 600], scud: ['SCUD Launcher', 1200] },
+                barracks: {
+                    rebel: ['Rebel', 80, 'Guerrilla assault infantry with capture ability.'],
+                    rpg: ['RPG Trooper', 150, 'Anti-armor guerrilla rocket trooper.'],
+                    terrorist: ['Terrorist', 200, 'Suicide explosive infantry with devastating blast.'],
+                    mob: ['Angry Mob', 700, 'Armed crowd throwing Molotov cocktails and bullets.'],
+                    hijacker: ['Hijacker', 800, 'Stealth commando, steals enemy vehicles on contact.'],
+                    jarmen: ['Jarmen Kell', 1500, 'Elite sniper hero, snipes vehicle drivers leaving them empty.']
+                },
+                factory: {
+                    radarvan: ['Radar Van', 500, 'Mobile radar van providing map radar & stealth detection.'],
+                    technical: ['Technical', 300, 'Fast guerrilla pickup with mounted heavy machine gun.'],
+                    scorpion: ['Scorpion Tank', 450, 'Light combat tank with rocket upgrade.'],
+                    quad: ['Quad Cannon', 450, 'Four 23mm anti-aircraft and anti-infantry autocannons.'],
+                    toxintractor: ['Toxin Tractor', 650, 'Corrosive chemical sprayer, cleans garrisoned buildings.'],
+                    marauder: ['Marauder Tank', 800, 'Heavy salvage tank with double-cannon upgrades.'],
+                    buggy: ['Rocket Buggy', 700, 'High-speed hit-and-run mobile rocket artillery.'],
+                    bombtruck: ['Bomb Truck', 600, 'Disguised suicide vehicle packed with explosives.'],
+                    scud: ['SCUD Launcher', 1200, 'Mobile tactical ballistic missile with anthrax payload.']
+                },
+                airfield: {},
+                supplyCenter: {
+                    worker: ['Worker', 200, 'Gathers supplies and builds GLA installations.']
+                },
+                commandCenter: {
+                    worker: ['Worker', 200, 'Gathers supplies and builds GLA installations.']
+                },
                 support: ['Worker (builder and resource gatherer)']
+            }
+        };
+
+        const buildingUpgradesCatalog = {
+            usa: {
+                barracks: [
+                    { id: 'upg_flashbang', name: 'FLASHBANG GRENADES', cost: 800, desc: 'Equips Rangers with flashbangs to instantly breach & clear garrisons.' },
+                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rangers and infantry to capture hostile structures.' }
+                ],
+                factory: [
+                    { id: 'upg_tow', name: 'TOW MISSILES', cost: 800, desc: 'Equips Humvees with roof-mounted anti-armor TOW missiles.' }
+                ],
+                airfield: [
+                    { id: 'upg_laser_missiles', name: 'LASER GUIDED MISSILES', cost: 1000, desc: 'Increases Raptor and Comanche missile damage by +25%.' },
+                    { id: 'upg_bunker_busters', name: 'BUNKER BUSTERS', cost: 500, desc: 'Equips Aurora Bombers to penetrate & clear fortified bunkers.' }
+                ]
+            },
+            china: {
+                barracks: [
+                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Red Guard to capture hostile structures.' },
+                    { id: 'upg_redguard_training', name: 'RED GUARD TRAINING', cost: 800, desc: 'All newly trained Red Guard deploy with Veteran rank.' }
+                ],
+                factory: [
+                    { id: 'upg_black_napalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Increases Dragon Tank and Inferno Cannon fire damage by +30%.' },
+                    { id: 'upg_chain_guns', name: 'CHAIN GUNS', cost: 1000, desc: 'Equips Gatling Tanks with depleted uranium ammo (+25% damage).' }
+                ],
+                airfield: [
+                    { id: 'upg_black_napalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Equips MiG-29s with high-temperature black napalm missiles.' }
+                ]
+            },
+            gla: {
+                barracks: [
+                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rebels to capture enemy structures.' },
+                    { id: 'upg_camouflage', name: 'CAMOUFLAGE', cost: 1000, desc: 'Grants Rebel infantry permanent stealth while stationary.' }
+                ],
+                factory: [
+                    { id: 'upg_scorpion_rocket', name: 'SCORPION ROCKET', cost: 1000, desc: 'Equips Scorpion Tanks with roof-mounted anti-armor rockets.' },
+                    { id: 'upg_junk_repair', name: 'JUNK REPAIR', cost: 1000, desc: 'Enables all GLA vehicles to automatically auto-regenerate armor.' }
+                ],
+                airfield: []
             }
         };
         const factionBuildings = {
@@ -524,27 +634,39 @@
             if (tooltip) tooltip.style.display = 'none';
         }
 
-        function refreshFactionRoster() {
+                function refreshFactionRoster() {
             const faction = factionCatalog[selectedFaction];
             unitRoster = {};
-            Object.entries(faction.barracks).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'barracks' };
-            });
-            const airUnits = ['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora'];
-            Object.entries(faction.factory).forEach(([type, data]) => {
-                unitRoster[type] = {
-                    name: data[0], cost: data[1], building: airUnits.includes(type) ? 'airfield' : 'factory'
-                };
-            });
-            unitRoster[faction.builder] = {
-                name: faction.builder === 'worker' ? 'Worker' : 'Construction Dozer',
-                cost: faction.builder === 'worker' ? 200 : 500,
-                building: 'commandCenter'
-            };
-            if (selectedFaction !== 'gla') {
-                unitRoster['truck'] = { name: 'Supply Truck', cost: 600, building: 'supplyCenter' };
-            } else {
-                unitRoster['worker'] = { name: 'Worker', cost: 200, building: 'commandCenter' };
+            
+            // 1. Barracks Infantry
+            if (faction.barracks) {
+                Object.entries(faction.barracks).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'barracks', role: data[2] || 'Infantry', buildTime: 3.0 };
+                });
+            }
+            // 2. War Factory Ground Armor
+            if (faction.factory) {
+                Object.entries(faction.factory).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'factory', role: data[2] || 'Ground Vehicle', buildTime: 5.5 };
+                });
+            }
+            // 3. Airfield Aircraft & Helicopters
+            if (faction.airfield) {
+                Object.entries(faction.airfield).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'airfield', role: data[2] || 'Aircraft', buildTime: 7.0 };
+                });
+            }
+            // 4. Logistics (Supply Center)
+            if (faction.supplyCenter) {
+                Object.entries(faction.supplyCenter).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'supplyCenter', role: data[2] || 'Logistics', buildTime: 4.0 };
+                });
+            }
+            // 5. Command Center (Dozers / Workers)
+            if (faction.commandCenter) {
+                Object.entries(faction.commandCenter).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'commandCenter', role: data[2] || 'Construction', buildTime: 4.5 };
+                });
             }
 
             // Update Start Menu active faction buttons
@@ -553,11 +675,11 @@
                 else button.classList.remove('active');
             });
 
-            // Update Faction badge in Sidebar Header
+            // Update Faction badge in Top HUD
             const badge = document.getElementById('sidebar-faction-badge');
             if (badge) {
-                badge.textContent = selectedFaction === 'usa' ? 'USA STRATEGIC COMMAND' :
-                                    selectedFaction === 'china' ? 'CHINA ARMED FORCES' : 'GLA CELL NETWORK';
+                badge.textContent = selectedFaction === 'usa' ? 'USA STRATEGIC FORCES' :
+                                    selectedFaction === 'china' ? 'PEOPLE\'S LIBERATION ARMY' : 'GLA CELL NETWORK';
             }
             updateSidebar();
         }

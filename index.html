@@ -912,6 +912,618 @@ body {
 .theme-gla .hud-faction-tag { color: #e67e22; }
 .theme-gla .grid-cat-btn.active { color: #e67e22; background: #382413; border-color: #d35400; }
 
+/* ========================================================================== */
+/* C&C GENERALS "CONTROL BAR PRO" UI (1:1 AUTHENTIC SCREENSHOT LAYOUT)       */
+/* ========================================================================== */
+
+#generals-command-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 165px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 14px 6px 14px;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 25;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e5e0ce;
+    user-select: none;
+}
+
+.cb-panel {
+    pointer-events: auto;
+    position: relative;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, #2b3842 0%, #1a2228 35%, #0f1519 100%);
+    border: 2px solid #5a7282;
+    border-top: 3px solid #7899ad;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.15);
+    border-radius: 4px 4px 0 0;
+}
+
+/* 1. BOTTOM-LEFT: RADAR MINIMAP BOX */
+#cb-radar-box {
+    width: 220px;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    gap: 8px;
+}
+
+.cb-radar-frame {
+    width: 145px;
+    height: 145px;
+    position: relative;
+    background: #000;
+    border: 2px solid #3d515e;
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+}
+
+.cb-radar-frame canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.cb-radar-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 50px;
+}
+
+.cb-tool-btn {
+    background: linear-gradient(180deg, #2a3740 0%, #151d22 100%);
+    border: 1px solid #4a6170;
+    border-radius: 3px;
+    color: #9cb5c7;
+    padding: 6px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cb-tool-btn span { font-size: 14px; }
+.cb-tool-btn label { font-size: 9px; font-weight: bold; margin-top: 2px; letter-spacing: 0.5px; }
+
+.cb-tool-btn:hover {
+    border-color: #00ffcc;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(0,255,204,0.4);
+}
+
+/* 2. BOTTOM-CENTER: PRODUCTION & COMMAND CONSOLE */
+#cb-center-console {
+    width: 540px;
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 10px;
+}
+
+/* Top Center Trapezoid Badge ($ 43200) */
+.cb-funds-trapezoid {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 24px;
+    padding: 0 24px;
+    background: linear-gradient(180deg, #1b3852 0%, #0d1e2e 100%);
+    border: 2px solid #5a8cb5;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.6);
+}
+
+.cb-funds-dollar {
+    color: #55efc4;
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.cb-funds-val {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 1.5px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    text-shadow: 0 0 6px rgba(85,239,196,0.6);
+}
+
+.cb-center-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 2px;
+}
+
+/* Left 3 Utility Buttons */
+.cb-left-utilities {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 44px;
+    height: 100%;
+    justify-content: center;
+}
+
+.cb-util-btn {
+    flex: 1;
+    background: linear-gradient(180deg, #2b3944 0%, #161e24 100%);
+    border: 1px solid #4a6373;
+    border-radius: 3px;
+    color: #c0d4e3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 2px;
+}
+
+.cb-util-btn .util-icon { font-size: 13px; }
+.cb-util-btn .util-tag { font-size: 8px; font-weight: bold; letter-spacing: 0.5px; color: #8ba5b8; }
+
+.cb-util-btn:hover {
+    border-color: #00ffcc;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(0,255,204,0.3);
+}
+
+/* 2-Row Production Grid (2x6) */
+.cb-production-grid {
+    flex: 1;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 5px;
+}
+
+.cb-production-grid .grid-slot-btn {
+    position: relative;
+    background: linear-gradient(180deg, #232e36 0%, #12181d 100%);
+    border: 1px solid #3c4e5c;
+    border-radius: 3px;
+    color: #e0ecf5;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.cb-production-grid .grid-slot-btn:hover:not([disabled]) {
+    border-color: #00ffcc;
+    background: linear-gradient(180deg, #30414e 0%, #182229 100%);
+    box-shadow: 0 0 10px rgba(0,255,204,0.35);
+}
+
+.cb-production-grid .grid-slot-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(80%);
+}
+
+.cb-production-grid .grid-slot-btn.slot-rally {
+    border-color: #f1c40f;
+    background: linear-gradient(180deg, #3b351d 0%, #1e1b0c 100%);
+}
+.cb-production-grid .grid-slot-btn.slot-sell {
+    border-color: #2ecc71;
+    background: linear-gradient(180deg, #1c3826 0%, #0d1e13 100%);
+}
+
+.grid-key-badge {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: bold;
+    color: #55efc4;
+    font-family: monospace;
+}
+
+.grid-slot-name {
+    font-size: 10px;
+    font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 90%;
+    margin-top: 1px;
+}
+
+.grid-slot-footer {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 9px;
+}
+
+.grid-slot-cost {
+    color: #55efc4;
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.grid-slot-badge {
+    font-size: 8px;
+    font-weight: bold;
+    color: #c5b98e;
+}
+
+/* 3. BOTTOM-RIGHT: INSPECTOR & TRAINING QUEUE (WIDE: 340px) */
+#cb-inspector-box {
+    width: 340px;
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 6px;
+    position: relative;
+}
+
+/* Top Promotion Stars Bar */
+.cb-inspector-stars-bar {
+    width: 100%;
+    height: 18px;
+    background: linear-gradient(90deg, #182933 0%, #253d4d 50%, #182933 100%);
+    border: 1px solid #3c5d73;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    box-sizing: border-box;
+}
+
+.cb-stars-rank-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: #55efc4;
+    letter-spacing: 1px;
+}
+
+.cb-stars-icons {
+    color: #f1c40f;
+    font-size: 11px;
+    letter-spacing: 2px;
+}
+
+.cb-inspector-body {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    height: calc(100% - 20px);
+    margin-top: 3px;
+    gap: 6px;
+}
+
+.cb-inspector-content {
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Active Training Queue Strip (Side-by-side cards like [MD] [MD] in screenshot!) */
+.cb-queue-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+.cb-queue-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: #55efc4;
+}
+
+.cb-queue-slots {
+    display: flex;
+    gap: 4px;
+}
+
+.cb-queue-card {
+    position: relative;
+    width: 34px;
+    height: 24px;
+    background: #192329;
+    border: 1px solid #3d5566;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.cb-queue-card.active {
+    border-color: #00ffcc;
+    box-shadow: 0 0 6px rgba(0,255,204,0.3);
+}
+
+.cb-qc-tag {
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    z-index: 2;
+    font-family: monospace;
+}
+
+.cb-qc-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: rgba(0,255,204,0.35);
+    z-index: 1;
+}
+
+.cb-qc-x {
+    position: absolute;
+    right: 2px;
+    top: 1px;
+    font-size: 8px;
+    color: #e74c3c;
+    display: none;
+    z-index: 3;
+}
+.cb-queue-card:hover .cb-qc-x { display: block; }
+
+/* Right Vertical Segmented Green LED Power Gauge */
+.cb-power-strip {
+    width: 26px;
+    height: 100%;
+    background: #0f1519;
+    border: 1px solid #2d3c47;
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 1px;
+    box-sizing: border-box;
+}
+
+.cb-power-star {
+    font-size: 11px;
+    color: #00ffcc;
+    margin-bottom: 2px;
+}
+
+.cb-power-leds {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 2px;
+    box-sizing: border-box;
+}
+
+.cb-power-notch {
+    flex: 1;
+    width: 100%;
+    border-radius: 1px;
+    background: #142018;
+}
+
+.cb-power-notch.lit {
+    background: #2ecc71;
+    box-shadow: 0 0 4px #2ecc71;
+}
+
+.cb-power-num {
+    font-size: 8px;
+    font-weight: bold;
+    color: #55efc4;
+    font-family: monospace;
+    margin-top: 2px;
+}
+
+/* ========================================================================== */
+/* FLOATING BUILDER PALETTE (Right-Side Drawer for Dozers / Workers)         */
+/* ========================================================================== */
+.builder-floating-palette {
+    position: fixed;
+    right: 16px;
+    bottom: 175px;
+    width: 240px;
+    max-height: 420px;
+    background: linear-gradient(180deg, #26333d 0%, #151d22 100%);
+    border: 2px solid #5a7587;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.85);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e5e0ce;
+}
+
+.bp-header {
+    background: linear-gradient(90deg, #1e2c36 0%, #2b3e4c 100%);
+    padding: 6px 10px;
+    border-bottom: 1px solid #4a6373;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bp-title {
+    font-size: 11px;
+    font-weight: bold;
+    color: #55efc4;
+    letter-spacing: 0.5px;
+}
+
+.bp-close-btn {
+    background: none;
+    border: none;
+    color: #8da5b5;
+    font-size: 13px;
+    cursor: pointer;
+}
+.bp-close-btn:hover { color: #fff; }
+
+.bp-category-tabs {
+    display: flex;
+    border-bottom: 1px solid #3c4e5c;
+}
+
+.bp-cat-btn {
+    flex: 1;
+    padding: 6px 4px;
+    background: #141b20;
+    border: none;
+    color: #8da5b5;
+    font-size: 9px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.bp-cat-btn.active {
+    background: #23303a;
+    color: #55efc4;
+    border-bottom: 2px solid #55efc4;
+}
+
+.bp-cards-grid {
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.bp-card-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(90deg, #1b252c 0%, #12181d 100%);
+    border: 1px solid #3c4f5e;
+    border-radius: 3px;
+    padding: 6px 8px;
+    color: #e0ecf5;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.bp-card-btn:hover:not([disabled]) {
+    border-color: #00ffcc;
+    background: linear-gradient(90deg, #283742 0%, #192228 100%);
+    box-shadow: 0 0 8px rgba(0,255,204,0.3);
+}
+
+.bp-card-btn.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(80%);
+}
+
+.bp-card-icon {
+    width: 28px;
+    height: 24px;
+    background: #263642;
+    border: 1px solid #486173;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: #55efc4;
+}
+
+.bp-card-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.bp-card-title {
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.bp-card-cost {
+    font-size: 9px;
+    color: #55efc4;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+/* ========================================================================== */
+/* FLOATING GENERAL POWERS (Right Edge)                                      */
+/* ========================================================================== */
+.general-powers-bar {
+    position: fixed;
+    right: 16px;
+    bottom: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: auto;
+    z-index: 20;
+}
+
+.gp-power-btn {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(180deg, #22313b 0%, #11181d 100%);
+    border: 2px solid #4e6b7d;
+    border-radius: 4px;
+    color: #e5e0ce;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+}
+
+.gp-power-btn:hover {
+    border-color: #00ffcc;
+    box-shadow: 0 0 12px rgba(0,255,204,0.4);
+    transform: scale(1.05);
+}
+
+.gp-power-btn .gp-icon { font-size: 18px; }
+.gp-power-btn .gp-label { font-size: 8px; font-weight: bold; margin-top: 2px; color: #55efc4; }
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -1254,17 +1866,115 @@ body {
         </div>
     </div>
 
+        <!-- ============================================================== -->
+    <!-- FLOATING BUILDER PALETTE (Appears when Dozer / Worker selected)-->
     <!-- ============================================================== -->
-    <!-- C&C GENERALS BOTTOM COMMAND BAR (THE CLASSIC CONTROL CONSOLE)  -->
+    <div id="builder-palette" class="builder-floating-palette" style="display: none;">
+        <div class="bp-header">
+            <span class="bp-title">🏗️ CONSTRUCTION PALETTE</span>
+            <button class="bp-close-btn" onclick="hideBuilderPalette()">✕</button>
+        </div>
+        <div class="bp-category-tabs">
+            <button id="bp-tab-base" class="bp-cat-btn active" onclick="switchBuilderCategory('base')">BASE BUILDINGS</button>
+            <button id="bp-tab-def" class="bp-cat-btn" onclick="switchBuilderCategory('defenses')">DEFENSES</button>
+        </div>
+        <div id="bp-cards-grid" class="bp-cards-grid">
+            <!-- Dynamically populated with buildable structure cards -->
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- FLOATING GENERAL POWERS (Right Edge)                           -->
+    <!-- ============================================================== -->
+    <div id="general-powers-bar" class="general-powers-bar">
+        <button class="gp-power-btn" title="Spy Satellite Radar Scan (S)" onclick="triggerTacticalBeacon()">
+            <span class="gp-icon">🛰️</span>
+            <span class="gp-label">SCAN</span>
+        </button>
+        <button class="gp-power-btn" title="Predator Drone Recon" onclick="showNotification('Predator Drone on patrol.', 'info')">
+            <span class="gp-icon">🛩️</span>
+            <span class="gp-label">DRONE</span>
+        </button>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- C&C GENERALS CONTROL BAR PRO (1:1 Layout from screenshot)      -->
     <!-- ============================================================== -->
     <div id="generals-command-bar" class="theme-usa">
-        <!-- 1. LEFT: Circular / Octagonal Radar Console -->
-        <div id="radar-console" class="cmd-bar-section">
-            <div class="radar-bezel-frame">
-                <canvas id="radar-canvas" width="160" height="160" class="radar-screen"></canvas>
+        <!-- 1. BOTTOM-LEFT: Square Radar Box -->
+        <div id="cb-radar-box" class="cb-panel">
+            <div class="cb-radar-frame">
+                <canvas id="radar-canvas" width="185" height="185" class="radar-screen"></canvas>
                 <div class="radar-sweep-line"></div>
                 <div class="radar-crosshairs"></div>
             </div>
+            <div class="cb-radar-tools">
+                <button class="cb-tool-btn" id="btn-ping" title="Tactical Ping / Beacon (B)" onclick="triggerTacticalBeacon()">
+                    <span>🔔</span><label>PING</label>
+                </button>
+                <button class="cb-tool-btn" id="btn-recenter" title="Recenter Base (Space)" onclick="recenterBase()">
+                    <span>🎯</span><label>BASE</label>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. BOTTOM-CENTER: Production & Command Console -->
+        <div id="cb-center-console" class="cb-panel">
+            <!-- Top Trapezoid Badge: $ Funds -->
+            <div id="cb-funds-badge" class="cb-funds-trapezoid">
+                <span class="cb-funds-dollar">$</span>
+                <span id="resource-display" class="cb-funds-val">43,200</span>
+            </div>
+
+            <div class="cb-center-inner">
+                <!-- Left 3 Utility Buttons Stack -->
+                <div class="cb-left-utilities">
+                    <button class="cb-util-btn" id="util-select-army" title="Select All Combat Units (Q)" onclick="selectUnitsByType('combat')">
+                        <span class="util-icon">🗂️</span>
+                        <span class="util-tag">ARMY</span>
+                    </button>
+                    <button class="cb-util-btn" id="util-repair-wrench" title="Toggle Field Repair Mode (R)" onclick="toggleRepairMode()">
+                        <span class="util-icon">🔧</span>
+                        <span class="util-tag">REPAIR</span>
+                    </button>
+                    <button class="cb-util-btn" id="util-rally-point" title="Set Rally Point (F)" onclick="triggerRallyPointMode()">
+                        <span class="util-icon">🚩</span>
+                        <span class="util-tag">RALLY</span>
+                    </button>
+                </div>
+
+                <!-- 2-Row Grid for Units, Upgrades, Rally Flag, and Sell -->
+                <div class="cb-production-grid" id="command-grid-3x4">
+                    <!-- 12 slots populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. BOTTOM-RIGHT: Inspector & Training Queue Console (Wide ~340px) -->
+        <div id="cb-inspector-box" class="cb-panel">
+            <!-- Top Generals Promotion Stars Bar -->
+            <div class="cb-inspector-stars-bar">
+                <span class="cb-stars-rank-label">RANK</span>
+                <span id="generals-rank" class="cb-stars-icons">★★★☆☆</span>
+            </div>
+
+            <div class="cb-inspector-body">
+                <!-- Main Inspector / Active Training Queue Content -->
+                <div id="inspector-console" class="cb-inspector-content">
+                    <!-- Dynamically populated with active queue cards [MD] [MD] and unit details -->
+                </div>
+
+                <!-- Right Vertical Segmented Power Gauge -->
+                <div class="cb-power-strip" id="power-meter-container" title="Base Power Grid Status">
+                    <div class="cb-power-star">✪</div>
+                    <div class="cb-power-leds" id="cb-power-leds">
+                        <!-- Dynamically filled with glowing green LED notches -->
+                    </div>
+                    <div class="cb-power-num" id="power-nums">10/5</div>
+                </div>
+            </div>
+        </div>
+    </div>
             <div class="radar-bezel-controls">
                 <button class="bezel-btn" id="btn-ping" title="Tactical Ping / Beacon (B)" onclick="triggerTacticalBeacon()">
                     <span>🔔</span><label>PING</label>
@@ -6033,6 +6743,68 @@ function playUSASound(type, options = {}) {
             });
         }
 
+        // Tactical Ground Waypoint Marker & Beacon (Move, Attack, Rally)
+        function spawnWaypointMarker(pos, orderType = 'move') {
+            if (!pos) return;
+            const group = new THREE.Group();
+            const yPos = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) + 0.15 : pos.y + 0.15;
+            group.position.set(pos.x, yPos, pos.z);
+
+            const color = orderType === 'attack' ? 0xff2222 : orderType === 'rally' ? 0xf1c40f : 0x00ffcc;
+
+            // 1. Expanding ground ripple ring
+            const ringGeo = new THREE.RingGeometry(0.7, 1.15, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.rotation.x = -Math.PI / 2;
+            group.add(ringMesh);
+
+            // 2. Crosshair reticle ticks
+            const tickGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-1.8, 0.05, 0), new THREE.Vector3(1.8, 0.05, 0),
+                new THREE.Vector3(0, 0.05, -1.8), new THREE.Vector3(0, 0.05, 1.8)
+            ]);
+            const tickMat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.9 });
+            const crosshair = new THREE.LineSegments(tickGeo, tickMat);
+            group.add(crosshair);
+
+            // 3. Vertical beacon light beam shooting upwards
+            const beamGeo = new THREE.CylinderGeometry(0.12, 0.35, 18, 16, 1, true);
+            const beamMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
+            const beamMesh = new THREE.Mesh(beamGeo, beamMat);
+            beamMesh.position.y = 9.0;
+            group.add(beamMesh);
+
+            scene.add(group);
+
+            let life = 0;
+            const maxLife = 40;
+
+            activeFX.push({
+                update() {
+                    life++;
+                    const t = life / maxLife;
+                    ringMesh.scale.addScalar(0.045);
+                    ringMat.opacity = Math.max(0, 0.95 * (1.0 - t));
+                    tickMat.opacity = Math.max(0, 0.9 * (1.0 - t));
+                    beamMat.opacity = Math.max(0, 0.65 * (1.0 - t));
+                    group.position.y += 0.02;
+
+                    if (life >= maxLife) {
+                        scene.remove(group);
+                        ringGeo.dispose();
+                        ringMat.dispose();
+                        tickGeo.dispose();
+                        tickMat.dispose();
+                        beamGeo.dispose();
+                        beamMat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+
 
 // --- MODULE: 07_terrain.js ---
 // MAP ENVIRONMENTS, PROCEDURAL TERRAIN, WATER & PROPS (TREES / CITY)
@@ -7248,24 +8020,134 @@ function playUSASound(type, options = {}) {
             });
         }
 
-        const factionCatalog = {
+                const factionCatalog = {
             usa: {
                 label: 'USA', builder: 'dozer', starter: ['dozer', 'tank', 'truck'],
-                barracks: { infantry: ['Ranger', 100], rocket: ['Missile Defender', 175], pathfinder: ['Pathfinder', 600], burton: ['Colonel Burton', 1500] },
-                factory: { humvee: ['Humvee', 350], ambulance: ['Ambulance', 300], tank: ['Crusader Tank', 400], paladin: ['Paladin Tank', 600], tomahawk: ['Tomahawk', 900], chinook: ['Chinook', 1200], comanche: ['Comanche', 1000], raptor: ['Raptor', 1100], stealthfighter: ['Stealth Fighter', 1400], aurora: ['Aurora Bomber', 1800] },
+                barracks: {
+                    infantry: ['Ranger', 100, 'Assault rifleman with flashbangs & capture ability.'],
+                    rocket: ['Missile Defender', 175, 'Laser-guided anti-armor & anti-air missile infantry.'],
+                    pathfinder: ['Pathfinder', 600, 'Elite sniper infantry, detects stealth.'],
+                    burton: ['Colonel Burton', 1500, 'Elite commando with C4 charges and combat knife.']
+                },
+                factory: {
+                    crusader: ['Crusader Tank', 400, 'Main battle tank with 105mm cannon.'],
+                    paladin: ['Paladin Tank', 600, 'Advanced battle tank with point-defense laser.'],
+                    humvee: ['Humvee', 350, 'Fast scout transport. Carries 5 infantry.'],
+                    ambulance: ['Ambulance', 300, 'Field medical unit. Cleans toxins & heals nearby troops.'],
+                    tomahawk: ['Tomahawk Missile', 900, 'Long-range cruise missile mobile artillery.']
+                },
+                airfield: {
+                    raptor: ['Raptor', 1100, 'Supersonic strike jet with laser-guided missiles.'],
+                    stealthfighter: ['Stealth Fighter', 1400, 'Radar-invisible ground attack stealth jet.'],
+                    aurora: ['Aurora Bomber', 1800, 'Mach-4 supersonic invincible bomb-run aircraft.'],
+                    comanche: ['Comanche', 1000, 'Attack gunship helicopter with rocket pods.'],
+                    chinook: ['Chinook', 1200, 'Heavy supply and troop transport helicopter.']
+                },
+                supplyCenter: {
+                    truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
+                },
+                commandCenter: {
+                    dozer: ['Construction Dozer', 500, 'Constructs and repairs USA military installations.']
+                },
                 support: ['Construction Dozer', 'Pilot (unbuildable)', 'Scout Drone (attachment)', 'Battle Drone (attachment)']
             },
             china: {
                 label: 'China', builder: 'dozer', starter: ['dozer', 'gatling', 'truck'],
-                barracks: { redguard: ['Red Guard', 80], tankhunter: ['Tank Hunter', 150], hacker: ['Hacker', 600], blacklotus: ['Black Lotus', 1500] },
-                factory: { battlemaster: ['Battle Master Tank', 400], dragon: ['Dragon Tank', 500], gatling: ['Gatling Tank', 500], crawler: ['Troop Crawler', 700], overlord: ['Overlord Tank', 1500], inferno: ['Inferno Cannon', 900], nukecannon: ['Nuke Cannon', 1800] },
+                barracks: {
+                    redguard: ['Red Guard', 80, 'Assault rifle infantry trained in pairs.'],
+                    tankhunter: ['Tank Hunter', 150, 'Anti-armor rocket infantry with TNT charges.'],
+                    hacker: ['Hacker', 600, 'Stealth hacker, disables buildings & drains internet funds.'],
+                    blacklotus: ['Black Lotus', 1500, 'Elite hacker hero, captures structures & disables armor.']
+                },
+                factory: {
+                    battlemaster: ['Battle Master Tank', 400, 'Standard frontline battle tank.'],
+                    dragon: ['Dragon Tank', 500, 'Flamethrower tank, flushes out garrisoned structures.'],
+                    gatling: ['Gatling Tank', 500, 'Twin 20mm rotary anti-air/anti-infantry tank.'],
+                    crawler: ['Troop Crawler', 700, 'Armored personnel carrier with 8 Red Guard soldiers.'],
+                    overlord: ['Overlord Tank', 1500, 'Super-heavy double-barrel dreadnought tank.'],
+                    inferno: ['Inferno Cannon', 900, 'Napalm siege artillery creating firestorms.'],
+                    nukecannon: ['Nuke Cannon', 1800, 'Mobile tactical nuclear siege artillery.']
+                },
+                airfield: {
+                    raptor: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
+                },
+                supplyCenter: {
+                    truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
+                },
+                commandCenter: {
+                    dozer: ['Construction Dozer', 500, 'Constructs and repairs Chinese military installations.']
+                },
                 support: ['Construction Dozer']
             },
             gla: {
                 label: 'GLA', builder: 'worker', starter: ['worker', 'scorpion', 'technical'],
-                barracks: { rebel: ['Rebel', 80], rpg: ['RPG Trooper', 150], terrorist: ['Terrorist', 200], mob: ['Angry Mob', 700], hijacker: ['Hijacker', 800], jarmen: ['Jarmen Kell', 1500] },
-                factory: { radarvan: ['Radar Van', 500], technical: ['Technical', 300], scorpion: ['Scorpion Tank', 450], quad: ['Quad Cannon', 450], toxintractor: ['Toxin Tractor', 650], marauder: ['Marauder Tank', 800], buggy: ['Rocket Buggy', 700], bombtruck: ['Bomb Truck', 600], scud: ['SCUD Launcher', 1200] },
+                barracks: {
+                    rebel: ['Rebel', 80, 'Guerrilla assault infantry with capture ability.'],
+                    rpg: ['RPG Trooper', 150, 'Anti-armor guerrilla rocket trooper.'],
+                    terrorist: ['Terrorist', 200, 'Suicide explosive infantry with devastating blast.'],
+                    mob: ['Angry Mob', 700, 'Armed crowd throwing Molotov cocktails and bullets.'],
+                    hijacker: ['Hijacker', 800, 'Stealth commando, steals enemy vehicles on contact.'],
+                    jarmen: ['Jarmen Kell', 1500, 'Elite sniper hero, snipes vehicle drivers leaving them empty.']
+                },
+                factory: {
+                    radarvan: ['Radar Van', 500, 'Mobile radar van providing map radar & stealth detection.'],
+                    technical: ['Technical', 300, 'Fast guerrilla pickup with mounted heavy machine gun.'],
+                    scorpion: ['Scorpion Tank', 450, 'Light combat tank with rocket upgrade.'],
+                    quad: ['Quad Cannon', 450, 'Four 23mm anti-aircraft and anti-infantry autocannons.'],
+                    toxintractor: ['Toxin Tractor', 650, 'Corrosive chemical sprayer, cleans garrisoned buildings.'],
+                    marauder: ['Marauder Tank', 800, 'Heavy salvage tank with double-cannon upgrades.'],
+                    buggy: ['Rocket Buggy', 700, 'High-speed hit-and-run mobile rocket artillery.'],
+                    bombtruck: ['Bomb Truck', 600, 'Disguised suicide vehicle packed with explosives.'],
+                    scud: ['SCUD Launcher', 1200, 'Mobile tactical ballistic missile with anthrax payload.']
+                },
+                airfield: {},
+                supplyCenter: {
+                    worker: ['Worker', 200, 'Gathers supplies and builds GLA installations.']
+                },
+                commandCenter: {
+                    worker: ['Worker', 200, 'Gathers supplies and builds GLA installations.']
+                },
                 support: ['Worker (builder and resource gatherer)']
+            }
+        };
+
+        const buildingUpgradesCatalog = {
+            usa: {
+                barracks: [
+                    { id: 'upg_flashbang', name: 'FLASHBANG GRENADES', cost: 800, desc: 'Equips Rangers with flashbangs to instantly breach & clear garrisons.' },
+                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rangers and infantry to capture hostile structures.' }
+                ],
+                factory: [
+                    { id: 'upg_tow', name: 'TOW MISSILES', cost: 800, desc: 'Equips Humvees with roof-mounted anti-armor TOW missiles.' }
+                ],
+                airfield: [
+                    { id: 'upg_laser_missiles', name: 'LASER GUIDED MISSILES', cost: 1000, desc: 'Increases Raptor and Comanche missile damage by +25%.' },
+                    { id: 'upg_bunker_busters', name: 'BUNKER BUSTERS', cost: 500, desc: 'Equips Aurora Bombers to penetrate & clear fortified bunkers.' }
+                ]
+            },
+            china: {
+                barracks: [
+                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Red Guard to capture hostile structures.' },
+                    { id: 'upg_redguard_training', name: 'RED GUARD TRAINING', cost: 800, desc: 'All newly trained Red Guard deploy with Veteran rank.' }
+                ],
+                factory: [
+                    { id: 'upg_black_napalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Increases Dragon Tank and Inferno Cannon fire damage by +30%.' },
+                    { id: 'upg_chain_guns', name: 'CHAIN GUNS', cost: 1000, desc: 'Equips Gatling Tanks with depleted uranium ammo (+25% damage).' }
+                ],
+                airfield: [
+                    { id: 'upg_black_napalm', name: 'BLACK NAPALM', cost: 1000, desc: 'Equips MiG-29s with high-temperature black napalm missiles.' }
+                ]
+            },
+            gla: {
+                barracks: [
+                    { id: 'upg_capture', name: 'CAPTURE BUILDING', cost: 1000, desc: 'Enables Rebels to capture enemy structures.' },
+                    { id: 'upg_camouflage', name: 'CAMOUFLAGE', cost: 1000, desc: 'Grants Rebel infantry permanent stealth while stationary.' }
+                ],
+                factory: [
+                    { id: 'upg_scorpion_rocket', name: 'SCORPION ROCKET', cost: 1000, desc: 'Equips Scorpion Tanks with roof-mounted anti-armor rockets.' },
+                    { id: 'upg_junk_repair', name: 'JUNK REPAIR', cost: 1000, desc: 'Enables all GLA vehicles to automatically auto-regenerate armor.' }
+                ],
+                airfield: []
             }
         };
         const factionBuildings = {
@@ -7624,27 +8506,39 @@ function playUSASound(type, options = {}) {
             if (tooltip) tooltip.style.display = 'none';
         }
 
-        function refreshFactionRoster() {
+                function refreshFactionRoster() {
             const faction = factionCatalog[selectedFaction];
             unitRoster = {};
-            Object.entries(faction.barracks).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'barracks' };
-            });
-            const airUnits = ['chinook', 'comanche', 'raptor', 'stealthfighter', 'aurora'];
-            Object.entries(faction.factory).forEach(([type, data]) => {
-                unitRoster[type] = {
-                    name: data[0], cost: data[1], building: airUnits.includes(type) ? 'airfield' : 'factory'
-                };
-            });
-            unitRoster[faction.builder] = {
-                name: faction.builder === 'worker' ? 'Worker' : 'Construction Dozer',
-                cost: faction.builder === 'worker' ? 200 : 500,
-                building: 'commandCenter'
-            };
-            if (selectedFaction !== 'gla') {
-                unitRoster['truck'] = { name: 'Supply Truck', cost: 600, building: 'supplyCenter' };
-            } else {
-                unitRoster['worker'] = { name: 'Worker', cost: 200, building: 'commandCenter' };
+            
+            // 1. Barracks Infantry
+            if (faction.barracks) {
+                Object.entries(faction.barracks).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'barracks', role: data[2] || 'Infantry', buildTime: 3.0 };
+                });
+            }
+            // 2. War Factory Ground Armor
+            if (faction.factory) {
+                Object.entries(faction.factory).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'factory', role: data[2] || 'Ground Vehicle', buildTime: 5.5 };
+                });
+            }
+            // 3. Airfield Aircraft & Helicopters
+            if (faction.airfield) {
+                Object.entries(faction.airfield).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'airfield', role: data[2] || 'Aircraft', buildTime: 7.0 };
+                });
+            }
+            // 4. Logistics (Supply Center)
+            if (faction.supplyCenter) {
+                Object.entries(faction.supplyCenter).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'supplyCenter', role: data[2] || 'Logistics', buildTime: 4.0 };
+                });
+            }
+            // 5. Command Center (Dozers / Workers)
+            if (faction.commandCenter) {
+                Object.entries(faction.commandCenter).forEach(([type, data]) => {
+                    unitRoster[type] = { name: data[0], cost: data[1], building: 'commandCenter', role: data[2] || 'Construction', buildTime: 4.5 };
+                });
             }
 
             // Update Start Menu active faction buttons
@@ -7653,11 +8547,11 @@ function playUSASound(type, options = {}) {
                 else button.classList.remove('active');
             });
 
-            // Update Faction badge in Sidebar Header
+            // Update Faction badge in Top HUD
             const badge = document.getElementById('sidebar-faction-badge');
             if (badge) {
-                badge.textContent = selectedFaction === 'usa' ? 'USA STRATEGIC COMMAND' :
-                                    selectedFaction === 'china' ? 'CHINA ARMED FORCES' : 'GLA CELL NETWORK';
+                badge.textContent = selectedFaction === 'usa' ? 'USA STRATEGIC FORCES' :
+                                    selectedFaction === 'china' ? 'PEOPLE\'S LIBERATION ARMY' : 'GLA CELL NETWORK';
             }
             updateSidebar();
         }
@@ -8870,6 +9764,20 @@ function playUSASound(type, options = {}) {
         
 
 // --- MODULE: 11_sidebar.js ---
+function getUnitInitials(type) {
+    const map = {
+        infantry: 'RG', rocket: 'MD', pathfinder: 'PF', burton: 'CB',
+        crusader: 'CR', paladin: 'PL', humvee: 'HV', ambulance: 'AM', tomahawk: 'TM',
+        chinook: 'CH', comanche: 'CM', raptor: 'RP', stealthfighter: 'SF', aurora: 'AU',
+        redguard: 'RG', tankhunter: 'TH', hacker: 'HK', blacklotus: 'BL',
+        battlemaster: 'BM', dragon: 'DT', gatling: 'GT', crawler: 'TC', overlord: 'OL', inferno: 'IC', nukecannon: 'NC',
+        rebel: 'RB', rpg: 'RPG', terrorist: 'TR', mob: 'MOB', hijacker: 'HJ', jarmen: 'JK',
+        technical: 'TK', scorpion: 'SC', marauder: 'MR', buggy: 'RB', quad: 'QC', toxintractor: 'TT', bombtruck: 'BT', scud: 'SD', radarvan: 'RV',
+        dozer: 'DZ', worker: 'WK', truck: 'TR'
+    };
+    return map[type] || (type ? type.substring(0, 2).toUpperCase() : '??');
+}
+
 // =========================================================================
 // AUTHENTIC C&C GENERALS COMMAND BAR & RADAR MINIMAP ENGINE
 // =========================================================================
@@ -8880,7 +9788,7 @@ let isSellMode = false;
 let radarCanvas = null;
 let radarCtx = null;
 let radarSweepAngle = 0;
-const GRID_HOTKEYS = ['Q', 'W', 'E', 'R', 'A', 'S', 'D', 'F', 'Z', 'X', 'C', 'V'];
+const GRID_HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H'];
 let currentGridSlots = [];
 
 // 1. RADAR MINIMAP ENGINE
@@ -9259,6 +10167,12 @@ function updateSidebar() {
 }
 
 function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
+    const isBuilderSelected = selectedUnits.length === 1 && (selectedUnits[0].type === 'dozer' || selectedUnits[0].type === 'worker');
+    if (isBuilderSelected) {
+        showBuilderPalette();
+    } else {
+        hideBuilderPalette();
+    }
     if (selectedUnits.length === 1) {
         const u = selectedUnits[0];
         const spec = unitRoster[u.type] || { name: u.type.toUpperCase(), role: 'Combat Unit', cost: '' };
@@ -9404,10 +10318,11 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
 }
 
 function renderStructureInspectorAndGrid(inspector, structure) {
+    hideBuilderPalette();
     const names = {
         center: 'Command Center', power: 'Cold Fusion Reactor', nuclearReactor: 'Nuclear Reactor',
-        factory: selectedFaction === 'gla' ? 'Arms Dealer' : 'War Factory', supplyCenter: 'Supply Center',
-        supplyStash: 'Supply Stash', supplyDrop: 'Supply Drop Zone', airfield: 'Air Field',
+        factory: selectedFaction === 'gla' ? 'Arms Dealer' : 'War Factory',
+        supplyCenter: 'Supply Center', supplyStash: 'Supply Stash', supplyDrop: 'Supply Drop Zone', airfield: 'Air Field',
         strategyCenter: 'Strategy Center', detentionCamp: 'Detention Camp', internetCenter: 'Internet Center',
         propagandaCenter: 'Propaganda Center', bunker: 'Bunker', patriot: 'Patriot Missile System',
         gatlingCannon: 'Gatling Cannon', speakerTower: 'Speaker Tower', particleCannon: 'Particle Cannon',
@@ -9419,48 +10334,73 @@ function renderStructureInspectorAndGrid(inspector, structure) {
     const hpPct = Math.max(0, Math.min(100, Math.round((structure.health / structure.maxHealth) * 100)));
     const isConstructing = structure.isBuilding;
 
+    // Build Queue Display HTML (matching [MD] [MD] from Control Bar Pro screenshot)
+    let queueHtml = '';
+    if (structure.productionQueue && structure.productionQueue.length > 0) {
+        queueHtml = `
+            <div class="cb-queue-strip">
+                <span class="cb-queue-label">QUEUED:</span>
+                <div class="cb-queue-slots">
+                    ${structure.productionQueue.map((item, idx) => {
+                        const pct = Math.round((item.progress || 0) * 100);
+                        const initials = getUnitInitials(item.type);
+                        return `
+                            <div class="cb-queue-card ${idx === 0 ? 'active' : 'waiting'}" title="${item.name} (${pct}%). Click to cancel." onclick="cancelQueuedItem(selectedStructure, ${idx})">
+                                <span class="cb-qc-tag">${initials}</span>
+                                ${idx === 0 ? `<div class="cb-qc-fill" style="width: ${pct}%;"></div>` : ''}
+                                <span class="cb-qc-x">✕</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     inspector.innerHTML = `
-        <div class="inspector-card">
-            <div class="inspector-info-pane" style="width: 100%;">
-                <div class="inspector-header-row">
-                    <span class="inspector-title">${title}</span>
-                    <span class="inspector-kills-tag">${isConstructing ? '🔨 BUILDING...' : '● OPERATIONAL'}</span>
-                </div>
-                <div class="inspector-sub-role">${structure.isAir ? 'Airfield Operations' : 'Forward Installation'}</div>
-                <div class="inspector-hp-box">
-                    <div class="inspector-hp-label">
-                        <span>STRUCTURAL INTEGRITY</span>
-                        <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP</span>
+        <div class="cb-inspector-pane">
+            ${queueHtml}
+            <div class="inspector-card">
+                <div class="inspector-info-pane" style="width: 100%;">
+                    <div class="inspector-header-row">
+                        <span class="inspector-title">${title}</span>
+                        <span class="inspector-kills-tag">${isConstructing ? '🔨 BUILDING...' : '● ONLINE'}</span>
                     </div>
-                    <div class="inspector-hp-track">
-                        <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                    <div class="inspector-sub-role">${structure.isAir ? 'Airfield Operations' : 'Forward Installation'}</div>
+                    <div class="inspector-hp-box">
+                        <div class="inspector-hp-label">
+                            <span>STRUCTURAL INTEGRITY</span>
+                            <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP</span>
+                        </div>
+                        <div class="inspector-hp-track">
+                            <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                        </div>
                     </div>
-                </div>
-                <div class="inspector-quick-btns">
-                    <button class="quick-army-btn" onclick="repairStructure(selectedStructure)">🔧 Repair ($50)</button>
-                    <button class="quick-army-btn" onclick="sellStructure(selectedStructure)">💰 Demolish / Sell</button>
-                    <button class="quick-army-btn" onclick="selectedStructure = null; updateSidebar();">✕ Deselect</button>
+                    <div class="inspector-quick-btns">
+                        <button class="quick-army-btn" onclick="repairStructure(selectedStructure)">🔧 Repair ($50)</button>
+                        <button class="quick-army-btn" onclick="sellStructure(selectedStructure)">💰 Sell</button>
+                        <button class="quick-army-btn" onclick="triggerRallyPointMode()">🚩 Set Rally</button>
+                    </div>
                 </div>
             </div>
         </div>
     `;
 
-    // 3x4 Grid for Building: Unit Production & Facility Abilities
+    // 2-Row Production Grid (strictly units built by this structure + upgrades + rally + sell)
+    currentGridSlots = new Array(12).fill(null);
+
     const productionType = structure.type === 'center' ? 'commandCenter' : structure.type;
     const producers = Object.entries(unitRoster).filter(([type, spec]) => {
-        if (spec.building === productionType) return true;
-        if (structure.type === 'supplyCenter' && type === 'truck') return true;
-        if (structure.type === 'supplyStash' && type === 'worker') return true;
-        if (structure.type === 'factory' && type === 'truck' && selectedFaction !== 'gla') return true;
-        return false;
+        return spec.building === productionType;
     });
 
-    currentGridSlots = producers.map(([type, spec]) => {
+    // Populate units into slots 0..4
+    producers.slice(0, 5).forEach(([type, spec], idx) => {
         const techReq = getUnitTechPrerequisite(type);
         const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
         const canAfford = playerResources >= spec.cost;
         let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
-        return {
+        currentGridSlots[idx] = {
             id: type,
             name: spec.name.toUpperCase(),
             cost: spec.cost,
@@ -9471,17 +10411,45 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         };
     });
 
-    const abilityButtons = getBuildingAbilities(structure);
-    abilityButtons.forEach(ab => {
-        currentGridSlots.push({
-            name: ab.label.toUpperCase(),
-            cost: ab.cost || '',
-            badge: ab.badge || 'ACTION',
-            disabled: ab.disabled,
-            action: () => useStructureAbility(ab.action),
-            desc: ab.desc || ''
-        });
+    // Slot 5 (Top-Right): RALLY POINT
+    currentGridSlots[5] = {
+        name: 'SET RALLY',
+        cost: '',
+        badge: 'RALLY 🚩',
+        disabled: isConstructing,
+        action: () => triggerRallyPointMode(),
+        desc: 'Set unit deployment rally point'
+    };
+
+    // Upgrades for this building in slots 6..9
+    const factionUpgs = (buildingUpgradesCatalog && buildingUpgradesCatalog[selectedFaction] && buildingUpgradesCatalog[selectedFaction][structure.type]) || [];
+    factionUpgs.slice(0, 4).forEach((upg, idx) => {
+        const canAfford = playerResources >= upg.cost;
+        currentGridSlots[6 + idx] = {
+            name: upg.name,
+            cost: upg.cost,
+            badge: canAfford ? 'UPG' : 'FUNDS',
+            disabled: !canAfford || isConstructing,
+            action: () => {
+                if (playerResources < upg.cost) { showNotification('Insufficient funds.', 'error'); return; }
+                playerResources -= upg.cost;
+                showNotification(`Upgrade completed: ${upg.name}`, 'success');
+                playUSASound('construction');
+                updateSidebar();
+            },
+            desc: upg.desc
+        };
     });
+
+    // Slot 11 (Bottom-Right): SELL STRUCTURE
+    currentGridSlots[11] = {
+        name: 'SELL ($)',
+        cost: '',
+        badge: 'SELL 💰',
+        disabled: false,
+        action: () => sellStructure(selectedStructure),
+        desc: 'Demolish structure for 50% refund'
+    };
 }
 
 function renderSupplyInspectorAndGrid(inspector, supplyPoint) {
@@ -9605,31 +10573,36 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
 }
 
 function renderCommandGrid(container, slots) {
+    if (!container) return;
     let html = '';
     for (let i = 0; i < 12; i++) {
         const key = GRID_HOTKEYS[i];
         const s = slots[i];
         if (s) {
-            html += `
-                <button class="grid-slot-btn" onclick="currentGridSlots[${i}].action()" onmouseenter="showTacticalTooltip(event, '${s.id || ''}')" onmouseleave="hideTacticalTooltip()" ${s.disabled ? 'disabled' : ''}>
-                    <span class="grid-key-badge">${key}</span>
-                    <span class="grid-slot-name">${s.name}</span>
-                    <div class="grid-slot-footer">
-                        <span class="grid-slot-cost">${s.cost ? '$' + s.cost : ''}</span>
-                        <span class="grid-slot-badge badge-ready">${s.badge || ''}</span>
-                    </div>
-                </button>
-            `;
+            const isRally = s.badge && s.badge.includes('RALLY');
+            const isSell = s.badge && s.badge.includes('SELL');
+            const specialClass = isRally ? 'slot-rally' : isSell ? 'slot-sell' : '';
+            const costStr = s.cost ? ('$' + s.cost) : '';
+            const badgeStr = s.badge || '';
+            const idStr = s.id || '';
+            const disabledAttr = s.disabled ? 'disabled' : '';
+            html += '<button class="grid-slot-btn ' + specialClass + '" onclick="currentGridSlots[' + i + '].action()" onmouseenter="showTacticalTooltip(event, \'' + idStr + '\')" onmouseleave="hideTacticalTooltip()" ' + disabledAttr + '>' +
+                '<span class="grid-key-badge">' + key + '</span>' +
+                '<span class="grid-slot-name">' + s.name + '</span>' +
+                '<div class="grid-slot-footer">' +
+                    '<span class="grid-slot-cost">' + costStr + '</span>' +
+                    '<span class="grid-slot-badge badge-ready">' + badgeStr + '</span>' +
+                '</div>' +
+            '</button>';
         } else {
-            html += `
-                <div class="grid-slot-btn empty">
-                    <span class="grid-key-badge">${key}</span>
-                </div>
-            `;
+            html += '<div class="grid-slot-btn empty">' +
+                '<span class="grid-key-badge">' + key + '</span>' +
+            '</div>';
         }
     }
     container.innerHTML = html;
 }
+
 
 // 3. KEYBOARD HOTKEY LISTENER (Q, W, E, R, A, S, D, F, Z, X, C, V)
 const KEY_SLOT_MAP = {
@@ -9789,31 +10762,53 @@ function produceUnit(type) {
         return;
     }
 
-    const fac = structures.find(s => {
-        if (s.isBuilding || s.health <= 0) return false;
-        if (spec.building === 'commandCenter' && s.type === 'center') return true;
-        if (s.type === spec.building) return true;
-        if (s.type === 'supplyCenter' && type === 'truck') return true;
-        if (s.type === 'supplyStash' && type === 'worker') return true;
-        if (s.type === 'factory' && type === 'truck' && selectedFaction !== 'gla') return true;
-        return false;
-    });
+    // Prioritize selected structure if it can build this unit!
+    let fac = null;
+    if (selectedStructure && !selectedStructure.isBuilding && selectedStructure.health > 0) {
+        if (spec.building === 'commandCenter' && selectedStructure.type === 'center') fac = selectedStructure;
+        else if (selectedStructure.type === spec.building) fac = selectedStructure;
+    }
+    if (!fac) {
+        fac = structures.find(s => {
+            if (s.isBuilding || s.health <= 0) return false;
+            if (spec.building === 'commandCenter' && s.type === 'center') return true;
+            if (s.type === spec.building) return true;
+            return false;
+        });
+    }
 
     if (!fac) {
         showNotification(`Production halted: No operational production facility available!`, 'error');
         return;
     }
 
+    if (!fac.productionQueue) fac.productionQueue = [];
+    if (fac.productionQueue.length >= 5) {
+        showNotification('Production queue full (max 5 units).', 'warning');
+        return;
+    }
+
     playerResources -= spec.cost;
-    const spawnPos = fac.position.clone().add(new THREE.Vector3(fac.radius + 3.5, 0, fac.radius + 3.5));
-    spawnPos.y = getTerrainHeight(spawnPos.x, spawnPos.z);
+    fac.productionQueue.push({
+        type: type,
+        name: spec.name,
+        cost: spec.cost,
+        progress: 0,
+        buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
+    });
 
-    const newUnit = spawnUnit(type, spawnPos);
-    const rallyTarget = spawnPos.clone().add(new THREE.Vector3(5, 0, 5));
-    newUnit.targetPosition.copy(rallyTarget);
+    playUSASound('radio_chirp');
+    showNotification(`Queued: ${spec.name}`, 'info');
+    updateSidebar();
+}
 
-    playUSASound('construction');
-    showNotification(`Unit deployed: ${spec.name}`, 'success');
+function cancelQueuedItem(structure, index) {
+    if (!structure || !structure.productionQueue || !structure.productionQueue[index]) return;
+    const item = structure.productionQueue[index];
+    playerResources += item.cost;
+    structure.productionQueue.splice(index, 1);
+    playUSASound('radio_chirp');
+    showNotification(`Cancelled: ${item.name} (Refunded $${item.cost})`, 'info');
     updateSidebar();
 }
 
@@ -10099,17 +11094,77 @@ function updateHUD() {
 
         function addSelectionCircle(unit) {
             if (unit.selectionCircle) return;
-            const r = unit.radius * 1.35;
-            const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.12, r, 32), new THREE.MeshBasicMaterial({ color: 0xe0c46e, side: THREE.DoubleSide }));
-            ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04;
-            unit.mesh.add(ring); unit.selectionCircle = ring;
+            const r = unit.radius * 1.45;
+            const group = new THREE.Group();
+            group.name = "selectionReticle";
+            group.position.y = 0.05;
+
+            const factionColor = (typeof selectedFaction !== 'undefined' && selectedFaction === 'china') ? 0xff4757 : 
+                                 (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla') ? 0xffa502 : 0x00ffcc;
+
+            // 1. High-contrast ground circle
+            const ringGeo = new THREE.RingGeometry(r - 0.08, r, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: factionColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            group.add(ring);
+
+            // 2. Four distinct L-shaped corner brackets [ ]
+            const bMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
+            const bOffset = r * 1.15;
+            const bArm = r * 0.45;
+
+            // Corner 1 (+X, +Z)
+            const c1Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(bOffset - bArm, 0.02, bOffset),
+                new THREE.Vector3(bOffset, 0.02, bOffset),
+                new THREE.Vector3(bOffset, 0.02, bOffset - bArm)
+            ]);
+            group.add(new THREE.Line(c1Geo, bMat));
+
+            // Corner 2 (-X, +Z)
+            const c2Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-bOffset + bArm, 0.02, bOffset),
+                new THREE.Vector3(-bOffset, 0.02, bOffset),
+                new THREE.Vector3(-bOffset, 0.02, bOffset - bArm)
+            ]);
+            group.add(new THREE.Line(c2Geo, bMat));
+
+            // Corner 3 (-X, -Z)
+            const c3Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-bOffset + bArm, 0.02, -bOffset),
+                new THREE.Vector3(-bOffset, 0.02, -bOffset),
+                new THREE.Vector3(-bOffset, 0.02, -bOffset + bArm)
+            ]);
+            group.add(new THREE.Line(c3Geo, bMat));
+
+            // Corner 4 (+X, -Z)
+            const c4Geo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(bOffset - bArm, 0.02, -bOffset),
+                new THREE.Vector3(bOffset, 0.02, -bOffset),
+                new THREE.Vector3(bOffset, 0.02, -bOffset + bArm)
+            ]);
+            group.add(new THREE.Line(c4Geo, bMat));
+
+            unit.mesh.add(group);
+            unit.selectionCircle = group;
             playUSASound('radio_chirp');
         }
 
         function removeSelectionCircle(unit) {
             if (unit.selectionCircle) {
-                unit.mesh.remove(unit.selectionCircle); unit.selectionCircle.geometry.dispose();
-                unit.selectionCircle.material.dispose(); unit.selectionCircle = null;
+                unit.mesh.remove(unit.selectionCircle);
+                unit.selectionCircle.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) c.material.dispose();
+                });
+                unit.selectionCircle = null;
+            }
+            if (unit.trajectoryLine) {
+                scene.remove(unit.trajectoryLine);
+                if (unit.trajectoryLine.geometry) unit.trajectoryLine.geometry.dispose();
+                if (unit.trajectoryLine.material) unit.trajectoryLine.material.dispose();
+                unit.trajectoryLine = null;
             }
         }
 
@@ -10139,6 +11194,68 @@ function updateHUD() {
             // Players pan using WASD / Arrow keys or middle-mouse drag.
         }
 		
+function triggerRallyPointMode() {
+    if (selectedStructure) {
+        showNotification('Click anywhere on battlefield to set Rally Point.', 'info');
+    } else {
+        showNotification('Select a production building first to set its Rally Point.', 'warning');
+    }
+}
+
+let activeBuilderCategory = 'base';
+
+function showBuilderPalette() {
+    const pal = document.getElementById('builder-palette');
+    if (!pal) return;
+    pal.style.display = 'flex';
+    renderBuilderPaletteCards();
+}
+
+function hideBuilderPalette() {
+    const pal = document.getElementById('builder-palette');
+    if (pal) pal.style.display = 'none';
+}
+
+function switchBuilderCategory(cat) {
+    activeBuilderCategory = cat;
+    document.querySelectorAll('.bp-cat-btn').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.getElementById(cat === 'base' ? 'bp-tab-base' : 'bp-tab-def');
+    if (activeBtn) activeBtn.classList.add('active');
+    renderBuilderPaletteCards();
+}
+
+function renderBuilderPaletteCards() {
+    const container = document.getElementById('bp-cards-grid');
+    if (!container) return;
+
+    const allBuildings = factionBuildings[selectedFaction] || [];
+    const defenseKeys = ['patriot', 'gatlingCannon', 'speakerTower', 'bunker', 'tunnel', 'stingerSite', 'demoTrap', 'particleCannon', 'nukeSilo', 'scudStorm'];
+    
+    const bList = activeBuilderCategory === 'defenses'
+        ? allBuildings.filter(([type]) => defenseKeys.includes(type))
+        : allBuildings.filter(([type]) => !defenseKeys.includes(type));
+
+    let html = '';
+    bList.forEach(([type, name, cost]) => {
+        const structReq = getStructureTechPrerequisite(type);
+        const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
+        const canAfford = playerResources >= cost;
+        const disabled = !hasTech || !canAfford;
+
+        const initials = name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase();
+        html += `
+            <button class="bp-card-btn ${disabled ? 'disabled' : ''}" onclick="activateBlueprint('${type}')" ${disabled ? 'disabled' : ''}>
+                <div class="bp-card-icon">${initials}</div>
+                <div class="bp-card-info">
+                    <span class="bp-card-title">${name}</span>
+                    <span class="bp-card-cost">$${cost}</span>
+                </div>
+            </button>
+        `;
+    });
+    container.innerHTML = html;
+}
+
 
 // --- MODULE: 12_combat.js ---
 function processCombatScanning() {
@@ -10815,6 +11932,19 @@ function processEnemyAIEngine() {
         }
 
         function issueMoveCommand(e) {
+            // Check if player has a building selected and right-clicks on ground to set its rally point!
+            if (selectedStructure && !units.some(u => u.selected)) {
+                const gHit = getGroundIntersectPoint();
+                if (gHit) {
+                    selectedStructure.rallyPoint = gHit.clone();
+                    if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(gHit, 'rally');
+                    showNotification('Rally point established for ' + selectedStructure.type.toUpperCase() + '.', 'info');
+                    playUSASound('radio_chirp');
+                    updateSidebar();
+                    return;
+                }
+            }
+
             if (units.some(u => u.selected)) playUSASound('acknowledge');
             // Ignore if clicking inside UI elements
             if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
@@ -10840,6 +11970,10 @@ function processEnemyAIEngine() {
 
                 const targetedEnemy = enemyUnits.find(enemy => enemy.mesh === hitEnemyObj) ||
                                       enemyStructures.find(struct => struct.mesh === hitEnemyObj);
+                if (targetedEnemy && typeof spawnWaypointMarker === 'function') {
+                    const tPos = targetedEnemy.mesh ? targetedEnemy.mesh.position : hitEnemyObj.position;
+                    spawnWaypointMarker(tPos, 'attack');
+                }
 
                 if (targetedEnemy) {
                     const targetPos = (targetedEnemy.position || targetedEnemy.mesh.position).clone();
@@ -10953,6 +12087,9 @@ function processEnemyAIEngine() {
 
             // 3. Open Ground Fallback (Runs if no enemy or supply was right-clicked)
             if (groundHit) {
+                if (typeof spawnWaypointMarker === 'function') {
+                    spawnWaypointMarker(groundHit, 'move');
+                }
                 // If destination point is in deep water without a bridge, redirect to nearest dry shore!
                 const destOnBridge = mapBridges.some(b => isPointOnBridge(groundHit.x, groundHit.z, b));
                 if (!destOnBridge && getTerrainHeight(groundHit.x, groundHit.z) < currentWaterLevel) {
@@ -11383,6 +12520,72 @@ function animate() {
             // Update Weapon Effects & Particle System
             
             updateFXEngine();
+
+            // =========================================================
+            // 0. ACTIVE SELECTION VISUALS & DYNAMIC TRAJECTORY LINES
+            // =========================================================
+            units.forEach(unit => {
+                if (unit.selected && unit.selectionCircle) {
+                    unit.selectionCircle.rotation.y += 0.02;
+                    const d = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                    if (d > 2.5 && unit.health > 0) {
+                        if (!unit.trajectoryLine) {
+                            const lineMat = new THREE.LineDashedMaterial({
+                                color: 0x00ffcc,
+                                dashSize: 1.0,
+                                gapSize: 0.6,
+                                transparent: true,
+                                opacity: 0.85
+                            });
+                            const lineGeo = new THREE.BufferGeometry().setFromPoints([
+                                unit.mesh.position.clone(),
+                                unit.targetPosition.clone()
+                            ]);
+                            unit.trajectoryLine = new THREE.Line(lineGeo, lineMat);
+                            scene.add(unit.trajectoryLine);
+                        } else {
+                            const p1 = unit.mesh.position.clone();
+                            p1.y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(p1.x, p1.z) : 0) + 0.25;
+                            const p2 = unit.targetPosition.clone();
+                            p2.y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(p2.x, p2.z) : 0) + 0.25;
+                            unit.trajectoryLine.geometry.setFromPoints([p1, p2]);
+                            unit.trajectoryLine.computeLineDistances();
+                        }
+                    } else if (unit.trajectoryLine) {
+                        scene.remove(unit.trajectoryLine);
+                        unit.trajectoryLine.geometry.dispose();
+                        unit.trajectoryLine.material.dispose();
+                        unit.trajectoryLine = null;
+                    }
+                } else if (unit.trajectoryLine) {
+                    scene.remove(unit.trajectoryLine);
+                    unit.trajectoryLine.geometry.dispose();
+                    unit.trajectoryLine.material.dispose();
+                    unit.trajectoryLine = null;
+                }
+            });
+
+            // =========================================================
+            // ACTIVE STRUCTURE PRODUCTION QUEUES
+            // =========================================================
+            structures.forEach(structure => {
+                if (structure.productionQueue && structure.productionQueue.length > 0 && !structure.isBuilding && structure.health > 0) {
+                    const item = structure.productionQueue[0];
+                    item.progress = (item.progress || 0) + (dt / (item.buildTime || 4.0));
+                    if (item.progress >= 1.0) {
+                        // Training complete! Deploy unit at rally point or structure entrance
+                        const spawnPos = structure.position.clone().add(new THREE.Vector3(structure.radius + 3.5, 0, structure.radius + 3.5));
+                        spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
+                        const newUnit = spawnUnit(item.type, spawnPos);
+                        const targetRally = structure.rallyPoint ? structure.rallyPoint.clone() : spawnPos.clone().add(new THREE.Vector3(6, 0, 6));
+                        newUnit.targetPosition.copy(targetRally);
+                        playUSASound('construction');
+                        showNotification('Unit deployed: ' + item.name, 'success');
+                        structure.productionQueue.shift();
+                        updateSidebar();
+                    }
+                }
+            });
 
             // =========================================================
             // ACTIVE DRONES, OVERLORD UPGRADES & HEROIC VETERANCY REGENERATION

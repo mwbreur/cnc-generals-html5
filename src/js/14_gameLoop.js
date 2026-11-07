@@ -13,6 +13,72 @@ function animate() {
             updateFXEngine();
 
             // =========================================================
+            // 0. ACTIVE SELECTION VISUALS & DYNAMIC TRAJECTORY LINES
+            // =========================================================
+            units.forEach(unit => {
+                if (unit.selected && unit.selectionCircle) {
+                    unit.selectionCircle.rotation.y += 0.02;
+                    const d = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                    if (d > 2.5 && unit.health > 0) {
+                        if (!unit.trajectoryLine) {
+                            const lineMat = new THREE.LineDashedMaterial({
+                                color: 0x00ffcc,
+                                dashSize: 1.0,
+                                gapSize: 0.6,
+                                transparent: true,
+                                opacity: 0.85
+                            });
+                            const lineGeo = new THREE.BufferGeometry().setFromPoints([
+                                unit.mesh.position.clone(),
+                                unit.targetPosition.clone()
+                            ]);
+                            unit.trajectoryLine = new THREE.Line(lineGeo, lineMat);
+                            scene.add(unit.trajectoryLine);
+                        } else {
+                            const p1 = unit.mesh.position.clone();
+                            p1.y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(p1.x, p1.z) : 0) + 0.25;
+                            const p2 = unit.targetPosition.clone();
+                            p2.y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(p2.x, p2.z) : 0) + 0.25;
+                            unit.trajectoryLine.geometry.setFromPoints([p1, p2]);
+                            unit.trajectoryLine.computeLineDistances();
+                        }
+                    } else if (unit.trajectoryLine) {
+                        scene.remove(unit.trajectoryLine);
+                        unit.trajectoryLine.geometry.dispose();
+                        unit.trajectoryLine.material.dispose();
+                        unit.trajectoryLine = null;
+                    }
+                } else if (unit.trajectoryLine) {
+                    scene.remove(unit.trajectoryLine);
+                    unit.trajectoryLine.geometry.dispose();
+                    unit.trajectoryLine.material.dispose();
+                    unit.trajectoryLine = null;
+                }
+            });
+
+            // =========================================================
+            // ACTIVE STRUCTURE PRODUCTION QUEUES
+            // =========================================================
+            structures.forEach(structure => {
+                if (structure.productionQueue && structure.productionQueue.length > 0 && !structure.isBuilding && structure.health > 0) {
+                    const item = structure.productionQueue[0];
+                    item.progress = (item.progress || 0) + (dt / (item.buildTime || 4.0));
+                    if (item.progress >= 1.0) {
+                        // Training complete! Deploy unit at rally point or structure entrance
+                        const spawnPos = structure.position.clone().add(new THREE.Vector3(structure.radius + 3.5, 0, structure.radius + 3.5));
+                        spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
+                        const newUnit = spawnUnit(item.type, spawnPos);
+                        const targetRally = structure.rallyPoint ? structure.rallyPoint.clone() : spawnPos.clone().add(new THREE.Vector3(6, 0, 6));
+                        newUnit.targetPosition.copy(targetRally);
+                        playUSASound('construction');
+                        showNotification('Unit deployed: ' + item.name, 'success');
+                        structure.productionQueue.shift();
+                        updateSidebar();
+                    }
+                }
+            });
+
+            // =========================================================
             // ACTIVE DRONES, OVERLORD UPGRADES & HEROIC VETERANCY REGENERATION
             // =========================================================
             units.forEach(unit => {

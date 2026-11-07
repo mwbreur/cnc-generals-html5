@@ -904,3 +904,615 @@ body {
 }
 .theme-gla .hud-faction-tag { color: #e67e22; }
 .theme-gla .grid-cat-btn.active { color: #e67e22; background: #382413; border-color: #d35400; }
+
+/* ========================================================================== */
+/* C&C GENERALS "CONTROL BAR PRO" UI (1:1 AUTHENTIC SCREENSHOT LAYOUT)       */
+/* ========================================================================== */
+
+#generals-command-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 165px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 14px 6px 14px;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 25;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e5e0ce;
+    user-select: none;
+}
+
+.cb-panel {
+    pointer-events: auto;
+    position: relative;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, #2b3842 0%, #1a2228 35%, #0f1519 100%);
+    border: 2px solid #5a7282;
+    border-top: 3px solid #7899ad;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.15);
+    border-radius: 4px 4px 0 0;
+}
+
+/* 1. BOTTOM-LEFT: RADAR MINIMAP BOX */
+#cb-radar-box {
+    width: 220px;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    gap: 8px;
+}
+
+.cb-radar-frame {
+    width: 145px;
+    height: 145px;
+    position: relative;
+    background: #000;
+    border: 2px solid #3d515e;
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+}
+
+.cb-radar-frame canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.cb-radar-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 50px;
+}
+
+.cb-tool-btn {
+    background: linear-gradient(180deg, #2a3740 0%, #151d22 100%);
+    border: 1px solid #4a6170;
+    border-radius: 3px;
+    color: #9cb5c7;
+    padding: 6px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cb-tool-btn span { font-size: 14px; }
+.cb-tool-btn label { font-size: 9px; font-weight: bold; margin-top: 2px; letter-spacing: 0.5px; }
+
+.cb-tool-btn:hover {
+    border-color: #00ffcc;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(0,255,204,0.4);
+}
+
+/* 2. BOTTOM-CENTER: PRODUCTION & COMMAND CONSOLE */
+#cb-center-console {
+    width: 540px;
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 10px;
+}
+
+/* Top Center Trapezoid Badge ($ 43200) */
+.cb-funds-trapezoid {
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 24px;
+    padding: 0 24px;
+    background: linear-gradient(180deg, #1b3852 0%, #0d1e2e 100%);
+    border: 2px solid #5a8cb5;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.6);
+}
+
+.cb-funds-dollar {
+    color: #55efc4;
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.cb-funds-val {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 1.5px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    text-shadow: 0 0 6px rgba(85,239,196,0.6);
+}
+
+.cb-center-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 2px;
+}
+
+/* Left 3 Utility Buttons */
+.cb-left-utilities {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 44px;
+    height: 100%;
+    justify-content: center;
+}
+
+.cb-util-btn {
+    flex: 1;
+    background: linear-gradient(180deg, #2b3944 0%, #161e24 100%);
+    border: 1px solid #4a6373;
+    border-radius: 3px;
+    color: #c0d4e3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 2px;
+}
+
+.cb-util-btn .util-icon { font-size: 13px; }
+.cb-util-btn .util-tag { font-size: 8px; font-weight: bold; letter-spacing: 0.5px; color: #8ba5b8; }
+
+.cb-util-btn:hover {
+    border-color: #00ffcc;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(0,255,204,0.3);
+}
+
+/* 2-Row Production Grid (2x6) */
+.cb-production-grid {
+    flex: 1;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 5px;
+}
+
+.cb-production-grid .grid-slot-btn {
+    position: relative;
+    background: linear-gradient(180deg, #232e36 0%, #12181d 100%);
+    border: 1px solid #3c4e5c;
+    border-radius: 3px;
+    color: #e0ecf5;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.cb-production-grid .grid-slot-btn:hover:not([disabled]) {
+    border-color: #00ffcc;
+    background: linear-gradient(180deg, #30414e 0%, #182229 100%);
+    box-shadow: 0 0 10px rgba(0,255,204,0.35);
+}
+
+.cb-production-grid .grid-slot-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(80%);
+}
+
+.cb-production-grid .grid-slot-btn.slot-rally {
+    border-color: #f1c40f;
+    background: linear-gradient(180deg, #3b351d 0%, #1e1b0c 100%);
+}
+.cb-production-grid .grid-slot-btn.slot-sell {
+    border-color: #2ecc71;
+    background: linear-gradient(180deg, #1c3826 0%, #0d1e13 100%);
+}
+
+.grid-key-badge {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: bold;
+    color: #55efc4;
+    font-family: monospace;
+}
+
+.grid-slot-name {
+    font-size: 10px;
+    font-weight: bold;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 90%;
+    margin-top: 1px;
+}
+
+.grid-slot-footer {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 9px;
+}
+
+.grid-slot-cost {
+    color: #55efc4;
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.grid-slot-badge {
+    font-size: 8px;
+    font-weight: bold;
+    color: #c5b98e;
+}
+
+/* 3. BOTTOM-RIGHT: INSPECTOR & TRAINING QUEUE (WIDE: 340px) */
+#cb-inspector-box {
+    width: 340px;
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 6px;
+    position: relative;
+}
+
+/* Top Promotion Stars Bar */
+.cb-inspector-stars-bar {
+    width: 100%;
+    height: 18px;
+    background: linear-gradient(90deg, #182933 0%, #253d4d 50%, #182933 100%);
+    border: 1px solid #3c5d73;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    box-sizing: border-box;
+}
+
+.cb-stars-rank-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: #55efc4;
+    letter-spacing: 1px;
+}
+
+.cb-stars-icons {
+    color: #f1c40f;
+    font-size: 11px;
+    letter-spacing: 2px;
+}
+
+.cb-inspector-body {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    height: calc(100% - 20px);
+    margin-top: 3px;
+    gap: 6px;
+}
+
+.cb-inspector-content {
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Active Training Queue Strip (Side-by-side cards like [MD] [MD] in screenshot!) */
+.cb-queue-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+.cb-queue-label {
+    font-size: 9px;
+    font-weight: bold;
+    color: #55efc4;
+}
+
+.cb-queue-slots {
+    display: flex;
+    gap: 4px;
+}
+
+.cb-queue-card {
+    position: relative;
+    width: 34px;
+    height: 24px;
+    background: #192329;
+    border: 1px solid #3d5566;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.cb-queue-card.active {
+    border-color: #00ffcc;
+    box-shadow: 0 0 6px rgba(0,255,204,0.3);
+}
+
+.cb-qc-tag {
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    z-index: 2;
+    font-family: monospace;
+}
+
+.cb-qc-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: rgba(0,255,204,0.35);
+    z-index: 1;
+}
+
+.cb-qc-x {
+    position: absolute;
+    right: 2px;
+    top: 1px;
+    font-size: 8px;
+    color: #e74c3c;
+    display: none;
+    z-index: 3;
+}
+.cb-queue-card:hover .cb-qc-x { display: block; }
+
+/* Right Vertical Segmented Green LED Power Gauge */
+.cb-power-strip {
+    width: 26px;
+    height: 100%;
+    background: #0f1519;
+    border: 1px solid #2d3c47;
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 1px;
+    box-sizing: border-box;
+}
+
+.cb-power-star {
+    font-size: 11px;
+    color: #00ffcc;
+    margin-bottom: 2px;
+}
+
+.cb-power-leds {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 2px;
+    box-sizing: border-box;
+}
+
+.cb-power-notch {
+    flex: 1;
+    width: 100%;
+    border-radius: 1px;
+    background: #142018;
+}
+
+.cb-power-notch.lit {
+    background: #2ecc71;
+    box-shadow: 0 0 4px #2ecc71;
+}
+
+.cb-power-num {
+    font-size: 8px;
+    font-weight: bold;
+    color: #55efc4;
+    font-family: monospace;
+    margin-top: 2px;
+}
+
+/* ========================================================================== */
+/* FLOATING BUILDER PALETTE (Right-Side Drawer for Dozers / Workers)         */
+/* ========================================================================== */
+.builder-floating-palette {
+    position: fixed;
+    right: 16px;
+    bottom: 175px;
+    width: 240px;
+    max-height: 420px;
+    background: linear-gradient(180deg, #26333d 0%, #151d22 100%);
+    border: 2px solid #5a7587;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.85);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e5e0ce;
+}
+
+.bp-header {
+    background: linear-gradient(90deg, #1e2c36 0%, #2b3e4c 100%);
+    padding: 6px 10px;
+    border-bottom: 1px solid #4a6373;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bp-title {
+    font-size: 11px;
+    font-weight: bold;
+    color: #55efc4;
+    letter-spacing: 0.5px;
+}
+
+.bp-close-btn {
+    background: none;
+    border: none;
+    color: #8da5b5;
+    font-size: 13px;
+    cursor: pointer;
+}
+.bp-close-btn:hover { color: #fff; }
+
+.bp-category-tabs {
+    display: flex;
+    border-bottom: 1px solid #3c4e5c;
+}
+
+.bp-cat-btn {
+    flex: 1;
+    padding: 6px 4px;
+    background: #141b20;
+    border: none;
+    color: #8da5b5;
+    font-size: 9px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.bp-cat-btn.active {
+    background: #23303a;
+    color: #55efc4;
+    border-bottom: 2px solid #55efc4;
+}
+
+.bp-cards-grid {
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.bp-card-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(90deg, #1b252c 0%, #12181d 100%);
+    border: 1px solid #3c4f5e;
+    border-radius: 3px;
+    padding: 6px 8px;
+    color: #e0ecf5;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.bp-card-btn:hover:not([disabled]) {
+    border-color: #00ffcc;
+    background: linear-gradient(90deg, #283742 0%, #192228 100%);
+    box-shadow: 0 0 8px rgba(0,255,204,0.3);
+}
+
+.bp-card-btn.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(80%);
+}
+
+.bp-card-icon {
+    width: 28px;
+    height: 24px;
+    background: #263642;
+    border: 1px solid #486173;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: #55efc4;
+}
+
+.bp-card-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.bp-card-title {
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.bp-card-cost {
+    font-size: 9px;
+    color: #55efc4;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+/* ========================================================================== */
+/* FLOATING GENERAL POWERS (Right Edge)                                      */
+/* ========================================================================== */
+.general-powers-bar {
+    position: fixed;
+    right: 16px;
+    bottom: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: auto;
+    z-index: 20;
+}
+
+.gp-power-btn {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(180deg, #22313b 0%, #11181d 100%);
+    border: 2px solid #4e6b7d;
+    border-radius: 4px;
+    color: #e5e0ce;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+}
+
+.gp-power-btn:hover {
+    border-color: #00ffcc;
+    box-shadow: 0 0 12px rgba(0,255,204,0.4);
+    transform: scale(1.05);
+}
+
+.gp-power-btn .gp-icon { font-size: 18px; }
+.gp-power-btn .gp-label { font-size: 8px; font-weight: bold; margin-top: 2px; color: #55efc4; }

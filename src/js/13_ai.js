@@ -277,6 +277,19 @@ function processEnemyAIEngine() {
         }
 
         function issueMoveCommand(e) {
+            // Check if player has a building selected and right-clicks on ground to set its rally point!
+            if (selectedStructure && !units.some(u => u.selected)) {
+                const gHit = getGroundIntersectPoint();
+                if (gHit) {
+                    selectedStructure.rallyPoint = gHit.clone();
+                    if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(gHit, 'rally');
+                    showNotification('Rally point established for ' + selectedStructure.type.toUpperCase() + '.', 'info');
+                    playUSASound('radio_chirp');
+                    updateSidebar();
+                    return;
+                }
+            }
+
             if (units.some(u => u.selected)) playUSASound('acknowledge');
             // Ignore if clicking inside UI elements
             if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
@@ -302,6 +315,10 @@ function processEnemyAIEngine() {
 
                 const targetedEnemy = enemyUnits.find(enemy => enemy.mesh === hitEnemyObj) ||
                                       enemyStructures.find(struct => struct.mesh === hitEnemyObj);
+                if (targetedEnemy && typeof spawnWaypointMarker === 'function') {
+                    const tPos = targetedEnemy.mesh ? targetedEnemy.mesh.position : hitEnemyObj.position;
+                    spawnWaypointMarker(tPos, 'attack');
+                }
 
                 if (targetedEnemy) {
                     const targetPos = (targetedEnemy.position || targetedEnemy.mesh.position).clone();
@@ -415,6 +432,9 @@ function processEnemyAIEngine() {
 
             // 3. Open Ground Fallback (Runs if no enemy or supply was right-clicked)
             if (groundHit) {
+                if (typeof spawnWaypointMarker === 'function') {
+                    spawnWaypointMarker(groundHit, 'move');
+                }
                 // If destination point is in deep water without a bridge, redirect to nearest dry shore!
                 const destOnBridge = mapBridges.some(b => isPointOnBridge(groundHit.x, groundHit.z, b));
                 if (!destOnBridge && getTerrainHeight(groundHit.x, groundHit.z) < currentWaterLevel) {
