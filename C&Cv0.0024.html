@@ -1579,6 +1579,129 @@ body {
 .gp-power-btn .gp-icon { font-size: 18px; }
 .gp-power-btn .gp-label { font-size: 8px; font-weight: bold; margin-top: 2px; color: #55efc4; }
 
+/* Authentic Squad Selection Panel with Watermark (Control Bar Pro) */
+.cb-inspector-squad-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    padding: 2px 4px;
+    box-sizing: border-box;
+}
+
+.cb-watermark-svg {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 130px;
+    height: 130px;
+    pointer-events: none;
+    opacity: 0.22;
+    z-index: 1;
+}
+
+.cb-squad-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: #9cb5c7;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 2px;
+    z-index: 2;
+}
+
+.cb-squad-readiness {
+    color: #55efc4;
+    font-family: monospace;
+}
+
+.cb-squad-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin: 4px 0;
+    z-index: 2;
+}
+
+.cb-squad-unit-card {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(180deg, #1e2830 0%, #11171d 100%);
+    border: 1.5px solid #4a6170;
+    border-radius: 3px;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.15s ease;
+}
+
+.cb-squad-unit-card:hover {
+    border-color: #00ffcc;
+    box-shadow: 0 0 8px rgba(0,255,204,0.4);
+    transform: scale(1.04);
+}
+
+.cb-squad-hp-track {
+    width: 100%;
+    height: 4px;
+    background: #0d1216;
+}
+
+.cb-squad-hp-bar {
+    height: 100%;
+    transition: width 0.2s ease;
+}
+
+.cb-squad-avatar-preview {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cb-squad-avatar-preview svg {
+    width: 100%;
+    height: 100%;
+}
+
+.cb-squad-rank-stars {
+    position: absolute;
+    right: 2px;
+    top: 5px;
+    font-size: 8px;
+    color: #ffd700;
+    text-shadow: 0 0 3px #000;
+}
+
+.cb-squad-tag {
+    position: absolute;
+    left: 2px;
+    bottom: 2px;
+    font-size: 8px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0,0,0,0.65);
+    padding: 0 2px;
+    border-radius: 2px;
+    font-family: monospace;
+}
+
+.cb-squad-quick-actions {
+    display: flex;
+    gap: 4px;
+    z-index: 2;
+}
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -1942,13 +2065,13 @@ body {
     <!-- FLOATING GENERAL POWERS (Right Edge)                           -->
     <!-- ============================================================== -->
     <div id="general-powers-bar" class="general-powers-bar">
-        <button class="gp-power-btn" title="Spy Satellite Radar Scan (S)" onclick="triggerTacticalBeacon()">
+        <button class="gp-power-btn" id="gp-spy-satellite" title="USA Spy Satellite: Scan & Uncloak Target Area (S)" onclick="activateGeneralsPower('spySatellite')">
             <span class="gp-icon">🛰️</span>
-            <span class="gp-label">SCAN</span>
+            <span class="gp-label">SATELLITE</span>
         </button>
-        <button class="gp-power-btn" title="Predator Drone Recon" onclick="showNotification('Predator Drone on patrol.', 'info')">
+        <button class="gp-power-btn" id="gp-a10-strike" title="A-10 Thunderbolt Warthog CAS Air Strike (A)" onclick="activateGeneralsPower('a10Strike')">
             <span class="gp-icon">🛩️</span>
-            <span class="gp-label">DRONE</span>
+            <span class="gp-label">A-10 CAS</span>
         </button>
     </div>
 
@@ -5429,7 +5552,7 @@ if (typeof window !== 'undefined') {
 
 function isAudioAllowed(type, faction = null) {
     if (typeof selectedFaction === 'undefined') return true;
-    const globalSounds = ['superweapon_siren', 'orbital_beam', 'nuke_detonation', 'scud_storm_volley', 'explosion', 'construction'];
+    const globalSounds = ['superweapon_siren', 'orbital_beam', 'nuke_detonation', 'scud_storm_volley', 'explosion', 'construction', 'infantry_squish', 'laser_point_defense', 'scrap_pickup', 'gla_salvage'];
     if (globalSounds.includes(type)) return true;
 
     const targetFaction = faction || (type.startsWith('china') || ['gatling_fire', 'flamethrower', 'propaganda_drone', 'nuke_artillery'].includes(type) ? 'china' : (type.startsWith('gla') || ['ak47', 'technical_rev', 'scud_launch', 'demo_beep', 'scrap_pickup'].includes(type)) ? 'gla' : 'usa');
@@ -5692,12 +5815,39 @@ function playAudio(type, options = {}, faction = null) {
                 }
                 break;
             }
-            case 'scrap_pickup': {
+            case 'scrap_pickup':
+            case 'gla_salvage': {
                 const osc = ctx.createOscillator(); const gain = ctx.createGain();
                 osc.type = 'triangle'; osc.frequency.setValueAtTime(1200, t); osc.frequency.setValueAtTime(1800, t + 0.06);
                 gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
                 osc.connect(gain); gain.connect(ctx.destination);
                 osc.start(t); osc.stop(t + 0.16);
+                break;
+            }
+            case 'infantry_squish': {
+                // Heavy crushing squelch + bone crunch
+                const bSize = Math.floor(ctx.sampleRate * 0.18);
+                const buf = ctx.createBuffer(1, bSize, ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < bSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
+                const src = ctx.createBufferSource(); src.buffer = buf;
+                const filter = ctx.createBiquadFilter(); filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(700, t); filter.frequency.exponentialRampToValueAtTime(180, t + 0.16);
+                const gain = ctx.createGain(); gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+                src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+                src.start(t);
+                break;
+            }
+            case 'laser_point_defense': {
+                // High-tech laser interception chirp
+                const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(2600, t);
+                osc.frequency.exponentialRampToValueAtTime(650, t + 0.08);
+                gain.gain.setValueAtTime(0.25, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.1);
                 break;
             }
 
@@ -5764,6 +5914,8 @@ function playUSASound(type, options = {}) {
 // COMMAND & CONQUER: GENERALS - AUTHENTIC WEAPON EFFECTS & PARTICLE SYSTEM
         // =========================================================================
         const activeFX = [];
+        const activeMissiles = [];
+        const activeScrapCrates = [];
 
         // Helper: Create glowing particle materials
         const fxMatFire = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.95 });
@@ -5828,7 +5980,7 @@ function playUSASound(type, options = {}) {
             });
         }
 
-        function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false) {
+        function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false, metadata = null) {
             const group = new THREE.Group();
             group.position.copy(fromPos);
 
@@ -5853,7 +6005,8 @@ function playUSASound(type, options = {}) {
             const speed = isHeavy ? 1.6 : 2.2;
             const distTotal = fromPos.distanceTo(toPos);
 
-            activeFX.push({
+            const missileObj = {
+                id: 'missile_' + Math.random().toString(36).substr(2, 9),
                 group: group,
                 curPos: fromPos.clone(),
                 toPos: toPos.clone(),
@@ -5862,7 +6015,22 @@ function playUSASound(type, options = {}) {
                 speed: speed,
                 isHeavy: isHeavy,
                 isToxin: isToxin,
+                metadata: metadata,
+                intercepted: false,
                 update() {
+                    if (this.intercepted) {
+                        // Point Defense Laser Interception in Mid-Air!
+                        scene.remove(this.group);
+                        this.group.traverse(child => {
+                            if (child.geometry) child.geometry.dispose();
+                            if (child.material) child.material.dispose();
+                        });
+                        spawnEnhancedExplosion(this.curPos, 0x00ffff, 0.9, false);
+                        const mIdx = activeMissiles.indexOf(this);
+                        if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
+                        return false;
+                    }
+
                     this.distTraveled += this.speed;
                     const alpha = Math.min(1.0, this.distTraveled / this.distTotal);
                     this.curPos.lerpVectors(fromPos, this.toPos, alpha);
@@ -5885,17 +6053,53 @@ function playUSASound(type, options = {}) {
                             if (child.material) child.material.dispose();
                         });
 
+                        const mIdx = activeMissiles.indexOf(this);
+                        if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
+
                         spawnEnhancedExplosion(this.toPos, this.isToxin ? 0x2ed573 : 0xff4757, this.isHeavy ? 2.2 : 1.2, this.isHeavy);
                         if (this.isToxin) {
                             spawnLingeringToxinCloud(this.toPos);
                         } else if (this.isHeavy) {
                             spawnCraterDecal(this.toPos, 3.2, 420);
                         }
+
+                        // Apply authentic missile / rocket payload damage if not intercepted!
+                        if (this.metadata) {
+                            const { attacker, target, damage, damageType, splashRadius } = this.metadata;
+                            if (target && target.health > 0) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(attacker, target, damage, damageType || 'EXPLOSIVE');
+                                } else {
+                                    target.health -= damage;
+                                }
+                            }
+                            if (splashRadius && splashRadius > 0) {
+                                const allEnemies = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
+                                    ? [...units, ...enemyUnits] : [];
+                                allEnemies.forEach(other => {
+                                    if (other !== target && other.health > 0 && other.mesh) {
+                                        const d = other.mesh.position.distanceTo(this.toPos);
+                                        if (d <= splashRadius && (typeof isFriendly === 'function' ? !isFriendly(attacker, other) : true)) {
+                                            const splashDmg = Math.floor(damage * (1 - (d / splashRadius) * 0.5));
+                                            if (typeof applyCalculatedDamage === 'function') {
+                                                applyCalculatedDamage(attacker, other, splashDmg, damageType || 'EXPLOSIVE');
+                                            } else {
+                                                other.health -= splashDmg;
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        }
+
                         return false;
                     }
                     return true;
                 }
-            });
+            };
+
+            activeFX.push(missileObj);
+            activeMissiles.push(missileObj);
         }
 
         function spawnGuidedBomb(fromPos, toPos, isFuelAir = false) {
@@ -6375,12 +6579,120 @@ function playUSASound(type, options = {}) {
             spawnLingeringToxinCloud(pos);
         }
 
+        // Authentic Infantry Crushing Decal (SquishCollide.cpp)
+        function spawnSquishDecal(pos) {
+            const geo = new THREE.CircleGeometry(1.2, 10);
+            geo.rotateX(-Math.PI / 2);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x5a0b0b,
+                transparent: true,
+                opacity: 0.85,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+            mesh.position.set(pos.x, groundY + 0.04, pos.z);
+            mesh.rotation.y = Math.random() * Math.PI * 2;
+            mesh.scale.set(1.0 + Math.random() * 0.4, 1.0, 0.8 + Math.random() * 0.3);
+            scene.add(mesh);
+            activeFX.push({
+                mesh: mesh,
+                life: 600, // ~10 seconds
+                maxLife: 600,
+                update() {
+                    this.life--;
+                    if (this.life < 60) {
+                        this.mesh.material.opacity = (this.life / 60) * 0.85;
+                    }
+                    if (this.life <= 0) {
+                        scene.remove(this.mesh);
+                        this.mesh.geometry.dispose();
+                        this.mesh.material.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+
+        // Authentic GLA Salvage Scrap Crate (SalvageCrateCollide.cpp)
+        function spawnScrapCrate(pos) {
+            const group = new THREE.Group();
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+            group.position.set(pos.x, groundY + 0.45, pos.z);
+
+            // Crate Box
+            const crateGeo = new THREE.BoxGeometry(1.3, 0.8, 1.3);
+            const crateMat = new THREE.MeshStandardMaterial({
+                color: 0x5c4033, // rusted bronze/scrap
+                roughness: 0.65,
+                metalness: 0.75
+            });
+            const crate = new THREE.Mesh(crateGeo, crateMat);
+            group.add(crate);
+
+            // Green salvage scrap beacon icon
+            const scrapGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 6);
+            const scrapMat = new THREE.MeshBasicMaterial({
+                color: 0x2ed573,
+                transparent: true,
+                opacity: 0.95
+            });
+            const scrapIcon = new THREE.Mesh(scrapGeo, scrapMat);
+            scrapIcon.position.y = 0.55;
+            group.add(scrapIcon);
+
+            // Ground pulse aura
+            const ringGeo = new THREE.RingGeometry(0.8, 1.3, 16);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: 0x2ed573,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.55
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.y = -0.4;
+            group.add(ring);
+
+            scene.add(group);
+
+            const crateObj = {
+                mesh: group,
+                position: group.position,
+                ringMat: ringMat,
+                life: 2400, // ~40 seconds
+                update() {
+                    this.life--;
+                    this.mesh.rotation.y += 0.02;
+                    const pulse = 0.35 + Math.sin(Date.now() * 0.005) * 0.25;
+                    this.ringMat.opacity = pulse;
+                    if (this.life <= 0) {
+                        scene.remove(this.mesh);
+                        this.mesh.traverse(c => {
+                            if (c.geometry) c.geometry.dispose();
+                            if (c.material) c.material.dispose();
+                        });
+                        return false;
+                    }
+                    return true;
+                }
+            };
+            activeScrapCrates.push(crateObj);
+        }
+
         // Update all FX every frame
         function updateFXEngine() {
             for (let i = activeFX.length - 1; i >= 0; i--) {
                 const alive = activeFX[i].update();
                 if (!alive) {
                     activeFX.splice(i, 1);
+                }
+            }
+            for (let i = activeScrapCrates.length - 1; i >= 0; i--) {
+                const alive = activeScrapCrates[i].update();
+                if (!alive) {
+                    activeScrapCrates.splice(i, 1);
                 }
             }
         }
@@ -8036,6 +8348,16 @@ function playUSASound(type, options = {}) {
         let fogGrid = null; // Uint8Array: 0 = Shroud, 1 = Fog (explored), 2 = Visible
         const FOG_RES = 128;
         let fogUpdateTick = 0;
+        const activeVisionBeacons = [];
+
+        function revealFogOfWarAt(pos, radius = 35, duration = 1800) {
+            activeVisionBeacons.push({
+                x: pos.x,
+                z: pos.z,
+                radius: radius,
+                life: duration
+            });
+        }
 
         function initFogOfWar(mapSize) {
             if (fogMesh) {
@@ -8099,13 +8421,23 @@ function playUSASound(type, options = {}) {
                 if (fogGrid[i] === 2) fogGrid[i] = 1;
             }
 
-            // 2. Mark cells currently in line of sight of any friendly unit or structure (including Allied AI!)
+            // 2. Mark cells currently in line of sight of any friendly unit or structure (including Allied AI & General Powers)
             const visionSources = [
                 ...units.filter(u => u.health > 0 && !u.garrisonedIn),
                 ...structures.filter(s => s.health > 0 && !s.isBuilding),
                 ...enemyUnits.filter(u => u.health > 0 && !u.garrisonedIn && isFriendly({ teamId: playerTeamId }, u)),
                 ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
             ];
+
+            for (let i = activeVisionBeacons.length - 1; i >= 0; i--) {
+                const b = activeVisionBeacons[i];
+                b.life--;
+                visionSources.push({
+                    position: { x: b.x, z: b.z },
+                    scanRange: b.radius
+                });
+                if (b.life <= 0) activeVisionBeacons.splice(i, 1);
+            }
 
             visionSources.forEach(src => {
                 const pos = src.position || src.mesh.position;
@@ -10512,38 +10844,54 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             );
         }
     } else {
-        // Multi-Unit Squad
+        // Multi-Unit Squad (Control Bar Pro Layout matching screenshot!)
         const totalHP = selectedUnits.reduce((a, u) => a + u.health, 0);
         const maxHP = selectedUnits.reduce((a, u) => a + u.maxHealth, 0);
         const hpPct = Math.max(0, Math.min(100, Math.round((totalHP / maxHP) * 100)));
         const totalKills = selectedUnits.reduce((a, u) => a + (u.kills || 0), 0);
 
-        const counts = {};
-        selectedUnits.forEach(u => { counts[u.type] = (counts[u.type] || 0) + 1; });
-        const breakdown = Object.entries(counts).map(([type, c]) => `${c}x ${unitRoster[type] ? unitRoster[type].name : type.toUpperCase()}`).join(', ');
+        // Watermark SVG based on faction
+        const watermarkSVGs = {
+            usa: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><path d="M50 15 L62 38 L88 38 L68 54 L75 80 L50 64 L25 80 L32 54 L12 38 L38 38 Z" fill="rgba(0,255,204,0.14)"/></svg>`,
+            china: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><polygon points="50,15 62,38 88,38 68,54 75,80 50,64 25,80 32,54 12,38 38,38" fill="rgba(255,71,87,0.14)"/></svg>`,
+            gla: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><path d="M25 75 Q50 20 75 75 Z" fill="rgba(255,165,2,0.14)"/></svg>`
+        };
+        const watermark = watermarkSVGs[selectedFaction] || watermarkSVGs.usa;
+
+        // Render interactive unit cameo portraits (matching screenshot!)
+        const unitCameosHtml = selectedUnits.slice(0, 10).map((u, idx) => {
+            const uHpPct = Math.max(0, Math.min(100, Math.round((u.health / u.maxHealth) * 100)));
+            const hpColor = uHpPct > 50 ? '#2ecc71' : uHpPct > 25 ? '#f39c12' : '#e74c3c';
+            const initials = getUnitInitials(u.type);
+            const rankStars = u.veterancy === 3 ? '★★★' : u.veterancy === 2 ? '★★' : u.veterancy === 1 ? '★' : '';
+            return `
+                <div class="cb-squad-unit-card" title="${u.type.toUpperCase()} (${Math.ceil(u.health)}/${u.maxHealth} HP). Click to isolate, Shift+Click to deselect." onclick="handleSquadCardClick(event, ${idx})">
+                    <div class="cb-squad-hp-track">
+                        <div class="cb-squad-hp-bar" style="width: ${uHpPct}%; background: ${hpColor};"></div>
+                    </div>
+                    <div class="cb-squad-avatar-preview">
+                        ${getCameoSVG(u.type, selectedFaction, u.type)}
+                    </div>
+                    ${rankStars ? `<span class="cb-squad-rank-stars">${rankStars}</span>` : ''}
+                    <span class="cb-squad-tag">${initials}</span>
+                </div>
+            `;
+        }).join('');
 
         inspector.innerHTML = `
-            <div class="inspector-card">
-                <div class="inspector-info-pane" style="width: 100%;">
-                    <div class="inspector-header-row">
-                        <span class="inspector-title">TACTICAL SQUAD (${selectedUnits.length} UNITS)</span>
-                        <span class="inspector-kills-tag">★ ${totalKills} TOTAL KILLS</span>
-                    </div>
-                    <div class="inspector-sub-role">${breakdown}</div>
-                    <div class="inspector-hp-box">
-                        <div class="inspector-hp-label">
-                            <span>SQUAD READINESS</span>
-                            <span>${Math.ceil(totalHP)} / ${maxHP} HP</span>
-                        </div>
-                        <div class="inspector-hp-track">
-                            <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
-                        </div>
-                    </div>
-                    <div class="inspector-quick-btns">
-                        <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ Combat</button>
-                        <button class="quick-army-btn" onclick="orderUnitsHalt()">⏹ Stop</button>
-                        <button class="quick-army-btn" onclick="scatterSelectedUnits()">💨 Scatter</button>
-                    </div>
+            <div class="cb-inspector-squad-container">
+                ${watermark}
+                <div class="cb-squad-header-row">
+                    <span class="cb-squad-title">TACTICAL SQUAD (${selectedUnits.length} UNITS)</span>
+                    <span class="cb-squad-readiness">${Math.ceil(totalHP)} / ${maxHP} HP (★ ${totalKills} KILLS)</span>
+                </div>
+                <div class="cb-squad-grid">
+                    ${unitCameosHtml}
+                </div>
+                <div class="cb-squad-quick-actions">
+                    <button class="quick-army-btn" onclick="orderUnitsHalt()">⏹ Stop (S)</button>
+                    <button class="quick-army-btn" onclick="scatterSelectedUnits()">💨 Scatter (X)</button>
+                    <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ All Combat</button>
                 </div>
             </div>
         `;
@@ -12378,6 +12726,85 @@ function updateHUD() {
         }
 
         
+// =========================================================================
+// SQUAD INTERACTION & GENERALS POWERS (Control Bar Pro)
+// =========================================================================
+function handleSquadCardClick(e, idx) {
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    const sel = units.filter(u => u.selected);
+    const targetUnit = sel[idx];
+    if (!targetUnit) return;
+
+    if (e.shiftKey) {
+        targetUnit.selected = false;
+        if (typeof removeSelectionCircle === 'function') removeSelectionCircle(targetUnit);
+    } else {
+        units.forEach(u => {
+            const match = (u === targetUnit);
+            u.selected = match;
+            if (!match && typeof removeSelectionCircle === 'function') removeSelectionCircle(u);
+        });
+    }
+    updateSidebar();
+}
+
+let activeGeneralPower = null;
+
+function activateGeneralsPower(powerType) {
+    activeGeneralPower = powerType;
+    if (powerType === 'spySatellite') {
+        showNotification('USA Spy Satellite: Click on the terrain or minimap to survey target sector.', 'info');
+    } else if (powerType === 'a10Strike') {
+        showNotification('A-10 Thunderbolt Strike: Click ground target to order CAS air strike.', 'info');
+    }
+}
+
+function executeGeneralsPowerAt(pos) {
+    if (!activeGeneralPower) return false;
+    const p = activeGeneralPower;
+    activeGeneralPower = null;
+
+    if (p === 'spySatellite') {
+        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, 42, 1800);
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00ffff, 4.0);
+        if (typeof spawnLaserBeam === 'function') {
+            const orbitalHigh = pos.clone().add(new THREE.Vector3(0, 50, 0));
+            spawnLaserBeam(orbitalHigh, pos, 0x00ffff, 3.5);
+        }
+        playAudio('radio_chirp');
+        showNotification('★ USA Spy Satellite online! Sector uncloaked for 30 seconds.', 'success');
+        return true;
+    } else if (p === 'a10Strike') {
+        showNotification('★ A-10 Warthog flight inbound to target coordinates!', 'success');
+        playAudio('radio_chirp');
+        for (let i = 0; i < 2; i++) {
+            setTimeout(() => {
+                const flyStart = pos.clone().add(new THREE.Vector3(-40 + i * 8, 22, -40));
+                const flyEnd = pos.clone().add(new THREE.Vector3(40 + i * 8, 22, 40));
+                for (let r = 0; r < 3; r++) {
+                    setTimeout(() => {
+                        const rPos = flyStart.clone().lerp(flyEnd, 0.4 + r * 0.15);
+                        const impact = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8));
+                        if (typeof spawnRocketProjectile === 'function') {
+                            spawnRocketProjectile(rPos, impact, true, false, {
+                                attacker: units[0] || { teamId: playerTeamId },
+                                target: null,
+                                targetPos: impact,
+                                damage: 110,
+                                damageType: 'EXPLOSIVE',
+                                splashRadius: 6.0
+                            });
+                        }
+                        if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                    }, r * 150);
+                }
+            }, i * 350);
+        }
+        return true;
+    }
+    return false;
+}
+
 
 // --- MODULE: 12_combat.js ---
 function processCombatScanning() {
@@ -12447,274 +12874,416 @@ function processCombatScanning() {
             });
         }
 
-        function executeWeaponFire(attacker, target) {
-            // Never fire weapon or deal damage to friendly teammates / allies!
-            if (!attacker || !target || isFriendly(attacker, target)) {
-                if (attacker && attacker.combatTarget === target) attacker.combatTarget = null;
-                return;
-            }
-            // Authentic Command & Conquer: Generals Weapon Reload Rates (60 ticks = 1.0s)
-            const cncCooldowns = {
-                // Main Battle & Heavy Tanks (~3.0s - 4.0s)
-                'tank': 180, 'crusader': 180, 'battlemaster': 180, 'scorpion': 160, 'marauder': 170,
-                'paladin': 190, 'overlord': 240,
-                // Artillery & Heavy Siege Missiles (~6.0s - 7.5s)
-                'tomahawk': 360, 'scud': 360, 'inferno': 360, 'nukecannon': 450,
-                // Anti-Tank & Rocket Troops (~2.66s)
-                'rocket': 160, 'rpg': 160, 'tankhunter': 160, 'patriot': 190, 'stingerSite': 150,
-                // Standard Infantry Rifle Bursts (~1.66s)
-                'ranger': 100, 'redguard': 100, 'rebel': 100, 'infantry': 100,
-                // High-Caliber Snipers (~3.66s)
-                'pathfinder': 220, 'jarmen': 220,
-                // Fast Attack & Light Vehicles (~1.25s)
-                'humvee': 75, 'technical': 75, 'buggy': 75,
-                'dragon': 50, 'toxintractor': 50,
-                // Rapid-Fire Autocannons & Gatling Guns (~0.46s - 0.75s)
-                'gatling': 28, 'gatlingCannon': 28, 'quad': 45,
-                // Aircraft (~2.5s - 6.0s)
-                'comanche': 150, 'raptor': 240, 'stealthfighter': 240, 'aurora': 360,
-                'chinook': 180, 'truck': 180, 'worker': 180, 'dozer': 180
-            };
-            attacker.attackCooldown = cncCooldowns[attacker.type] || 160;
+        // =========================================================================
+// AUTHENTIC SAGE ENGINE DAMAGE & ARMOR MULTIPLIER MATRIX (Damage.h & Armor.h)
+// =========================================================================
+const DAMAGE_TYPES = {
+    SMALL_ARMS: 'SMALL_ARMS',
+    GATLING: 'GATLING',
+    ARMOR_PIERCING: 'ARMOR_PIERCING',
+    EXPLOSIVE: 'EXPLOSIVE',
+    SNIPER: 'SNIPER',
+    FLAME: 'FLAME',
+    TOXIN: 'TOXIN',
+    CRUSH: 'CRUSH'
+};
 
-            if (battlePlan === 'search' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 0.75);
-            if (battlePlan === 'hold' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 1.25);
+const ARMOR_COEFFICIENTS = {
+    infantry: {
+        SMALL_ARMS: 1.0,
+        GATLING: 1.5,
+        ARMOR_PIERCING: 0.35,
+        EXPLOSIVE: 0.8,
+        SNIPER: 3.0,
+        FLAME: 1.5,
+        TOXIN: 1.5,
+        CRUSH: 10.0
+    },
+    light_vehicle: {
+        SMALL_ARMS: 0.5,
+        GATLING: 1.0,
+        ARMOR_PIERCING: 1.35,
+        EXPLOSIVE: 1.2,
+        SNIPER: 0.1,
+        FLAME: 0.85,
+        TOXIN: 0.6,
+        CRUSH: 0.0
+    },
+    heavy_vehicle: {
+        SMALL_ARMS: 0.2,
+        GATLING: 0.45,
+        ARMOR_PIERCING: 1.0,
+        EXPLOSIVE: 1.0,
+        SNIPER: 0.05,
+        FLAME: 0.5,
+        TOXIN: 0.4,
+        CRUSH: 0.0
+    },
+    aircraft: {
+        SMALL_ARMS: 0.6,
+        GATLING: 1.5,
+        ARMOR_PIERCING: 0.4,
+        EXPLOSIVE: 1.3,
+        SNIPER: 0.0,
+        FLAME: 0.0,
+        TOXIN: 0.0,
+        CRUSH: 0.0
+    },
+    building: {
+        SMALL_ARMS: 0.25,
+        GATLING: 0.4,
+        ARMOR_PIERCING: 0.85,
+        EXPLOSIVE: 1.35,
+        SNIPER: 0.0,
+        FLAME: 1.25,
+        TOXIN: 0.25,
+        CRUSH: 0.0
+    }
+};
 
-            const targetPos = (target.position || target.mesh.position).clone();
-            targetPos.y += (target.isAir ? 0.2 : 0.5);
+function getArmorCategory(target) {
+    if (!target) return 'infantry';
+    if (target.radius >= 4 || target.isBuilding || target.productionQueue || ['center', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'tunnel', 'demoTrap'].includes(target.type)) {
+        return 'building';
+    }
+    if (target.isAir) return 'aircraft';
+    if (['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker'].includes(target.type)) {
+        return 'infantry';
+    }
+    if (['humvee', 'technical', 'buggy', 'dragon', 'toxintractor', 'truck', 'dozer', 'quad'].includes(target.type)) {
+        return 'light_vehicle';
+    }
+    return 'heavy_vehicle';
+}
 
-            const muzzlePos = getMuzzleWorldPosition(attacker);
+function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR_PIERCING') {
+    if (!target || target.health <= 0) return;
+    const cat = getArmorCategory(target);
+    const mult = (ARMOR_COEFFICIENTS[cat] && ARMOR_COEFFICIENTS[cat][damageType] !== undefined)
+        ? ARMOR_COEFFICIENTS[cat][damageType]
+        : 1.0;
+    
+    let finalDmg = Math.max(1, Math.round(baseDamage * mult));
 
-            // Spin Gatling barrels when firing
-            const gatling = attacker.mesh.getObjectByName("gatlingBarrels");
-            if (gatling) gatling.rotation.z += 1.2;
+    // Target defensive upgrade buffs
+    if (target.salvageLevel >= 2) finalDmg = Math.max(1, Math.round(finalDmg * 0.8)); // GLA Level 2 Scrap Armor
+    if (target.compositeArmor) finalDmg = Math.max(1, Math.round(finalDmg * 0.85)); // USA Composite Armor
 
-            // --- SIGNATURE C&C GENERALS WEAPON EFFECTS ---
+    target.health = Math.max(0, target.health - finalDmg);
 
-            if (attacker.type === 'overlord') {
-                // Overlord Tank DUAL CANNONS!
-                const muzzleL = getMuzzleWorldPosition(attacker, -0.45);
-                const muzzleR = getMuzzleWorldPosition(attacker, 0.45);
-                spawnMuzzleFlash(muzzleL, 0xffa502, 0.9);
-                spawnMuzzleFlash(muzzleR, 0xffa502, 0.9);
-                spawnBulletTracer(muzzleL, targetPos, 0xff4757, 4);
-                spawnBulletTracer(muzzleR, targetPos, 0xff4757, 4);
-                playAudio('china_cannon', {}, 'china');
-                const ovDmg = (units.includes(attacker) && researchedTechs.has('uraniumShells')) ? 119 : 95;
-                target.health -= ovDmg;
-            } else if (attacker.type === 'dragon') {
-                // Dragon Tank NAPALM FLAMETHROWER!
-                spawnFlamethrowerBurst(muzzlePos, targetPos);
-                target.health -= 32;
-            } else if (attacker.type === 'toxintractor') {
-                // Toxin Tractor CHEMICAL ANTHRAX SPRAY!
-                spawnToxinSprayBurst(muzzlePos, targetPos);
-                target.health -= 30;
-            } else if (attacker.type === 'buggy') {
-                // Rocket Buggy RIPPLE VOLLEY!
-                for (let r = 0; r < 4; r++) {
-                    setTimeout(() => {
-                        const mPos = getMuzzleWorldPosition(attacker, (r % 2 === 0 ? -0.25 : 0.25));
-                        spawnMuzzleFlash(mPos, 0xff9f43, 0.4);
-                        spawnRocketProjectile(mPos, targetPos, false, false);
-                    }, r * 80);
-                }
-                target.health -= (units.includes(attacker) && researchedTechs.has('apRockets')) ? 56 : 45;
-            } else if (['rocket', 'rpg', 'tankhunter'].includes(attacker.type)) {
-                // Shoulder-fired rockets
-                spawnMuzzleFlash(muzzlePos, 0xff9f43, 0.5);
-                spawnRocketProjectile(muzzlePos, targetPos, false, attacker.type === 'rpg' || attacker.type === 'tankhunter');
-                target.health -= (units.includes(attacker) && researchedTechs.has('apRockets') && attacker.type === 'rpg') ? 50 : 40;
-            } else if (['tomahawk', 'scud'].includes(attacker.type)) {
-                // Heavy cruise / ballistic missile
-                spawnMuzzleFlash(muzzlePos, 0xff793f, 1.2);
-                spawnRocketProjectile(muzzlePos, targetPos, true, attacker.type === 'scud');
-                if (attacker.type === 'tomahawk') playUSASound('missile_launch');
-                target.health -= 90;
-            } else if (attacker.type === 'inferno') {
-                // Inferno Cannon Napalm Artillery
-                spawnMuzzleFlash(muzzlePos, 0xff5252, 1.0);
-                spawnBulletTracer(muzzlePos, targetPos, 0xff793f, 5);
-                setTimeout(() => spawnNapalmScorchPool(targetPos), 300);
-                target.health -= 65;
-            } else if (attacker.type === 'nukecannon') {
-                // Tactical Atomic Shell with Mini-Mushroom Cloud!
-                spawnMuzzleFlash(muzzlePos, 0x10ac84, 1.5);
-                spawnBulletTracer(muzzlePos, targetPos, 0x10ac84, 6);
-                setTimeout(() => spawnMiniNukeMushroom(targetPos), 280);
-                target.health -= 140;
-            } else if (['battlemaster', 'overlord'].includes(attacker.type)) {
-                // China 152mm Smoothbore Twin Cannon
-                spawnMuzzleFlash(muzzlePos, 0xff793f, 1.1);
-                spawnBulletTracer(muzzlePos, targetPos, 0xf39c12, 3.8);
-                playAudio('china_cannon', {}, 'china');
-                target.health -= (attacker.type === 'overlord' ? 95 : 45);
-            } else if (['gatlingTank', 'gatlingCannon'].includes(attacker.type)) {
-                // China Twin 20mm Rotary Gatling Cannon
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.45);
-                spawnBulletTracer(muzzlePos, targetPos, 0xf1c40f, 4.5);
-                playAudio('gatling_fire', {}, 'china');
-                target.health -= 25;
-            } else if (attacker.type === 'dragonTank') {
-                // China Dragon Tank Flamethrower
-                spawnFlamethrowerBurst(muzzlePos, targetPos);
-                playAudio('flamethrower', {}, 'china');
-                target.health -= 40;
-            } else if (attacker.type === 'nukecannon') {
-                // China Nuke Cannon Nuclear Artillery Shell
-                deployNukeCannonOutriggers(attacker);
-                spawnMuzzleFlash(muzzlePos, 0x2ed573, 1.5);
-                playAudio('nuke_artillery', {}, 'china');
-                setTimeout(() => {
-                    spawnMiniNukeMushroom(targetPos);
-                    target.health -= (attacker.neutronShells ? 180 : 140);
-                }, 800);
-            } else if (['rebel', 'technical'].includes(attacker.type)) {
-                // GLA Kalashnikov AK-47 & Technical Heavy MG
-                spawnMuzzleFlash(muzzlePos, 0xf1c40f, 0.4);
-                spawnBulletTracer(muzzlePos, targetPos, 0xe67e22, 3.0);
-                playAudio('ak47', {}, 'gla');
-                target.health -= (attacker.type === 'technical' ? 24 : 16);
-            } else if (attacker.type === 'scud') {
-                // GLA SCUD Launcher Chemical Warhead
-                spawnMuzzleFlash(muzzlePos, 0x2ed573, 1.2);
-                spawnRocketProjectile(muzzlePos, targetPos, true, true);
-                playAudio('scud_launch', {}, 'gla');
-                target.health -= 130;
-            } else if (attacker.type === 'raptor') {
-                // USA Raptor Air-Superiority Fighter: Dual AMRAAM Guided Missiles!
-                const mPosL = getMuzzleWorldPosition(attacker, -0.65);
-                const mPosR = getMuzzleWorldPosition(attacker, 0.65);
-                spawnMuzzleFlash(mPosL, 0xff9f43, 0.5);
-                spawnMuzzleFlash(mPosR, 0xff9f43, 0.5);
-                spawnRocketProjectile(mPosL, targetPos, false, false);
-                setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false), 100);
-                playUSASound('missile_launch');
-                target.health -= 120;
-            } else if (attacker.type === 'stealthfighter') {
-                // USA Stealth Fighter: Laser-Guided Precision Bunker-Buster Bomb!
-                spawnMuzzleFlash(muzzlePos, 0x00d2d3, 0.6);
-                spawnGuidedBomb(muzzlePos, targetPos, false);
-                playUSASound('missile_launch');
-                target.health -= 150;
-            } else if (attacker.type === 'aurora') {
-                // USA Aurora Hypersonic Bomber: Fuel-Air Cluster Bomb with Massive Shockwave!
-                spawnMuzzleFlash(muzzlePos, 0x00d2d3, 1.2);
-                spawnGuidedBomb(muzzlePos, targetPos, true);
-                playUSASound('aurora_bomb');
-                target.health -= 220;
-            } else if (attacker.type === 'comanche') {
-                // USA Comanche Attack Helicopter: 20mm Rotary Cannon + Hellfire Missiles!
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.45);
-                spawnBulletTracer(muzzlePos, targetPos, 0xffd32a, 3.0);
-                const mPosL = getMuzzleWorldPosition(attacker, -0.5);
-                const mPosR = getMuzzleWorldPosition(attacker, 0.5);
-                setTimeout(() => spawnRocketProjectile(mPosL, targetPos, false, false), 80);
-                setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false), 180);
-                playUSASound('machine_gun');
-                playUSASound('missile_launch');
-                target.health -= 70;
-            } else if (attacker.type === 'paladin') {
-                // Paladin Cannon + Point Defense Laser
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.7);
-                spawnBulletTracer(muzzlePos, targetPos, 0xff4757, 3);
-                spawnLaserBeam(muzzlePos, targetPos, 0x00d2d3, 3);
-                playUSASound('cannon');
-                playUSASound('laser');
-                target.health -= 55;
-                // Paladin Cannon + Point Defense Laser
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.7);
-                spawnBulletTracer(muzzlePos, targetPos, 0xff4757, 3);
-                spawnLaserBeam(muzzlePos, targetPos, 0x00d2d3, 3);
-                target.health -= 55;
-            } else if (attacker.type === 'quad') {
-                // Quad Cannon 4x23mm Autocannon Salvo!
-                [-0.22, 0.22].forEach(xOff => {
-                    const mPos = getMuzzleWorldPosition(attacker, xOff);
-                    spawnMuzzleFlash(mPos, 0xffa502, 0.35);
-                    spawnBulletTracer(mPos, targetPos, 0xffd32a, 2.5);
+    // Sync damage dealt over WebRTC DataChannel
+    if (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive && typeof netConn !== 'undefined' && netConn && netConn.open && typeof units !== 'undefined' && units.includes(attacker) && target && target.netId) {
+        broadcastNetPacket({
+            type: 'unit_damage',
+            targetNetId: target.netId,
+            remainingHealth: target.health
+        });
+    }
+
+    // Check veterancy promotion on kill
+    if (target.health <= 0 && attacker && attacker.kills !== undefined) {
+        attacker.kills = (attacker.kills || 0) + 1;
+        checkVeterancyPromotion(attacker);
+    }
+}
+
+function checkVeterancyPromotion(unit) {
+    if (!unit || unit.health <= 0) return;
+    if (unit.kills >= 2 && (!unit.veterancy || unit.veterancy < 1)) {
+        unit.veterancy = 1; // Veteran (+20% HP)
+        const oldMax = unit.maxHealth;
+        unit.maxHealth = Math.floor(unit.maxHealth * 1.2);
+        unit.health = Math.min(unit.maxHealth, unit.health + (unit.maxHealth - oldMax));
+        if (typeof showNotification === 'function') {
+            showNotification(`★ ${unit.type.toUpperCase()} promoted to VETERAN! (+20% HP, +2 HP/s Heal)`, 'info');
+        }
+    } else if (unit.kills >= 5 && (!unit.veterancy || unit.veterancy < 2)) {
+        unit.veterancy = 2; // Elite (+40% HP from base, +25% Fire Rate)
+        const oldMax = unit.maxHealth;
+        unit.maxHealth = Math.floor(unit.maxHealth * (1.4 / 1.2));
+        unit.health = Math.min(unit.maxHealth, unit.health + (unit.maxHealth - oldMax));
+        if (typeof showNotification === 'function') {
+            showNotification(`★★ ${unit.type.toUpperCase()} promoted to ELITE! (+40% HP, +25% ROF, +4 HP/s Heal)`, 'info');
+        }
+    } else if (unit.kills >= 10 && (!unit.veterancy || unit.veterancy < 3)) {
+        unit.veterancy = 3; // Heroic (+60% HP from base, +50% Fire Rate, Heroic Crimson Laser Tracers)
+        const oldMax = unit.maxHealth;
+        unit.maxHealth = Math.floor(unit.maxHealth * (1.6 / 1.4));
+        unit.health = Math.min(unit.maxHealth, unit.health + (unit.maxHealth - oldMax));
+        if (typeof showNotification === 'function') {
+            showNotification(`★★★ ${unit.type.toUpperCase()} achieved HEROIC rank! (+60% HP, +50% ROF, +6 HP/s Heal, Heroic Red Tracers)`, 'success');
+        }
+    }
+}
+
+function executeWeaponFire(attacker, target) {
+    // Never fire weapon or deal damage to friendly teammates / allies!
+    if (!attacker || !target || isFriendly(attacker, target)) {
+        if (attacker && attacker.combatTarget === target) attacker.combatTarget = null;
+        return;
+    }
+    // Authentic Command & Conquer: Generals Weapon Reload Rates (60 ticks = 1.0s)
+    const cncCooldowns = {
+        // Main Battle & Heavy Tanks (~3.0s - 4.0s)
+        'tank': 180, 'crusader': 180, 'battlemaster': 180, 'scorpion': 160, 'marauder': 170,
+        'paladin': 190, 'overlord': 240,
+        // Artillery & Heavy Siege Missiles (~6.0s - 7.5s)
+        'tomahawk': 360, 'scud': 360, 'inferno': 360, 'nukecannon': 450,
+        // Anti-Tank & Rocket Troops (~2.66s)
+        'rocket': 160, 'rpg': 160, 'tankhunter': 160, 'patriot': 190, 'stingerSite': 150,
+        // Standard Infantry Rifle Bursts (~1.66s)
+        'ranger': 100, 'redguard': 100, 'rebel': 100, 'infantry': 100,
+        // High-Caliber Snipers (~3.66s)
+        'pathfinder': 220, 'jarmen': 220,
+        // Fast Attack & Light Vehicles (~1.25s)
+        'humvee': 75, 'technical': 75, 'buggy': 75,
+        'dragon': 50, 'toxintractor': 50,
+        // Rapid-Fire Autocannons & Gatling Guns (~0.46s - 0.75s)
+        'gatling': 28, 'gatlingCannon': 28, 'quad': 45,
+        // Aircraft (~2.5s - 6.0s)
+        'comanche': 150, 'raptor': 240, 'stealthfighter': 240, 'aurora': 360,
+        'chinook': 180, 'truck': 180, 'worker': 180, 'dozer': 180
+    };
+    let baseCooldown = cncCooldowns[attacker.type] || 160;
+
+    // Authentic Gatling Spool-Up Fire Rate Acceleration
+    if (attacker.type === 'gatling' || attacker.type === 'gatlingCannon') {
+        attacker.gatlingSpin = Math.min(6, (attacker.gatlingSpin || 0) + 1);
+        baseCooldown = Math.max(13, Math.round(baseCooldown - attacker.gatlingSpin * 2.5));
+    } else if (attacker.gatlingSpin) {
+        attacker.gatlingSpin = 0;
+    }
+
+    // Authentic Veterancy Fire Rate Bonus (ExperienceTracker.cpp)
+    if (attacker.veterancy === 2) {
+        baseCooldown = Math.floor(baseCooldown * 0.80); // Elite: 1.25x ROF
+    } else if (attacker.veterancy === 3) {
+        baseCooldown = Math.floor(baseCooldown * 0.65); // Heroic: 1.50x ROF
+    }
+
+    attacker.attackCooldown = baseCooldown;
+
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 0.75);
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 1.25);
+
+    const targetPos = (target.position || target.mesh.position).clone();
+    targetPos.y += (target.isAir ? 0.2 : 0.5);
+
+    const muzzlePos = getMuzzleWorldPosition(attacker);
+
+    // Spin Gatling barrels when firing
+    const gatling = attacker.mesh.getObjectByName("gatlingBarrels");
+    if (gatling) gatling.rotation.z += 1.2;
+
+    // Authentic Heroic Tracers (Heroic rank units fire intense red laser tracers!)
+    const isHeroic = (attacker.veterancy === 3);
+    const heroicTracerColor = 0xff2222;
+    const heroicFlashColor = 0xff1111;
+
+    // --- SIGNATURE C&C GENERALS WEAPON EFFECTS & DAMAGE APPLICATION ---
+
+    if (attacker.type === 'overlord') {
+        // Overlord Tank DUAL CANNONS!
+        const muzzleL = getMuzzleWorldPosition(attacker, -0.45);
+        const muzzleR = getMuzzleWorldPosition(attacker, 0.45);
+        spawnMuzzleFlash(muzzleL, isHeroic ? heroicFlashColor : 0xffa502, 0.9);
+        spawnMuzzleFlash(muzzleR, isHeroic ? heroicFlashColor : 0xffa502, 0.9);
+        spawnBulletTracer(muzzleL, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 4.2);
+        spawnBulletTracer(muzzleR, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 4.2);
+        playAudio('china_cannon', {}, 'china');
+        const ovDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('uraniumShells')) ? 119 : 95;
+        applyCalculatedDamage(attacker, target, ovDmg, 'ARMOR_PIERCING');
+    } else if (attacker.type === 'dragon') {
+        // Dragon Tank NAPALM FLAMETHROWER!
+        spawnFlamethrowerBurst(muzzlePos, targetPos);
+        applyCalculatedDamage(attacker, target, 35, 'FLAME');
+    } else if (attacker.type === 'toxintractor') {
+        // Toxin Tractor CHEMICAL ANTHRAX SPRAY!
+        spawnToxinSprayBurst(muzzlePos, targetPos);
+        applyCalculatedDamage(attacker, target, 32, 'TOXIN');
+    } else if (attacker.type === 'buggy') {
+        // Rocket Buggy RIPPLE VOLLEY!
+        const rDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets')) ? 15 : 12;
+        for (let r = 0; r < 4; r++) {
+            setTimeout(() => {
+                const mPos = getMuzzleWorldPosition(attacker, (r % 2 === 0 ? -0.25 : 0.25));
+                spawnMuzzleFlash(mPos, 0xff9f43, 0.4);
+                spawnRocketProjectile(mPos, targetPos, false, false, {
+                    attacker: attacker,
+                    target: target,
+                    damage: rDmg,
+                    damageType: 'EXPLOSIVE',
+                    splashRadius: 1.5
                 });
-                target.health -= (units.includes(attacker) && researchedTechs.has('apBullets')) ? 40 : 32;
-            } else if (attacker.type === 'gatling' || attacker.type === 'gatlingCannon') {
-                // High-speed Gatling autocannon stream
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.4);
-                spawnBulletTracer(muzzlePos, targetPos, 0xf1c40f, 2.5);
-                target.health -= (units.includes(attacker) && researchedTechs.has('chainGuns')) ? 25 : 20;
-            } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
-                // Supersonic Sniper Vapor Trail
-                spawnMuzzleFlash(muzzlePos, 0xffffff, 0.3);
-                spawnLaserBeam(muzzlePos, targetPos, 0xffffff, 2);
-                target.health -= 85;
-            } else if (['tank', 'crusader', 'battlemaster', 'scorpion', 'marauder'].includes(attacker.type)) {
-                // Heavy Tank Cannon
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.75);
-                spawnBulletTracer(muzzlePos, targetPos, 0xff4757, 3.5);
-                if (['tank', 'crusader'].includes(attacker.type)) playUSASound('cannon');
-                let tkDmg = 50;
-                if (units.includes(attacker)) {
-                    if (attacker.type === 'battlemaster' && researchedTechs.has('uraniumShells')) tkDmg = 62;
-                    else if (attacker.type === 'scorpion' && researchedTechs.has('scorpionRocket')) tkDmg = 70;
-                }
-                target.health -= tkDmg;
-            } else if (attacker.type === 'humvee' || attacker.type === 'technical') {
-                // Heavy Machine Gun .50 cal / DShK
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.45);
-                spawnBulletTracer(muzzlePos, targetPos, 0xf39c12, 2.5);
-                if (attacker.type === 'humvee') playUSASound('machine_gun');
-                let vehDmg = 22;
-                if (units.includes(attacker)) {
-                    if (attacker.type === 'humvee' && researchedTechs.has('towMissile')) {
-                        vehDmg = 35;
-                        spawnRocketProjectile(muzzlePos, targetPos, false, false);
-                    } else if (attacker.type === 'technical' && researchedTechs.has('apBullets')) {
-                        vehDmg = 28;
-                    }
-                    // Fire-From-Within: Garrisoned infantry fire out through firing ports!
-                    if (attacker.garrisoned && attacker.garrisoned.length > 0) {
-                        vehDmg += attacker.garrisoned.length * 8;
-                    }
-                }
-                target.health -= vehDmg;
-            } else {
-                // Assault Rifle burst
-                spawnMuzzleFlash(muzzlePos, 0xffa502, 0.25);
-                spawnBulletTracer(muzzlePos, targetPos, 0xf1c40f, 1.8);
-                let infDmg = (units.includes(attacker) && attacker.type === 'rebel' && researchedTechs.has('apBullets')) ? 20 : 16;
-                target.health -= infDmg;
+            }, r * 80);
+        }
+    } else if (['rocket', 'rpg', 'tankhunter'].includes(attacker.type)) {
+        // Shoulder-fired rockets (Tracked for Point Defense Laser interception!)
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff9f43, 0.5);
+        const rDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets') && attacker.type === 'rpg') ? 52 : 42;
+        spawnRocketProjectile(muzzlePos, targetPos, false, attacker.type === 'rpg' || attacker.type === 'tankhunter', {
+            attacker: attacker,
+            target: target,
+            damage: rDmg,
+            damageType: 'EXPLOSIVE',
+            splashRadius: 2.0
+        });
+    } else if (['tomahawk', 'scud'].includes(attacker.type)) {
+        // Heavy cruise / ballistic missile (Tracked for Point Defense Laser interception!)
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.2);
+        const mDmg = attacker.type === 'scud' ? 130 : 95;
+        spawnRocketProjectile(muzzlePos, targetPos, true, attacker.type === 'scud', {
+            attacker: attacker,
+            target: target,
+            damage: mDmg,
+            damageType: 'EXPLOSIVE',
+            splashRadius: 5.5
+        });
+        if (attacker.type === 'tomahawk') playUSASound('missile_launch');
+        if (attacker.type === 'scud') playAudio('scud_launch', {}, 'gla');
+    } else if (attacker.type === 'inferno') {
+        // Inferno Cannon Napalm Artillery
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff5252, 1.0);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5);
+        setTimeout(() => spawnNapalmScorchPool(targetPos), 300);
+        applyCalculatedDamage(attacker, target, 65, 'FLAME');
+    } else if (attacker.type === 'nukecannon') {
+        // Tactical Atomic Shell with Mini-Mushroom Cloud!
+        deployNukeCannonOutriggers(attacker);
+        spawnMuzzleFlash(muzzlePos, 0x10ac84, 1.5);
+        spawnBulletTracer(muzzlePos, targetPos, 0x10ac84, 6);
+        playAudio('nuke_artillery', {}, 'china');
+        setTimeout(() => {
+            spawnMiniNukeMushroom(targetPos);
+            applyCalculatedDamage(attacker, target, (attacker.neutronShells ? 180 : 140), 'EXPLOSIVE');
+        }, 750);
+    } else if (['battlemaster'].includes(attacker.type)) {
+        // China 152mm Smoothbore Cannon
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.1);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 3.8);
+        playAudio('china_cannon', {}, 'china');
+        const bmDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('uraniumShells')) ? 62 : 48;
+        applyCalculatedDamage(attacker, target, bmDmg, 'ARMOR_PIERCING');
+    } else if (['gatlingTank', 'gatlingCannon', 'gatling'].includes(attacker.type)) {
+        // China Twin 20mm Rotary Gatling Cannon
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 4.5);
+        playAudio('gatling_fire', {}, 'china');
+        const gatDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('chainGuns')) ? 26 : 20;
+        applyCalculatedDamage(attacker, target, gatDmg, 'GATLING');
+    } else if (attacker.type === 'dragonTank') {
+        // China Dragon Tank Flamethrower
+        spawnFlamethrowerBurst(muzzlePos, targetPos);
+        playAudio('flamethrower', {}, 'china');
+        applyCalculatedDamage(attacker, target, 40, 'FLAME');
+    } else if (['rebel', 'technical'].includes(attacker.type)) {
+        // GLA Kalashnikov AK-47 & Technical Heavy MG (with scrap upgrades!)
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xf1c40f, 0.4);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xe67e22, 3.0);
+        playAudio('ak47', {}, 'gla');
+        let baseMG = (attacker.type === 'technical' ? 24 : 16);
+        if (attacker.type === 'technical' && attacker.salvageLevel >= 1) {
+            baseMG = Math.round(baseMG * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
+        }
+        applyCalculatedDamage(attacker, target, baseMG, 'SMALL_ARMS');
+    } else if (attacker.type === 'raptor') {
+        // USA Raptor Air-Superiority Fighter: Dual AMRAAM Guided Missiles!
+        const mPosL = getMuzzleWorldPosition(attacker, -0.65);
+        const mPosR = getMuzzleWorldPosition(attacker, 0.65);
+        spawnMuzzleFlash(mPosL, 0xff9f43, 0.5);
+        spawnMuzzleFlash(mPosR, 0xff9f43, 0.5);
+        spawnRocketProjectile(mPosL, targetPos, false, false, { attacker, target, damage: 60, damageType: 'EXPLOSIVE', splashRadius: 2.0 });
+        setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false, { attacker, target, damage: 60, damageType: 'EXPLOSIVE', splashRadius: 2.0 }), 100);
+        playUSASound('missile_launch');
+    } else if (attacker.type === 'stealthfighter') {
+        // USA Stealth Fighter: Laser-Guided Precision Bunker-Buster Bomb!
+        spawnMuzzleFlash(muzzlePos, 0x00d2d3, 0.6);
+        spawnGuidedBomb(muzzlePos, targetPos, false);
+        playUSASound('missile_launch');
+        setTimeout(() => applyCalculatedDamage(attacker, target, 150, 'EXPLOSIVE'), 400);
+    } else if (attacker.type === 'aurora') {
+        // USA Aurora Hypersonic Bomber: Fuel-Air Cluster Bomb with Massive Shockwave!
+        spawnMuzzleFlash(muzzlePos, 0x00d2d3, 1.2);
+        spawnGuidedBomb(muzzlePos, targetPos, true);
+        playUSASound('aurora_bomb');
+        setTimeout(() => applyCalculatedDamage(attacker, target, 220, 'EXPLOSIVE'), 500);
+    } else if (attacker.type === 'comanche') {
+        // USA Comanche Attack Helicopter: 20mm Rotary Cannon + Hellfire Missiles!
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 3.0);
+        const mPosL = getMuzzleWorldPosition(attacker, -0.5);
+        const mPosR = getMuzzleWorldPosition(attacker, 0.5);
+        setTimeout(() => spawnRocketProjectile(mPosL, targetPos, false, false, { attacker, target, damage: 35, damageType: 'EXPLOSIVE' }), 80);
+        setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false, { attacker, target, damage: 35, damageType: 'EXPLOSIVE' }), 180);
+        playUSASound('machine_gun');
+        playUSASound('missile_launch');
+        applyCalculatedDamage(attacker, target, 25, 'SMALL_ARMS');
+    } else if (attacker.type === 'paladin') {
+        // USA Paladin Tank: High-Velocity 105mm Tank Cannon (PDL runs autonomously on defense!)
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
+        playUSASound('cannon');
+        applyCalculatedDamage(attacker, target, 56, 'ARMOR_PIERCING');
+    } else if (attacker.type === 'quad') {
+        // Quad Cannon 4x23mm Autocannon Salvo!
+        [-0.22, 0.22].forEach(xOff => {
+            const mPos = getMuzzleWorldPosition(attacker, xOff);
+            spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
+            spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.5);
+        });
+        const qDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 40 : 32;
+        applyCalculatedDamage(attacker, target, qDmg, 'GATLING');
+    } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
+        // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry!)
+        spawnMuzzleFlash(muzzlePos, 0xffffff, 0.3);
+        spawnLaserBeam(muzzlePos, targetPos, 0xffffff, 2);
+        applyCalculatedDamage(attacker, target, 90, 'SNIPER');
+    } else if (['tank', 'crusader', 'scorpion', 'marauder'].includes(attacker.type)) {
+        // Heavy Tank Cannon
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
+        if (['tank', 'crusader'].includes(attacker.type)) playUSASound('cannon');
+        let tkDmg = 50;
+        if (attacker.type === 'marauder' && attacker.salvageLevel >= 1) {
+            tkDmg = Math.round(tkDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
+            // Marauder twin cannon visuals on scrap upgrade
+            const mPosR = getMuzzleWorldPosition(attacker, 0.3);
+            spawnMuzzleFlash(mPosR, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
+            spawnBulletTracer(mPosR, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
+        } else if (attacker.type === 'scorpion' && (attacker.salvageLevel >= 1 || (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket')))) {
+            // Secondary Scorpion Rocket
+            setTimeout(() => {
+                spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 38, damageType: 'EXPLOSIVE' });
+            }, 120);
+        }
+        applyCalculatedDamage(attacker, target, tkDmg, 'ARMOR_PIERCING');
+    } else if (attacker.type === 'humvee') {
+        // USA Humvee Heavy .50 Machine Gun
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.5);
+        playUSASound('machine_gun');
+        let vehDmg = 22;
+        if (typeof units !== 'undefined' && units.includes(attacker)) {
+            if (typeof researchedTechs !== 'undefined' && researchedTechs.has('towMissile')) {
+                vehDmg = 35;
+                spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 32, damageType: 'EXPLOSIVE' });
             }
-
-            // Sync damage dealt over WebRTC DataChannel
-            if (isMultiplayerActive && netConn && netConn.open && units.includes(attacker) && target && target.netId) {
-                broadcastNetPacket({
-                    type: 'unit_damage',
-                    targetNetId: target.netId,
-                    remainingHealth: Math.max(0, target.health)
-                });
-            }
-
-            // Veterancy promotion check on kill
-            if (target && target.health <= 0 && attacker && attacker.kills !== undefined) {
-                attacker.kills++;
-                if (attacker.kills === 2 && attacker.veterancy < 1) {
-                    attacker.veterancy = 1; // Veteran (+20% HP)
-                    attacker.maxHealth = Math.floor(attacker.maxHealth * 1.2);
-                    attacker.health = attacker.maxHealth;
-                    showNotification(`★ ${attacker.type.toUpperCase()} promoted to VETERAN!`, 'info');
-                } else if (attacker.kills === 5 && attacker.veterancy < 2) {
-                    attacker.veterancy = 2; // Elite (+40% HP)
-                    attacker.maxHealth = Math.floor(attacker.maxHealth * 1.2);
-                    attacker.health = attacker.maxHealth;
-                    showNotification(`★★ ${attacker.type.toUpperCase()} promoted to ELITE!`, 'info');
-                } else if (attacker.kills === 10 && attacker.veterancy < 3) {
-                    attacker.veterancy = 3; // Heroic (Self-healing & Gold muzzle flash)
-                    attacker.maxHealth = Math.floor(attacker.maxHealth * 1.4);
-                    attacker.health = attacker.maxHealth;
-                    showNotification(`★★★ ${attacker.type.toUpperCase()} achieved HEROIC rank! (Auto-Regeneration Active)`, 'success');
-                }
+            // Fire-From-Within: Garrisoned troops fire out
+            if (attacker.garrisoned && attacker.garrisoned.length > 0) {
+                vehDmg += attacker.garrisoned.length * 8;
             }
         }
+        applyCalculatedDamage(attacker, target, vehDmg, 'SMALL_ARMS');
+    } else {
+        // Infantry Rifle / Carbine burst
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.25);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 1.8);
+        let infDmg = (typeof units !== 'undefined' && units.includes(attacker) && attacker.type === 'rebel' && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 20 : 16;
+        applyCalculatedDamage(attacker, target, infDmg, 'SMALL_ARMS');
+    }
+}
 
-        function activateBlueprint(type) {
+function activateBlueprint(type) {
             if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; }
 
             // Prerequisite tech tree check!
@@ -13115,6 +13684,16 @@ function processEnemyAIEngine() {
                     raycaster.setFromCamera(mouse, camera);
                     const placement = getGroundIntersectPoint();
                     if (placement) deployBase(placement);
+                    return;
+                }
+                if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const targetPosition = getGroundIntersectPoint();
+                    if (targetPosition) {
+                        executeGeneralsPowerAt(targetPosition);
+                    }
                     return;
                 }
                 if (pendingSuperweapon) {
@@ -14023,9 +14602,11 @@ function animate() {
             units.forEach(unit => {
                 if (unit.health <= 0) return;
 
-                // 1. Heroic Self-Healing
-                if (unit.veterancy === 3 && buildingTick % 30 === 0 && unit.health < unit.maxHealth) {
-                    unit.health = Math.min(unit.maxHealth, unit.health + 3);
+                // 1. Authentic SAGE Engine Veterancy Passive Regeneration (ActiveBody.cpp)
+                if (buildingTick % 60 === 0 && unit.health < unit.maxHealth) {
+                    if (unit.veterancy === 1) unit.health = Math.min(unit.maxHealth, unit.health + 2); // +2 HP/s
+                    else if (unit.veterancy === 2) unit.health = Math.min(unit.maxHealth, unit.health + 4); // +4 HP/s
+                    else if (unit.veterancy === 3) unit.health = Math.min(unit.maxHealth, unit.health + 6); // +6 HP/s
                 }
 
                 // 2. USA Vehicle Drones
@@ -14145,6 +14726,8 @@ function animate() {
                     u.mesh.position.y += (flightY - u.mesh.position.y) * 0.06;
                 }
             });
+            processPointDefenseLasers();
+            processScrapCrateCollection();
             processCameraKeyboardPanning();
             updateTurretSystems();
             updateFogOfWar();
@@ -14472,6 +15055,31 @@ function animate() {
                     unit.mesh.position.x += dirX * step;
                     unit.mesh.position.z += dirZ * step;
 
+                    // Authentic Tank Crushing (SquishCollide.cpp: heavy tanks crush enemy infantry)
+                    const isCrusherTank = ['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank'].includes(unit.type);
+                    if (isCrusherTank) {
+                        const hostiles = (typeof enemyUnits !== 'undefined') ? enemyUnits : [];
+                        for (let enemy of hostiles) {
+                            if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy) && (typeof getArmorCategory === 'function' ? getArmorCategory(enemy) === 'infantry' : ['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(enemy.type))) {
+                                const infDist = Math.hypot(unit.mesh.position.x - enemy.mesh.position.x, unit.mesh.position.z - enemy.mesh.position.z);
+                                if (infDist <= ((unit.radius || 1.8) + (enemy.radius || 0.6)) * 0.95) {
+                                    const toX = enemy.mesh.position.x - unit.mesh.position.x;
+                                    const toZ = enemy.mesh.position.z - unit.mesh.position.z;
+                                    if (toX * dirX + toZ * dirZ > 0) { // moving towards infantry
+                                        enemy.health = 0;
+                                        if (typeof spawnSquishDecal === 'function') spawnSquishDecal(enemy.mesh.position);
+                                        playAudio('infantry_squish');
+                                        if (typeof showNotification === 'function') {
+                                            showNotification(`Enemy infantry crushed under treads of ${unit.type.toUpperCase()}!`, 'info');
+                                        }
+                                        unit.kills = (unit.kills || 0) + 1;
+                                        if (typeof checkVeterancyPromotion === 'function') checkVeterancyPromotion(unit);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Anti-Stuck Corner Watchdog: if stuck against a tight crevice or corner, nudge free!
                     if (!unit._lastPos) unit._lastPos = unit.mesh.position.clone();
                     if (!unit._stuckTimer) unit._stuckTimer = 0;
@@ -14551,6 +15159,10 @@ function animate() {
                 if (enemy.health > 0) return true;
                 scene.remove(enemy.mesh);
                 createImpactExplosion(enemy.mesh.position);
+                // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
+                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(enemy.type))) {
+                    if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
+                }
                 units.forEach(unit => {
                     if (unit.combatTarget === enemy) unit.combatTarget = null;
                 });
@@ -14601,6 +15213,10 @@ function animate() {
                 if (unit.health > 0) return true;
                 removeSelectionCircle(unit);
                 scene.remove(unit.mesh);
+                // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
+                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(unit.type))) {
+                    if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);
+                }
                 enemyUnits.forEach(enemy => {
                     if (enemy.combatTarget === unit) enemy.combatTarget = null;
                 });
@@ -14652,6 +15268,29 @@ function processEnemyMovement() {
             const step = Math.min(dist2D, enemy.speed);
             enemy.mesh.position.x += dirX * step;
             enemy.mesh.position.z += dirZ * step;
+
+            // Authentic Tank Crushing by AI vehicles (SquishCollide.cpp)
+            const isEnemyCrusher = ['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank'].includes(enemy.type);
+            if (isEnemyCrusher) {
+                for (let ally of units) {
+                    if (ally.health > 0 && ally.mesh && !isFriendly(enemy, ally) && (typeof getArmorCategory === 'function' ? getArmorCategory(ally) === 'infantry' : ['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(ally.type))) {
+                        const infDist = Math.hypot(enemy.mesh.position.x - ally.mesh.position.x, enemy.mesh.position.z - ally.mesh.position.z);
+                        if (infDist <= ((enemy.radius || 1.8) + (ally.radius || 0.6)) * 0.95) {
+                            const toX = ally.mesh.position.x - enemy.mesh.position.x;
+                            const toZ = ally.mesh.position.z - enemy.mesh.position.z;
+                            if (toX * dirX + toZ * dirZ > 0) {
+                                ally.health = 0;
+                                if (typeof spawnSquishDecal === 'function') spawnSquishDecal(ally.mesh.position);
+                                playAudio('infantry_squish');
+                                if (typeof showNotification === 'function') {
+                                    showNotification(`Friendly ${ally.type.toUpperCase()} crushed by hostile tank!`, 'error');
+                                }
+                                enemy.kills = (enemy.kills || 0) + 1;
+                            }
+                        }
+                    }
+                }
+            }
             enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
         }
 
@@ -14695,6 +15334,110 @@ function processEnemyCombat() {
 
                 // =========================================================================
         
+// =========================================================================
+// AUTHENTIC POINT DEFENSE LASER SYSTEM (PointDefenseLaserUpdate.cpp)
+// =========================================================================
+function processPointDefenseLasers() {
+    if (typeof activeMissiles === 'undefined' || activeMissiles.length === 0) return;
+    const allLivingUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
+        ? [...units, ...enemyUnits] : [];
+
+    allLivingUnits.forEach(defender => {
+        if (defender.health <= 0 || !defender.mesh) return;
+
+        const hasPDL = (defender.type === 'paladin') || (defender.drone && defender.drone.type === 'battle');
+        if (!hasPDL) return;
+
+        if (defender.pdlCooldown > 0) {
+            defender.pdlCooldown = Math.max(0, defender.pdlCooldown - (typeof combatDeltaScale !== 'undefined' ? combatDeltaScale : 1.0));
+            return;
+        }
+
+        const scanRange = (defender.type === 'paladin') ? 22.0 : 16.0;
+        const myPos = defender.mesh.position;
+
+        for (let missile of activeMissiles) {
+            if (missile.intercepted) continue;
+            const attacker = missile.metadata ? missile.metadata.attacker : null;
+            if (attacker && typeof isFriendly === 'function' && isFriendly(defender, attacker)) continue;
+
+            const dist = myPos.distanceTo(missile.curPos);
+            if (dist <= scanRange) {
+                // Intercept missile in mid-air!
+                missile.intercepted = true;
+                const laserOrigin = (defender.drone && defender.drone.mesh)
+                    ? defender.drone.mesh.position.clone()
+                    : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
+
+                if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
+                playAudio('laser_point_defense');
+                defender.pdlCooldown = (defender.type === 'paladin') ? 65 : 85;
+
+                if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
+                    showNotification('★ Paladin Point Defense Laser intercepted hostile missile!', 'info');
+                }
+                break;
+            }
+        }
+    });
+}
+
+// =========================================================================
+// AUTHENTIC GLA SALVAGE SCRAP COLLECTION (SalvageCrateCollide.cpp)
+// =========================================================================
+function processScrapCrateCollection() {
+    if (typeof activeScrapCrates === 'undefined' || activeScrapCrates.length === 0) return;
+    const allLivingUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
+        ? [...units, ...enemyUnits] : [];
+
+    for (let cIdx = activeScrapCrates.length - 1; cIdx >= 0; cIdx--) {
+        const crate = activeScrapCrates[cIdx];
+        if (!crate || !crate.mesh) continue;
+
+        for (let u of allLivingUnits) {
+            if (u.health > 0 && u.mesh && ['technical', 'scorpion', 'marauder'].includes(u.type)) {
+                const d = Math.hypot(u.mesh.position.x - crate.position.x, u.mesh.position.z - crate.position.z);
+                if (d <= (u.radius || 1.5) + 1.2) {
+                    // Pick up crate!
+                    scene.remove(crate.mesh);
+                    crate.mesh.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) child.material.dispose();
+                    });
+                    activeScrapCrates.splice(cIdx, 1);
+                    playAudio('scrap_pickup', {}, 'gla');
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(u.mesh.position, 0x2ed573, 1.2);
+
+                    u.salvageLevel = (u.salvageLevel || 0) + 1;
+                    if (u.salvageLevel === 1) {
+                        if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
+                            showNotification(`★ ${u.type.toUpperCase()} salvaged scrap: WEAPONS UPGRADED!`, 'success');
+                        }
+                    } else if (u.salvageLevel === 2) {
+                        const oldMax = u.maxHealth;
+                        u.maxHealth = Math.floor(u.maxHealth * 1.3);
+                        u.health = u.maxHealth;
+                        if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
+                            showNotification(`★★ ${u.type.toUpperCase()} salvaged scrap: HEAVY ARMOR MAXED!`, 'success');
+                        }
+                    } else {
+                        u.health = u.maxHealth;
+                        if (typeof units !== 'undefined' && units.includes(u)) {
+                            playerResources += 500;
+                            if (typeof updateSidebar === 'function') updateSidebar();
+                            if (typeof showNotification === 'function') {
+                                showNotification('💰 GLA salvaged scrap converted into +$500 Cash!', 'success');
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
 
 // --- MODULE: 15_multiplayer.js ---
 // REAL-TIME WEBRTC P2P MULTIPLAYER ENGINE (PEER.JS) & BASE DEFENSE SYSTEMS

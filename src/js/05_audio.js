@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') {
 
 function isAudioAllowed(type, faction = null) {
     if (typeof selectedFaction === 'undefined') return true;
-    const globalSounds = ['superweapon_siren', 'orbital_beam', 'nuke_detonation', 'scud_storm_volley', 'explosion', 'construction'];
+    const globalSounds = ['superweapon_siren', 'orbital_beam', 'nuke_detonation', 'scud_storm_volley', 'explosion', 'construction', 'infantry_squish', 'laser_point_defense', 'scrap_pickup', 'gla_salvage'];
     if (globalSounds.includes(type)) return true;
 
     const targetFaction = faction || (type.startsWith('china') || ['gatling_fire', 'flamethrower', 'propaganda_drone', 'nuke_artillery'].includes(type) ? 'china' : (type.startsWith('gla') || ['ak47', 'technical_rev', 'scud_launch', 'demo_beep', 'scrap_pickup'].includes(type)) ? 'gla' : 'usa');
@@ -294,12 +294,39 @@ function playAudio(type, options = {}, faction = null) {
                 }
                 break;
             }
-            case 'scrap_pickup': {
+            case 'scrap_pickup':
+            case 'gla_salvage': {
                 const osc = ctx.createOscillator(); const gain = ctx.createGain();
                 osc.type = 'triangle'; osc.frequency.setValueAtTime(1200, t); osc.frequency.setValueAtTime(1800, t + 0.06);
                 gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
                 osc.connect(gain); gain.connect(ctx.destination);
                 osc.start(t); osc.stop(t + 0.16);
+                break;
+            }
+            case 'infantry_squish': {
+                // Heavy crushing squelch + bone crunch
+                const bSize = Math.floor(ctx.sampleRate * 0.18);
+                const buf = ctx.createBuffer(1, bSize, ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < bSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
+                const src = ctx.createBufferSource(); src.buffer = buf;
+                const filter = ctx.createBiquadFilter(); filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(700, t); filter.frequency.exponentialRampToValueAtTime(180, t + 0.16);
+                const gain = ctx.createGain(); gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+                src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+                src.start(t);
+                break;
+            }
+            case 'laser_point_defense': {
+                // High-tech laser interception chirp
+                const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(2600, t);
+                osc.frequency.exponentialRampToValueAtTime(650, t + 0.08);
+                gain.gain.setValueAtTime(0.25, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.1);
                 break;
             }
 

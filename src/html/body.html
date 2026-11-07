@@ -356,13 +356,13 @@
     <!-- FLOATING GENERAL POWERS (Right Edge)                           -->
     <!-- ============================================================== -->
     <div id="general-powers-bar" class="general-powers-bar">
-        <button class="gp-power-btn" title="Spy Satellite Radar Scan (S)" onclick="triggerTacticalBeacon()">
+        <button class="gp-power-btn" id="gp-spy-satellite" title="USA Spy Satellite: Scan & Uncloak Target Area (S)" onclick="activateGeneralsPower('spySatellite')">
             <span class="gp-icon">🛰️</span>
-            <span class="gp-label">SCAN</span>
+            <span class="gp-label">SATELLITE</span>
         </button>
-        <button class="gp-power-btn" title="Predator Drone Recon" onclick="showNotification('Predator Drone on patrol.', 'info')">
+        <button class="gp-power-btn" id="gp-a10-strike" title="A-10 Thunderbolt Warthog CAS Air Strike (A)" onclick="activateGeneralsPower('a10Strike')">
             <span class="gp-icon">🛩️</span>
-            <span class="gp-label">DRONE</span>
+            <span class="gp-label">A-10 CAS</span>
         </button>
     </div>
 

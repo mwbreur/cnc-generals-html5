@@ -84,9 +84,11 @@ function animate() {
             units.forEach(unit => {
                 if (unit.health <= 0) return;
 
-                // 1. Heroic Self-Healing
-                if (unit.veterancy === 3 && buildingTick % 30 === 0 && unit.health < unit.maxHealth) {
-                    unit.health = Math.min(unit.maxHealth, unit.health + 3);
+                // 1. Authentic SAGE Engine Veterancy Passive Regeneration (ActiveBody.cpp)
+                if (buildingTick % 60 === 0 && unit.health < unit.maxHealth) {
+                    if (unit.veterancy === 1) unit.health = Math.min(unit.maxHealth, unit.health + 2); // +2 HP/s
+                    else if (unit.veterancy === 2) unit.health = Math.min(unit.maxHealth, unit.health + 4); // +4 HP/s
+                    else if (unit.veterancy === 3) unit.health = Math.min(unit.maxHealth, unit.health + 6); // +6 HP/s
                 }
 
                 // 2. USA Vehicle Drones
@@ -206,6 +208,8 @@ function animate() {
                     u.mesh.position.y += (flightY - u.mesh.position.y) * 0.06;
                 }
             });
+            processPointDefenseLasers();
+            processScrapCrateCollection();
             processCameraKeyboardPanning();
             updateTurretSystems();
             updateFogOfWar();
@@ -533,6 +537,31 @@ function animate() {
                     unit.mesh.position.x += dirX * step;
                     unit.mesh.position.z += dirZ * step;
 
+                    // Authentic Tank Crushing (SquishCollide.cpp: heavy tanks crush enemy infantry)
+                    const isCrusherTank = ['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank'].includes(unit.type);
+                    if (isCrusherTank) {
+                        const hostiles = (typeof enemyUnits !== 'undefined') ? enemyUnits : [];
+                        for (let enemy of hostiles) {
+                            if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy) && (typeof getArmorCategory === 'function' ? getArmorCategory(enemy) === 'infantry' : ['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(enemy.type))) {
+                                const infDist = Math.hypot(unit.mesh.position.x - enemy.mesh.position.x, unit.mesh.position.z - enemy.mesh.position.z);
+                                if (infDist <= ((unit.radius || 1.8) + (enemy.radius || 0.6)) * 0.95) {
+                                    const toX = enemy.mesh.position.x - unit.mesh.position.x;
+                                    const toZ = enemy.mesh.position.z - unit.mesh.position.z;
+                                    if (toX * dirX + toZ * dirZ > 0) { // moving towards infantry
+                                        enemy.health = 0;
+                                        if (typeof spawnSquishDecal === 'function') spawnSquishDecal(enemy.mesh.position);
+                                        playAudio('infantry_squish');
+                                        if (typeof showNotification === 'function') {
+                                            showNotification(`Enemy infantry crushed under treads of ${unit.type.toUpperCase()}!`, 'info');
+                                        }
+                                        unit.kills = (unit.kills || 0) + 1;
+                                        if (typeof checkVeterancyPromotion === 'function') checkVeterancyPromotion(unit);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Anti-Stuck Corner Watchdog: if stuck against a tight crevice or corner, nudge free!
                     if (!unit._lastPos) unit._lastPos = unit.mesh.position.clone();
                     if (!unit._stuckTimer) unit._stuckTimer = 0;
@@ -612,6 +641,10 @@ function animate() {
                 if (enemy.health > 0) return true;
                 scene.remove(enemy.mesh);
                 createImpactExplosion(enemy.mesh.position);
+                // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
+                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(enemy.type))) {
+                    if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
+                }
                 units.forEach(unit => {
                     if (unit.combatTarget === enemy) unit.combatTarget = null;
                 });
@@ -662,6 +695,10 @@ function animate() {
                 if (unit.health > 0) return true;
                 removeSelectionCircle(unit);
                 scene.remove(unit.mesh);
+                // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
+                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(unit.type))) {
+                    if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);
+                }
                 enemyUnits.forEach(enemy => {
                     if (enemy.combatTarget === unit) enemy.combatTarget = null;
                 });
@@ -713,6 +750,29 @@ function processEnemyMovement() {
             const step = Math.min(dist2D, enemy.speed);
             enemy.mesh.position.x += dirX * step;
             enemy.mesh.position.z += dirZ * step;
+
+            // Authentic Tank Crushing by AI vehicles (SquishCollide.cpp)
+            const isEnemyCrusher = ['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank'].includes(enemy.type);
+            if (isEnemyCrusher) {
+                for (let ally of units) {
+                    if (ally.health > 0 && ally.mesh && !isFriendly(enemy, ally) && (typeof getArmorCategory === 'function' ? getArmorCategory(ally) === 'infantry' : ['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(ally.type))) {
+                        const infDist = Math.hypot(enemy.mesh.position.x - ally.mesh.position.x, enemy.mesh.position.z - ally.mesh.position.z);
+                        if (infDist <= ((enemy.radius || 1.8) + (ally.radius || 0.6)) * 0.95) {
+                            const toX = ally.mesh.position.x - enemy.mesh.position.x;
+                            const toZ = ally.mesh.position.z - enemy.mesh.position.z;
+                            if (toX * dirX + toZ * dirZ > 0) {
+                                ally.health = 0;
+                                if (typeof spawnSquishDecal === 'function') spawnSquishDecal(ally.mesh.position);
+                                playAudio('infantry_squish');
+                                if (typeof showNotification === 'function') {
+                                    showNotification(`Friendly ${ally.type.toUpperCase()} crushed by hostile tank!`, 'error');
+                                }
+                                enemy.kills = (enemy.kills || 0) + 1;
+                            }
+                        }
+                    }
+                }
+            }
             enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
         }
 
@@ -756,3 +816,106 @@ function processEnemyCombat() {
 
                 // =========================================================================
         
+// =========================================================================
+// AUTHENTIC POINT DEFENSE LASER SYSTEM (PointDefenseLaserUpdate.cpp)
+// =========================================================================
+function processPointDefenseLasers() {
+    if (typeof activeMissiles === 'undefined' || activeMissiles.length === 0) return;
+    const allLivingUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
+        ? [...units, ...enemyUnits] : [];
+
+    allLivingUnits.forEach(defender => {
+        if (defender.health <= 0 || !defender.mesh) return;
+
+        const hasPDL = (defender.type === 'paladin') || (defender.drone && defender.drone.type === 'battle');
+        if (!hasPDL) return;
+
+        if (defender.pdlCooldown > 0) {
+            defender.pdlCooldown = Math.max(0, defender.pdlCooldown - (typeof combatDeltaScale !== 'undefined' ? combatDeltaScale : 1.0));
+            return;
+        }
+
+        const scanRange = (defender.type === 'paladin') ? 22.0 : 16.0;
+        const myPos = defender.mesh.position;
+
+        for (let missile of activeMissiles) {
+            if (missile.intercepted) continue;
+            const attacker = missile.metadata ? missile.metadata.attacker : null;
+            if (attacker && typeof isFriendly === 'function' && isFriendly(defender, attacker)) continue;
+
+            const dist = myPos.distanceTo(missile.curPos);
+            if (dist <= scanRange) {
+                // Intercept missile in mid-air!
+                missile.intercepted = true;
+                const laserOrigin = (defender.drone && defender.drone.mesh)
+                    ? defender.drone.mesh.position.clone()
+                    : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
+
+                if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
+                playAudio('laser_point_defense');
+                defender.pdlCooldown = (defender.type === 'paladin') ? 65 : 85;
+
+                if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
+                    showNotification('★ Paladin Point Defense Laser intercepted hostile missile!', 'info');
+                }
+                break;
+            }
+        }
+    });
+}
+
+// =========================================================================
+// AUTHENTIC GLA SALVAGE SCRAP COLLECTION (SalvageCrateCollide.cpp)
+// =========================================================================
+function processScrapCrateCollection() {
+    if (typeof activeScrapCrates === 'undefined' || activeScrapCrates.length === 0) return;
+    const allLivingUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
+        ? [...units, ...enemyUnits] : [];
+
+    for (let cIdx = activeScrapCrates.length - 1; cIdx >= 0; cIdx--) {
+        const crate = activeScrapCrates[cIdx];
+        if (!crate || !crate.mesh) continue;
+
+        for (let u of allLivingUnits) {
+            if (u.health > 0 && u.mesh && ['technical', 'scorpion', 'marauder'].includes(u.type)) {
+                const d = Math.hypot(u.mesh.position.x - crate.position.x, u.mesh.position.z - crate.position.z);
+                if (d <= (u.radius || 1.5) + 1.2) {
+                    // Pick up crate!
+                    scene.remove(crate.mesh);
+                    crate.mesh.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) child.material.dispose();
+                    });
+                    activeScrapCrates.splice(cIdx, 1);
+                    playAudio('scrap_pickup', {}, 'gla');
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(u.mesh.position, 0x2ed573, 1.2);
+
+                    u.salvageLevel = (u.salvageLevel || 0) + 1;
+                    if (u.salvageLevel === 1) {
+                        if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
+                            showNotification(`★ ${u.type.toUpperCase()} salvaged scrap: WEAPONS UPGRADED!`, 'success');
+                        }
+                    } else if (u.salvageLevel === 2) {
+                        const oldMax = u.maxHealth;
+                        u.maxHealth = Math.floor(u.maxHealth * 1.3);
+                        u.health = u.maxHealth;
+                        if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
+                            showNotification(`★★ ${u.type.toUpperCase()} salvaged scrap: HEAVY ARMOR MAXED!`, 'success');
+                        }
+                    } else {
+                        u.health = u.maxHealth;
+                        if (typeof units !== 'undefined' && units.includes(u)) {
+                            playerResources += 500;
+                            if (typeof updateSidebar === 'function') updateSidebar();
+                            if (typeof showNotification === 'function') {
+                                showNotification('💰 GLA salvaged scrap converted into +$500 Cash!', 'success');
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}

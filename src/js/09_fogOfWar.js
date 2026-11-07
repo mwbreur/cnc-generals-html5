@@ -7,6 +7,16 @@
         let fogGrid = null; // Uint8Array: 0 = Shroud, 1 = Fog (explored), 2 = Visible
         const FOG_RES = 128;
         let fogUpdateTick = 0;
+        const activeVisionBeacons = [];
+
+        function revealFogOfWarAt(pos, radius = 35, duration = 1800) {
+            activeVisionBeacons.push({
+                x: pos.x,
+                z: pos.z,
+                radius: radius,
+                life: duration
+            });
+        }
 
         function initFogOfWar(mapSize) {
             if (fogMesh) {
@@ -70,13 +80,23 @@
                 if (fogGrid[i] === 2) fogGrid[i] = 1;
             }
 
-            // 2. Mark cells currently in line of sight of any friendly unit or structure (including Allied AI!)
+            // 2. Mark cells currently in line of sight of any friendly unit or structure (including Allied AI & General Powers)
             const visionSources = [
                 ...units.filter(u => u.health > 0 && !u.garrisonedIn),
                 ...structures.filter(s => s.health > 0 && !s.isBuilding),
                 ...enemyUnits.filter(u => u.health > 0 && !u.garrisonedIn && isFriendly({ teamId: playerTeamId }, u)),
                 ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
             ];
+
+            for (let i = activeVisionBeacons.length - 1; i >= 0; i--) {
+                const b = activeVisionBeacons[i];
+                b.life--;
+                visionSources.push({
+                    position: { x: b.x, z: b.z },
+                    scanRange: b.radius
+                });
+                if (b.life <= 0) activeVisionBeacons.splice(i, 1);
+            }
 
             visionSources.forEach(src => {
                 const pos = src.position || src.mesh.position;

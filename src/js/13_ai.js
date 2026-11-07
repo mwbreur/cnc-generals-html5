@@ -330,6 +330,16 @@ function processEnemyAIEngine() {
                     if (placement) deployBase(placement);
                     return;
                 }
+                if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const targetPosition = getGroundIntersectPoint();
+                    if (targetPosition) {
+                        executeGeneralsPowerAt(targetPosition);
+                    }
+                    return;
+                }
                 if (pendingSuperweapon) {
                     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
                     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;

@@ -552,38 +552,54 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             );
         }
     } else {
-        // Multi-Unit Squad
+        // Multi-Unit Squad (Control Bar Pro Layout matching screenshot!)
         const totalHP = selectedUnits.reduce((a, u) => a + u.health, 0);
         const maxHP = selectedUnits.reduce((a, u) => a + u.maxHealth, 0);
         const hpPct = Math.max(0, Math.min(100, Math.round((totalHP / maxHP) * 100)));
         const totalKills = selectedUnits.reduce((a, u) => a + (u.kills || 0), 0);
 
-        const counts = {};
-        selectedUnits.forEach(u => { counts[u.type] = (counts[u.type] || 0) + 1; });
-        const breakdown = Object.entries(counts).map(([type, c]) => `${c}x ${unitRoster[type] ? unitRoster[type].name : type.toUpperCase()}`).join(', ');
+        // Watermark SVG based on faction
+        const watermarkSVGs = {
+            usa: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><path d="M50 15 L62 38 L88 38 L68 54 L75 80 L50 64 L25 80 L32 54 L12 38 L38 38 Z" fill="rgba(0,255,204,0.14)"/></svg>`,
+            china: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><polygon points="50,15 62,38 88,38 68,54 75,80 50,64 25,80 32,54 12,38 38,38" fill="rgba(255,71,87,0.14)"/></svg>`,
+            gla: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><path d="M25 75 Q50 20 75 75 Z" fill="rgba(255,165,2,0.14)"/></svg>`
+        };
+        const watermark = watermarkSVGs[selectedFaction] || watermarkSVGs.usa;
+
+        // Render interactive unit cameo portraits (matching screenshot!)
+        const unitCameosHtml = selectedUnits.slice(0, 10).map((u, idx) => {
+            const uHpPct = Math.max(0, Math.min(100, Math.round((u.health / u.maxHealth) * 100)));
+            const hpColor = uHpPct > 50 ? '#2ecc71' : uHpPct > 25 ? '#f39c12' : '#e74c3c';
+            const initials = getUnitInitials(u.type);
+            const rankStars = u.veterancy === 3 ? '★★★' : u.veterancy === 2 ? '★★' : u.veterancy === 1 ? '★' : '';
+            return `
+                <div class="cb-squad-unit-card" title="${u.type.toUpperCase()} (${Math.ceil(u.health)}/${u.maxHealth} HP). Click to isolate, Shift+Click to deselect." onclick="handleSquadCardClick(event, ${idx})">
+                    <div class="cb-squad-hp-track">
+                        <div class="cb-squad-hp-bar" style="width: ${uHpPct}%; background: ${hpColor};"></div>
+                    </div>
+                    <div class="cb-squad-avatar-preview">
+                        ${getCameoSVG(u.type, selectedFaction, u.type)}
+                    </div>
+                    ${rankStars ? `<span class="cb-squad-rank-stars">${rankStars}</span>` : ''}
+                    <span class="cb-squad-tag">${initials}</span>
+                </div>
+            `;
+        }).join('');
 
         inspector.innerHTML = `
-            <div class="inspector-card">
-                <div class="inspector-info-pane" style="width: 100%;">
-                    <div class="inspector-header-row">
-                        <span class="inspector-title">TACTICAL SQUAD (${selectedUnits.length} UNITS)</span>
-                        <span class="inspector-kills-tag">★ ${totalKills} TOTAL KILLS</span>
-                    </div>
-                    <div class="inspector-sub-role">${breakdown}</div>
-                    <div class="inspector-hp-box">
-                        <div class="inspector-hp-label">
-                            <span>SQUAD READINESS</span>
-                            <span>${Math.ceil(totalHP)} / ${maxHP} HP</span>
-                        </div>
-                        <div class="inspector-hp-track">
-                            <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
-                        </div>
-                    </div>
-                    <div class="inspector-quick-btns">
-                        <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ Combat</button>
-                        <button class="quick-army-btn" onclick="orderUnitsHalt()">⏹ Stop</button>
-                        <button class="quick-army-btn" onclick="scatterSelectedUnits()">💨 Scatter</button>
-                    </div>
+            <div class="cb-inspector-squad-container">
+                ${watermark}
+                <div class="cb-squad-header-row">
+                    <span class="cb-squad-title">TACTICAL SQUAD (${selectedUnits.length} UNITS)</span>
+                    <span class="cb-squad-readiness">${Math.ceil(totalHP)} / ${maxHP} HP (★ ${totalKills} KILLS)</span>
+                </div>
+                <div class="cb-squad-grid">
+                    ${unitCameosHtml}
+                </div>
+                <div class="cb-squad-quick-actions">
+                    <button class="quick-army-btn" onclick="orderUnitsHalt()">⏹ Stop (S)</button>
+                    <button class="quick-army-btn" onclick="scatterSelectedUnits()">💨 Scatter (X)</button>
+                    <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ All Combat</button>
                 </div>
             </div>
         `;
@@ -2418,3 +2434,81 @@ function updateHUD() {
         }
 
         
+// =========================================================================
+// SQUAD INTERACTION & GENERALS POWERS (Control Bar Pro)
+// =========================================================================
+function handleSquadCardClick(e, idx) {
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    const sel = units.filter(u => u.selected);
+    const targetUnit = sel[idx];
+    if (!targetUnit) return;
+
+    if (e.shiftKey) {
+        targetUnit.selected = false;
+        if (typeof removeSelectionCircle === 'function') removeSelectionCircle(targetUnit);
+    } else {
+        units.forEach(u => {
+            const match = (u === targetUnit);
+            u.selected = match;
+            if (!match && typeof removeSelectionCircle === 'function') removeSelectionCircle(u);
+        });
+    }
+    updateSidebar();
+}
+
+let activeGeneralPower = null;
+
+function activateGeneralsPower(powerType) {
+    activeGeneralPower = powerType;
+    if (powerType === 'spySatellite') {
+        showNotification('USA Spy Satellite: Click on the terrain or minimap to survey target sector.', 'info');
+    } else if (powerType === 'a10Strike') {
+        showNotification('A-10 Thunderbolt Strike: Click ground target to order CAS air strike.', 'info');
+    }
+}
+
+function executeGeneralsPowerAt(pos) {
+    if (!activeGeneralPower) return false;
+    const p = activeGeneralPower;
+    activeGeneralPower = null;
+
+    if (p === 'spySatellite') {
+        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, 42, 1800);
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00ffff, 4.0);
+        if (typeof spawnLaserBeam === 'function') {
+            const orbitalHigh = pos.clone().add(new THREE.Vector3(0, 50, 0));
+            spawnLaserBeam(orbitalHigh, pos, 0x00ffff, 3.5);
+        }
+        playAudio('radio_chirp');
+        showNotification('★ USA Spy Satellite online! Sector uncloaked for 30 seconds.', 'success');
+        return true;
+    } else if (p === 'a10Strike') {
+        showNotification('★ A-10 Warthog flight inbound to target coordinates!', 'success');
+        playAudio('radio_chirp');
+        for (let i = 0; i < 2; i++) {
+            setTimeout(() => {
+                const flyStart = pos.clone().add(new THREE.Vector3(-40 + i * 8, 22, -40));
+                const flyEnd = pos.clone().add(new THREE.Vector3(40 + i * 8, 22, 40));
+                for (let r = 0; r < 3; r++) {
+                    setTimeout(() => {
+                        const rPos = flyStart.clone().lerp(flyEnd, 0.4 + r * 0.15);
+                        const impact = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8));
+                        if (typeof spawnRocketProjectile === 'function') {
+                            spawnRocketProjectile(rPos, impact, true, false, {
+                                attacker: units[0] || { teamId: playerTeamId },
+                                target: null,
+                                targetPos: impact,
+                                damage: 110,
+                                damageType: 'EXPLOSIVE',
+                                splashRadius: 6.0
+                            });
+                        }
+                        if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                    }, r * 150);
+                }
+            }, i * 350);
+        }
+        return true;
+    }
+    return false;
+}

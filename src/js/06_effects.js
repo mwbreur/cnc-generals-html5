@@ -1,6 +1,8 @@
 // COMMAND & CONQUER: GENERALS - AUTHENTIC WEAPON EFFECTS & PARTICLE SYSTEM
         // =========================================================================
         const activeFX = [];
+        const activeMissiles = [];
+        const activeScrapCrates = [];
 
         // Helper: Create glowing particle materials
         const fxMatFire = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.95 });
@@ -65,7 +67,7 @@
             });
         }
 
-        function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false) {
+        function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false, metadata = null) {
             const group = new THREE.Group();
             group.position.copy(fromPos);
 
@@ -90,7 +92,8 @@
             const speed = isHeavy ? 1.6 : 2.2;
             const distTotal = fromPos.distanceTo(toPos);
 
-            activeFX.push({
+            const missileObj = {
+                id: 'missile_' + Math.random().toString(36).substr(2, 9),
                 group: group,
                 curPos: fromPos.clone(),
                 toPos: toPos.clone(),
@@ -99,7 +102,22 @@
                 speed: speed,
                 isHeavy: isHeavy,
                 isToxin: isToxin,
+                metadata: metadata,
+                intercepted: false,
                 update() {
+                    if (this.intercepted) {
+                        // Point Defense Laser Interception in Mid-Air!
+                        scene.remove(this.group);
+                        this.group.traverse(child => {
+                            if (child.geometry) child.geometry.dispose();
+                            if (child.material) child.material.dispose();
+                        });
+                        spawnEnhancedExplosion(this.curPos, 0x00ffff, 0.9, false);
+                        const mIdx = activeMissiles.indexOf(this);
+                        if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
+                        return false;
+                    }
+
                     this.distTraveled += this.speed;
                     const alpha = Math.min(1.0, this.distTraveled / this.distTotal);
                     this.curPos.lerpVectors(fromPos, this.toPos, alpha);
@@ -122,17 +140,53 @@
                             if (child.material) child.material.dispose();
                         });
 
+                        const mIdx = activeMissiles.indexOf(this);
+                        if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
+
                         spawnEnhancedExplosion(this.toPos, this.isToxin ? 0x2ed573 : 0xff4757, this.isHeavy ? 2.2 : 1.2, this.isHeavy);
                         if (this.isToxin) {
                             spawnLingeringToxinCloud(this.toPos);
                         } else if (this.isHeavy) {
                             spawnCraterDecal(this.toPos, 3.2, 420);
                         }
+
+                        // Apply authentic missile / rocket payload damage if not intercepted!
+                        if (this.metadata) {
+                            const { attacker, target, damage, damageType, splashRadius } = this.metadata;
+                            if (target && target.health > 0) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(attacker, target, damage, damageType || 'EXPLOSIVE');
+                                } else {
+                                    target.health -= damage;
+                                }
+                            }
+                            if (splashRadius && splashRadius > 0) {
+                                const allEnemies = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
+                                    ? [...units, ...enemyUnits] : [];
+                                allEnemies.forEach(other => {
+                                    if (other !== target && other.health > 0 && other.mesh) {
+                                        const d = other.mesh.position.distanceTo(this.toPos);
+                                        if (d <= splashRadius && (typeof isFriendly === 'function' ? !isFriendly(attacker, other) : true)) {
+                                            const splashDmg = Math.floor(damage * (1 - (d / splashRadius) * 0.5));
+                                            if (typeof applyCalculatedDamage === 'function') {
+                                                applyCalculatedDamage(attacker, other, splashDmg, damageType || 'EXPLOSIVE');
+                                            } else {
+                                                other.health -= splashDmg;
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        }
+
                         return false;
                     }
                     return true;
                 }
-            });
+            };
+
+            activeFX.push(missileObj);
+            activeMissiles.push(missileObj);
         }
 
         function spawnGuidedBomb(fromPos, toPos, isFuelAir = false) {
@@ -612,12 +666,120 @@
             spawnLingeringToxinCloud(pos);
         }
 
+        // Authentic Infantry Crushing Decal (SquishCollide.cpp)
+        function spawnSquishDecal(pos) {
+            const geo = new THREE.CircleGeometry(1.2, 10);
+            geo.rotateX(-Math.PI / 2);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x5a0b0b,
+                transparent: true,
+                opacity: 0.85,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+            mesh.position.set(pos.x, groundY + 0.04, pos.z);
+            mesh.rotation.y = Math.random() * Math.PI * 2;
+            mesh.scale.set(1.0 + Math.random() * 0.4, 1.0, 0.8 + Math.random() * 0.3);
+            scene.add(mesh);
+            activeFX.push({
+                mesh: mesh,
+                life: 600, // ~10 seconds
+                maxLife: 600,
+                update() {
+                    this.life--;
+                    if (this.life < 60) {
+                        this.mesh.material.opacity = (this.life / 60) * 0.85;
+                    }
+                    if (this.life <= 0) {
+                        scene.remove(this.mesh);
+                        this.mesh.geometry.dispose();
+                        this.mesh.material.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+
+        // Authentic GLA Salvage Scrap Crate (SalvageCrateCollide.cpp)
+        function spawnScrapCrate(pos) {
+            const group = new THREE.Group();
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+            group.position.set(pos.x, groundY + 0.45, pos.z);
+
+            // Crate Box
+            const crateGeo = new THREE.BoxGeometry(1.3, 0.8, 1.3);
+            const crateMat = new THREE.MeshStandardMaterial({
+                color: 0x5c4033, // rusted bronze/scrap
+                roughness: 0.65,
+                metalness: 0.75
+            });
+            const crate = new THREE.Mesh(crateGeo, crateMat);
+            group.add(crate);
+
+            // Green salvage scrap beacon icon
+            const scrapGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 6);
+            const scrapMat = new THREE.MeshBasicMaterial({
+                color: 0x2ed573,
+                transparent: true,
+                opacity: 0.95
+            });
+            const scrapIcon = new THREE.Mesh(scrapGeo, scrapMat);
+            scrapIcon.position.y = 0.55;
+            group.add(scrapIcon);
+
+            // Ground pulse aura
+            const ringGeo = new THREE.RingGeometry(0.8, 1.3, 16);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: 0x2ed573,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.55
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.y = -0.4;
+            group.add(ring);
+
+            scene.add(group);
+
+            const crateObj = {
+                mesh: group,
+                position: group.position,
+                ringMat: ringMat,
+                life: 2400, // ~40 seconds
+                update() {
+                    this.life--;
+                    this.mesh.rotation.y += 0.02;
+                    const pulse = 0.35 + Math.sin(Date.now() * 0.005) * 0.25;
+                    this.ringMat.opacity = pulse;
+                    if (this.life <= 0) {
+                        scene.remove(this.mesh);
+                        this.mesh.traverse(c => {
+                            if (c.geometry) c.geometry.dispose();
+                            if (c.material) c.material.dispose();
+                        });
+                        return false;
+                    }
+                    return true;
+                }
+            };
+            activeScrapCrates.push(crateObj);
+        }
+
         // Update all FX every frame
         function updateFXEngine() {
             for (let i = activeFX.length - 1; i >= 0; i--) {
                 const alive = activeFX[i].update();
                 if (!alive) {
                     activeFX.splice(i, 1);
+                }
+            }
+            for (let i = activeScrapCrates.length - 1; i >= 0; i--) {
+                const alive = activeScrapCrates[i].update();
+                if (!alive) {
+                    activeScrapCrates.splice(i, 1);
                 }
             }
         }
