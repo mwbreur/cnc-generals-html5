@@ -100,6 +100,41 @@ function renderRadarMinimap() {
     const mapSize = currentMapSize || 800;
     const half = mapSize / 2;
 
+    // Check if player has active radar telemetry
+    const hasRadar = (typeof isRadarOnline === 'function') ? isRadarOnline(selectedFaction) : true;
+    if (!hasRadar) {
+        // Draw Radar Offline display with animated scanlines
+        ctx.fillStyle = '#061009';
+        ctx.fillRect(0, 0, w, h);
+        
+        ctx.strokeStyle = 'rgba(0, 255, 180, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(w/2, h/2, w * 0.44, 0, Math.PI * 2);
+        ctx.moveTo(w/2, 4); ctx.lineTo(w/2, h - 4);
+        ctx.moveTo(4, h/2); ctx.lineTo(w - 4, h/2);
+        ctx.stroke();
+
+        radarSweepAngle = (radarSweepAngle + 0.03) % (Math.PI * 2);
+        const scanY = (Math.sin(radarSweepAngle) * 0.5 + 0.5) * h;
+        ctx.strokeStyle = 'rgba(231, 76, 60, 0.45)';
+        ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(w, scanY); ctx.stroke();
+
+        ctx.fillStyle = '#e74c3c';
+        ctx.font = 'bold 11px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚡ RADAR OFFLINE', w / 2, h / 2 - 8);
+
+        ctx.fillStyle = '#95a5a6';
+        ctx.font = '9px Arial, sans-serif';
+        const reason = (selectedFaction === 'china' && (typeof researchedTechs === 'undefined' || !researchedTechs.has('radar')))
+            ? 'RESEARCH RADAR AT HQ'
+            : 'INSUFFICIENT POWER / NO HQ';
+        ctx.fillText(reason, w / 2, h / 2 + 10);
+        return;
+    }
+
     // Clear radar background
     ctx.fillStyle = '#061009';
     ctx.fillRect(0, 0, w, h);
@@ -381,6 +416,17 @@ function openSkirmishSetupFromGame() {
 
 function surrenderMatch() {
     if (typeof isMatchActive !== 'undefined') isMatchActive = false;
+    if (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive) {
+        if (typeof isMultiplayerHost !== 'undefined' && isMultiplayerHost) {
+            if (typeof broadcastNetPacket === 'function') {
+                broadcastNetPacket({ type: 'host_left', message: 'Host commander surrendered and left the match.' });
+            }
+        } else {
+            if (typeof broadcastNetPacket === 'function') {
+                broadcastNetPacket({ type: 'client_left', message: 'Challenger surrendered and left the match.' });
+            }
+        }
+    }
     resumeGame();
     if (typeof showNotification === 'function') showNotification('MISSION TERMINATED: Tactical forces ordered to surrender.', 'error');
     const ticker = document.getElementById('tactical-message');
@@ -770,6 +816,38 @@ function renderStructureInspectorAndGrid(inspector, structure) {
     const title = (names[structure.type] || structure.type).toUpperCase();
     const hpPct = Math.max(0, Math.min(100, Math.round((structure.health / structure.maxHealth) * 100)));
     const isConstructing = structure.isBuilding;
+
+    // Friendly players cannot interact with their allies' buildings
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        const teamLabel = structure.teamId ? `Team ${structure.teamId}` : 'Allied Forces';
+        inspector.innerHTML = `
+            <div class="cb-inspector-pane">
+                <div class="inspector-card">
+                    <div class="inspector-info-pane" style="width: 100%;">
+                        <div class="inspector-header-row">
+                            <span class="inspector-title" style="color: #00cec9;">[ALLIED] ${title}</span>
+                            <span class="inspector-kills-tag" style="color: #00cec9;">● ALLY</span>
+                        </div>
+                        <div class="inspector-sub-role">${teamLabel} • Commanded by Ally</div>
+                        <div class="inspector-hp-box">
+                            <div class="inspector-hp-label">
+                                <span>STRUCTURAL INTEGRITY</span>
+                                <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP</span>
+                            </div>
+                            <div class="inspector-hp-track">
+                                <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: #a4b0be; margin-top: 8px; font-style: italic;">
+                            ⚠️ Allied Command Protocol: Friendly players cannot interact with or command allied facilities.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        currentGridSlots = new Array(12).fill(null);
+        return;
+    }
 
     // Build Queue Display HTML (matching [MD] [MD] from Control Bar Pro screenshot)
     let queueHtml = '';
@@ -2029,6 +2107,10 @@ function repairStructure(structure) {
         showNotification('Structure is at 100% integrity.', 'info');
         return;
     }
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        showNotification('Cannot command repairs on allied structures!', 'error');
+        return;
+    }
     const fee = Math.min(50, Math.ceil((structure.maxHealth - structure.health) * 0.1));
     if (playerResources < fee) {
         showNotification(`Insufficient funds to repair ($${fee} needed).`, 'error');
@@ -2043,6 +2125,10 @@ function repairStructure(structure) {
 
 function sellStructure(structure) {
     if (!structure) return;
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        showNotification('Cannot demolish allied structures!', 'error');
+        return;
+    }
     const cost = getStructureCost(structure.type) || 500;
     const refund = Math.floor(cost * 0.5);
     playerResources += refund;
@@ -2071,6 +2157,11 @@ function getEffectiveUnitCost(type) {
 function produceUnit(type) {
     const spec = unitRoster[type];
     if (!spec) return;
+
+    if (selectedStructure && selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
+        showNotification('Cannot train units from allied facilities!', 'error');
+        return;
+    }
 
     const effCost = getEffectiveUnitCost(type);
     if (playerResources < effCost) {
@@ -2142,6 +2233,10 @@ function useStructureAbility(action) {
 
 function executeStructureUpgradeOrAction(upg, structure) {
     if (!structure || structure.health <= 0 || structure.isBuilding) return;
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        showNotification('Cannot purchase upgrades for allied structures!', 'error');
+        return;
+    }
 
     if (upg.isStance) {
         battlePlan = upg.stance;
@@ -2785,6 +2880,10 @@ function updateHUD() {
 		
 function triggerRallyPointMode() {
     if (selectedStructure) {
+        if (selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
+            showNotification('Cannot set rally points on allied structures!', 'error');
+            return;
+        }
         showNotification('Click anywhere on battlefield to set Rally Point.', 'info');
     } else {
         showNotification('Select a production building first to set its Rally Point.', 'warning');

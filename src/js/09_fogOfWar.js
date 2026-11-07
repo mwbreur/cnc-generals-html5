@@ -67,6 +67,43 @@
             scene.add(fogMesh);
         }
 
+        function isRadarOnline(faction = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa')) {
+            if (typeof structures === 'undefined') return true;
+
+            // Check power requirement (USA & China need sufficient power grid to operate radar)
+            if (faction !== 'gla') {
+                let produced = 0, consumed = 0;
+                structures.forEach(s => {
+                    if (s.health <= 0 || s.isBuilding) return;
+                    if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
+                    if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
+                    const drain = {
+                        barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
+                        strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
+                        propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
+                        particleCannon: 4, nukeSilo: 4
+                    }[s.type] || 0;
+                    consumed += drain;
+                });
+                if (produced < consumed) return false;
+            }
+
+            if (faction === 'usa') {
+                return structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
+            } else if (faction === 'china') {
+                const hasCC = structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
+                const hasRadarUpgrade = (typeof researchedTechs !== 'undefined' && researchedTechs.has('radar'));
+                return hasCC && hasRadarUpgrade;
+            } else if (faction === 'gla') {
+                const hasRadarVan = (typeof units !== 'undefined') && units.some(u => u.type === 'radarvan' && u.health > 0);
+                const hasBlackMarket = structures.some(s => s.type === 'blackMarket' && s.health > 0 && !s.isBuilding);
+                const hasCC = structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
+                return hasRadarVan || hasBlackMarket || hasCC;
+            }
+            return true;
+        }
+        window.isRadarOnline = isRadarOnline;
+
         function updateFogOfWar() {
             if (!fogCanvas || !fogCtx || !fogMesh) return;
             fogUpdateTick++;
@@ -80,13 +117,20 @@
                 if (fogGrid[i] === 2) fogGrid[i] = 1;
             }
 
-            // 2. Mark cells currently in line of sight of any friendly unit or structure (including Allied AI & General Powers)
+            // 2. Mark cells currently in line of sight of local player units and structures
+            const radarActive = isRadarOnline(selectedFaction);
             const visionSources = [
                 ...units.filter(u => u.health > 0 && !u.garrisonedIn),
-                ...structures.filter(s => s.health > 0 && !s.isBuilding),
-                ...enemyUnits.filter(u => u.health > 0 && !u.garrisonedIn && isFriendly({ teamId: playerTeamId }, u)),
-                ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
+                ...structures.filter(s => s.health > 0 && !s.isBuilding)
             ];
+
+            // Friendly players can watch each other's units when they have radar!
+            if (radarActive) {
+                visionSources.push(
+                    ...enemyUnits.filter(u => u.health > 0 && !u.garrisonedIn && isFriendly({ teamId: playerTeamId }, u)),
+                    ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
+                );
+            }
 
             // Satellite Hack I: Continuous orbital recon on all enemy Command Centers
             if (typeof researchedTechs !== 'undefined' && researchedTechs.has('satHack1')) {

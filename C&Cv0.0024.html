@@ -2566,6 +2566,20 @@ body {
         </div>
     </div>
 
+    <!-- HOST DISCONNECT WARNING MODAL FOR CLIENT -->
+    <div id="host-disconnected-modal" class="end-game-modal" style="display: none;">
+        <div class="end-game-card defeat-card" style="border-color: #ff4757; box-shadow: 0 0 35px rgba(255, 71, 87, 0.45);">
+            <div class="end-game-laurel" style="color: #ff4757;">⚠️ CONNECTION LOST ⚠️</div>
+            <h1 class="defeat-title" style="color: #ff4757; font-size: 28px; letter-spacing: 3px;">HOST HAS DISCONNECTED</h1>
+            <div id="host-disconnect-reason" class="end-game-subtitle" style="margin-bottom: 20px;">The host commander has left or closed the multiplayer match. Tactical uplink terminated.</div>
+            <div class="end-game-actions" style="justify-content: center; gap: 14px;">
+                <button class="rts-btn end-game-btn play-again-btn" onclick="leaveMultiplayerSessionToMenu()" style="border-color: #ff4757; color: #ff4757; min-width: 220px;">
+                    ↩ RETURN TO MAIN LOBBY
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Hidden compatibility container for legacy references -->
     <div id="sidebar-body" style="display: none;"></div>
 
@@ -9212,6 +9226,43 @@ function playUSASound(type, options = {}) {
             scene.add(fogMesh);
         }
 
+        function isRadarOnline(faction = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa')) {
+            if (typeof structures === 'undefined') return true;
+
+            // Check power requirement (USA & China need sufficient power grid to operate radar)
+            if (faction !== 'gla') {
+                let produced = 0, consumed = 0;
+                structures.forEach(s => {
+                    if (s.health <= 0 || s.isBuilding) return;
+                    if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
+                    if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
+                    const drain = {
+                        barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
+                        strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
+                        propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
+                        particleCannon: 4, nukeSilo: 4
+                    }[s.type] || 0;
+                    consumed += drain;
+                });
+                if (produced < consumed) return false;
+            }
+
+            if (faction === 'usa') {
+                return structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
+            } else if (faction === 'china') {
+                const hasCC = structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
+                const hasRadarUpgrade = (typeof researchedTechs !== 'undefined' && researchedTechs.has('radar'));
+                return hasCC && hasRadarUpgrade;
+            } else if (faction === 'gla') {
+                const hasRadarVan = (typeof units !== 'undefined') && units.some(u => u.type === 'radarvan' && u.health > 0);
+                const hasBlackMarket = structures.some(s => s.type === 'blackMarket' && s.health > 0 && !s.isBuilding);
+                const hasCC = structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
+                return hasRadarVan || hasBlackMarket || hasCC;
+            }
+            return true;
+        }
+        window.isRadarOnline = isRadarOnline;
+
         function updateFogOfWar() {
             if (!fogCanvas || !fogCtx || !fogMesh) return;
             fogUpdateTick++;
@@ -9225,13 +9276,20 @@ function playUSASound(type, options = {}) {
                 if (fogGrid[i] === 2) fogGrid[i] = 1;
             }
 
-            // 2. Mark cells currently in line of sight of any friendly unit or structure (including Allied AI & General Powers)
+            // 2. Mark cells currently in line of sight of local player units and structures
+            const radarActive = isRadarOnline(selectedFaction);
             const visionSources = [
                 ...units.filter(u => u.health > 0 && !u.garrisonedIn),
-                ...structures.filter(s => s.health > 0 && !s.isBuilding),
-                ...enemyUnits.filter(u => u.health > 0 && !u.garrisonedIn && isFriendly({ teamId: playerTeamId }, u)),
-                ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
+                ...structures.filter(s => s.health > 0 && !s.isBuilding)
             ];
+
+            // Friendly players can watch each other's units when they have radar!
+            if (radarActive) {
+                visionSources.push(
+                    ...enemyUnits.filter(u => u.health > 0 && !u.garrisonedIn && isFriendly({ teamId: playerTeamId }, u)),
+                    ...enemyStructures.filter(s => s.health > 0 && !s.isBuilding && isFriendly({ teamId: playerTeamId }, s))
+                );
+            }
 
             // Satellite Hack I: Continuous orbital recon on all enemy Command Centers
             if (typeof researchedTechs !== 'undefined' && researchedTechs.has('satHack1')) {
@@ -10953,27 +11011,112 @@ function playUSASound(type, options = {}) {
             updateSidebar();
         }
 
+        function resetEntireBattlefieldState(mapSize = 800) {
+            // 1. Deselect everything and reset cursors & blueprint states
+            if (typeof selectedStructure !== 'undefined') selectedStructure = null;
+            if (typeof selectedSupplyPoint !== 'undefined') selectedSupplyPoint = null;
+            if (typeof blueprintMesh !== 'undefined' && blueprintMesh) {
+                if (typeof scene !== 'undefined') scene.remove(blueprintMesh);
+                blueprintMesh = null;
+                activeBlueprintType = null;
+            }
+            if (typeof isPlacingBlueprint !== 'undefined') isPlacingBlueprint = false;
+            if (typeof pendingSuperweapon !== 'undefined') pendingSuperweapon = null;
+            if (typeof activeGeneralPower !== 'undefined') activeGeneralPower = null;
+            if (typeof isSellMode !== 'undefined') isSellMode = false;
+            if (typeof isRepairMode !== 'undefined') isRepairMode = false;
+            if (document.body) document.body.style.cursor = 'default';
+
+            // 2. Clear previous battle structures
+            if (typeof structures !== 'undefined') {
+                structures.forEach(s => { if (s.mesh && typeof scene !== 'undefined') scene.remove(s.mesh); });
+                structures.length = 0;
+            }
+            if (typeof enemyStructures !== 'undefined') {
+                enemyStructures.forEach(es => { if (es.mesh && typeof scene !== 'undefined') scene.remove(es.mesh); });
+                enemyStructures.length = 0;
+            }
+            if (typeof window.neutralStructures !== 'undefined' && window.neutralStructures) {
+                window.neutralStructures.forEach(ns => { if (ns.mesh && typeof scene !== 'undefined') scene.remove(ns.mesh); });
+                window.neutralStructures.length = 0;
+            } else {
+                window.neutralStructures = [];
+            }
+
+            // 3. Clear previous battle units
+            if (typeof units !== 'undefined') {
+                units.forEach(u => {
+                    if (u.mesh && typeof scene !== 'undefined') scene.remove(u.mesh);
+                    if (u.selectionCircle && typeof scene !== 'undefined') scene.remove(u.selectionCircle);
+                });
+                units.length = 0;
+            }
+            if (typeof enemyUnits !== 'undefined') {
+                enemyUnits.forEach(eu => {
+                    if (eu.mesh && typeof scene !== 'undefined') scene.remove(eu.mesh);
+                    if (eu.selectionCircle && typeof scene !== 'undefined') scene.remove(eu.selectionCircle);
+                });
+                enemyUnits.length = 0;
+            }
+
+            // 4. Clear projectiles, explosions, debris
+            if (typeof projectiles !== 'undefined') {
+                projectiles.forEach(p => { if (p.mesh && typeof scene !== 'undefined') scene.remove(p.mesh); });
+                projectiles.length = 0;
+            }
+            if (typeof debrisList !== 'undefined') {
+                debrisList.forEach(d => { if (d.mesh && typeof scene !== 'undefined') scene.remove(d.mesh); });
+                debrisList.length = 0;
+            }
+
+            // 5. Reset tech tree research, General powers, resources
+            if (typeof researchedTechs !== 'undefined') researchedTechs.clear();
+            if (typeof generalsPoints !== 'undefined') generalsPoints = 0;
+            if (typeof currentGeneralRank !== 'undefined') currentGeneralRank = 1;
+            if (typeof currentGeneralXP !== 'undefined') currentGeneralXP = 0;
+            if (typeof unlockedGeneralsPowers !== 'undefined') unlockedGeneralsPowers.clear();
+
+            // 6. Reset UI health bars
+            if (typeof healthBarElements !== 'undefined' && healthBarElements) {
+                healthBarElements.forEach(bar => { if (bar.container) bar.container.remove(); });
+                healthBarElements.clear();
+            }
+
+            // 7. Reset Fog of War shroud to completely unrevealed
+            if (typeof initFogOfWar === 'function') {
+                initFogOfWar(mapSize);
+            }
+            if (typeof activeVisionBeacons !== 'undefined') {
+                activeVisionBeacons.length = 0;
+            }
+
+            // 8. Reset AI commanders and timers
+            if (typeof aiCommanders !== 'undefined') {
+                for (const k in aiCommanders) delete aiCommanders[k];
+            }
+            if (typeof buildingTick !== 'undefined') buildingTick = 0;
+            hasSpawnedInitialEnemyBase = false;
+
+            // 9. Reset modals
+            const vicModal = document.getElementById('victory-modal');
+            if (vicModal) vicModal.style.display = 'none';
+            const defModal = document.getElementById('defeat-modal');
+            if (defModal) defModal.style.display = 'none';
+            const hostModal = document.getElementById('host-disconnected-modal');
+            if (hostModal) hostModal.style.display = 'none';
+            if (typeof hasDeclaredVictory !== 'undefined') hasDeclaredVictory = false;
+
+            if (typeof resumeGame === 'function') resumeGame();
+        }
+        window.resetEntireBattlefieldState = resetEntireBattlefieldState;
+
         function setupGameDeployment() {
             const selectedEnv = document.getElementById('map-environment').value;
             const selectedSize = Number(document.getElementById('map-size').value);
             const spawns = getSpawnPointsForMap(selectedSize, selectedEnv, activeCustomMap);
 
-            // 1. Clear previous battle assets
-            if (typeof researchedTechs !== 'undefined') researchedTechs.clear();
-            structures.forEach(s => { if (s.mesh) scene.remove(s.mesh); });
-            structures.length = 0;
-            units.forEach(u => { if (u.mesh) scene.remove(u.mesh); });
-            units.length = 0;
-            enemyStructures.forEach(es => { if (es.mesh) scene.remove(es.mesh); });
-            enemyStructures.length = 0;
-            enemyUnits.forEach(eu => { if (eu.mesh) scene.remove(eu.mesh); });
-            enemyUnits.length = 0;
-            if (window.neutralStructures) {
-                window.neutralStructures.forEach(ns => { if (ns.mesh) scene.remove(ns.mesh); });
-                window.neutralStructures.length = 0;
-            } else {
-                window.neutralStructures = [];
-            }
+            // 1. Clear previous battle assets with full battlefield refresh
+            resetEntireBattlefieldState(selectedSize);
 
             choosingBaseLocation = false;
             document.getElementById('deployment-hint').style.display = 'none';
@@ -11455,6 +11598,41 @@ function renderRadarMinimap() {
     const mapSize = currentMapSize || 800;
     const half = mapSize / 2;
 
+    // Check if player has active radar telemetry
+    const hasRadar = (typeof isRadarOnline === 'function') ? isRadarOnline(selectedFaction) : true;
+    if (!hasRadar) {
+        // Draw Radar Offline display with animated scanlines
+        ctx.fillStyle = '#061009';
+        ctx.fillRect(0, 0, w, h);
+        
+        ctx.strokeStyle = 'rgba(0, 255, 180, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(w/2, h/2, w * 0.44, 0, Math.PI * 2);
+        ctx.moveTo(w/2, 4); ctx.lineTo(w/2, h - 4);
+        ctx.moveTo(4, h/2); ctx.lineTo(w - 4, h/2);
+        ctx.stroke();
+
+        radarSweepAngle = (radarSweepAngle + 0.03) % (Math.PI * 2);
+        const scanY = (Math.sin(radarSweepAngle) * 0.5 + 0.5) * h;
+        ctx.strokeStyle = 'rgba(231, 76, 60, 0.45)';
+        ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(w, scanY); ctx.stroke();
+
+        ctx.fillStyle = '#e74c3c';
+        ctx.font = 'bold 11px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚡ RADAR OFFLINE', w / 2, h / 2 - 8);
+
+        ctx.fillStyle = '#95a5a6';
+        ctx.font = '9px Arial, sans-serif';
+        const reason = (selectedFaction === 'china' && (typeof researchedTechs === 'undefined' || !researchedTechs.has('radar')))
+            ? 'RESEARCH RADAR AT HQ'
+            : 'INSUFFICIENT POWER / NO HQ';
+        ctx.fillText(reason, w / 2, h / 2 + 10);
+        return;
+    }
+
     // Clear radar background
     ctx.fillStyle = '#061009';
     ctx.fillRect(0, 0, w, h);
@@ -11736,6 +11914,17 @@ function openSkirmishSetupFromGame() {
 
 function surrenderMatch() {
     if (typeof isMatchActive !== 'undefined') isMatchActive = false;
+    if (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive) {
+        if (typeof isMultiplayerHost !== 'undefined' && isMultiplayerHost) {
+            if (typeof broadcastNetPacket === 'function') {
+                broadcastNetPacket({ type: 'host_left', message: 'Host commander surrendered and left the match.' });
+            }
+        } else {
+            if (typeof broadcastNetPacket === 'function') {
+                broadcastNetPacket({ type: 'client_left', message: 'Challenger surrendered and left the match.' });
+            }
+        }
+    }
     resumeGame();
     if (typeof showNotification === 'function') showNotification('MISSION TERMINATED: Tactical forces ordered to surrender.', 'error');
     const ticker = document.getElementById('tactical-message');
@@ -12125,6 +12314,38 @@ function renderStructureInspectorAndGrid(inspector, structure) {
     const title = (names[structure.type] || structure.type).toUpperCase();
     const hpPct = Math.max(0, Math.min(100, Math.round((structure.health / structure.maxHealth) * 100)));
     const isConstructing = structure.isBuilding;
+
+    // Friendly players cannot interact with their allies' buildings
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        const teamLabel = structure.teamId ? `Team ${structure.teamId}` : 'Allied Forces';
+        inspector.innerHTML = `
+            <div class="cb-inspector-pane">
+                <div class="inspector-card">
+                    <div class="inspector-info-pane" style="width: 100%;">
+                        <div class="inspector-header-row">
+                            <span class="inspector-title" style="color: #00cec9;">[ALLIED] ${title}</span>
+                            <span class="inspector-kills-tag" style="color: #00cec9;">● ALLY</span>
+                        </div>
+                        <div class="inspector-sub-role">${teamLabel} • Commanded by Ally</div>
+                        <div class="inspector-hp-box">
+                            <div class="inspector-hp-label">
+                                <span>STRUCTURAL INTEGRITY</span>
+                                <span>${Math.ceil(structure.health)} / ${structure.maxHealth} HP</span>
+                            </div>
+                            <div class="inspector-hp-track">
+                                <div class="inspector-hp-fill high" style="width: ${hpPct}%;"></div>
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; color: #a4b0be; margin-top: 8px; font-style: italic;">
+                            ⚠️ Allied Command Protocol: Friendly players cannot interact with or command allied facilities.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        currentGridSlots = new Array(12).fill(null);
+        return;
+    }
 
     // Build Queue Display HTML (matching [MD] [MD] from Control Bar Pro screenshot)
     let queueHtml = '';
@@ -13384,6 +13605,10 @@ function repairStructure(structure) {
         showNotification('Structure is at 100% integrity.', 'info');
         return;
     }
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        showNotification('Cannot command repairs on allied structures!', 'error');
+        return;
+    }
     const fee = Math.min(50, Math.ceil((structure.maxHealth - structure.health) * 0.1));
     if (playerResources < fee) {
         showNotification(`Insufficient funds to repair ($${fee} needed).`, 'error');
@@ -13398,6 +13623,10 @@ function repairStructure(structure) {
 
 function sellStructure(structure) {
     if (!structure) return;
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        showNotification('Cannot demolish allied structures!', 'error');
+        return;
+    }
     const cost = getStructureCost(structure.type) || 500;
     const refund = Math.floor(cost * 0.5);
     playerResources += refund;
@@ -13426,6 +13655,11 @@ function getEffectiveUnitCost(type) {
 function produceUnit(type) {
     const spec = unitRoster[type];
     if (!spec) return;
+
+    if (selectedStructure && selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
+        showNotification('Cannot train units from allied facilities!', 'error');
+        return;
+    }
 
     const effCost = getEffectiveUnitCost(type);
     if (playerResources < effCost) {
@@ -13497,6 +13731,10 @@ function useStructureAbility(action) {
 
 function executeStructureUpgradeOrAction(upg, structure) {
     if (!structure || structure.health <= 0 || structure.isBuilding) return;
+    if (structure.ownerId && structure.ownerId !== 'player') {
+        showNotification('Cannot purchase upgrades for allied structures!', 'error');
+        return;
+    }
 
     if (upg.isStance) {
         battlePlan = upg.stance;
@@ -14140,6 +14378,10 @@ function updateHUD() {
 		
 function triggerRallyPointMode() {
     if (selectedStructure) {
+        if (selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
+            showNotification('Cannot set rally points on allied structures!', 'error');
+            return;
+        }
         showNotification('Click anywhere on battlefield to set Rally Point.', 'info');
     } else {
         showNotification('Select a production building first to set its Rally Point.', 'warning');
@@ -15464,6 +15706,46 @@ function processEnemyAIEngine() {
             if (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.tagName === 'BUTTON') return;
 
             if (e.button === 0) {
+                if (typeof isSellMode !== 'undefined' && isSellMode) {
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const allStructures = [...structures, ...enemyStructures];
+                    const hits = raycaster.intersectObjects(allStructures.map(s => s.mesh).filter(Boolean), true);
+                    if (hits.length > 0) {
+                        let hit = hits[0].object;
+                        while (hit.parent && hit.parent !== scene) hit = hit.parent;
+                        const targetStruct = allStructures.find(s => s.mesh === hit);
+                        if (targetStruct) {
+                            if (targetStruct.ownerId && targetStruct.ownerId !== 'player') {
+                                showNotification("Cannot demolish an allied structure!", "error");
+                            } else {
+                                sellStructure(targetStruct);
+                            }
+                        }
+                    }
+                    return;
+                }
+                if (typeof isRepairMode !== 'undefined' && isRepairMode) {
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const allStructures = [...structures, ...enemyStructures];
+                    const hits = raycaster.intersectObjects(allStructures.map(s => s.mesh).filter(Boolean), true);
+                    if (hits.length > 0) {
+                        let hit = hits[0].object;
+                        while (hit.parent && hit.parent !== scene) hit = hit.parent;
+                        const targetStruct = allStructures.find(s => s.mesh === hit);
+                        if (targetStruct) {
+                            if (targetStruct.ownerId && targetStruct.ownerId !== 'player') {
+                                showNotification("Cannot command repairs on allied structures!", "error");
+                            } else {
+                                repairStructure(targetStruct);
+                            }
+                        }
+                    }
+                    return;
+                }
                 if (choosingBaseLocation) {
                     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
                     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -15736,6 +16018,10 @@ function processEnemyAIEngine() {
         function issueMoveCommand(e) {
             // Check if player has a building selected and right-clicks on ground to set its rally point!
             if (selectedStructure && !units.some(u => u.selected)) {
+                if (selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
+                    showNotification('Cannot set rally points on allied structures!', 'error');
+                    return;
+                }
                 const gHit = getGroundIntersectPoint();
                 if (gHit) {
                     selectedStructure.rallyPoint = gHit.clone();
@@ -16166,16 +16452,27 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // 2. Check Structures
-            const structureHits = raycaster.intersectObjects(structures.map(structure => structure.mesh), true);
+            // 2. Check Structures (Player & Allied)
+            const allStructures = [...structures, ...enemyStructures];
+            const structureHits = raycaster.intersectObjects(allStructures.map(structure => structure.mesh).filter(Boolean), true);
             if (structureHits.length > 0) {
                 let hit = structureHits[0].object;
                 while (hit.parent && hit.parent !== scene) hit = hit.parent;
-                selectedStructure = structures.find(candidate => candidate.mesh === hit) || null;
-                if (selectedStructure) {
-                    activeSidebarTab = 'production';
-                    updateSidebar();
-                    return;
+                const hitCandidate = allStructures.find(candidate => candidate.mesh === hit) || null;
+                if (hitCandidate) {
+                    if (isFriendly({ teamId: playerTeamId }, hitCandidate) && hitCandidate.ownerId !== 'player') {
+                        selectedStructure = hitCandidate;
+                        showNotification(`Allied ${hitCandidate.type.toUpperCase()}: Commanded by Ally (Interaction Restricted)`, 'info');
+                        activeSidebarTab = 'production';
+                        updateSidebar();
+                        return;
+                    }
+                    if (structures.includes(hitCandidate)) {
+                        selectedStructure = hitCandidate;
+                        activeSidebarTab = 'production';
+                        updateSidebar();
+                        return;
+                    }
                 }
             }
 
@@ -17728,9 +18025,13 @@ function processScrapCrateCollection() {
             });
 
             conn.on('close', () => {
-                showNotification("Multiplayer peer disconnected.", "error");
-                const badge = document.getElementById('mp-status-badge');
-                if (badge) badge.innerHTML = '🔴 PEER DISCONNECTED';
+                if (!isMultiplayerHost && isMultiplayerActive) {
+                    onHostDisconnected("The host commander has disconnected and terminated the session.");
+                } else if (isMultiplayerHost && isMultiplayerActive) {
+                    showNotification("Challenger disconnected from the match.", "error");
+                    const badge = document.getElementById('mp-status-badge');
+                    if (badge) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
+                }
             });
         }
 
@@ -17841,9 +18142,25 @@ function processScrapCrateCollection() {
                     });
                 }
             }
+            else if (packet.type === 'host_left') {
+                if (!isMultiplayerHost && isMultiplayerActive) {
+                    onHostDisconnected(packet.message || "Host has left the match.");
+                }
+            }
+            else if (packet.type === 'client_left') {
+                showNotification(packet.message || "Challenger has left the match.", "error");
+                const badge = document.getElementById('mp-status-badge');
+                if (badge) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
+            }
             else if (packet.type === 'spawn_unit') {
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
-                spawnEnemyUnit(packet.unitType, pos, packet.netId);
+                const spawnTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
+                const isAlly = (spawnTeam === playerTeamId);
+                const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId);
+                unit.teamId = spawnTeam;
+                unit.ownerId = isAlly ? 'ally' : 'challenger';
+                unit.isAI = false;
+                if (packet.faction) unit.faction = packet.faction;
             }
             else if (packet.type === 'build_structure') {
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
@@ -17866,6 +18183,9 @@ function processScrapCrateCollection() {
                 }
                 group.position.copy(pos);
                 scene.add(group);
+                const structTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
+                const isAlly = (structTeam === playerTeamId);
+                if (packet.position && packet.position.rotationY) group.rotation.y = packet.position.rotationY;
                 enemyStructures.push({
                     type: packet.structType,
                     faction: foeFaction,
@@ -17876,7 +18196,10 @@ function processScrapCrateCollection() {
                     radius: 8,
                     buildProgress: 100,
                     isBuilding: false,
-                    netId: packet.netId
+                    netId: packet.netId,
+                    teamId: structTeam,
+                    ownerId: isAlly ? 'ally' : 'challenger',
+                    isAI: false
                 });
             }
             else if (packet.type === 'unit_damage') {
@@ -17936,6 +18259,11 @@ function processScrapCrateCollection() {
             playerTeamId = playerSlot.team;
             selectedFaction = playerSlot.faction;
 
+            // Refresh map & purge any previous single player skirmish remnants completely
+            if (typeof resetEntireBattlefieldState === 'function') {
+                resetEntireBattlefieldState(currentMapSize);
+            }
+
             // Hide start menu
             const startMenu = document.getElementById('start-menu');
             if (startMenu) startMenu.style.display = 'none';
@@ -17986,6 +18314,14 @@ function processScrapCrateCollection() {
                     deployEnemyBase(spawnPos, slot.faction, 'ai_' + slot.id, slot.team, slot.difficulty);
                 }
             });
+
+            // Deploy Contested Neutral Map Tech Buildings (Oil Derricks, Hospital, Refinery)
+            if (typeof spawnNeutralMapTechBuildings === 'function') {
+                spawnNeutralMapTechBuildings(currentMapSize, currentMapType);
+            }
+
+            const resEl = document.getElementById('resource-display');
+            if (resEl) resEl.innerText = `${playerResources}`;
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
@@ -18136,6 +18472,78 @@ function processScrapCrateCollection() {
 
         window.onload = init;
     
+        function onHostDisconnected(reason = "The host commander has left or closed the multiplayer match.") {
+            isMatchActive = false;
+            isMultiplayerActive = false;
+
+            const modal = document.getElementById('host-disconnected-modal');
+            const reasonEl = document.getElementById('host-disconnect-reason');
+            if (reasonEl) reasonEl.textContent = reason;
+            if (modal) modal.style.display = 'flex';
+
+            const badge = document.getElementById('mp-status-badge');
+            if (badge) badge.innerHTML = '🔴 HOST DISCONNECTED';
+
+            const ticker = document.getElementById('tactical-message');
+            if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">ALERT: Host commander has disconnected. Match terminated.</strong>';
+
+            showNotification("⚠️ HOST HAS DISCONNECTED: The multiplayer match has ended.", "error");
+            if (typeof playAudio === 'function') playAudio('defeat', {}, selectedFaction);
+        }
+        window.onHostDisconnected = onHostDisconnected;
+
+        function leaveMultiplayerSessionToMenu() {
+            const modal = document.getElementById('host-disconnected-modal');
+            if (modal) modal.style.display = 'none';
+
+            if (netConn) {
+                try { netConn.close(); } catch (e) {}
+                netConn = null;
+            }
+            if (netPeer) {
+                try { netPeer.destroy(); } catch (e) {}
+                netPeer = null;
+            }
+
+            isMultiplayerActive = false;
+            isMultiplayerHost = false;
+            isMatchActive = false;
+
+            if (typeof resetEntireBattlefieldState === 'function') {
+                resetEntireBattlefieldState(currentMapSize || 800);
+            }
+
+            const badge = document.getElementById('mp-status-badge');
+            if (badge) badge.style.display = 'none';
+            const chatContainer = document.getElementById('mp-chat-container');
+            if (chatContainer) chatContainer.style.display = 'none';
+
+            const startMenu = document.getElementById('start-menu');
+            if (startMenu) {
+                startMenu.style.display = 'flex';
+                startMenu.classList.remove('pause-mode');
+            }
+            const startCard = document.getElementById('start-card');
+            if (startCard) startCard.style.display = 'block';
+            const resumeBtn = document.getElementById('resume-game-btn');
+            if (resumeBtn) resumeBtn.style.display = 'none';
+
+            switchGameModeTab('multiplayer');
+            switchMpSubTab('join');
+            showNotification("Returned to Multiplayer Lobby.", "info");
+        }
+        window.leaveMultiplayerSessionToMenu = leaveMultiplayerSessionToMenu;
+
+        window.addEventListener('beforeunload', () => {
+            if (isMultiplayerActive && netConn && netConn.open) {
+                if (isMultiplayerHost) {
+                    broadcastNetPacket({ type: 'host_left', message: 'Host closed the game window.' });
+                } else {
+                    broadcastNetPacket({ type: 'client_left', message: 'Challenger closed the game window.' });
+                }
+            }
+        });
+
 
 </script>
 </body>

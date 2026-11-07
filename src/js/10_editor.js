@@ -509,27 +509,112 @@
             updateSidebar();
         }
 
+        function resetEntireBattlefieldState(mapSize = 800) {
+            // 1. Deselect everything and reset cursors & blueprint states
+            if (typeof selectedStructure !== 'undefined') selectedStructure = null;
+            if (typeof selectedSupplyPoint !== 'undefined') selectedSupplyPoint = null;
+            if (typeof blueprintMesh !== 'undefined' && blueprintMesh) {
+                if (typeof scene !== 'undefined') scene.remove(blueprintMesh);
+                blueprintMesh = null;
+                activeBlueprintType = null;
+            }
+            if (typeof isPlacingBlueprint !== 'undefined') isPlacingBlueprint = false;
+            if (typeof pendingSuperweapon !== 'undefined') pendingSuperweapon = null;
+            if (typeof activeGeneralPower !== 'undefined') activeGeneralPower = null;
+            if (typeof isSellMode !== 'undefined') isSellMode = false;
+            if (typeof isRepairMode !== 'undefined') isRepairMode = false;
+            if (document.body) document.body.style.cursor = 'default';
+
+            // 2. Clear previous battle structures
+            if (typeof structures !== 'undefined') {
+                structures.forEach(s => { if (s.mesh && typeof scene !== 'undefined') scene.remove(s.mesh); });
+                structures.length = 0;
+            }
+            if (typeof enemyStructures !== 'undefined') {
+                enemyStructures.forEach(es => { if (es.mesh && typeof scene !== 'undefined') scene.remove(es.mesh); });
+                enemyStructures.length = 0;
+            }
+            if (typeof window.neutralStructures !== 'undefined' && window.neutralStructures) {
+                window.neutralStructures.forEach(ns => { if (ns.mesh && typeof scene !== 'undefined') scene.remove(ns.mesh); });
+                window.neutralStructures.length = 0;
+            } else {
+                window.neutralStructures = [];
+            }
+
+            // 3. Clear previous battle units
+            if (typeof units !== 'undefined') {
+                units.forEach(u => {
+                    if (u.mesh && typeof scene !== 'undefined') scene.remove(u.mesh);
+                    if (u.selectionCircle && typeof scene !== 'undefined') scene.remove(u.selectionCircle);
+                });
+                units.length = 0;
+            }
+            if (typeof enemyUnits !== 'undefined') {
+                enemyUnits.forEach(eu => {
+                    if (eu.mesh && typeof scene !== 'undefined') scene.remove(eu.mesh);
+                    if (eu.selectionCircle && typeof scene !== 'undefined') scene.remove(eu.selectionCircle);
+                });
+                enemyUnits.length = 0;
+            }
+
+            // 4. Clear projectiles, explosions, debris
+            if (typeof projectiles !== 'undefined') {
+                projectiles.forEach(p => { if (p.mesh && typeof scene !== 'undefined') scene.remove(p.mesh); });
+                projectiles.length = 0;
+            }
+            if (typeof debrisList !== 'undefined') {
+                debrisList.forEach(d => { if (d.mesh && typeof scene !== 'undefined') scene.remove(d.mesh); });
+                debrisList.length = 0;
+            }
+
+            // 5. Reset tech tree research, General powers, resources
+            if (typeof researchedTechs !== 'undefined') researchedTechs.clear();
+            if (typeof generalsPoints !== 'undefined') generalsPoints = 0;
+            if (typeof currentGeneralRank !== 'undefined') currentGeneralRank = 1;
+            if (typeof currentGeneralXP !== 'undefined') currentGeneralXP = 0;
+            if (typeof unlockedGeneralsPowers !== 'undefined') unlockedGeneralsPowers.clear();
+
+            // 6. Reset UI health bars
+            if (typeof healthBarElements !== 'undefined' && healthBarElements) {
+                healthBarElements.forEach(bar => { if (bar.container) bar.container.remove(); });
+                healthBarElements.clear();
+            }
+
+            // 7. Reset Fog of War shroud to completely unrevealed
+            if (typeof initFogOfWar === 'function') {
+                initFogOfWar(mapSize);
+            }
+            if (typeof activeVisionBeacons !== 'undefined') {
+                activeVisionBeacons.length = 0;
+            }
+
+            // 8. Reset AI commanders and timers
+            if (typeof aiCommanders !== 'undefined') {
+                for (const k in aiCommanders) delete aiCommanders[k];
+            }
+            if (typeof buildingTick !== 'undefined') buildingTick = 0;
+            hasSpawnedInitialEnemyBase = false;
+
+            // 9. Reset modals
+            const vicModal = document.getElementById('victory-modal');
+            if (vicModal) vicModal.style.display = 'none';
+            const defModal = document.getElementById('defeat-modal');
+            if (defModal) defModal.style.display = 'none';
+            const hostModal = document.getElementById('host-disconnected-modal');
+            if (hostModal) hostModal.style.display = 'none';
+            if (typeof hasDeclaredVictory !== 'undefined') hasDeclaredVictory = false;
+
+            if (typeof resumeGame === 'function') resumeGame();
+        }
+        window.resetEntireBattlefieldState = resetEntireBattlefieldState;
+
         function setupGameDeployment() {
             const selectedEnv = document.getElementById('map-environment').value;
             const selectedSize = Number(document.getElementById('map-size').value);
             const spawns = getSpawnPointsForMap(selectedSize, selectedEnv, activeCustomMap);
 
-            // 1. Clear previous battle assets
-            if (typeof researchedTechs !== 'undefined') researchedTechs.clear();
-            structures.forEach(s => { if (s.mesh) scene.remove(s.mesh); });
-            structures.length = 0;
-            units.forEach(u => { if (u.mesh) scene.remove(u.mesh); });
-            units.length = 0;
-            enemyStructures.forEach(es => { if (es.mesh) scene.remove(es.mesh); });
-            enemyStructures.length = 0;
-            enemyUnits.forEach(eu => { if (eu.mesh) scene.remove(eu.mesh); });
-            enemyUnits.length = 0;
-            if (window.neutralStructures) {
-                window.neutralStructures.forEach(ns => { if (ns.mesh) scene.remove(ns.mesh); });
-                window.neutralStructures.length = 0;
-            } else {
-                window.neutralStructures = [];
-            }
+            // 1. Clear previous battle assets with full battlefield refresh
+            resetEntireBattlefieldState(selectedSize);
 
             choosingBaseLocation = false;
             document.getElementById('deployment-hint').style.display = 'none';

@@ -196,9 +196,13 @@
             });
 
             conn.on('close', () => {
-                showNotification("Multiplayer peer disconnected.", "error");
-                const badge = document.getElementById('mp-status-badge');
-                if (badge) badge.innerHTML = '🔴 PEER DISCONNECTED';
+                if (!isMultiplayerHost && isMultiplayerActive) {
+                    onHostDisconnected("The host commander has disconnected and terminated the session.");
+                } else if (isMultiplayerHost && isMultiplayerActive) {
+                    showNotification("Challenger disconnected from the match.", "error");
+                    const badge = document.getElementById('mp-status-badge');
+                    if (badge) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
+                }
             });
         }
 
@@ -309,9 +313,25 @@
                     });
                 }
             }
+            else if (packet.type === 'host_left') {
+                if (!isMultiplayerHost && isMultiplayerActive) {
+                    onHostDisconnected(packet.message || "Host has left the match.");
+                }
+            }
+            else if (packet.type === 'client_left') {
+                showNotification(packet.message || "Challenger has left the match.", "error");
+                const badge = document.getElementById('mp-status-badge');
+                if (badge) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
+            }
             else if (packet.type === 'spawn_unit') {
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
-                spawnEnemyUnit(packet.unitType, pos, packet.netId);
+                const spawnTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
+                const isAlly = (spawnTeam === playerTeamId);
+                const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId);
+                unit.teamId = spawnTeam;
+                unit.ownerId = isAlly ? 'ally' : 'challenger';
+                unit.isAI = false;
+                if (packet.faction) unit.faction = packet.faction;
             }
             else if (packet.type === 'build_structure') {
                 const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
@@ -334,6 +354,9 @@
                 }
                 group.position.copy(pos);
                 scene.add(group);
+                const structTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
+                const isAlly = (structTeam === playerTeamId);
+                if (packet.position && packet.position.rotationY) group.rotation.y = packet.position.rotationY;
                 enemyStructures.push({
                     type: packet.structType,
                     faction: foeFaction,
@@ -344,7 +367,10 @@
                     radius: 8,
                     buildProgress: 100,
                     isBuilding: false,
-                    netId: packet.netId
+                    netId: packet.netId,
+                    teamId: structTeam,
+                    ownerId: isAlly ? 'ally' : 'challenger',
+                    isAI: false
                 });
             }
             else if (packet.type === 'unit_damage') {
@@ -404,6 +430,11 @@
             playerTeamId = playerSlot.team;
             selectedFaction = playerSlot.faction;
 
+            // Refresh map & purge any previous single player skirmish remnants completely
+            if (typeof resetEntireBattlefieldState === 'function') {
+                resetEntireBattlefieldState(currentMapSize);
+            }
+
             // Hide start menu
             const startMenu = document.getElementById('start-menu');
             if (startMenu) startMenu.style.display = 'none';
@@ -454,6 +485,14 @@
                     deployEnemyBase(spawnPos, slot.faction, 'ai_' + slot.id, slot.team, slot.difficulty);
                 }
             });
+
+            // Deploy Contested Neutral Map Tech Buildings (Oil Derricks, Hospital, Refinery)
+            if (typeof spawnNeutralMapTechBuildings === 'function') {
+                spawnNeutralMapTechBuildings(currentMapSize, currentMapType);
+            }
+
+            const resEl = document.getElementById('resource-display');
+            if (resEl) resEl.innerText = `${playerResources}`;
 
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
@@ -604,3 +643,74 @@
 
         window.onload = init;
     
+        function onHostDisconnected(reason = "The host commander has left or closed the multiplayer match.") {
+            isMatchActive = false;
+            isMultiplayerActive = false;
+
+            const modal = document.getElementById('host-disconnected-modal');
+            const reasonEl = document.getElementById('host-disconnect-reason');
+            if (reasonEl) reasonEl.textContent = reason;
+            if (modal) modal.style.display = 'flex';
+
+            const badge = document.getElementById('mp-status-badge');
+            if (badge) badge.innerHTML = '🔴 HOST DISCONNECTED';
+
+            const ticker = document.getElementById('tactical-message');
+            if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">ALERT: Host commander has disconnected. Match terminated.</strong>';
+
+            showNotification("⚠️ HOST HAS DISCONNECTED: The multiplayer match has ended.", "error");
+            if (typeof playAudio === 'function') playAudio('defeat', {}, selectedFaction);
+        }
+        window.onHostDisconnected = onHostDisconnected;
+
+        function leaveMultiplayerSessionToMenu() {
+            const modal = document.getElementById('host-disconnected-modal');
+            if (modal) modal.style.display = 'none';
+
+            if (netConn) {
+                try { netConn.close(); } catch (e) {}
+                netConn = null;
+            }
+            if (netPeer) {
+                try { netPeer.destroy(); } catch (e) {}
+                netPeer = null;
+            }
+
+            isMultiplayerActive = false;
+            isMultiplayerHost = false;
+            isMatchActive = false;
+
+            if (typeof resetEntireBattlefieldState === 'function') {
+                resetEntireBattlefieldState(currentMapSize || 800);
+            }
+
+            const badge = document.getElementById('mp-status-badge');
+            if (badge) badge.style.display = 'none';
+            const chatContainer = document.getElementById('mp-chat-container');
+            if (chatContainer) chatContainer.style.display = 'none';
+
+            const startMenu = document.getElementById('start-menu');
+            if (startMenu) {
+                startMenu.style.display = 'flex';
+                startMenu.classList.remove('pause-mode');
+            }
+            const startCard = document.getElementById('start-card');
+            if (startCard) startCard.style.display = 'block';
+            const resumeBtn = document.getElementById('resume-game-btn');
+            if (resumeBtn) resumeBtn.style.display = 'none';
+
+            switchGameModeTab('multiplayer');
+            switchMpSubTab('join');
+            showNotification("Returned to Multiplayer Lobby.", "info");
+        }
+        window.leaveMultiplayerSessionToMenu = leaveMultiplayerSessionToMenu;
+
+        window.addEventListener('beforeunload', () => {
+            if (isMultiplayerActive && netConn && netConn.open) {
+                if (isMultiplayerHost) {
+                    broadcastNetPacket({ type: 'host_left', message: 'Host closed the game window.' });
+                } else {
+                    broadcastNetPacket({ type: 'client_left', message: 'Challenger closed the game window.' });
+                }
+            }
+        });

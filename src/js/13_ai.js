@@ -353,6 +353,46 @@ function processEnemyAIEngine() {
             if (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.tagName === 'BUTTON') return;
 
             if (e.button === 0) {
+                if (typeof isSellMode !== 'undefined' && isSellMode) {
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const allStructures = [...structures, ...enemyStructures];
+                    const hits = raycaster.intersectObjects(allStructures.map(s => s.mesh).filter(Boolean), true);
+                    if (hits.length > 0) {
+                        let hit = hits[0].object;
+                        while (hit.parent && hit.parent !== scene) hit = hit.parent;
+                        const targetStruct = allStructures.find(s => s.mesh === hit);
+                        if (targetStruct) {
+                            if (targetStruct.ownerId && targetStruct.ownerId !== 'player') {
+                                showNotification("Cannot demolish an allied structure!", "error");
+                            } else {
+                                sellStructure(targetStruct);
+                            }
+                        }
+                    }
+                    return;
+                }
+                if (typeof isRepairMode !== 'undefined' && isRepairMode) {
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const allStructures = [...structures, ...enemyStructures];
+                    const hits = raycaster.intersectObjects(allStructures.map(s => s.mesh).filter(Boolean), true);
+                    if (hits.length > 0) {
+                        let hit = hits[0].object;
+                        while (hit.parent && hit.parent !== scene) hit = hit.parent;
+                        const targetStruct = allStructures.find(s => s.mesh === hit);
+                        if (targetStruct) {
+                            if (targetStruct.ownerId && targetStruct.ownerId !== 'player') {
+                                showNotification("Cannot command repairs on allied structures!", "error");
+                            } else {
+                                repairStructure(targetStruct);
+                            }
+                        }
+                    }
+                    return;
+                }
                 if (choosingBaseLocation) {
                     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
                     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -625,6 +665,10 @@ function processEnemyAIEngine() {
         function issueMoveCommand(e) {
             // Check if player has a building selected and right-clicks on ground to set its rally point!
             if (selectedStructure && !units.some(u => u.selected)) {
+                if (selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
+                    showNotification('Cannot set rally points on allied structures!', 'error');
+                    return;
+                }
                 const gHit = getGroundIntersectPoint();
                 if (gHit) {
                     selectedStructure.rallyPoint = gHit.clone();
@@ -1055,16 +1099,27 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // 2. Check Structures
-            const structureHits = raycaster.intersectObjects(structures.map(structure => structure.mesh), true);
+            // 2. Check Structures (Player & Allied)
+            const allStructures = [...structures, ...enemyStructures];
+            const structureHits = raycaster.intersectObjects(allStructures.map(structure => structure.mesh).filter(Boolean), true);
             if (structureHits.length > 0) {
                 let hit = structureHits[0].object;
                 while (hit.parent && hit.parent !== scene) hit = hit.parent;
-                selectedStructure = structures.find(candidate => candidate.mesh === hit) || null;
-                if (selectedStructure) {
-                    activeSidebarTab = 'production';
-                    updateSidebar();
-                    return;
+                const hitCandidate = allStructures.find(candidate => candidate.mesh === hit) || null;
+                if (hitCandidate) {
+                    if (isFriendly({ teamId: playerTeamId }, hitCandidate) && hitCandidate.ownerId !== 'player') {
+                        selectedStructure = hitCandidate;
+                        showNotification(`Allied ${hitCandidate.type.toUpperCase()}: Commanded by Ally (Interaction Restricted)`, 'info');
+                        activeSidebarTab = 'production';
+                        updateSidebar();
+                        return;
+                    }
+                    if (structures.includes(hitCandidate)) {
+                        selectedStructure = hitCandidate;
+                        activeSidebarTab = 'production';
+                        updateSidebar();
+                        return;
+                    }
                 }
             }
 
