@@ -4,3 +4,9 @@
 node_modules/
 .DS_Store
 Thumbs.db
+
+# Large asset archives & extraction caches
+generals_big_files/
+extracted_assets/
+extracted_models/
+*.png

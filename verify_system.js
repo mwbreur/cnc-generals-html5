@@ -81,10 +81,12 @@ const THREE = {
     },
     BufferGeometry: function() {
         this.setAttribute = () => {};
+        this.setIndex = () => {};
         this.setFromPoints = () => this;
         this.dispose = () => {};
         this.computeVertexNormals = () => {};
     },
+    Float32BufferAttribute: function(arr, itemSize) { this.array = arr; this.itemSize = itemSize; },
     BoxGeometry: function() { this.dispose = () => {}; },
     CylinderGeometry: function() { this.dispose = () => {}; },
     SphereGeometry: function() { this.dispose = () => {}; },
@@ -205,6 +207,7 @@ vm.createContext(sandbox);
 const jsFiles = [
     '01_core.js',
     '02_textures.js',
+    '02b_w3d_models.js',
     '03_units.js',
     '04_buildings.js',
     '05_audio.js',
@@ -230,7 +233,7 @@ for (const f of jsFiles) {
     }
 }
 
-console.log("✓ All 15 JS modules evaluated in sandbox successfully.");
+console.log("✓ All 16 JS modules evaluated in sandbox successfully.");
 
 // Initialize Three.js scene
 vm.runInContext("init();", sandbox);

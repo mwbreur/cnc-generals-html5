@@ -2683,7 +2683,8 @@ function updateHUD() {
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 1.2; speed = 0.13; health = 260; }
             else if (type === 'chinook') { mesh = createChinookMesh(); radius = 1.6; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
             else if (type === 'comanche') { mesh = createComancheMesh(); radius = 1.4; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
-            else if (type === 'raptor' || type === 'mig') { mesh = createRaptorMesh(); radius = 1.5; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
+            else if (type === 'mig') { mesh = createMigMesh(false); radius = 1.5; speed = 0.32; health = 280; scanRange = 30; isAir = true; }
+            else if (type === 'raptor') { mesh = createRaptorMesh(false); radius = 1.5; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
             else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(); radius = 1.4; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
             else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 1.6; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
             else if (type === 'infantry') { mesh = createRangerMesh(); radius = 0.5; speed = 0.08; health = 100; scanRange = 16; }

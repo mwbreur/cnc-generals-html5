@@ -87,6 +87,9 @@ function createTrackAssembly(width, height, length, matHull, isEnemy = false) {
 // High visual fidelity, composite armor plates, FLIR pods, antennae, cupolas, weapon systems
 
 function createCrusaderTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['crusader']) {
+        return createW3DVehicleMesh('crusader', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matUSA;
     const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matUSAColor;
@@ -187,6 +190,9 @@ function createCrusaderTankMesh(isEnemy = false) {
 }
 
 function createPaladinTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['paladin']) {
+        return createW3DVehicleMesh('paladin', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matUSA;
     const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matUSAColor;
@@ -240,6 +246,9 @@ function createPaladinTankMesh(isEnemy = false) {
 }
 
 function createHumveeMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['humvee']) {
+        return createW3DVehicleMesh('humvee', isEnemy);
+    }
     const g = new THREE.Group();
     const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matUSA;
     const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matUSAColor;
@@ -318,7 +327,10 @@ function createHumveeMesh(isEnemy = false) {
     return g;
 }
 
-function createAmbulanceMesh() {
+function createAmbulanceMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['ambulance']) {
+        return createW3DVehicleMesh('ambulance', isEnemy);
+    }
     const g = new THREE.Group();
     // Extended medical Humvee chassis
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.2, 3.6), matDarkMetal);
@@ -366,6 +378,9 @@ function createAmbulanceMesh() {
 }
 
 function createTomahawkMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['tomahawk']) {
+        return createW3DVehicleMesh('tomahawk', isEnemy);
+    }
     const g = new THREE.Group();
     const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matUSA;
     const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x333, roughness: 0.5 }) : matUSAColor;
@@ -421,7 +436,10 @@ function createTomahawkMesh(isEnemy = false) {
     return g;
 }
 
-function createUSADozerMesh() {
+function createUSADozerMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['dozer']) {
+        return createW3DVehicleMesh('dozer', isEnemy);
+    }
     const g = new THREE.Group();
     // Heavy tracked construction tractor
     g.add(createTrackAssembly(2.5, 0.65, 3.2, matHazard, false));
@@ -459,7 +477,10 @@ function createUSADozerMesh() {
     return g;
 }
 
-function createUSATruckMesh() {
+function createUSATruckMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['truck']) {
+        return createW3DVehicleMesh('truck', isEnemy);
+    }
     const g = new THREE.Group();
     // 6x6 Heavy Supply Transport Hauler
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.25, 4.2), matDarkMetal);
@@ -488,7 +509,10 @@ function createUSATruckMesh() {
     return g;
 }
 
-function createChinookMesh() {
+function createChinookMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['chinook']) {
+        return createW3DVehicleMesh('chinook', isEnemy);
+    }
     const g = new THREE.Group();
     g.userData.isAir = true;
     g.userData.flightAltitude = 8.0;
@@ -548,7 +572,10 @@ function createChinookMesh() {
     return g;
 }
 
-function createComancheMesh() {
+function createComancheMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['comanche']) {
+        return createW3DVehicleMesh('comanche', isEnemy);
+    }
     const g = new THREE.Group();
     g.userData.isAir = true;
     g.userData.flightAltitude = 7.5;
@@ -617,7 +644,10 @@ function createComancheMesh() {
     return g;
 }
 
-function createRaptorMesh() {
+function createRaptorMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['raptor']) {
+        return createW3DVehicleMesh('raptor', isEnemy);
+    }
     const g = new THREE.Group();
     g.userData.isAir = true;
     g.userData.flightAltitude = 9.0;
@@ -661,7 +691,10 @@ function createRaptorMesh() {
     return g;
 }
 
-function createStealthFighterMesh() {
+function createStealthFighterMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['stealthfighter']) {
+        return createW3DVehicleMesh('stealthfighter', isEnemy);
+    }
     const g = new THREE.Group();
     g.userData.isAir = true;
     g.userData.flightAltitude = 9.0;
@@ -684,7 +717,10 @@ function createStealthFighterMesh() {
     return g;
 }
 
-function createAuroraMesh() {
+function createAuroraMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['aurora']) {
+        return createW3DVehicleMesh('aurora', isEnemy);
+    }
     const g = new THREE.Group();
     g.userData.isAir = true;
     g.userData.flightAltitude = 10.5;
@@ -798,6 +834,9 @@ function createBurtonMesh() {
 // Heavy cast armor, reactive armor blocks, Gatling barrels, flame projectors, nuclear artillery, PLA insignias
 
 function createBattlemasterTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['battlemaster']) {
+        return createW3DVehicleMesh('battlemaster', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
     const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matChinaColor;
@@ -875,6 +914,9 @@ function createBattlemasterTankMesh(isEnemy = false) {
 }
 
 function createOverlordTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['overlord']) {
+        return createW3DVehicleMesh('overlord', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
     const trimMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matChinaColor;
@@ -943,6 +985,9 @@ function createOverlordTankMesh(isEnemy = false) {
 }
 
 function createGatlingTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['gatling']) {
+        return createW3DVehicleMesh('gatling', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
     const darkMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matDarkMetal;
@@ -992,6 +1037,9 @@ function createGatlingTankMesh(isEnemy = false) {
 }
 
 function createDragonTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['dragon']) {
+        return createW3DVehicleMesh('dragon', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
 
@@ -1031,7 +1079,10 @@ function createDragonTankMesh(isEnemy = false) {
     return g;
 }
 
-function createTroopCrawlerMesh() {
+function createTroopCrawlerMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['crawler']) {
+        return createW3DVehicleMesh('crawler', isEnemy);
+    }
     const g = new THREE.Group();
     // Heavy 8x8 Wheeled APC / Troop Transport
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.28, 4.6), matDarkMetal);
@@ -1074,7 +1125,10 @@ function createTroopCrawlerMesh() {
     return g;
 }
 
-function createInfernoCannonMesh() {
+function createInfernoCannonMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['inferno']) {
+        return createW3DVehicleMesh('inferno', isEnemy);
+    }
     const g = new THREE.Group();
     g.add(createTrackAssembly(2.45, 0.58, 3.6, matChina, false));
 
@@ -1109,7 +1163,10 @@ function createInfernoCannonMesh() {
     return g;
 }
 
-function createNukeCannonMesh() {
+function createNukeCannonMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['nukecannon']) {
+        return createW3DVehicleMesh('nukecannon', isEnemy);
+    }
     const g = new THREE.Group();
     // Heavy atomic artillery tractor carriage
     g.add(createTrackAssembly(2.7, 0.68, 4.6, matChina, false));
@@ -1303,6 +1360,9 @@ function createGLAWorkerMesh() {
 }
 
 function createTechnicalMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['technical']) {
+        return createW3DVehicleMesh('technical', isEnemy);
+    }
     const g = new THREE.Group();
     const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
     const rustMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x333, roughness: 0.7 }) : matCorrugated;
@@ -1363,6 +1423,9 @@ function createTechnicalMesh(isEnemy = false) {
 }
 
 function createScorpionTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['scorpion']) {
+        return createW3DVehicleMesh('scorpion', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matGLA;
 
@@ -1399,6 +1462,9 @@ function createScorpionTankMesh(isEnemy = false) {
 }
 
 function createMarauderTankMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['marauder']) {
+        return createW3DVehicleMesh('marauder', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matGLA;
     const plateMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matCorrugated;
@@ -1441,6 +1507,9 @@ function createMarauderTankMesh(isEnemy = false) {
 }
 
 function createRocketBuggyMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['buggy']) {
+        return createW3DVehicleMesh('buggy', isEnemy);
+    }
     const g = new THREE.Group();
     const frameMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matDarkMetal;
     const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matGLA;
@@ -1490,6 +1559,9 @@ function createRocketBuggyMesh(isEnemy = false) {
 }
 
 function createQuadCannonMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['quad']) {
+        return createW3DVehicleMesh('quad', isEnemy);
+    }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
 
@@ -1526,6 +1598,9 @@ function createQuadCannonMesh(isEnemy = false) {
 }
 
 function createToxinTractorMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['toxintractor']) {
+        return createW3DVehicleMesh('toxintractor', isEnemy);
+    }
     const g = new THREE.Group();
     const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
 
@@ -1564,6 +1639,9 @@ function createToxinTractorMesh(isEnemy = false) {
 }
 
 function createBombTruckMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['bombtruck']) {
+        return createW3DVehicleMesh('bombtruck', isEnemy);
+    }
     const g = new THREE.Group();
     const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matCorrugated;
 
@@ -1597,6 +1675,9 @@ function createBombTruckMesh(isEnemy = false) {
 }
 
 function createScudLauncherMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['scud']) {
+        return createW3DVehicleMesh('scud', isEnemy);
+    }
     const g = new THREE.Group();
     const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
 
@@ -1634,7 +1715,10 @@ function createScudLauncherMesh(isEnemy = false) {
     return g;
 }
 
-function createRadarVanMesh() {
+function createRadarVanMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['radarvan']) {
+        return createW3DVehicleMesh('radarvan', isEnemy);
+    }
     const g = new THREE.Group();
     // Weathered van body
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.75, 1.15, 2.9), matCorrugated);
@@ -1768,3 +1852,11 @@ function createJarmenKellMesh() {
 
 // --- USA STRUCTURES ---
 
+
+
+function createMigMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['mig']) {
+        return createW3DVehicleMesh('mig', isEnemy);
+    }
+    return createRaptorMesh(isEnemy);
+}
