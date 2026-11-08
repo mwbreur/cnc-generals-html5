@@ -98,27 +98,28 @@ const BUILDING_CONFIG = {
 // Retail Westwood 3D Infantry Characters (calibrated to ~2.4-2.6 units tall, classic RTS visual readability)
 const INFANTRY_CONFIG = {
     // USA
-    'ranger':          { file: 'AIRNGR_SKN.W3D',  skl: 'AIRNGR_SKL.W3D',  submesh: null,              tex: 'zhca_airanger.tga',   scale: 0.160, faction: 'usa' },
-    'missiledefender': { file: 'INF4BRG_SKN.W3D', skl: 'INF4BRG_SKL.W3D', submesh: 'AIMSSL_SKIN_01', tex: 'zhca_aimsslguy.tga',  scale: 0.160, faction: 'usa' },
-    'pathfinder':      { file: 'AIPFDR_SKN.W3D',  skl: 'AIPFDR_SKL.W3D',  submesh: null,              tex: 'zhca_aipthfindr.tga', scale: 0.160, faction: 'usa' },
-    'burton':          { file: 'AIHERO_SKN.W3D',  skl: 'AIHERO_SKL.W3D',  submesh: null,              tex: 'zhca_aihero2.tga',    scale: 0.170, faction: 'usa' },
+    'ranger':          { file: 'AIRNGR_SKN.W3D',  skl: 'AIRNGR_SKL.W3D',  anim: 'AIRNGR_STA.W3D',  submesh: null,              tex: 'zhca_airanger.tga',   scale: 0.160, faction: 'usa' },
+    'missiledefender': { file: 'INF4BRG_SKN.W3D', skl: 'INF4BRG_SKL.W3D', anim: null,              submesh: 'AIMSSL_SKIN_01', tex: 'zhca_aimsslguy.tga',  scale: 0.160, faction: 'usa' },
+    'pathfinder':      { file: 'AIPFDR_SKN.W3D',  skl: 'AIPFDR_SKL.W3D',  anim: 'AIPFDR_STA.W3D',  submesh: null,              tex: 'zhca_aipthfindr.tga', scale: 0.160, faction: 'usa' },
+    'burton':          { file: 'AIHERO_SKN.W3D',  skl: 'AIHERO_SKL.W3D',  anim: 'AIHERO_STA.W3D',  submesh: null,              tex: 'zhca_aihero2.tga',    scale: 0.170, faction: 'usa' },
     // China
-    'redguard':        { file: 'NICNSC_SKN.W3D',  skl: 'NICNSC_SKL.W3D',  submesh: null,              tex: 'zhca_niconscrpt.tga', scale: 0.160, faction: 'china' },
-    'tankhunter':      { file: 'NITHNT_SKN.W3D',  skl: 'NITHNT_SKL.W3D',  submesh: null,              tex: 'zhca_nithunter.tga',  scale: 0.160, faction: 'china' },
-    'hacker':          { file: 'NIHCKR_SKN.W3D',  skl: 'NIHCKR_SKL.W3D',  submesh: null,              tex: 'zhca_nihacker.tga',   scale: 0.160, faction: 'china' },
-    'lotus':           { file: 'NIHERO_SKN.W3D',  skl: 'NIHERO_SKL.W3D',  submesh: null,              tex: 'zhca_niblotus.tga',   scale: 0.165, faction: 'china' },
+    'redguard':        { file: 'NICNSC_SKN.W3D',  skl: 'NICNSC_SKL.W3D',  anim: 'NICNSC_STA.W3D',  submesh: null,              tex: 'zhca_niconscrpt.tga', scale: 0.160, faction: 'china' },
+    'tankhunter':      { file: 'NITHNT_SKN.W3D',  skl: 'NITHNT_SKL.W3D',  anim: 'NITHNT_STA.W3D',  submesh: null,              tex: 'zhca_nithunter.tga',  scale: 0.160, faction: 'china' },
+    'hacker':          { file: 'NIHCKR_SKN.W3D',  skl: 'NIHCKR_SKL.W3D',  anim: 'NIHCKR_STA.W3D',  submesh: null,              tex: 'zhca_nihacker.tga',   scale: 0.160, faction: 'china' },
+    'lotus':           { file: 'NIHERO_SKN.W3D',  skl: 'NIHERO_SKL.W3D',  anim: 'NIHERO_STA.W3D',  submesh: null,              tex: 'zhca_niblotus.tga',   scale: 0.165, faction: 'china' },
     // GLA
-    'rebel':           { file: 'UIRGRD_SKN.W3D',  skl: 'UIRGRD_SKL.W3D',  submesh: null,              tex: 'zhca_uirguard.tga',   scale: 0.160, faction: 'gla' },
-    'rpg':             { file: 'UISMSD_SKN.W3D',  skl: 'UISMSD_SKL.W3D',  submesh: null,              tex: 'zhca_uirstnger.tga',  scale: 0.160, faction: 'gla' },
-    'terrorist':       { file: 'UITRST_SKN.W3D',  skl: 'UITRST_SKL.W3D',  submesh: null,              tex: 'zhca_uiter.tga',      scale: 0.160, faction: 'gla' },
-    'jarmen':          { file: 'UIHERO_SKN.W3D',  skl: 'UIHERO_SKL.W3D',  submesh: null,              tex: 'zhca_uihero01.tga',   scale: 0.170, faction: 'gla' },
-    'worker':          { file: 'UIWRKR_SKN.W3D',  skl: 'UIWRKR_SKL.W3D',  submesh: null,              tex: 'zhca_uiworker.tga',   scale: 0.155, faction: 'gla' }
+    'rebel':           { file: 'UIRGRD_SKN.W3D',  skl: 'UIRGRD_SKL.W3D',  anim: 'UIRGRD_STB.W3D',  submesh: null,              tex: 'zhca_uirguard.tga',   scale: 0.160, faction: 'gla' },
+    'rpg':             { file: 'UISMSD_SKN.W3D',  skl: 'UISMSD_SKL.W3D',  anim: 'UISMSD_STA.W3D',  submesh: null,              tex: 'zhca_uirstnger.tga',  scale: 0.160, faction: 'gla' },
+    'terrorist':       { file: 'UITRST_SKN.W3D',  skl: 'UITRST_SKL.W3D',  anim: 'UITRST_STA.W3D',  submesh: null,              tex: 'zhca_uiter.tga',      scale: 0.160, faction: 'gla' },
+    'jarmen':          { file: 'UIHERO_SKN.W3D',  skl: 'UIHERO_SKL.W3D',  anim: 'UIHERO_STA.W3D',  submesh: null,              tex: 'zhca_uihero01.tga',   scale: 0.170, faction: 'gla' },
+    'worker':          { file: 'UIWRKR_SKN.W3D',  skl: 'UIWRKR_SKL.W3D',  anim: 'UIWRKR_STA.W3D',  submesh: null,              tex: 'zhca_uiworker.tga',   scale: 0.155, faction: 'gla' }
 };
 
 // Additional architectural and detail textures
 const EXTRA_TEXTURES = {
     'gradient2': 'gradient2.dds',
-    'z_infxtras': 'z_infxtras.tga',
+    'z_infxtras': 'z_infxtras.dds',
+    'z_aipthfindr2': 'z_aipthfindr2.dds',
     'atcemwall01': 'atcemwall01.dds',
     'atcemblock02': 'atcemblock02.dds',
     'atsilverroof02': 'atsilverroof02.dds',
@@ -493,7 +494,7 @@ function transformPoint(m, p) {
     ];
 }
 
-function loadSkeleton(sklFileName) {
+function loadSkeletonWithPose(sklFileName, animFileName = null) {
     const sklPath = path.join(w3dDir, sklFileName);
     if (!fs.existsSync(sklPath)) return null;
     const buf = fs.readFileSync(sklPath);
@@ -514,7 +515,7 @@ function loadSkeleton(sklFileName) {
                 } else if (st === 0x102) { // W3D_CHUNK_PIVOTS (60 bytes per pivot)
                     const pre30 = version < 0x00030000;
                     if (pre30) {
-                        sklPivots.push({ name: 'RootTransform', parentIndex: -1, localThree: new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]) });
+                        sklPivots.push({ name: 'RootTransform', parentIndex: -1, localThree: new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]), tx: 0, ty: 0, tz: 0 });
                     }
                     let po = sub + 8;
                     for (let i = 0; i < pivotCount; i++) {
@@ -537,6 +538,7 @@ function loadSkeleton(sklFileName) {
                             name: pName,
                             parentIndex: parentIndex === 0xffffffff ? -1 : parentIndex,
                             localThree,
+                            tx, ty, tz,
                             worldMat: null
                         });
                         po += 60;
@@ -546,6 +548,66 @@ function loadSkeleton(sklFileName) {
             }
         }
         off += 8 + size;
+    }
+
+    if (animFileName) {
+        const animPath = path.join(w3dDir, animFileName);
+        if (fs.existsSync(animPath)) {
+            const animBuf = fs.readFileSync(animPath);
+            let aoff = 0;
+            const pivotDeltas = {};
+            while (aoff < animBuf.length) {
+                const atype = animBuf.readUInt32LE(aoff);
+                const asize = animBuf.readUInt32LE(aoff + 4) & 0x7fffffff;
+                if (atype === 0x200) { // W3D_CHUNK_ANIMATION
+                    let asub = aoff + 8;
+                    while (asub < aoff + 8 + asize) {
+                        const ast = animBuf.readUInt32LE(asub);
+                        const ass = animBuf.readUInt32LE(asub + 4) & 0x7fffffff;
+                        if (ast === 0x202) { // ANIMATION_CHANNEL
+                            const channelType = animBuf.readUInt16LE(asub + 14);
+                            let pivotIndex = animBuf.readUInt16LE(asub + 16);
+                            pivotIndex = pivotIndex + 1; // pre30 offset
+                            if (!pivotDeltas[pivotIndex]) {
+                                pivotDeltas[pivotIndex] = { t: [0,0,0], q: [0,0,0,1] };
+                            }
+                            const valOff = asub + 20; // frame 0
+                            if (channelType === 0) pivotDeltas[pivotIndex].t[0] = animBuf.readFloatLE(valOff);
+                            else if (channelType === 1) pivotDeltas[pivotIndex].t[1] = animBuf.readFloatLE(valOff);
+                            else if (channelType === 2) pivotDeltas[pivotIndex].t[2] = animBuf.readFloatLE(valOff);
+                            else if (channelType === 6) {
+                                pivotDeltas[pivotIndex].q = [
+                                    animBuf.readFloatLE(valOff + 0),
+                                    animBuf.readFloatLE(valOff + 4),
+                                    animBuf.readFloatLE(valOff + 8),
+                                    animBuf.readFloatLE(valOff + 12)
+                                ];
+                            }
+                        }
+                        asub += 8 + ass;
+                    }
+                }
+                aoff += 8 + asize;
+            }
+
+            for (const [piStr, delta] of Object.entries(pivotDeltas)) {
+                const pi = parseInt(piStr);
+                if (pi < sklPivots.length) {
+                    const rawDelta = mat4Compose(delta.t, delta.q);
+                    const deltaThree = mat4Mul(mat4Mul(AXIS_SWAP, rawDelta), AXIS_SWAP);
+                    sklPivots[pi].localThree = mat4Mul(sklPivots[pi].localThree, deltaThree);
+                }
+            }
+        }
+    }
+
+    // Special case adjustments (e.g. Missile Defender launcher seated directly on right shoulder)
+    if (sklFileName === 'INF4BRG_SKL.W3D') {
+        const roktBone = sklPivots[239];
+        if (roktBone) {
+            const rawM = mat4Compose([-0.55, 35.97, 12.35], [0, 0, 0, 1]);
+            roktBone.localThree = mat4Mul(mat4Mul(AXIS_SWAP, rawM), AXIS_SWAP);
+        }
     }
 
     for (let i = 0; i < sklPivots.length; i++) {
@@ -559,8 +621,8 @@ function loadSkeleton(sklFileName) {
     return sklPivots;
 }
 
-function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null) {
-    const skl = loadSkeleton(sklFileName);
+function parseAndBakeSkinnedMesh(sknFileName, sklFileName, animFileName = null, targetSubmesh = null) {
+    const skl = loadSkeletonWithPose(sklFileName, animFileName);
     if (!skl) {
         console.warn(`Skeleton ${sklFileName} not found for ${sknFileName}`);
         return null;
@@ -577,7 +639,7 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null)
         if (type === 0) { // W3D_CHUNK_MESH
             let sub = off + 8;
             let meshName = '', numV = 0, numF = 0, attr = 0;
-            let vArr = [], infArr = [], triArr = [], uvArr = [];
+            let vArr = [], infArr = [], triArr = [], uvArr = [], meshTex = null;
             while (sub < off + 8 + size) {
                 const st = buf.readUInt32LE(sub);
                 const ss = buf.readUInt32LE(sub + 4) & 0x7fffffff;
@@ -610,11 +672,40 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null)
                         triArr.push(v0, v2, v1);
                     }
                 } else if (st === 0x30) {
-                    const count = Math.floor(ss / 8);
-                    for (let i = 0; i < count; i++) {
-                        const u = buf.readFloatLE(sub + 8 + i * 8 + 0);
-                        const v = buf.readFloatLE(sub + 8 + i * 8 + 4);
-                        uvArr.push(parseFloat(u.toFixed(4)), parseFloat((1.0 - v).toFixed(4)));
+                    let tSub = sub + 8;
+                    while (tSub < sub + 8 + ss) {
+                        const tst = buf.readUInt32LE(tSub);
+                        const tss = buf.readUInt32LE(tSub + 4) & 0x7fffffff;
+                        if (tst === 0x31) {
+                            const nameBuf = buf.slice(tSub + 8, tSub + 8 + tss);
+                            let raw = nameBuf.toString('ascii').replace(/\0/g, '').trim();
+                            raw = raw.replace(/^[^a-zA-Z0-9_]+/, '');
+                            meshTex = raw.toLowerCase();
+                        }
+                        tSub += 8 + tss;
+                    }
+                } else if (st === 0x38) { // W3D_CHUNK_MATERIAL_PASS
+                    let pSub = sub + 8;
+                    while (pSub < sub + 8 + ss) {
+                        const pst = buf.readUInt32LE(pSub);
+                        const pss = buf.readUInt32LE(pSub + 4) & 0x7fffffff;
+                        if (pst === 0x48) { // W3D_CHUNK_STAGE_TEX_COORDS
+                            let sSub = pSub + 8;
+                            while (sSub < pSub + 8 + pss) {
+                                const sst = buf.readUInt32LE(sSub);
+                                const sss = buf.readUInt32LE(sSub + 4) & 0x7fffffff;
+                                if (sst === 0x4a) { // W3D_CHUNK_TEX_COORDS
+                                    const count = Math.floor(sss / 8);
+                                    for (let i = 0; i < count; i++) {
+                                        const u = buf.readFloatLE(sSub + 8 + i * 8 + 0);
+                                        const v = buf.readFloatLE(sSub + 8 + i * 8 + 4);
+                                        uvArr.push(parseFloat(u.toFixed(4)), parseFloat((1.0 - v).toFixed(4)));
+                                    }
+                                }
+                                sSub += 8 + sss;
+                            }
+                        }
+                        pSub += 8 + pss;
                     }
                 }
                 sub += 8 + ss;
@@ -636,7 +727,8 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null)
                     rawV: vArr,
                     inf: infArr,
                     tri: triArr,
-                    uv: uvArr
+                    uv: uvArr,
+                    tex: meshTex
                 };
             }
         }
@@ -661,7 +753,8 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null)
         finalMeshes[mName] = {
             vList: bakedV,
             i: mData.tri,
-            u: mData.uv
+            u: mData.uv,
+            tex: mData.tex
         };
     }
 
@@ -689,7 +782,8 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null)
         exportMeshes[mName] = {
             v: flatV,
             i: m.i,
-            u: m.u
+            u: m.u,
+            tex: m.tex
         };
     }
 
@@ -706,7 +800,7 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null)
 function processInfantry(configMap) {
     const results = {};
     for (const [key, cfg] of Object.entries(configMap)) {
-        const baked = parseAndBakeSkinnedMesh(cfg.file, cfg.skl, cfg.submesh);
+        const baked = parseAndBakeSkinnedMesh(cfg.file, cfg.skl, cfg.anim, cfg.submesh);
         if (!baked || Object.keys(baked.meshes).length === 0) {
             console.warn(`[W3D Infantry] Failed to bake skinned mesh for ${key}`);
             continue;
@@ -1296,7 +1390,21 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
         geom.setIndex(mdata.i);
         geom.computeVertexNormals();
 
-        const mesh = new THREE.Mesh(geom, skinMat);
+        let subMat = skinMat;
+        if (mdata.tex) {
+            const subTex = getW3dTexture(mdata.tex);
+            if (subTex) {
+                subMat = new THREE.MeshStandardMaterial({
+                    map: subTex,
+                    roughness: 0.72,
+                    metalness: 0.15,
+                    side: THREE.DoubleSide,
+                    color: isEnemy ? 0xcc6666 : 0xffffff
+                });
+            }
+        }
+
+        const mesh = new THREE.Mesh(geom, subMat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         root.add(mesh);

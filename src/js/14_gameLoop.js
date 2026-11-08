@@ -853,6 +853,12 @@ function animate() {
                             unit.mesh.rotation.z = 0;
                             unit.mesh.rotation.x = 0;
                         }
+                    } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
+                        unit._animTime = (unit._animTime || 0) + 0.28;
+                        const stride = unit._animTime;
+                        unit.mesh.rotation.x = 0.14 + Math.sin(stride * 2.0) * 0.04;
+                        unit.mesh.rotation.z = Math.sin(stride) * 0.08;
+                        unit._strideBob = Math.abs(Math.sin(stride)) * 0.14;
                     }
                 } else {
                     // Reached waypoint: advance to next waypoint if routing across bridges!
@@ -863,6 +869,11 @@ function animate() {
                         // Unit is at destination! Settle aircraft banking and pitch to zero without spinning or flipping
                         unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
                         unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
+                    } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
+                        unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.15;
+                        unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.15;
+                        unit._idleTime = (unit._idleTime || (unit.mesh.id ? unit.mesh.id * 1.5 : 0)) + 0.05;
+                        unit._strideBob = Math.sin(unit._idleTime) * 0.02;
                     }
                 }
 
@@ -874,7 +885,7 @@ function animate() {
                     unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.08;
                 } else {
                     const onBridge = mapBridges.find(b => isPointOnBridge(unit.mesh.position.x, unit.mesh.position.z, b));
-                    unit.mesh.position.y = onBridge ? onBridge.deckY : groundY;
+                    unit.mesh.position.y = (onBridge ? onBridge.deckY : groundY) + (unit._strideBob || 0);
                 }
 
                 // Gentle soft repulsion for ground units to avoid overlapping and bumping
@@ -1172,10 +1183,25 @@ function processEnemyMovement() {
                 }
             }
             enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+            if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(enemy.type)) {
+                enemy._animTime = (enemy._animTime || 0) + 0.28;
+                const stride = enemy._animTime;
+                enemy.mesh.rotation.x = 0.14 + Math.sin(stride * 2.0) * 0.04;
+                enemy.mesh.rotation.z = Math.sin(stride) * 0.08;
+                enemy._strideBob = Math.abs(Math.sin(stride)) * 0.14;
+            }
+        } else {
+            if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(enemy.type)) {
+                enemy.mesh.rotation.x += (0 - enemy.mesh.rotation.x) * 0.15;
+                enemy.mesh.rotation.z += (0 - enemy.mesh.rotation.z) * 0.15;
+                enemy._idleTime = (enemy._idleTime || (enemy.mesh.id ? enemy.mesh.id * 1.5 : 0)) + 0.05;
+                enemy._strideBob = Math.sin(enemy._idleTime) * 0.02;
+            }
         }
 
         // Match enemy ground height on hills & resolve obstacle collisions
-        enemy.mesh.position.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0;
+        const eGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0;
+        enemy.mesh.position.y = eGroundY + (enemy._strideBob || 0);
         resolveObstacleCollisions(enemy);
     });
 }

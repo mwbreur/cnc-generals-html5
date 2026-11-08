@@ -191,16 +191,7 @@ function createCrusaderTankMesh(isEnemy = false) {
 
 function createPaladinTankMesh(isEnemy = false) {
     if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['paladin']) {
-        const root = createW3DVehicleMesh('paladin', isEnemy);
-        if (window.W3D_VEHICLE_DATA['drone_battle']) {
-            const drone = createW3DVehicleMesh('drone_battle', isEnemy);
-            drone.name = 'paladinBattleDrone';
-            // Scale appropriately relative to parent paladin tank group (0.075 / 0.09)
-            drone.scale.set(0.833, 0.833, 0.833);
-            drone.position.set(0, 22.0, -10.0);
-            root.add(drone);
-        }
-        return root;
+        return createW3DVehicleMesh('paladin', isEnemy);
     }
     const g = new THREE.Group();
     const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matUSA;
