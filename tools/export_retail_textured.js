@@ -138,7 +138,8 @@ const EXTRA_TEXTURES = {
     'zbsupplydk': 'zbsupplydk.dds',
     'ztoilpump': 'ztoilpump.dds',
     'avbattledr': 'avbattledr.dds',
-    'avrepairdr': 'avrepairdr.dds'
+    'avrepairdr': 'avrepairdr.dds',
+    'avhelldrone': 'avhelldrone.dds'
 };
 
 // Clean disconnected rogue test boxes or vertex spikes from meshes
@@ -278,6 +279,20 @@ function processModels(map) {
                     p.tz = ox - cx;
                 }
             });
+        } else if (key === 'drone_hellfire') {
+            // Hellfire Drone: align chassis mesh to match world pivots and housecolor decals.
+            // In avhelldrone.w3d, CHASSIS mesh was unrotated relative to its 90-degree pivot orientation.
+            // Pure right-handed rotation (det = +1): X_new = Z_old, Y_new = X_old, Z_new = Y_old
+            // Wingspan aligns horizontally along X [-6.88..6.88], height along Y [-2.23..0.80], and length along Z [-4.91..4.91]
+            if (filteredMeshes['avhelldrone.chassis']) {
+                const m = filteredMeshes['avhelldrone.chassis'];
+                for (let i = 0; i < m.v.length; i += 3) {
+                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                    m.v[i] = oz;
+                    m.v[i+1] = ox;
+                    m.v[i+2] = oy;
+                }
+            }
         } else if (key === 'comanche') {
             // Comanche RAH-66: center main rotor mast and tail fenestron on fuselage centerline
             parsed.pivots.forEach(p => {
@@ -1144,6 +1159,10 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     if (modelKey === 'drone_battle') {
         const fanMesh = root.getObjectByName('avbattledr.fan');
         if (fanMesh) fanMesh.name = 'ductedFan';
+        const dTurret = root.getObjectByName('turretSystem') || root.getObjectByName('TURRET01');
+        if (dTurret) dTurret.name = 'droneTurret';
+        const dElev = root.getObjectByName('TURRETEL01');
+        if (dElev) dElev.name = 'droneTurretElevation';
     } else if (modelKey === 'comanche') {
         const rotor = root.getObjectByName('PROPELLER01') || root.getObjectByName('avcomanche.avcomanche_prop');
         if (rotor) rotor.name = 'comanche_rotor';
