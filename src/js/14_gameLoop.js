@@ -538,15 +538,21 @@ function animate() {
                 // =========================================================
                 // AIRPLANE & HELICOPTER FLIGHT, LANDING & CIRCLING ENGINE
                 // =========================================================
+                // COMPREHENSIVE AIRCRAFT & HELICOPTER FLIGHT DYNAMICS
+                // Helicopters: Hover in place, tilt into flight, strafe sideways in combat.
+                // Airplanes: High-speed strafe run, drop bombs/missiles overhead, overshoot, loop turnaround.
+                // =========================================================
                 if (unit.isAir) {
                     const cruiseAlt = (unit.mesh.userData && unit.mesh.userData.flightAltitude) ? unit.mesh.userData.flightAltitude : 8.5;
                     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z) : 0;
                     const isHeli = (unit.type === 'comanche' || unit.type === 'chinook');
 
                     if (!unit.patrolCenter) unit.patrolCenter = unit.mesh.position.clone();
-                    if (!unit.circleRadius) unit.circleRadius = isHeli ? 11.0 : 15.0;
+                    if (!unit.circleRadius) unit.circleRadius = isHeli ? 11.0 : 16.0;
                     if (unit.circleAngle === undefined) unit.circleAngle = Math.random() * Math.PI * 2;
-                    if (!unit.airState || unit.airState === 'none') unit.airState = 'circling';
+                    if (!unit.airState || unit.airState === 'none') {
+                        unit.airState = isHeli ? 'hovering' : 'circling';
+                    }
 
                     // Dynamic State Transition: Automatically react to player/AI orders!
                     if (unit.combatTarget && unit.combatTarget.health > 0) {
@@ -555,8 +561,12 @@ function animate() {
                         } else if (unit.airState !== 'taking_off') {
                             unit.airState = 'attacking';
                         }
+                    } else if (unit.airState === 'hovering') {
+                        const distToTarget = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                        if (distToTarget > 2.0 || unit.taskState === 'Moving') {
+                            unit.airState = 'flying';
+                        }
                     } else if (unit.airState === 'circling') {
-                        // Switch from circling to flying ONLY if a new destination away from patrolCenter is commanded
                         const distToPatrol = Math.hypot(unit.targetPosition.x - unit.patrolCenter.x, unit.targetPosition.z - unit.patrolCenter.z);
                         if (distToPatrol > 4.0 || unit.taskState === 'Moving') {
                             unit.airState = 'flying';
@@ -568,6 +578,7 @@ function animate() {
                     if (unit.airState === 'landed') {
                         unit.mesh.position.y = groundY + 0.35;
                         unit.mesh.rotation.z = 0;
+                        unit.mesh.rotation.x = 0;
                         const distToGoal = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
                         if (unit.combatTarget || (unit.waypoints && unit.waypoints.length > 0) || distToGoal > 4.0 || unit.taskState === 'Moving') {
                             unit.airState = 'taking_off';
@@ -580,75 +591,163 @@ function animate() {
                         const targetY = groundY + cruiseAlt;
                         unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.08;
                         if (unit.mesh.position.y >= targetY * 0.85) {
-                            unit.airState = (unit.combatTarget && unit.combatTarget.health > 0) ? 'attacking' : 'flying';
+                            unit.airState = (unit.combatTarget && unit.combatTarget.health > 0) ? 'attacking' : (isHeli ? 'hovering' : 'flying');
                         }
                     }
 
-                    // 3. Attacking an enemy target
+                    // 3. Helicopter Station Keeping: HOVER IN THE SAME SPOT
+                    if (unit.airState === 'hovering' && isHeli) {
+                        const targetHoverY = groundY + cruiseAlt + Math.sin(animTime * 2.5 + unit.mesh.id) * 0.18;
+                        unit.mesh.position.y += (targetHoverY - unit.mesh.position.y) * 0.10;
+                        unit.mesh.position.x += (unit.targetPosition.x - unit.mesh.position.x) * 0.12;
+                        unit.mesh.position.z += (unit.targetPosition.z - unit.mesh.position.z) * 0.12;
+
+                        // Return smoothly to level hover attitude
+                        unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
+                        unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
+
+                        return; // Complete hover update
+                    }
+
+                    // 4. Attacking an Enemy Target
                     if (unit.airState === 'attacking' && unit.combatTarget) {
                         const tPos = unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position);
-                        if (tPos && unit.combatTarget.health > 0) {
+                        if (!tPos || unit.combatTarget.health <= 0) {
+                            unit.combatTarget = null;
+                            unit.planeAttackPhase = null;
+                            if (isHeli) {
+                                unit.airState = 'hovering';
+                                unit.targetPosition.copy(unit.mesh.position);
+                            } else {
+                                unit.airState = 'circling';
+                                unit.patrolCenter.copy(unit.mesh.position);
+                                unit.targetPosition.copy(unit.mesh.position);
+                                unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
+                            }
+                            unit.taskState = 'Idle';
+                        } else if (isHeli) {
+                            // --- HELICOPTERS (Comanche): Strafe sideways while facing and firing on target ---
                             const dxA = tPos.x - unit.mesh.position.x;
                             const dzA = tPos.z - unit.mesh.position.z;
                             const distToEnemy = Math.hypot(dxA, dzA);
 
-                            // Aurora supersonic speed surge on attack run!
-                            const planeSpeed = (unit.type === 'aurora') ? unit.speed * 1.55 : unit.speed;
-                            const dirX = dxA / (distToEnemy || 1);
-                            const dirZ = dzA / (distToEnemy || 1);
-
-                            unit.mesh.position.x += dirX * planeSpeed;
-                            unit.mesh.position.z += dirZ * planeSpeed;
-
-                            const targetAngle = Math.atan2(-dirZ, dirX) + Math.PI / 2;
-                            let diff = targetAngle - unit.mesh.rotation.y;
+                            // Face directly toward the enemy target at all times
+                            const aimAngle = Math.atan2(-dzA, dxA) + Math.PI / 2;
+                            let diff = aimAngle - unit.mesh.rotation.y;
                             while (diff < -Math.PI) diff += Math.PI * 2;
                             while (diff > Math.PI) diff -= Math.PI * 2;
-                            unit.mesh.rotation.y += diff * 0.22;
-                            if (isHeli) {
-                                unit.mesh.rotation.z = 0;
-                                unit.mesh.rotation.x = 0;
+                            unit.mesh.rotation.y += diff * 0.20;
+
+                            if (distToEnemy > 22.0) {
+                                // Close distance into effective rocket & gun range
+                                const dirX = dxA / (distToEnemy || 1);
+                                const dirZ = dzA / (distToEnemy || 1);
+                                unit.mesh.position.x += dirX * unit.speed;
+                                unit.mesh.position.z += dirZ * unit.speed;
+                                unit.mesh.rotation.x += (0.14 - unit.mesh.rotation.x) * 0.12; // Forward tilt
+                                unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
                             } else {
-                                unit.mesh.rotation.order = 'YXZ';
-                                unit.mesh.rotation.x = 0;
-                                unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -0.45, 0.45) - unit.mesh.rotation.z) * 0.15;
+                                // Authentic Comanche Circle-Strafe: lateral sideways movement perpendicular to line-of-fire
+                                if (unit.strafeDir === undefined) unit.strafeDir = (Math.random() < 0.5 ? 1 : -1);
+                                unit.strafeTimer = (unit.strafeTimer || 0) + 1;
+                                if (unit.strafeTimer > 75) {
+                                    unit.strafeTimer = 0;
+                                    unit.strafeDir *= -1; // Reverse strafe direction periodically
+                                }
+
+                                const perpX = -dzA / (distToEnemy || 1);
+                                const perpZ = dxA / (distToEnemy || 1);
+                                const strafeSpeed = unit.speed * 0.60;
+                                unit.mesh.position.x += perpX * (strafeSpeed * unit.strafeDir);
+                                unit.mesh.position.z += perpZ * (strafeSpeed * unit.strafeDir);
+
+                                // Tilting roll during sideways strafe + nose dipped down toward ground target
+                                unit.mesh.rotation.z += (unit.strafeDir * 0.22 - unit.mesh.rotation.z) * 0.12;
+                                unit.mesh.rotation.x += (0.16 - unit.mesh.rotation.x) * 0.12;
                             }
 
-                            if (distToEnemy <= (unit.type === 'comanche' ? 24 : 28) && unit.attackCooldown === 0) {
+                            if (distToEnemy <= 24.0 && unit.attackCooldown === 0) {
                                 executeWeaponFire(unit, unit.combatTarget);
                             }
+                        } else {
+                            // --- FIXED-WING AIRPLANES (Raptor, Aurora, Stealth Fighter, MiG): Strafe Run & Bomb Drop ---
+                            if (!unit.planeAttackPhase) unit.planeAttackPhase = 'inbound';
 
-                            if (distToEnemy < 6.0 || unit.combatTarget.health <= 0) {
-                                if (unit.combatTarget.health <= 0) {
-                                    unit.combatTarget = null;
-                                    unit.patrolCenter.copy(unit.mesh.position);
-                                    unit.targetPosition.copy(unit.mesh.position);
-                                    unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
-                                    unit.airState = 'circling';
-                                    unit.taskState = 'Idle';
-                                } else {
-                                    // Strafing turn pass: carry momentum past target
-                                    unit.mesh.position.x += dirX * (planeSpeed * 1.4);
-                                    unit.mesh.position.z += dirZ * (planeSpeed * 1.4);
+                            const dxA = tPos.x - unit.mesh.position.x;
+                            const dzA = tPos.z - unit.mesh.position.z;
+                            const distToEnemy = Math.hypot(dxA, dzA);
+                            const planeSpeed = (unit.type === 'aurora') ? unit.speed * 1.60 : unit.speed;
+
+                            if (unit.planeAttackPhase === 'inbound') {
+                                // Phase 1: High-speed approach directly at the target
+                                const dirX = dxA / (distToEnemy || 1);
+                                const dirZ = dzA / (distToEnemy || 1);
+                                unit.mesh.position.x += dirX * planeSpeed;
+                                unit.mesh.position.z += dirZ * planeSpeed;
+
+                                const targetAngle = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                                let diff = targetAngle - unit.mesh.rotation.y;
+                                while (diff < -Math.PI) diff += Math.PI * 2;
+                                while (diff > Math.PI) diff -= Math.PI * 2;
+                                unit.mesh.rotation.y += diff * 0.22;
+                                unit.mesh.rotation.order = 'YXZ';
+                                unit.mesh.rotation.x += (-0.08 - unit.mesh.rotation.x) * 0.12; // Slight diving attack angle
+                                unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -0.42, 0.42) - unit.mesh.rotation.z) * 0.15;
+
+                                // Bomb & Missile Delivery: Release ordnance as plane streaks overhead
+                                if (distToEnemy <= 16.0 && unit.attackCooldown === 0) {
+                                    executeWeaponFire(unit, unit.combatTarget);
+                                    unit.planeAttackPhase = 'overshoot';
+                                    unit.overshootDirX = dirX;
+                                    unit.overshootDirZ = dirZ;
+                                    unit.overshootDist = 0;
+                                }
+                            } else if (unit.planeAttackPhase === 'overshoot') {
+                                // Phase 2: Carry momentum past target (zoom climb overshoot)
+                                unit.mesh.position.x += unit.overshootDirX * (planeSpeed * 1.35);
+                                unit.mesh.position.z += unit.overshootDirZ * (planeSpeed * 1.35);
+                                unit.overshootDist += planeSpeed * 1.35;
+                                unit.mesh.position.y += 0.08; // Zoom climb
+                                unit.mesh.rotation.x += (0.10 - unit.mesh.rotation.x) * 0.12;
+                                unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
+
+                                if (unit.overshootDist >= 34.0) {
+                                    unit.planeAttackPhase = 'turnaround';
+                                    unit.turnaroundTimer = 0;
+                                }
+                            } else if (unit.planeAttackPhase === 'turnaround') {
+                                // Phase 3: Wide 180-degree banking turnaround to set up next attack run
+                                unit.turnaroundTimer = (unit.turnaroundTimer || 0) + 1;
+                                const turnRate = 0.038;
+                                unit.mesh.rotation.y += turnRate;
+                                unit.mesh.rotation.z += (-0.40 - unit.mesh.rotation.z) * 0.12; // Deep banking roll
+                                unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.10;
+
+                                // Advance forward along turning vector
+                                unit.mesh.position.x += Math.sin(unit.mesh.rotation.y) * (planeSpeed * 1.05);
+                                unit.mesh.position.z += Math.cos(unit.mesh.rotation.y) * (planeSpeed * 1.05);
+
+                                // Check alignment back towards target
+                                const angleToTarget = Math.atan2(-dzA, dxA) + Math.PI / 2;
+                                let angleDiff = Math.abs(angleToTarget - unit.mesh.rotation.y);
+                                while (angleDiff > Math.PI) angleDiff = Math.abs(angleDiff - Math.PI * 2);
+
+                                if (angleDiff < 0.45 && unit.turnaroundTimer > 40) {
+                                    // Successfully re-aligned with target for next strafe pass!
+                                    unit.planeAttackPhase = 'inbound';
                                 }
                             }
-                        } else {
-                            unit.combatTarget = null;
-                            unit.patrolCenter.copy(unit.mesh.position);
-                            unit.targetPosition.copy(unit.mesh.position);
-                            unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
-                            unit.airState = 'circling';
-                            unit.taskState = 'Idle';
                         }
                     }
 
-                    // 4. Flying toward designated destination
+                    // 5. Commanded Flight Toward Destination
                     if (unit.airState === 'flying') {
                         const dx = unit.targetPosition.x - unit.mesh.position.x;
                         const dz = unit.targetPosition.z - unit.mesh.position.z;
                         const dist2D = Math.hypot(dx, dz);
+                        const stopThreshold = isHeli ? 1.5 : 4.0;
 
-                        if (dist2D > 3.5) {
+                        if (dist2D > stopThreshold) {
                             const dirX = dx / dist2D;
                             const dirZ = dz / dist2D;
                             unit.mesh.position.x += dirX * unit.speed;
@@ -659,61 +758,72 @@ function animate() {
                             while (diff < -Math.PI) diff += Math.PI * 2;
                             while (diff > Math.PI) diff -= Math.PI * 2;
                             unit.mesh.rotation.y += diff * 0.18;
+
                             if (isHeli) {
-                                unit.mesh.rotation.z = 0;
-                                unit.mesh.rotation.x = 0;
+                                // Helicopter tilts forward into flight and banks slightly into turns
+                                unit.mesh.rotation.x += (0.14 - unit.mesh.rotation.x) * 0.12;
+                                const targetBank = THREE.MathUtils.clamp(-diff * 0.8, -0.22, 0.22);
+                                unit.mesh.rotation.z += (targetBank - unit.mesh.rotation.z) * 0.12;
                             } else {
                                 unit.mesh.rotation.order = 'YXZ';
-                                unit.mesh.rotation.x = 0;
+                                unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
                                 unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.6, -0.42, 0.42) - unit.mesh.rotation.z) * 0.12;
                             }
                         } else {
                             if (unit.waypoints && unit.waypoints.length > 0) {
                                 unit.targetPosition.copy(unit.waypoints.shift());
                             } else {
-                                unit.patrolCenter.copy(unit.targetPosition);
-                                unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
-                                unit.airState = 'circling';
+                                if (isHeli) {
+                                    // Helicopters hover in place at arrival!
+                                    unit.airState = 'hovering';
+                                    unit.targetPosition.copy(unit.mesh.position);
+                                } else {
+                                    // Airplanes enter holding orbit
+                                    unit.patrolCenter.copy(unit.targetPosition);
+                                    unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
+                                    unit.airState = 'circling';
+                                }
                                 unit.taskState = 'Idle';
                             }
                         }
                     }
 
-                    // 5. Circling smoothly at location ("fly around slowly in circles at their location")
+                    // 6. Holding Pattern Circling (Strictly for fixed-wing airplanes)
                     if (unit.airState === 'circling') {
-                        const orbitR = unit.circleRadius || (isHeli ? 11.0 : 15.0);
-                        const orbitSpeed = unit.speed * 0.70; // Smooth, slow loiter speed
-                        const angularSpeed = orbitSpeed / orbitR;
-
-                        unit.circleAngle = (unit.circleAngle || 0) + angularSpeed;
-                        if (unit.circleAngle > Math.PI * 2) unit.circleAngle -= Math.PI * 2;
-
-                        const targetOrbitX = unit.patrolCenter.x + Math.cos(unit.circleAngle) * orbitR;
-                        const targetOrbitZ = unit.patrolCenter.z + Math.sin(unit.circleAngle) * orbitR;
-
-                        const dxO = targetOrbitX - unit.mesh.position.x;
-                        const dzO = targetOrbitZ - unit.mesh.position.z;
-                        const distO = Math.hypot(dxO, dzO);
-
-                        if (distO > 0.05) {
-                            const step = Math.min(distO, orbitSpeed);
-                            unit.mesh.position.x += (dxO / distO) * step;
-                            unit.mesh.position.z += (dzO / distO) * step;
-                        }
-
-                        // Align heading with circle tangent
-                        const tangentX = -Math.sin(unit.circleAngle);
-                        const tangentZ = Math.cos(unit.circleAngle);
-                        const targetAngle = Math.atan2(-tangentZ, tangentX) + Math.PI / 2;
-
-                        let diff = targetAngle - unit.mesh.rotation.y;
-                        while (diff < -Math.PI) diff += Math.PI * 2;
-                        while (diff > Math.PI) diff -= Math.PI * 2;
-                        unit.mesh.rotation.y += diff * 0.16;
                         if (isHeli) {
-                            unit.mesh.rotation.z = 0;
-                            unit.mesh.rotation.x = 0;
+                            // If a helicopter somehow gets into circling, immediately settle it to hovering
+                            unit.airState = 'hovering';
+                            unit.targetPosition.copy(unit.mesh.position);
                         } else {
+                            const orbitR = unit.circleRadius || 16.0;
+                            const orbitSpeed = unit.speed * 0.75;
+                            const angularSpeed = orbitSpeed / orbitR;
+
+                            unit.circleAngle = (unit.circleAngle || 0) + angularSpeed;
+                            if (unit.circleAngle > Math.PI * 2) unit.circleAngle -= Math.PI * 2;
+
+                            const targetOrbitX = unit.patrolCenter.x + Math.cos(unit.circleAngle) * orbitR;
+                            const targetOrbitZ = unit.patrolCenter.z + Math.sin(unit.circleAngle) * orbitR;
+
+                            const dxO = targetOrbitX - unit.mesh.position.x;
+                            const dzO = targetOrbitZ - unit.mesh.position.z;
+                            const distO = Math.hypot(dxO, dzO);
+
+                            if (distO > 0.05) {
+                                const step = Math.min(distO, orbitSpeed);
+                                unit.mesh.position.x += (dxO / distO) * step;
+                                unit.mesh.position.z += (dzO / distO) * step;
+                            }
+
+                            // Tangential heading for smooth circle flight
+                            const tangentX = -Math.sin(unit.circleAngle);
+                            const tangentZ = Math.cos(unit.circleAngle);
+                            const targetAngle = Math.atan2(-tangentZ, tangentX) + Math.PI / 2;
+
+                            let diff = targetAngle - unit.mesh.rotation.y;
+                            while (diff < -Math.PI) diff += Math.PI * 2;
+                            while (diff > Math.PI) diff -= Math.PI * 2;
+                            unit.mesh.rotation.y += diff * 0.16;
                             unit.mesh.rotation.order = 'YXZ';
                             unit.mesh.rotation.x = 0;
                             unit.mesh.rotation.z += (-0.28 - unit.mesh.rotation.z) * 0.12;
@@ -721,7 +831,7 @@ function animate() {
                     }
 
                     // Maintain flight cruising altitude above ground
-                    if (unit.airState !== 'landed') {
+                    if (unit.airState !== 'landed' && unit.airState !== 'hovering') {
                         const targetY = groundY + cruiseAlt;
                         unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.08;
                     }
@@ -1136,81 +1246,129 @@ function processEnemyMovement() {
     enemyUnits.forEach(enemy => {
         if (enemy.health <= 0) return;
 
-        // Authentic Aircraft Flight & Holding Pattern Circling
+        // Authentic Aircraft & Helicopter Flight Dynamics for AI
         if (enemy.isAir) {
             const isHeli = (enemy.type === 'comanche' || enemy.type === 'chinook');
             if (!enemy.patrolCenter) enemy.patrolCenter = enemy.mesh.position.clone();
-            if (!enemy.circleRadius) enemy.circleRadius = isHeli ? 11.0 : 15.0;
+            if (!enemy.circleRadius) enemy.circleRadius = isHeli ? 11.0 : 16.0;
             if (enemy.circleAngle === undefined) enemy.circleAngle = Math.random() * Math.PI * 2;
-            if (!enemy.airState) enemy.airState = 'circling';
+            if (!enemy.airState) enemy.airState = isHeli ? 'hovering' : 'circling';
 
             const cruiseAlt = (enemy.mesh.userData && enemy.mesh.userData.flightAltitude) ? enemy.mesh.userData.flightAltitude : 8.5;
             const targetY = (typeof getTerrainHeight === 'function' ? getTerrainHeight(enemy.mesh.position.x, enemy.mesh.position.z) : 0) + cruiseAlt;
             enemy.mesh.position.y += (targetY - enemy.mesh.position.y) * 0.08;
-            if (isHeli) {
-                enemy.mesh.rotation.z = 0;
-                enemy.mesh.rotation.x = 0;
-            } else {
-                enemy.mesh.rotation.order = 'YXZ';
-                enemy.mesh.rotation.x = 0;
-            }
 
             const target = enemy.combatTarget;
-            const targetPos = target && (target.position || target.mesh.position);
+            const targetPos = target && (target.position || (target.mesh && target.mesh.position));
 
-            // 1. If actively attacking a target
-            if (target && target.health > 0) {
+            // 1. Actively engaging a target
+            if (target && target.health > 0 && targetPos) {
                 const dxT = targetPos.x - enemy.mesh.position.x;
                 const dzT = targetPos.z - enemy.mesh.position.z;
                 const distT = Math.hypot(dxT, dzT);
-                if (distT > (enemy.scanRange || 24) * 0.7) {
-                    const dirX = dxT / distT;
-                    const dirZ = dzT / distT;
-                    enemy.mesh.position.x += dirX * enemy.speed;
-                    enemy.mesh.position.z += dirZ * enemy.speed;
-                    enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+
+                if (isHeli) {
+                    // AI Helicopter: Face target, dip nose, and strafe sideways
+                    const aimAngle = Math.atan2(-dzT, dxT) + Math.PI / 2;
+                    let diff = aimAngle - enemy.mesh.rotation.y;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    enemy.mesh.rotation.y += diff * 0.20;
+
+                    if (distT > 20.0) {
+                        const dirX = dxT / distT;
+                        const dirZ = dzT / distT;
+                        enemy.mesh.position.x += dirX * enemy.speed;
+                        enemy.mesh.position.z += dirZ * enemy.speed;
+                        enemy.mesh.rotation.x = 0.14;
+                    } else {
+                        if (enemy.strafeDir === undefined) enemy.strafeDir = (Math.random() < 0.5 ? 1 : -1);
+                        enemy.strafeTimer = (enemy.strafeTimer || 0) + 1;
+                        if (enemy.strafeTimer > 75) {
+                            enemy.strafeTimer = 0;
+                            enemy.strafeDir *= -1;
+                        }
+                        const perpX = -dzT / distT;
+                        const perpZ = dxT / distT;
+                        enemy.mesh.position.x += perpX * (enemy.speed * 0.60 * enemy.strafeDir);
+                        enemy.mesh.position.z += perpZ * (enemy.speed * 0.60 * enemy.strafeDir);
+                        enemy.mesh.rotation.z = enemy.strafeDir * 0.20;
+                        enemy.mesh.rotation.x = 0.15;
+                    }
                 } else {
-                    // Holding circle orbit around hostile target while engaging
-                    enemy.circleAngle += isHeli ? 0.018 : 0.024;
-                    const orbitRadius = (enemy.circleRadius || 12.0) * 0.75;
-                    const cX = targetPos.x + Math.cos(enemy.circleAngle) * orbitRadius;
-                    const cZ = targetPos.z + Math.sin(enemy.circleAngle) * orbitRadius;
-                    enemy.mesh.position.x += (cX - enemy.mesh.position.x) * 0.06;
-                    enemy.mesh.position.z += (cZ - enemy.mesh.position.z) * 0.06;
-                    const fwdX = -Math.sin(enemy.circleAngle);
-                    const fwdZ = Math.cos(enemy.circleAngle);
-                    enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                    // AI Airplane: High-speed strafe run and overshoot
+                    if (!enemy.planePhase) enemy.planePhase = 'inbound';
+                    const planeSpeed = enemy.speed * 1.30;
+
+                    if (enemy.planePhase === 'inbound') {
+                        const dirX = dxT / distT;
+                        const dirZ = dzT / distT;
+                        enemy.mesh.position.x += dirX * planeSpeed;
+                        enemy.mesh.position.z += dirZ * planeSpeed;
+                        enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                        enemy.mesh.rotation.x = -0.08;
+
+                        if (distT <= 16.0) {
+                            if (enemy.attackCooldown === 0) executeWeaponFire(enemy, target);
+                            enemy.planePhase = 'overshoot';
+                            enemy.overshootDirX = dirX;
+                            enemy.overshootDirZ = dirZ;
+                            enemy.overshootDist = 0;
+                        }
+                    } else if (enemy.planePhase === 'overshoot') {
+                        enemy.mesh.position.x += enemy.overshootDirX * (planeSpeed * 1.35);
+                        enemy.mesh.position.z += enemy.overshootDirZ * (planeSpeed * 1.35);
+                        enemy.overshootDist += planeSpeed * 1.35;
+                        if (enemy.overshootDist >= 32.0) enemy.planePhase = 'turnaround';
+                    } else if (enemy.planePhase === 'turnaround') {
+                        enemy.mesh.rotation.y += 0.040;
+                        enemy.mesh.rotation.z = -0.38;
+                        enemy.mesh.position.x += Math.sin(enemy.mesh.rotation.y) * planeSpeed;
+                        enemy.mesh.position.z += Math.cos(enemy.mesh.rotation.y) * planeSpeed;
+                        const angleToTarget = Math.atan2(-dzT, dxT) + Math.PI / 2;
+                        let aDiff = Math.abs(angleToTarget - enemy.mesh.rotation.y);
+                        while (aDiff > Math.PI) aDiff = Math.abs(aDiff - Math.PI * 2);
+                        if (aDiff < 0.45) enemy.planePhase = 'inbound';
+                    }
                 }
                 return;
             }
 
-            // 2. Normal commanded flight or patrol
+            // 2. Normal flight or idle hovering / holding pattern
             const dx = enemy.targetPosition.x - enemy.mesh.position.x;
             const dz = enemy.targetPosition.z - enemy.mesh.position.z;
             const distToGoal = Math.hypot(dx, dz);
 
-            if (distToGoal > 3.0) {
+            if (distToGoal > (isHeli ? 1.5 : 3.5)) {
                 const dirX = dx / distToGoal;
                 const dirZ = dz / distToGoal;
                 enemy.mesh.position.x += dirX * enemy.speed;
                 enemy.mesh.position.z += dirZ * enemy.speed;
                 enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                if (isHeli) enemy.mesh.rotation.x = 0.14;
                 enemy.patrolCenter.copy(enemy.targetPosition);
             } else {
-                // Smooth holding orbit circling around patrolCenter
-                enemy.circleAngle += isHeli ? 0.015 : 0.022;
-                const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * enemy.circleRadius;
-                const tZ = enemy.patrolCenter.z + Math.sin(enemy.circleAngle) * enemy.circleRadius;
-                const cDx = tX - enemy.mesh.position.x;
-                const cDz = tZ - enemy.mesh.position.z;
-                const cDist = Math.hypot(cDx, cDz);
-                if (cDist > 0.1) {
-                    const cSpeed = enemy.speed * 0.85;
-                    enemy.mesh.position.x += (cDx / cDist) * cSpeed;
-                    enemy.mesh.position.z += (cDz / cDist) * cSpeed;
-                    const fwdX = -Math.sin(enemy.circleAngle);
-                    const fwdZ = Math.cos(enemy.circleAngle);
-                    enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                if (isHeli) {
+                    // Hover in place!
+                    enemy.mesh.rotation.x = 0;
+                    enemy.mesh.rotation.z = 0;
+                } else {
+                    // Circling holding pattern for airplanes
+                    enemy.circleAngle += 0.022;
+                    const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * enemy.circleRadius;
+                    const tZ = enemy.patrolCenter.z + Math.sin(enemy.circleAngle) * enemy.circleRadius;
+                    const cDx = tX - enemy.mesh.position.x;
+                    const cDz = tZ - enemy.mesh.position.z;
+                    const cDist = Math.hypot(cDx, cDz);
+                    if (cDist > 0.1) {
+                        const cSpeed = enemy.speed * 0.85;
+                        enemy.mesh.position.x += (cDx / cDist) * cSpeed;
+                        enemy.mesh.position.z += (cDz / cDist) * cSpeed;
+                        const fwdX = -Math.sin(enemy.circleAngle);
+                        const fwdZ = Math.cos(enemy.circleAngle);
+                        enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                        enemy.mesh.rotation.z = -0.28;
+                    }
                 }
             }
             return;

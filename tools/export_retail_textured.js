@@ -278,6 +278,26 @@ function processModels(map) {
                     p.tz = ox - cx;
                 }
             });
+        } else if (key === 'comanche') {
+            // Comanche RAH-66: center main rotor mast and tail fenestron on fuselage centerline
+            parsed.pivots.forEach(p => {
+                if (p.name === 'PROPELLER01') {
+                    p.tx = 0; p.ty = 4.92; p.tz = 5.16;
+                } else if (p.name === 'PROPELLER02') {
+                    p.tx = 0; p.ty = 2.40; p.tz = -16.85;
+                } else if (p.name === 'MUZZLE01') {
+                    p.tx = 0; p.ty = -3.86; p.tz = 22.58;
+                }
+            });
+        } else if (key === 'chinook') {
+            // Chinook CH-47: center front and rear tandem rotor pylons on fuselage centerline
+            parsed.pivots.forEach(p => {
+                if (p.name === 'PROPELLER01') {
+                    p.tx = 0; p.ty = 5.21; p.tz = 12.74;
+                } else if (p.name === 'PROPELLER02') {
+                    p.tx = 0; p.ty = 7.20; p.tz = -17.06;
+                }
+            });
         }
 
         let meshEntries;
