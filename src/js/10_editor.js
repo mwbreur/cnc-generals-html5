@@ -492,38 +492,34 @@
                 ccObj.isAI = false;
             }
             const setupEl = document.getElementById('starting-units');
-            const setup = (setupEl && setupEl.value) || 'small';
+            const setup = (setupEl && setupEl.value) || 'dozer';
             const factionData = factionCatalog[faction] || factionCatalog['usa'];
-            const coreUnits = factionData.starter;
-            let forces = setup === 'dozer' ? [coreUnits[0]] : setup === 'large'
-                ? [coreUnits[0], coreUnits[0], coreUnits[1], coreUnits[1], coreUnits[2], coreUnits[2]]
-                : [...coreUnits];
-            if (faction === 'usa' && !forces.includes('chinook')) {
-                forces.push('chinook');
+            const builderType = factionData.builder || (faction === 'gla' ? 'worker' : 'dozer');
+            let forces;
+            if (setup === 'small') {
+                const tankType = faction === 'usa' ? 'tank' : (faction === 'china' ? 'gatling' : 'technical');
+                forces = [builderType, tankType];
+            } else if (setup === 'large') {
+                const tankType = faction === 'usa' ? 'tank' : (faction === 'china' ? 'gatling' : 'technical');
+                forces = [builderType, builderType, tankType, tankType];
+            } else {
+                // Authentic Zero Hour: Exactly 1 Builder (Dozer for USA/China, Worker for GLA)
+                forces = [builderType];
             }
             forces.forEach((type, index) => {
                 const angle = index * 2.4;
                 const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 14, 0, Math.sin(angle) * 14));
                 at.y = getTerrainHeight(at.x, at.z);
-                if (type === 'chinook') at.y += 4.5;
                 const u = spawnUnit(type, at);
                 if (u) {
                     u.teamId = team;
                     u.ownerId = 'player';
                     u.isAI = false;
-                    if (type === 'chinook') {
-                        u.aiState = 'MovingToDock';
-                        u.taskState = 'Idle';
-                        u.airState = 'hovering';
-                        u.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(u.mesh.position) : null;
-                        if (u.supplyTarget) {
-                            u.targetPosition.copy(u.supplyTarget.position);
-                            u.airState = 'flying';
-                        }
-                    }
+                    u.taskState = 'Idle';
                 }
             });
-            showNotification('Command Center operational. Base established.', 'success');
+            const builderName = (faction === 'gla' ? 'Worker' : 'Construction Dozer');
+            showNotification(`Command Center operational. 1 ${builderName} deployed.`, 'success');
             updateSidebar();
         }
 

@@ -253,7 +253,7 @@
 
                 const factionCatalog = {
             usa: {
-                label: 'USA', builder: 'dozer', starter: ['dozer', 'tank', 'chinook'],
+                label: 'USA', builder: 'dozer', starter: ['dozer'],
                 barracks: {
                     infantry: ['Ranger', 100, 'Assault rifleman with flashbangs & capture ability.'],
                     rocket: ['Missile Defender', 175, 'Laser-guided anti-armor & anti-air missile infantry.'],
@@ -275,7 +275,7 @@
                     chinook: ['Chinook', 1200, 'Heavy supply and troop transport helicopter.']
                 },
                 supplyCenter: {
-                    truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
+                    chinook: ['Chinook', 1200, 'Heavy supply and troop transport helicopter.']
                 },
                 commandCenter: {
                     dozer: ['Construction Dozer', 500, 'Constructs and repairs USA military installations.']
@@ -283,7 +283,7 @@
                 support: ['Construction Dozer', 'Pilot (unbuildable)', 'Scout Drone (attachment)', 'Battle Drone (attachment)']
             },
             china: {
-                label: 'China', builder: 'dozer', starter: ['dozer', 'gatling', 'truck'],
+                label: 'China', builder: 'dozer', starter: ['dozer'],
                 barracks: {
                     redguard: ['Red Guard', 80, 'Assault rifle infantry trained in pairs.'],
                     tankhunter: ['Tank Hunter', 150, 'Anti-armor rocket infantry with TNT charges.'],
@@ -311,7 +311,7 @@
                 support: ['Construction Dozer']
             },
             gla: {
-                label: 'GLA', builder: 'worker', starter: ['worker', 'scorpion', 'technical'],
+                label: 'GLA', builder: 'worker', starter: ['worker'],
                 barracks: {
                     rebel: ['Rebel', 80, 'Guerrilla assault infantry with capture ability.'],
                     rpg: ['RPG Trooper', 150, 'Anti-armor guerrilla rocket trooper.'],
