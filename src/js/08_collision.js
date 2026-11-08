@@ -227,17 +227,6 @@
                 registerFlattenedFootprint(pos.x, pos.z, radius * 1.15, deckY);
             }
 
-            // Concrete foundation skirt slab extending downward into ground to eliminate any gaps on slopes
-            const s = (group && group.scale && group.scale.x) ? group.scale.x : 1.0;
-            const skirtW = (radius * 2.2) / s;
-            const skirtH = 4.5 / s;
-            const skirtGeom = new THREE.BoxGeometry(skirtW, skirtH, skirtW);
-            const skirtMat = new THREE.MeshStandardMaterial({ color: 0x2e3135, roughness: 0.95 });
-            const skirtMesh = new THREE.Mesh(skirtGeom, skirtMat);
-            skirtMesh.name = 'foundationSkirt';
-            skirtMesh.position.set(0, -skirtH * 0.5, 0);
-            skirtMesh.receiveShadow = true;
-            group.add(skirtMesh);
             
             const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
             const structObj = {

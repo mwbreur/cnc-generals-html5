@@ -95,24 +95,24 @@ const BUILDING_CONFIG = {
     'tech_refinery':        { file: 'CBOilRfny.W3D',    tex: 'cboilrfny.dds',  scale: 0.260, faction: 'tech' }
 };
 
-// Retail Westwood 3D Infantry Characters (calibrated to ~0.55 units tall, authentic human-to-tank scale)
+// Retail Westwood 3D Infantry Characters (calibrated to ~2.8 units tall, classic RTS visual readability)
 const INFANTRY_CONFIG = {
     // USA
-    'ranger':         { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.055, faction: 'usa' },
-    'missiledefender':{ file: 'INF4BRG_SKN.W3D', tex: 'zhca_aimsslguy.tga',  scale: 0.055, faction: 'usa' },
-    'pathfinder':     { file: 'AIPFDR_SKN.W3D', tex: 'zhca_aipthfindr.tga', scale: 0.055, faction: 'usa' },
-    'burton':         { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.058, faction: 'usa' },
+    'ranger':         { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.280, faction: 'usa' },
+    'missiledefender':{ file: 'INF4BRG_SKN.W3D', tex: 'zhca_aimsslguy.tga',  scale: 0.280, faction: 'usa' },
+    'pathfinder':     { file: 'AIPFDR_SKN.W3D', tex: 'zhca_aipthfindr.tga', scale: 0.280, faction: 'usa' },
+    'burton':         { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.300, faction: 'usa' },
     // China
-    'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.055, faction: 'china' },
-    'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.055, faction: 'china' },
-    'hacker':     { file: 'NIHCKR_SKN.W3D', tex: 'zhca_nihacker.tga',   scale: 0.055, faction: 'china' },
-    'lotus':      { file: 'NIHERO_SKN.W3D', tex: 'zhca_niblotus.tga',   scale: 0.056, faction: 'china' },
+    'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.280, faction: 'china' },
+    'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.280, faction: 'china' },
+    'hacker':     { file: 'NIHCKR_SKN.W3D', tex: 'zhca_nihacker.tga',   scale: 0.280, faction: 'china' },
+    'lotus':      { file: 'NIHERO_SKN.W3D', tex: 'zhca_niblotus.tga',   scale: 0.290, faction: 'china' },
     // GLA
-    'rebel':      { file: 'UIRGRD_SKN.W3D', tex: 'zhca_uirguard.tga',   scale: 0.055, faction: 'gla' },
-    'rpg':        { file: 'UISMSD_SKN.W3D', tex: 'zhca_uirstnger.tga',  scale: 0.055, faction: 'gla' },
-    'terrorist':  { file: 'UITRST_SKN.W3D', tex: 'zhca_uiter.tga',      scale: 0.055, faction: 'gla' },
-    'jarmen':     { file: 'UIHERO_SKN.W3D', tex: 'zhca_uihero01.tga',   scale: 0.058, faction: 'gla' },
-    'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.054, faction: 'gla' }
+    'rebel':      { file: 'UIRGRD_SKN.W3D', tex: 'zhca_uirguard.tga',   scale: 0.280, faction: 'gla' },
+    'rpg':        { file: 'UISMSD_SKN.W3D', tex: 'zhca_uirstnger.tga',  scale: 0.280, faction: 'gla' },
+    'terrorist':  { file: 'UITRST_SKN.W3D', tex: 'zhca_uiter.tga',      scale: 0.280, faction: 'gla' },
+    'jarmen':     { file: 'UIHERO_SKN.W3D', tex: 'zhca_uihero01.tga',   scale: 0.300, faction: 'gla' },
+    'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.270, faction: 'gla' }
 };
 
 // Additional architectural and detail textures
@@ -222,7 +222,26 @@ function processModels(map) {
 
         // Canonical 3D Axis Alignment for Aircraft, Helicopters, and Drones (+Z forward, +Y up, +X right):
         if (key === 'comanche' || key === 'chinook') {
-            // Already upright and horizontal (+Y up, +Z forward, props flat at Y=0)
+            // Fuselage meshes and sub-pivots were authored in bone space with 90° roll rotation.
+            // Rotate fuselage meshes and child pivots (x' = y, y' = -x, z' = z) so fuselage is upright and matches horizontal rotor discs.
+            for (const [mName, m] of Object.entries(filteredMeshes)) {
+                if (!mName.includes('prop')) {
+                    for (let i = 0; i < m.v.length; i += 3) {
+                        const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                        m.v[i] = oy;
+                        m.v[i+1] = -ox;
+                        m.v[i+2] = oz;
+                    }
+                }
+            }
+            parsed.pivots.forEach(p => {
+                if (p.name !== 'ROOTTRANSFORM' && p.name !== 'CHASSIS') {
+                    const ox = p.tx, oy = p.ty, oz = p.tz;
+                    p.tx = oy;
+                    p.ty = -ox;
+                    p.tz = oz;
+                }
+            });
         } else if (key === 'raptor') {
             // Proper right-handed pure rotation (det = +1): Y is canopy UP (+ox), Z is nose FORWARD (+oy), X is wingspan (+oz)
             for (const m of Object.values(filteredMeshes)) {
