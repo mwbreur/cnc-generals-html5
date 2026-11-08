@@ -2155,7 +2155,7 @@ function orderUnitsHalt() {
             u.targetPosition.copy(u.mesh.position);
             u.combatTarget = null;
             u.taskState = 'Idle';
-            if (u.type === 'truck' || u.type === 'worker') u.aiState = 'Idle';
+            if (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook') u.aiState = 'Idle';
         }
     });
     playUSASound('acknowledge');
@@ -2163,9 +2163,9 @@ function orderUnitsHalt() {
 }
 
 function orderSelectedHarvestersToGather() {
-    const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
+    const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook'));
     if (harvesters.length === 0) {
-        showNotification('Select a Supply Truck or Worker first.', 'info');
+        showNotification('Select a Chinook, Supply Truck or Worker first.', 'info');
         return;
     }
     const targetSp = selectedSupplyPoint || findNearestSupplyPoint(harvesters[0].mesh.position);
@@ -2179,15 +2179,16 @@ function orderSelectedHarvestersToGather() {
         h.taskState = 'Idle';
         h.combatTarget = null;
         h.targetPosition.copy(targetSp.position);
+        if (h.type === 'chinook') h.airState = 'flying';
     });
     showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies.`, 'success');
 }
 
 function orderAllHarvestersToTargetSupply() {
     if (!selectedSupplyPoint) return;
-    const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker');
+    const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker' || u.type === 'chinook');
     if (harvesters.length === 0) {
-        showNotification('No harvesters available! Build Supply Trucks or Workers.', 'error');
+        showNotification('No harvesters available! Build Chinooks, Supply Trucks or Workers.', 'error');
         return;
     }
     harvesters.forEach(h => {
@@ -2196,6 +2197,7 @@ function orderAllHarvestersToTargetSupply() {
         h.taskState = 'Idle';
         h.combatTarget = null;
         h.targetPosition.copy(selectedSupplyPoint.position);
+        if (h.type === 'chinook') h.airState = 'flying';
     });
     showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies ($${selectedSupplyPoint.stock} left).`, 'success');
     updateSidebar();
@@ -2862,14 +2864,15 @@ function updateHUD() {
             }
 
             const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
+            const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
             const newUnitObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
                 speed: speed, radius: radius, selectionCircle: null, taskState: 'Idle',
-                aiState: (type === 'truck' || type === 'worker') ? 'MovingToDock' : 'Idle',
+                aiState: isGatherer ? 'MovingToDock' : 'Idle',
                 cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
                 health: health, maxHealth: health, scanRange: scanRange, netId: myNetId,
                 attackCooldown: 0, combatTarget: null, isAir: isAir,
-                airState: isAir ? 'circling' : 'none',
+                airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
                 patrolCenter: position ? position.clone() : new THREE.Vector3(),
                 circleAngle: Math.random() * Math.PI * 2,
                 circleRadius: (type === 'comanche' || type === 'chinook') ? 11.0 : 15.0,
@@ -2878,6 +2881,14 @@ function updateHUD() {
                 compositeArmor: (typeof researchedTechs !== 'undefined' && researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')),
                 shoesApplied: (typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes') && type === 'worker')
             };
+            if (type === 'chinook') {
+                const sTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(position) : null;
+                if (sTarget) {
+                    newUnitObj.supplyTarget = sTarget;
+                    newUnitObj.targetPosition.copy(sTarget.position);
+                    newUnitObj.airState = 'flying';
+                }
+            }
             newUnitObj.teamId = playerTeamId;
             newUnitObj.ownerId = 'player';
             newUnitObj.isAI = false;

@@ -497,16 +497,30 @@
             const coreUnits = factionData.starter;
             let forces = setup === 'dozer' ? [coreUnits[0]] : setup === 'large'
                 ? [coreUnits[0], coreUnits[0], coreUnits[1], coreUnits[1], coreUnits[2], coreUnits[2]]
-                : coreUnits;
+                : [...coreUnits];
+            if (faction === 'usa' && !forces.includes('chinook')) {
+                forces.push('chinook');
+            }
             forces.forEach((type, index) => {
                 const angle = index * 2.4;
-                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 13, 0, Math.sin(angle) * 13));
+                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 14, 0, Math.sin(angle) * 14));
                 at.y = getTerrainHeight(at.x, at.z);
+                if (type === 'chinook') at.y += 4.5;
                 const u = spawnUnit(type, at);
                 if (u) {
                     u.teamId = team;
                     u.ownerId = 'player';
                     u.isAI = false;
+                    if (type === 'chinook') {
+                        u.aiState = 'MovingToDock';
+                        u.taskState = 'Idle';
+                        u.airState = 'hovering';
+                        u.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(u.mesh.position) : null;
+                        if (u.supplyTarget) {
+                            u.targetPosition.copy(u.supplyTarget.position);
+                            u.airState = 'flying';
+                        }
+                    }
                 }
             });
             showNotification('Command Center operational. Base established.', 'success');
@@ -831,12 +845,27 @@
                 const eu = spawnEnemyUnit(tankType, uPos);
                 if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
             }
+            if (faction === 'usa') {
+                const cPos = pos.clone().add(new THREE.Vector3(12, 4.5, 12));
+                const eu = spawnEnemyUnit('chinook', cPos);
+                if (eu) {
+                    eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty;
+                    eu.aiState = 'MovingToDock';
+                    eu.taskState = 'Idle';
+                    eu.airState = 'hovering';
+                    eu.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(eu.mesh.position) : null;
+                    if (eu.supplyTarget) {
+                        eu.targetPosition.copy(eu.supplyTarget.position);
+                        eu.airState = 'flying';
+                    }
+                }
+            }
         }
 
         function orderSelectedHarvestersToGather() {
-            const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
+            const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook'));
             if (harvesters.length === 0) {
-                showNotification('Select a Supply Truck or Worker first.', 'info');
+                showNotification('Select a Chinook, Supply Truck or Worker first.', 'info');
                 return;
             }
             harvesters.forEach(h => {
@@ -847,6 +876,7 @@
                     h.taskState = 'Idle';
                     h.combatTarget = null;
                     h.targetPosition.copy(target.position);
+                    if (h.type === 'chinook') h.airState = 'flying';
                 }
             });
             showNotification(`Harvester dispatched to nearest supply depot.`, 'success');

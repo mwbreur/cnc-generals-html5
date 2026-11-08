@@ -507,11 +507,77 @@ function animate() {
                         progressFill.style.width = Math.min(100, s.buildProgress) + '%';
 
                         if (s.buildProgress >= 100) {
-                            s.isBuilding = false; s.dozerRef.taskState = 'Idle';
-                            s.dozerRef.targetStructure = null; s.dozerRef = null;
+                            s.isBuilding = false;
+                            if (s.dozerRef) {
+                                s.dozerRef.taskState = 'Idle';
+                                s.dozerRef.targetStructure = null;
+                                s.dozerRef = null;
+                            }
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
+                            const bFaction = s.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
                             if (typeof playBuildingCompleteSound === 'function') {
-                                playBuildingCompleteSound(s.type, typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+                                playBuildingCompleteSound(s.type, bFaction);
+                            }
+
+                            // Automatic Harvester Deployment upon Supply Center / Stash completion
+                            if (!s.spawnedHarvester) {
+                                s.spawnedHarvester = true;
+                                if (s.type === 'supplyCenter') {
+                                    if (bFaction === 'usa') {
+                                        const spawnPos = s.position.clone().add(new THREE.Vector3(0, 4.5, 7.5));
+                                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                                        const chinook = (typeof spawnUnit === 'function') ? spawnUnit('chinook', spawnPos) : null;
+                                        if (chinook) {
+                                            chinook.teamId = s.teamId || (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+                                            chinook.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            chinook.isAI = isAiStruct;
+                                            chinook.aiState = 'MovingToDock';
+                                            chinook.taskState = 'Idle';
+                                            chinook.airState = 'hovering';
+                                            chinook.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(chinook.mesh.position) : null;
+                                            if (chinook.supplyTarget) {
+                                                chinook.targetPosition.copy(chinook.supplyTarget.position);
+                                                chinook.airState = 'flying';
+                                            }
+                                            if (typeof playUnitReadyAudio === 'function') {
+                                                playUnitReadyAudio('chinook', 'usa');
+                                            }
+                                            if (!isAiStruct) {
+                                                showNotification('USA Supply Depot constructed! Chinook transport deployed to harvest supplies.', 'success');
+                                            }
+                                        }
+                                    } else if (bFaction === 'china') {
+                                        const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.5));
+                                        spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
+                                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                                        const truck = (typeof spawnUnit === 'function') ? spawnUnit('truck', spawnPos) : null;
+                                        if (truck) {
+                                            truck.teamId = s.teamId || 1;
+                                            truck.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            truck.isAI = isAiStruct;
+                                            truck.aiState = 'MovingToDock';
+                                            truck.taskState = 'Idle';
+                                            truck.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(truck.mesh.position) : null;
+                                            if (truck.supplyTarget) truck.targetPosition.copy(truck.supplyTarget.position);
+                                            if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('truck', 'china');
+                                        }
+                                    }
+                                } else if (s.type === 'supplyStash') {
+                                    const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.0));
+                                    spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
+                                    const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                                    const worker = (typeof spawnUnit === 'function') ? spawnUnit('worker', spawnPos) : null;
+                                    if (worker) {
+                                        worker.teamId = s.teamId || 1;
+                                        worker.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                        worker.isAI = isAiStruct;
+                                        worker.aiState = 'MovingToDock';
+                                        worker.taskState = 'Idle';
+                                        worker.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(worker.mesh.position) : null;
+                                        if (worker.supplyTarget) worker.targetPosition.copy(worker.supplyTarget.position);
+                                        if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('worker', 'gla');
+                                    }
+                                }
                             }
                         }
                     } else { s.dozerRef.targetPosition.copy(s.position); }
@@ -534,6 +600,8 @@ function animate() {
                             if (distToDock < dockDistThreshold) {
                                 unit.aiState = 'Harvesting';
                                 unit.timerState = 0;
+                                unit.targetPosition.copy(unit.mesh.position);
+                                if (unit.type === 'chinook') unit.airState = 'hovering';
                             }
                         } else {
                             unit.targetPosition.copy(unit.mesh.position);
@@ -561,6 +629,7 @@ function animate() {
                             }
                             if (cargoHold) { cargoHold.visible = true; cargoHold.scale.set(1, 1, 1); }
                             unit.aiState = 'MovingToCenter';
+                            if (unit.type === 'chinook') unit.airState = 'flying';
                         }
                         break;
                     case 'MovingToCenter': {
@@ -568,23 +637,33 @@ function animate() {
                         unit.targetPosition.copy(dropoffPosition);
                         if (cargoHold && cargoHold.scale.y < 1.0) cargoHold.scale.y += 0.015;
                         const distToDropoff = Math.hypot(unit.mesh.position.x - dropoffPosition.x, unit.mesh.position.z - dropoffPosition.z);
-                        if (distToDropoff < 9.0) {
+                        const centerDistThreshold = (unit.type === 'chinook') ? 14.0 : 9.0;
+                        if (distToDropoff < centerDistThreshold) {
                             unit.aiState = 'Depositing';
                             unit.timerState = 0;
+                            unit.targetPosition.copy(unit.mesh.position);
+                            if (unit.type === 'chinook') unit.airState = 'hovering';
                         }
                         break;
                     }
                     case 'Depositing':
+                        if (unit.type === 'chinook') unit.airState = 'hovering';
                         unit.timerState += 1;
                         if (unit.timerState > 40) {
                             const earned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? 100 : 200));
-                            playerResources += earned;
+                            if (unit.teamId === (typeof playerTeamId !== 'undefined' ? playerTeamId : 1)) {
+                                playerResources += earned;
+                                const resEl = document.getElementById('resource-display');
+                                if (resEl) resEl.innerText = '$' + playerResources;
+                                showNotification('Supplies delivered: +$' + earned, 'success');
+                                updateSidebar();
+                            } else if (typeof aiResources !== 'undefined') {
+                                aiResources += earned;
+                            }
                             unit.cargoLoaded = 0;
                             if (cargoHold) cargoHold.visible = false;
-                            document.getElementById('resource-display').innerText = `$${playerResources}`;
-                            showNotification(`Supplies delivered: +$${earned}`, 'success');
-                            updateSidebar();
                             unit.aiState = 'MovingToDock';
+                            if (unit.type === 'chinook') unit.airState = 'flying';
                         }
                         break;
                 }

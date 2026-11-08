@@ -238,8 +238,35 @@
                 netId: structNetId,
                 teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
                 ownerId: 'player',
-                isAI: false
+                isAI: false,
+                faction: f,
+                spawnedHarvester: false
             };
+
+            if (instant && (type === 'supplyCenter' || type === 'supplyStash')) {
+                structObj.spawnedHarvester = true;
+                setTimeout(() => {
+                    if (typeof spawnUnit === 'function') {
+                        const hType = (type === 'supplyStash') ? 'worker' : (f === 'usa' ? 'chinook' : 'truck');
+                        const spawnPos = pos.clone().add(new THREE.Vector3(0, hType === 'chinook' ? 4.5 : 0, 7.5));
+                        if (hType !== 'chinook') spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
+                        const hUnit = spawnUnit(hType, spawnPos);
+                        if (hUnit) {
+                            hUnit.teamId = structObj.teamId;
+                            hUnit.ownerId = structObj.ownerId;
+                            hUnit.isAI = structObj.isAI;
+                            hUnit.aiState = 'MovingToDock';
+                            hUnit.taskState = 'Idle';
+                            if (hType === 'chinook') hUnit.airState = 'hovering';
+                            hUnit.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(hUnit.mesh.position) : null;
+                            if (hUnit.supplyTarget) {
+                                hUnit.targetPosition.copy(hUnit.supplyTarget.position);
+                                if (hType === 'chinook') hUnit.airState = 'flying';
+                            }
+                        }
+                    }
+                }, 100);
+            }
 
             if (isMultiplayerActive && netConn && netConn.open) {
                 broadcastNetPacket({
@@ -344,6 +371,7 @@
             scene.add(mesh);
 
             const enemyNetId = netId || ((isMultiplayerActive ? (isMultiplayerHost ? 'C_' : 'H_') : 'E_') + (++netIdSequence));
+            const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
             const enemyObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: mesh.position.clone(),
                 speed: speed, radius: radius, health: health, maxHealth: health,
@@ -353,9 +381,19 @@
                 ownerId: 'ai_1',
                 isAI: true,
                 isAir: isAir,
-                airState: isAir ? 'circling' : 'none',
+                airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
+                aiState: isGatherer ? 'MovingToDock' : 'Idle',
+                cargoLoaded: 0, timerState: 0, supplyTarget: null,
                 patrolCenter: mesh.position.clone()
             };
+            if (isGatherer) {
+                const sTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(mesh.position) : null;
+                if (sTarget) {
+                    enemyObj.supplyTarget = sTarget;
+                    enemyObj.targetPosition.copy(sTarget.position);
+                    if (type === 'chinook') enemyObj.airState = 'flying';
+                }
+            }
             enemyUnits.push(enemyObj);
             return enemyObj;
         }

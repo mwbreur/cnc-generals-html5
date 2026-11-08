@@ -10252,8 +10252,35 @@ window.createTournamentDesertTexture = createTournamentDesertTexture;
                 netId: structNetId,
                 teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
                 ownerId: 'player',
-                isAI: false
+                isAI: false,
+                faction: f,
+                spawnedHarvester: false
             };
+
+            if (instant && (type === 'supplyCenter' || type === 'supplyStash')) {
+                structObj.spawnedHarvester = true;
+                setTimeout(() => {
+                    if (typeof spawnUnit === 'function') {
+                        const hType = (type === 'supplyStash') ? 'worker' : (f === 'usa' ? 'chinook' : 'truck');
+                        const spawnPos = pos.clone().add(new THREE.Vector3(0, hType === 'chinook' ? 4.5 : 0, 7.5));
+                        if (hType !== 'chinook') spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
+                        const hUnit = spawnUnit(hType, spawnPos);
+                        if (hUnit) {
+                            hUnit.teamId = structObj.teamId;
+                            hUnit.ownerId = structObj.ownerId;
+                            hUnit.isAI = structObj.isAI;
+                            hUnit.aiState = 'MovingToDock';
+                            hUnit.taskState = 'Idle';
+                            if (hType === 'chinook') hUnit.airState = 'hovering';
+                            hUnit.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(hUnit.mesh.position) : null;
+                            if (hUnit.supplyTarget) {
+                                hUnit.targetPosition.copy(hUnit.supplyTarget.position);
+                                if (hType === 'chinook') hUnit.airState = 'flying';
+                            }
+                        }
+                    }
+                }, 100);
+            }
 
             if (isMultiplayerActive && netConn && netConn.open) {
                 broadcastNetPacket({
@@ -10358,6 +10385,7 @@ window.createTournamentDesertTexture = createTournamentDesertTexture;
             scene.add(mesh);
 
             const enemyNetId = netId || ((isMultiplayerActive ? (isMultiplayerHost ? 'C_' : 'H_') : 'E_') + (++netIdSequence));
+            const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
             const enemyObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: mesh.position.clone(),
                 speed: speed, radius: radius, health: health, maxHealth: health,
@@ -10367,9 +10395,19 @@ window.createTournamentDesertTexture = createTournamentDesertTexture;
                 ownerId: 'ai_1',
                 isAI: true,
                 isAir: isAir,
-                airState: isAir ? 'circling' : 'none',
+                airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
+                aiState: isGatherer ? 'MovingToDock' : 'Idle',
+                cargoLoaded: 0, timerState: 0, supplyTarget: null,
                 patrolCenter: mesh.position.clone()
             };
+            if (isGatherer) {
+                const sTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(mesh.position) : null;
+                if (sTarget) {
+                    enemyObj.supplyTarget = sTarget;
+                    enemyObj.targetPosition.copy(sTarget.position);
+                    if (type === 'chinook') enemyObj.airState = 'flying';
+                }
+            }
             enemyUnits.push(enemyObj);
             return enemyObj;
         }
@@ -10637,7 +10675,7 @@ window.createTournamentDesertTexture = createTournamentDesertTexture;
 
                 const factionCatalog = {
             usa: {
-                label: 'USA', builder: 'dozer', starter: ['dozer', 'tank', 'truck'],
+                label: 'USA', builder: 'dozer', starter: ['dozer', 'tank', 'chinook'],
                 barracks: {
                     infantry: ['Ranger', 100, 'Assault rifleman with flashbangs & capture ability.'],
                     rocket: ['Missile Defender', 175, 'Laser-guided anti-armor & anti-air missile infantry.'],
@@ -12233,16 +12271,30 @@ window.createTournamentDesertTexture = createTournamentDesertTexture;
             const coreUnits = factionData.starter;
             let forces = setup === 'dozer' ? [coreUnits[0]] : setup === 'large'
                 ? [coreUnits[0], coreUnits[0], coreUnits[1], coreUnits[1], coreUnits[2], coreUnits[2]]
-                : coreUnits;
+                : [...coreUnits];
+            if (faction === 'usa' && !forces.includes('chinook')) {
+                forces.push('chinook');
+            }
             forces.forEach((type, index) => {
                 const angle = index * 2.4;
-                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 13, 0, Math.sin(angle) * 13));
+                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 14, 0, Math.sin(angle) * 14));
                 at.y = getTerrainHeight(at.x, at.z);
+                if (type === 'chinook') at.y += 4.5;
                 const u = spawnUnit(type, at);
                 if (u) {
                     u.teamId = team;
                     u.ownerId = 'player';
                     u.isAI = false;
+                    if (type === 'chinook') {
+                        u.aiState = 'MovingToDock';
+                        u.taskState = 'Idle';
+                        u.airState = 'hovering';
+                        u.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(u.mesh.position) : null;
+                        if (u.supplyTarget) {
+                            u.targetPosition.copy(u.supplyTarget.position);
+                            u.airState = 'flying';
+                        }
+                    }
                 }
             });
             showNotification('Command Center operational. Base established.', 'success');
@@ -12567,12 +12619,27 @@ window.createTournamentDesertTexture = createTournamentDesertTexture;
                 const eu = spawnEnemyUnit(tankType, uPos);
                 if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
             }
+            if (faction === 'usa') {
+                const cPos = pos.clone().add(new THREE.Vector3(12, 4.5, 12));
+                const eu = spawnEnemyUnit('chinook', cPos);
+                if (eu) {
+                    eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty;
+                    eu.aiState = 'MovingToDock';
+                    eu.taskState = 'Idle';
+                    eu.airState = 'hovering';
+                    eu.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(eu.mesh.position) : null;
+                    if (eu.supplyTarget) {
+                        eu.targetPosition.copy(eu.supplyTarget.position);
+                        eu.airState = 'flying';
+                    }
+                }
+            }
         }
 
         function orderSelectedHarvestersToGather() {
-            const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
+            const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook'));
             if (harvesters.length === 0) {
-                showNotification('Select a Supply Truck or Worker first.', 'info');
+                showNotification('Select a Chinook, Supply Truck or Worker first.', 'info');
                 return;
             }
             harvesters.forEach(h => {
@@ -12583,6 +12650,7 @@ window.createTournamentDesertTexture = createTournamentDesertTexture;
                     h.taskState = 'Idle';
                     h.combatTarget = null;
                     h.targetPosition.copy(target.position);
+                    if (h.type === 'chinook') h.airState = 'flying';
                 }
             });
             showNotification(`Harvester dispatched to nearest supply depot.`, 'success');
@@ -14829,7 +14897,7 @@ function orderUnitsHalt() {
             u.targetPosition.copy(u.mesh.position);
             u.combatTarget = null;
             u.taskState = 'Idle';
-            if (u.type === 'truck' || u.type === 'worker') u.aiState = 'Idle';
+            if (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook') u.aiState = 'Idle';
         }
     });
     playUSASound('acknowledge');
@@ -14837,9 +14905,9 @@ function orderUnitsHalt() {
 }
 
 function orderSelectedHarvestersToGather() {
-    const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker'));
+    const harvesters = units.filter(u => u.selected && (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook'));
     if (harvesters.length === 0) {
-        showNotification('Select a Supply Truck or Worker first.', 'info');
+        showNotification('Select a Chinook, Supply Truck or Worker first.', 'info');
         return;
     }
     const targetSp = selectedSupplyPoint || findNearestSupplyPoint(harvesters[0].mesh.position);
@@ -14853,15 +14921,16 @@ function orderSelectedHarvestersToGather() {
         h.taskState = 'Idle';
         h.combatTarget = null;
         h.targetPosition.copy(targetSp.position);
+        if (h.type === 'chinook') h.airState = 'flying';
     });
     showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies.`, 'success');
 }
 
 function orderAllHarvestersToTargetSupply() {
     if (!selectedSupplyPoint) return;
-    const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker');
+    const harvesters = units.filter(u => u.type === 'truck' || u.type === 'worker' || u.type === 'chinook');
     if (harvesters.length === 0) {
-        showNotification('No harvesters available! Build Supply Trucks or Workers.', 'error');
+        showNotification('No harvesters available! Build Chinooks, Supply Trucks or Workers.', 'error');
         return;
     }
     harvesters.forEach(h => {
@@ -14870,6 +14939,7 @@ function orderAllHarvestersToTargetSupply() {
         h.taskState = 'Idle';
         h.combatTarget = null;
         h.targetPosition.copy(selectedSupplyPoint.position);
+        if (h.type === 'chinook') h.airState = 'flying';
     });
     showNotification(`Dispatched ${harvesters.length} harvester(s) to gather supplies ($${selectedSupplyPoint.stock} left).`, 'success');
     updateSidebar();
@@ -15536,14 +15606,15 @@ function updateHUD() {
             }
 
             const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
+            const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
             const newUnitObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
                 speed: speed, radius: radius, selectionCircle: null, taskState: 'Idle',
-                aiState: (type === 'truck' || type === 'worker') ? 'MovingToDock' : 'Idle',
+                aiState: isGatherer ? 'MovingToDock' : 'Idle',
                 cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
                 health: health, maxHealth: health, scanRange: scanRange, netId: myNetId,
                 attackCooldown: 0, combatTarget: null, isAir: isAir,
-                airState: isAir ? 'circling' : 'none',
+                airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
                 patrolCenter: position ? position.clone() : new THREE.Vector3(),
                 circleAngle: Math.random() * Math.PI * 2,
                 circleRadius: (type === 'comanche' || type === 'chinook') ? 11.0 : 15.0,
@@ -15552,6 +15623,14 @@ function updateHUD() {
                 compositeArmor: (typeof researchedTechs !== 'undefined' && researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')),
                 shoesApplied: (typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes') && type === 'worker')
             };
+            if (type === 'chinook') {
+                const sTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(position) : null;
+                if (sTarget) {
+                    newUnitObj.supplyTarget = sTarget;
+                    newUnitObj.targetPosition.copy(sTarget.position);
+                    newUnitObj.airState = 'flying';
+                }
+            }
             newUnitObj.teamId = playerTeamId;
             newUnitObj.ownerId = 'player';
             newUnitObj.isAI = false;
@@ -18536,11 +18615,77 @@ function animate() {
                         progressFill.style.width = Math.min(100, s.buildProgress) + '%';
 
                         if (s.buildProgress >= 100) {
-                            s.isBuilding = false; s.dozerRef.taskState = 'Idle';
-                            s.dozerRef.targetStructure = null; s.dozerRef = null;
+                            s.isBuilding = false;
+                            if (s.dozerRef) {
+                                s.dozerRef.taskState = 'Idle';
+                                s.dozerRef.targetStructure = null;
+                                s.dozerRef = null;
+                            }
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
+                            const bFaction = s.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
                             if (typeof playBuildingCompleteSound === 'function') {
-                                playBuildingCompleteSound(s.type, typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+                                playBuildingCompleteSound(s.type, bFaction);
+                            }
+
+                            // Automatic Harvester Deployment upon Supply Center / Stash completion
+                            if (!s.spawnedHarvester) {
+                                s.spawnedHarvester = true;
+                                if (s.type === 'supplyCenter') {
+                                    if (bFaction === 'usa') {
+                                        const spawnPos = s.position.clone().add(new THREE.Vector3(0, 4.5, 7.5));
+                                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                                        const chinook = (typeof spawnUnit === 'function') ? spawnUnit('chinook', spawnPos) : null;
+                                        if (chinook) {
+                                            chinook.teamId = s.teamId || (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+                                            chinook.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            chinook.isAI = isAiStruct;
+                                            chinook.aiState = 'MovingToDock';
+                                            chinook.taskState = 'Idle';
+                                            chinook.airState = 'hovering';
+                                            chinook.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(chinook.mesh.position) : null;
+                                            if (chinook.supplyTarget) {
+                                                chinook.targetPosition.copy(chinook.supplyTarget.position);
+                                                chinook.airState = 'flying';
+                                            }
+                                            if (typeof playUnitReadyAudio === 'function') {
+                                                playUnitReadyAudio('chinook', 'usa');
+                                            }
+                                            if (!isAiStruct) {
+                                                showNotification('USA Supply Depot constructed! Chinook transport deployed to harvest supplies.', 'success');
+                                            }
+                                        }
+                                    } else if (bFaction === 'china') {
+                                        const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.5));
+                                        spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
+                                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                                        const truck = (typeof spawnUnit === 'function') ? spawnUnit('truck', spawnPos) : null;
+                                        if (truck) {
+                                            truck.teamId = s.teamId || 1;
+                                            truck.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            truck.isAI = isAiStruct;
+                                            truck.aiState = 'MovingToDock';
+                                            truck.taskState = 'Idle';
+                                            truck.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(truck.mesh.position) : null;
+                                            if (truck.supplyTarget) truck.targetPosition.copy(truck.supplyTarget.position);
+                                            if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('truck', 'china');
+                                        }
+                                    }
+                                } else if (s.type === 'supplyStash') {
+                                    const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.0));
+                                    spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
+                                    const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                                    const worker = (typeof spawnUnit === 'function') ? spawnUnit('worker', spawnPos) : null;
+                                    if (worker) {
+                                        worker.teamId = s.teamId || 1;
+                                        worker.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                        worker.isAI = isAiStruct;
+                                        worker.aiState = 'MovingToDock';
+                                        worker.taskState = 'Idle';
+                                        worker.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(worker.mesh.position) : null;
+                                        if (worker.supplyTarget) worker.targetPosition.copy(worker.supplyTarget.position);
+                                        if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('worker', 'gla');
+                                    }
+                                }
                             }
                         }
                     } else { s.dozerRef.targetPosition.copy(s.position); }
@@ -18563,6 +18708,8 @@ function animate() {
                             if (distToDock < dockDistThreshold) {
                                 unit.aiState = 'Harvesting';
                                 unit.timerState = 0;
+                                unit.targetPosition.copy(unit.mesh.position);
+                                if (unit.type === 'chinook') unit.airState = 'hovering';
                             }
                         } else {
                             unit.targetPosition.copy(unit.mesh.position);
@@ -18590,6 +18737,7 @@ function animate() {
                             }
                             if (cargoHold) { cargoHold.visible = true; cargoHold.scale.set(1, 1, 1); }
                             unit.aiState = 'MovingToCenter';
+                            if (unit.type === 'chinook') unit.airState = 'flying';
                         }
                         break;
                     case 'MovingToCenter': {
@@ -18597,23 +18745,33 @@ function animate() {
                         unit.targetPosition.copy(dropoffPosition);
                         if (cargoHold && cargoHold.scale.y < 1.0) cargoHold.scale.y += 0.015;
                         const distToDropoff = Math.hypot(unit.mesh.position.x - dropoffPosition.x, unit.mesh.position.z - dropoffPosition.z);
-                        if (distToDropoff < 9.0) {
+                        const centerDistThreshold = (unit.type === 'chinook') ? 14.0 : 9.0;
+                        if (distToDropoff < centerDistThreshold) {
                             unit.aiState = 'Depositing';
                             unit.timerState = 0;
+                            unit.targetPosition.copy(unit.mesh.position);
+                            if (unit.type === 'chinook') unit.airState = 'hovering';
                         }
                         break;
                     }
                     case 'Depositing':
+                        if (unit.type === 'chinook') unit.airState = 'hovering';
                         unit.timerState += 1;
                         if (unit.timerState > 40) {
                             const earned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? 100 : 200));
-                            playerResources += earned;
+                            if (unit.teamId === (typeof playerTeamId !== 'undefined' ? playerTeamId : 1)) {
+                                playerResources += earned;
+                                const resEl = document.getElementById('resource-display');
+                                if (resEl) resEl.innerText = '$' + playerResources;
+                                showNotification('Supplies delivered: +$' + earned, 'success');
+                                updateSidebar();
+                            } else if (typeof aiResources !== 'undefined') {
+                                aiResources += earned;
+                            }
                             unit.cargoLoaded = 0;
                             if (cargoHold) cargoHold.visible = false;
-                            document.getElementById('resource-display').innerText = `$${playerResources}`;
-                            showNotification(`Supplies delivered: +$${earned}`, 'success');
-                            updateSidebar();
                             unit.aiState = 'MovingToDock';
+                            if (unit.type === 'chinook') unit.airState = 'flying';
                         }
                         break;
                 }

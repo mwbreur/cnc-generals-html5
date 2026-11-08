@@ -253,7 +253,7 @@
 
                 const factionCatalog = {
             usa: {
-                label: 'USA', builder: 'dozer', starter: ['dozer', 'tank', 'truck'],
+                label: 'USA', builder: 'dozer', starter: ['dozer', 'tank', 'chinook'],
                 barracks: {
                     infantry: ['Ranger', 100, 'Assault rifleman with flashbangs & capture ability.'],
                     rocket: ['Missile Defender', 175, 'Laser-guided anti-armor & anti-air missile infantry.'],
