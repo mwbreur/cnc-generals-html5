@@ -17,17 +17,17 @@ function playOfficialSound(soundKey, volume = 0.8) {
 function playUnitVoice(unitType, action = 'select') {
     const t = (unitType || '').toLowerCase();
     let key = '';
-    if (t === 'crusader' || t === 'tank') key = 'voice_crusader_' + action;
-    else if (t === 'paladin') key = 'voice_paladin_' + action;
-    else if (t === 'ranger' || t === 'infantry') key = 'voice_ranger_' + action;
-    else if (t === 'humvee') key = 'voice_humvee_' + action;
-    else if (t === 'comanche') key = 'voice_comanche_' + action;
-    else if (t === 'chinook') key = 'voice_chinook_' + (action === 'attack' ? 'move' : action);
-    else if (t === 'raptor') key = 'voice_raptor_' + action;
-    else if (t === 'aurora') key = 'voice_aurora_' + action;
-    else if (t === 'dozer') key = 'voice_dozer_' + (action === 'attack' ? 'move' : action);
-    else if (t === 'burton') key = 'voice_burton_' + action;
-    else if (t === 'pathfinder') key = 'voice_pathfinder_' + action;
+    if (t.includes('crusader') || t === 'tank') key = 'voice_crusader_' + action;
+    else if (t.includes('paladin')) key = 'voice_paladin_' + action;
+    else if (t.includes('ranger') || t.includes('infantry')) key = 'voice_ranger_' + action;
+    else if (t.includes('humvee')) key = 'voice_humvee_' + action;
+    else if (t.includes('comanche')) key = 'voice_comanche_' + action;
+    else if (t.includes('chinook') || t.includes('truck')) key = 'voice_chinook_' + (action === 'attack' ? 'move' : action);
+    else if (t.includes('raptor')) key = 'voice_raptor_' + action;
+    else if (t.includes('aurora')) key = 'voice_aurora_' + action;
+    else if (t.includes('dozer') || t.includes('worker') || t.includes('builder')) key = 'voice_dozer_' + (action === 'attack' ? 'move' : action);
+    else if (t.includes('burton')) key = 'voice_burton_' + action;
+    else if (t.includes('pathfinder')) key = 'voice_pathfinder_' + action;
 
     if (key && window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[key]) {
         playOfficialSound(key, 0.85);

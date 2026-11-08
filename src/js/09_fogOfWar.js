@@ -563,7 +563,7 @@
         function getStructureFootprint(type) {
             const sizes = {
                 center: [26, 12, 24], power: [16, 8, 14], barracks: [18, 9, 18], factory: [26, 10, 22],
-                supplyCenter: [22, 9, 20], supplyDrop: [20, 10, 20], airfield: [28, 8, 24], strategyCenter: [24, 12, 22],
+                supplyCenter: [22, 9, 20], supplyDrop: [20, 10, 20], airfield: [42, 10, 60], strategyCenter: [24, 12, 22],
                 detentionCamp: [18, 9, 16], patriot: [12, 9, 12], particleCannon: [26, 14, 26], nuclearReactor: [16, 10, 16],
                 internetCenter: [20, 9, 18], propagandaCenter: [22, 10, 20], bunker: [14, 8, 14], gatlingCannon: [12, 9, 12],
                 speakerTower: [10, 12, 10], nukeSilo: [24, 14, 24], supplyStash: [18, 9, 18], blackMarket: [20, 9, 18],

@@ -1723,12 +1723,15 @@ function getCameoImg(id, name) {
         'infantry': 'ranger',
         'missiledefender': 'missileDefender',
         'rocket': 'missileDefender',
+        'pathfinder': 'pathfinder',
         'burton': 'burton',
         'colonelburton': 'burton',
         'battle_drone': 'drone_battle',
         'battledrone': 'drone_battle',
         'scout_drone': 'drone_scout',
         'scoutdrone': 'drone_scout',
+        'hellfire': 'drone_hellfire',
+        'hellfiredrone': 'drone_hellfire',
         'center': 'commandCenter',
         'commandcenter': 'commandCenter',
         'power': 'power',
@@ -1749,7 +1752,24 @@ function getCameoImg(id, name) {
         'tech_oilderrick': 'tech_oilDerrick',
         'oilderrick': 'tech_oilDerrick',
         'tech_supplydock': 'tech_supplyDock',
-        'supplydock': 'tech_supplyDock'
+        'supplydock': 'tech_supplyDock',
+        'stop': 'stop',
+        'guard': 'guard',
+        'scatter': 'scatter',
+        'repair': 'repair',
+        'repairmode': 'repair',
+        'sell': 'sell',
+        'sellmode': 'sell',
+        'rally': 'rally',
+        'attack': 'attack',
+        'builders': 'builders',
+        'beacon': 'beacon',
+        'pingmap': 'beacon',
+        'recenter': 'commandCenter',
+        'recenterbase': 'commandCenter',
+        'allcombat': 'crusader',
+        'harvesters': 'chinook',
+        'selecttrucks': 'chinook'
     };
     const resolved = cameoMap[rawKey] || rawKey;
     if (window.OFFICIAL_CAMEOS && window.OFFICIAL_CAMEOS[resolved]) {
@@ -2961,12 +2981,12 @@ function updateHUD() {
         function processCameraKeyboardPanning() {
             const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); forward.y = 0; forward.normalize();
             const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); right.y = 0; right.normalize();
-            if (keysPressed['w'] || keysPressed['arrowup']) cameraTarget.addScaledVector(forward, panSpeed);
-            if (keysPressed['s'] || keysPressed['arrowdown']) cameraTarget.addScaledVector(forward, -panSpeed);
-            if (keysPressed['a'] || keysPressed['arrowleft']) cameraTarget.addScaledVector(right, -panSpeed);
-            if (keysPressed['d'] || keysPressed['arrowright']) cameraTarget.addScaledVector(right, panSpeed);
-            if (keysPressed['w'] || keysPressed['arrowup'] || keysPressed['s'] || keysPressed['arrowdown'] || 
-                keysPressed['a'] || keysPressed['arrowleft'] || keysPressed['d'] || keysPressed['arrowright']) updateCameraPosition();
+            if (keysPressed['arrowup']) cameraTarget.addScaledVector(forward, panSpeed);
+            if (keysPressed['arrowdown']) cameraTarget.addScaledVector(forward, -panSpeed);
+            if (keysPressed['arrowleft']) cameraTarget.addScaledVector(right, -panSpeed);
+            if (keysPressed['arrowright']) cameraTarget.addScaledVector(right, panSpeed);
+            if (keysPressed['arrowup'] || keysPressed['arrowdown'] || 
+                keysPressed['arrowleft'] || keysPressed['arrowright']) updateCameraPosition();
         }
 
         function processCameraScreenEdgePanning(clientX, clientY) {

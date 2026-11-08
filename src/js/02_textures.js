@@ -77,7 +77,7 @@ function createTerrainTexture() {
             initLobbySlots('single');
             initLobbySlots('multiplayer');
             initMapEditor();
-            setupMapEnvironment('desert', 1500);
+            setupMapEnvironment('tournament_desert', 1500);
 
             window.addEventListener('pointerdown', onPointerDown);
             window.addEventListener('pointermove', onPointerMove);

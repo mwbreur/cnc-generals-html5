@@ -3,31 +3,34 @@ const path = require('path');
 const zlib = require('zlib');
 
 function readBigEntry(bigFile, subPath) {
-    const fd = fs.openSync(path.join('D:/C&C/generals_big_files', bigFile), 'r');
+    const fullBigPath = path.join('D:/C&C/generals_big_files', bigFile);
+    if (!fs.existsSync(fullBigPath)) return null;
+    const fd = fs.openSync(fullBigPath, 'r');
     const headerBuf = Buffer.alloc(16);
     fs.readSync(fd, headerBuf, 0, 16, 0);
     const numEntries = headerBuf.readUInt32BE(8);
     const tableSize = headerBuf.readUInt32BE(12);
     const tableBuf = Buffer.alloc(tableSize);
     fs.readSync(fd, tableBuf, 0, tableSize, 16);
-    let cursor = 0;
+    fs.closeSync(fd);
+    let offset = 0;
     for (let i = 0; i < numEntries; i++) {
-        if (cursor + 8 > tableSize) break;
-        const offset = tableBuf.readUInt32BE(cursor);
-        const size = tableBuf.readUInt32BE(cursor + 4);
-        cursor += 8;
-        let endNull = cursor;
+        if (offset + 8 > tableSize) break;
+        const o = tableBuf.readUInt32BE(offset);
+        const sz = tableBuf.readUInt32BE(offset + 4);
+        offset += 8;
+        let endNull = offset;
         while (endNull < tableSize && tableBuf[endNull] !== 0) endNull++;
-        const entryPath = tableBuf.toString('ascii', cursor, endNull);
-        cursor = endNull + 1;
+        const entryPath = tableBuf.toString('ascii', offset, endNull);
+        offset = endNull + 1;
         if (entryPath.toLowerCase() === subPath.toLowerCase() || path.basename(entryPath).toLowerCase() === subPath.toLowerCase()) {
-            const dataBuf = Buffer.alloc(size);
-            fs.readSync(fd, dataBuf, 0, size, offset);
-            fs.closeSync(fd);
+            const dataBuf = Buffer.alloc(sz);
+            const fd2 = fs.openSync(fullBigPath, 'r');
+            fs.readSync(fd2, dataBuf, 0, sz, o);
+            fs.closeSync(fd2);
             return dataBuf;
         }
     }
-    fs.closeSync(fd);
     return null;
 }
 
@@ -68,7 +71,7 @@ function encodePng(rgba, width, height) {
     ]).toString('base64');
 }
 
-// Load all 5 TGAs
+// Load TGAs
 const tgaCache = {};
 for (let i = 1; i <= 5; i++) {
     const fn = 'sauserinterface512_00' + i + '.tga';
@@ -77,14 +80,24 @@ for (let i = 1; i <= 5; i++) {
         tgaCache[fn.toLowerCase()] = fs.readFileSync(filePath);
     }
 }
+const scTga = path.join('D:/C&C/extracted_assets/textures', 'sacontrolbar512_001.tga');
+if (fs.existsSync(scTga)) {
+    tgaCache['sacontrolbar512_001.tga'] = fs.readFileSync(scTga);
+}
+const ss1 = readBigEntry('EnglishZH.big', 'Data\\English\\Art\\Textures\\SSUserInterface512_001.tga');
+if (ss1) tgaCache['ssuserinterface512_001.tga'] = ss1;
+const ss2 = readBigEntry('EnglishZH.big', 'Data\\English\\Art\\Textures\\SSUserInterface512_002.tga');
+if (ss2) tgaCache['ssuserinterface512_002.tga'] = ss2;
 
-const iniBuf = readBigEntry('INIZH.big', 'Data\\INI\\MappedImages\\TextureSize_512\\SAUserInterface512.INI');
-const iniText = iniBuf.toString('utf8');
+const ini1 = readBigEntry('INIZH.big', 'Data\\INI\\MappedImages\\TextureSize_512\\SAUserInterface512.INI').toString('utf8');
+const ini2 = readBigEntry('INIZH.big', 'Data\\INI\\MappedImages\\TextureSize_512\\SSUserInterface512.INI').toString('utf8');
+const ini3 = readBigEntry('INIZH.big', 'Data\\INI\\MappedImages\\TextureSize_512\\SAControlBar512.INI').toString('utf8');
+const combinedIni = ini1 + '\n' + ini2 + '\n' + ini3;
 
 const mapped = {};
 const blockRegex = /MappedImage\s+([a-zA-Z0-9_]+)[\s\S]*?Texture\s*=\s*([a-zA-Z0-9_.]+)\b[\s\S]*?Coords\s*=\s*Left:(\d+)\s+Top:(\d+)\s+Right:(\d+)\s+Bottom:(\d+)[\s\S]*?End/gi;
 let m;
-while ((m = blockRegex.exec(iniText)) !== null) {
+while ((m = blockRegex.exec(combinedIni)) !== null) {
     mapped[m[1].toLowerCase()] = {
         name: m[1],
         texture: m[2].toLowerCase(),
@@ -105,6 +118,7 @@ function cropCameo(imageName) {
     const dataOffset = 18;
     const cropW = info.right - info.left;
     const cropH = info.bottom - info.top;
+    if (cropW <= 0 || cropH <= 0) return null;
     const cropRgba = Buffer.alloc(cropW * cropH * 4);
 
     for (let y = 0; y < cropH; y++) {
@@ -113,10 +127,12 @@ function cropCameo(imageName) {
             const srcX = info.left + x;
             const srcIdx = dataOffset + (srcY * tgaW + srcX) * 4;
             const dstIdx = (y * cropW + x) * 4;
-            cropRgba[dstIdx + 0] = tgaBuf[srcIdx + 2]; // R
-            cropRgba[dstIdx + 1] = tgaBuf[srcIdx + 1]; // G
-            cropRgba[dstIdx + 2] = tgaBuf[srcIdx + 0]; // B
-            cropRgba[dstIdx + 3] = tgaBuf[srcIdx + 3]; // A
+            if (srcIdx + 3 < tgaBuf.length) {
+                cropRgba[dstIdx + 0] = tgaBuf[srcIdx + 2]; // R
+                cropRgba[dstIdx + 1] = tgaBuf[srcIdx + 1]; // G
+                cropRgba[dstIdx + 2] = tgaBuf[srcIdx + 0]; // B
+                cropRgba[dstIdx + 3] = tgaBuf[srcIdx + 3]; // A
+            }
         }
     }
     return encodePng(cropRgba, cropW, cropH);
@@ -130,6 +146,7 @@ const CAMEO_MAP = {
     'humvee': 'SAHummer',
     'ranger': 'SARanger',
     'missileDefender': 'SAMissleDefender',
+    'pathfinder': 'SAPathFinder1',
     'burton': 'SABurton',
     'dozer': 'SACDozer',
     'chinook': 'SAChinook',
@@ -141,9 +158,10 @@ const CAMEO_MAP = {
     'tomahawk': 'SACTomahawk',
     'drone_battle': 'SABattleDrone',
     'drone_scout': 'SAScout',
+    'drone_hellfire': 'SAHellfire',
 
     // USA Buildings
-    'commandCenter': 'SAACommand',
+    'commandCenter': 'SAComCentr',
     'power': 'SAPowerPlant',
     'barracks': 'SABarracks',
     'factory': 'SACWeaponsfact',
@@ -157,7 +175,18 @@ const CAMEO_MAP = {
 
     // Neutral / Tech
     'tech_oilDerrick': 'SAsupplyline',
-    'tech_supplyDock': 'SASupplyCntr'
+    'tech_supplyDock': 'SASupplyCntr',
+
+    // Command Action Buttons
+    'stop': 'SSStop',
+    'guard': 'SSGuard',
+    'scatter': 'SSGuardAIR',
+    'repair': 'SSRepair',
+    'sell': 'SSSell2',
+    'rally': 'SSRally',
+    'attack': 'SAUAttack',
+    'builders': 'SAWorker',
+    'beacon': 'SABeacon'
 };
 
 const outputCameos = {};
@@ -175,12 +204,12 @@ for (const [key, cameoName] of Object.entries(CAMEO_MAP)) {
 }
 
 const jsContent = `/**
- * Official Command & Conquer: Generals Zero Hour Command Card Cameos
- * Cropped directly from retail EnglishZH.big (SAUserInterface512_001.tga - 005.tga)
+ * Official Command & Conquer: Generals Zero Hour Command Card Cameos & Action Icons
+ * Cropped directly from retail EnglishZH.big & Textures.big
  */
 window.OFFICIAL_CAMEOS = ${JSON.stringify(outputCameos, null, 2)};
 `;
 
-const destPath = path.join('D:/C&C/src/js/11b_cameos.js');
+const destPath = path.join('D:/C&C/src/js/10b_cameos.js');
 fs.writeFileSync(destPath, jsContent, 'utf8');
 console.log(`Successfully generated ${destPath} with ${Object.keys(outputCameos).length} official cameos.`);

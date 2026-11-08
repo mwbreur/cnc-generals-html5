@@ -262,7 +262,8 @@
                 if (!sel) return;
                 const prevVal = sel.value;
                 sel.innerHTML = `
-                    <option value="desert" selected>Desert Canyon (Middle East) - Dunes, mesas, oasis</option>
+                    <option value="tournament_desert" selected>Tournament Desert (Official EA Retail Map)</option>
+                    <option value="desert">Desert Canyon (Middle East) - Dunes, mesas, oasis</option>
                     <option value="jungle">Tropical Jungle (Mekong Basin) - River, lush hills, canopy</option>
                     <option value="snow">Frozen Mountain (Siberian Tundra) - Icy ridges, frozen lake</option>
                     <option value="city">Small City Grid (Urban Warfare) - Skyscrapers, canal, streets</option>
@@ -419,7 +420,10 @@
             setupGameDeployment();
         }
 
-        function createSingleSupplyDock(pos) {
+        function createSingleSupplyDock(pos, stock = 30000) {
+            if (typeof spawnSingleSupplyDockAt === 'function') {
+                return spawnSingleSupplyDockAt(pos, stock);
+            }
             const crystalMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.5, metalness: 0.2 });
             const crateMat = new THREE.MeshStandardMaterial({ color: 0x7f5539, roughness: 0.9 });
             const padMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.95 });
@@ -448,10 +452,10 @@
             const dockObj = {
                 mesh: field,
                 position: pos.clone(),
-                stock: 8000,
-                maxStock: 8000,
-                remaining: 8000,
-                maxSupplies: 8000,
+                stock: stock,
+                maxStock: stock,
+                remaining: stock,
+                maxSupplies: stock,
                 crystals: crystals
             };
             supplyPoints.push(dockObj);
@@ -870,6 +874,10 @@
                 }
             });
             activeSidebarTab = 'production';
+            if (count > 0) {
+                const first = units.find(u => u.selected);
+                if (first && typeof playUnitVoice === 'function') playUnitVoice(first.type, 'select');
+            }
             showNotification(`Selected ${count} ${category} unit(s).`, 'info');
             updateSidebar();
         }

@@ -1101,6 +1101,7 @@ function processEnemyAIEngine() {
                 if (closestUnit) {
                     closestUnit.selected = true;
                     addSelectionCircle(closestUnit);
+                    if (typeof playUnitVoice === 'function') playUnitVoice(closestUnit.type, 'select');
                     activeSidebarTab = 'production';
                     updateSidebar();
                     updateHUD();

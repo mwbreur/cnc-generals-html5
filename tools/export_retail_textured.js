@@ -133,7 +133,9 @@ const EXTRA_TEXTURES = {
     'atgreebwall01': 'atgreebwall01.dds',
     'atventwall01': 'atventwall01.dds',
     'zbsupplydk': 'zbsupplydk.dds',
-    'ztoilpump': 'ztoilpump.dds'
+    'ztoilpump': 'ztoilpump.dds',
+    'avbattledr': 'avbattledr.dds',
+    'avrepairdr': 'avrepairdr.dds'
 };
 
 // Clean disconnected rogue test boxes or vertex spikes from meshes
@@ -188,37 +190,53 @@ function processModels(map) {
         if (key === 'crawler' && filteredMeshes['nvtcrawler.housecolor']) {
             cleanRogueVertices(filteredMeshes['nvtcrawler.housecolor'], 15);
         } else if (key === 'aurora' && filteredMeshes['avaurora.housecolor01']) {
-            cleanRogueVertices(filteredMeshes['avaurora.housecolor01'], 25);
-        } else if (key === 'raptor' && filteredMeshes['avraptor.housecolor01']) {
-            delete filteredMeshes['avraptor.housecolor01'];
-        }
-
-        // Canonical 3D Axis Alignment for Aircraft & Helicopters (+Z forward, +Y up, +X right):
-        if (key === 'comanche' || key === 'chinook') {
-            for (const [mName, m] of Object.entries(filteredMeshes)) {
-                if (!mName.includes('prop')) {
-                    for (let i = 0; i < m.v.length; i += 3) {
-                        const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                        m.v[i] = oy; m.v[i+1] = -ox; m.v[i+2] = oz;
+            delete filteredMeshes['avaurora.housecolor01'];
+        } else if (key === 'raptor') {
+            if (filteredMeshes['avraptor.housecolor01']) delete filteredMeshes['avraptor.housecolor01'];
+            if (filteredMeshes['avraptor.chassis01']) {
+                const c = filteredMeshes['avraptor.chassis01'];
+                const validFaces = [];
+                for (let f = 0; f < c.i.length; f += 3) {
+                    const i0 = c.i[f], i1 = c.i[f+1], i2 = c.i[f+2];
+                    const x0 = c.v[i0*3], x1 = c.v[i1*3], x2 = c.v[i2*3];
+                    if (x0 >= -3.5 && x1 >= -3.5 && x2 >= -3.5) {
+                        validFaces.push(i0, i1, i2);
                     }
                 }
+                const remap = new Map();
+                const newV = [];
+                const newU = c.u ? [] : null;
+                const newI = [];
+                for (const oldIdx of validFaces) {
+                    if (!remap.has(oldIdx)) {
+                        const newIdx = newV.length / 3;
+                        remap.set(oldIdx, newIdx);
+                        newV.push(c.v[oldIdx*3], c.v[oldIdx*3+1], c.v[oldIdx*3+2]);
+                        if (c.u) newU.push(c.u[oldIdx*2], c.u[oldIdx*2+1]);
+                    }
+                    newI.push(remap.get(oldIdx));
+                }
+                c.v = newV; c.i = newI; if (c.u) c.u = newU;
             }
-            parsed.pivots.forEach(p => {
-                const ox = p.tx, oy = p.ty, oz = p.tz;
-                p.tx = oy; p.ty = -ox; p.tz = oz;
-            });
+        }
+
+        // Canonical 3D Axis Alignment for Aircraft, Helicopters, and Drones (+Z forward, +Y up, +X right):
+        if (key === 'comanche' || key === 'chinook') {
+            // Already upright and horizontal (+Y up, +Z forward, props flat at Y=0)
         } else if (key === 'raptor') {
+            // Proper right-handed pure rotation (det = +1): Y is canopy UP (+ox), Z is nose FORWARD (+oy), X is wingspan (+oz)
             for (const m of Object.values(filteredMeshes)) {
                 for (let i = 0; i < m.v.length; i += 3) {
                     const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                    m.v[i] = oz; m.v[i+1] = -ox; m.v[i+2] = oy;
+                    m.v[i] = oz; m.v[i+1] = ox; m.v[i+2] = oy;
                 }
             }
             parsed.pivots.forEach(p => {
                 const ox = p.tx, oy = p.ty, oz = p.tz;
-                p.tx = oz; p.ty = -ox; p.tz = oy;
+                p.tx = oz; p.ty = ox; p.tz = oy;
             });
         } else if (key === 'aurora') {
+            // Proper rotation (det = +1): Y is UP (+oz), Z is nose FORWARD (+ox), X is wingspan (+oy)
             for (const m of Object.values(filteredMeshes)) {
                 for (let i = 0; i < m.v.length; i += 3) {
                     const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
@@ -228,6 +246,36 @@ function processModels(map) {
             parsed.pivots.forEach(p => {
                 const ox = p.tx, oy = p.ty, oz = p.tz;
                 p.tx = oy; p.ty = oz; p.tz = ox;
+            });
+        } else if (key === 'drone_battle') {
+            // Center Battle Drone body in Z and align machine gun turret pointing +Z forward
+            const cx = -4.835;
+            for (const [mName, m] of Object.entries(filteredMeshes)) {
+                if (mName.includes('turretel') || mName.includes('housecolor02') || mName.includes('fan')) {
+                    // Turret and Fan local meshes already aligned to their pivots
+                } else {
+                    for (let i = 0; i < m.v.length; i += 3) {
+                        const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                        m.v[i] = -oz;
+                        m.v[i+1] = oy;
+                        m.v[i+2] = ox - cx;
+                    }
+                }
+            }
+            parsed.pivots.forEach(p => {
+                if (p.name === 'ROOTTRANSFORM' || p.name === 'CHASSIS') {
+                    p.tx = 0; p.ty = 0; p.tz = 0;
+                } else if (p.name === 'TURRET01' || p.name === 'HOUSECOLOR01') {
+                    p.tz = p.tx - cx;
+                    p.tx = 0;
+                } else if (p.name === 'FAN' || p.name === 'TURRETEL01' || p.name === 'TURRETFX01' || p.name === 'MUZZLE01' || p.name === 'HOUSECOLOR02') {
+                    // Local relative offsets maintained
+                } else {
+                    const ox = p.tx, oy = p.ty, oz = p.tz;
+                    p.tx = -oz;
+                    p.ty = oy;
+                    p.tz = ox - cx;
+                }
             });
         }
 
