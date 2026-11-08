@@ -602,12 +602,6 @@ function updateSidebar() {
 }
 
 function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
-    const isBuilderSelected = selectedUnits.length === 1 && (selectedUnits[0].type === 'dozer' || selectedUnits[0].type === 'worker');
-    if (isBuilderSelected) {
-        showBuilderPalette();
-    } else {
-        hideBuilderPalette();
-    }
     if (selectedUnits.length === 1) {
         const u = selectedUnits[0];
         const spec = unitRoster[u.type] || { name: u.type.toUpperCase(), role: 'Combat Unit', cost: '' };
@@ -639,9 +633,20 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
         const icons = {
             crusader: '🛡️', paladin: '⚔️', humvee: '🚙', comanche: '🚁', raptor: '✈️', stealthfighter: '🛩️', aurora: '🚀',
             battlemaster: '🛡️', overlord: '🏰', gatling: '🔄', dragon: '🔥', nukecannon: '☢️',
-            scorpion: '🦂', marauder: '🛞', technical: '🛻', quad: '⚡', buggy: '🚀', toxintractor: '☣️', scud: '🚀'
+            scorpion: '🦂', marauder: '🛞', technical: '🛻', quad: '⚡', buggy: '🚀', toxintractor: '☣️', scud: '🚀',
+            dozer: '🚜', worker: '👷'
         };
         const uIcon = icons[u.type] || '🎖️';
+
+        let headerRightTag = `<span class="inspector-kills-tag">★ ${u.kills || 0} KILLS</span>`;
+        if (u.type === 'dozer' || u.type === 'worker') {
+            const myTeam = (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+            const myBuilders = units.filter(b => (b.type === 'dozer' || b.type === 'worker') && b.health > 0 && !b.isDead && (typeof b.teamId === 'undefined' || b.teamId === myTeam));
+            if (myBuilders.length > 1) {
+                const bIdx = myBuilders.indexOf(u);
+                headerRightTag = `<button class="quick-army-btn" style="padding: 2px 7px; font-size: 10px; margin: 0;" onclick="cycleSelectBuilder()" title="Cycle to next builder (Hotkeys: D or Ctrl+Arrow)">↻ NEXT (${bIdx + 1}/${myBuilders.length})</button>`;
+            }
+        }
 
         inspector.innerHTML = `
             <div class="inspector-card">
@@ -652,7 +657,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                 <div class="inspector-info-pane">
                     <div class="inspector-header-row">
                         <span class="inspector-title">${spec.name}</span>
-                        <span class="inspector-kills-tag">★ ${u.kills || 0} KILLS</span>
+                        ${headerRightTag}
                     </div>
                     <div class="inspector-sub-role">${spec.role}</div>
                     <div class="inspector-hp-box">
@@ -1130,7 +1135,7 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
             <div class="inspector-quick-btns">
                 <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ Combat (${combatCount})</button>
                 <button class="quick-army-btn" onclick="selectUnitsByType('harvesters')">⛏ Harvesters (${harvesterCount})</button>
-                <button class="quick-army-btn" onclick="selectUnitsByType('builders')">🔨 Builders (${builderCount})</button>
+                <button class="quick-army-btn" onclick="cycleSelectBuilder()" title="Cycle construction units (Hotkeys: D or Ctrl+Arrow)">🔨 Builders (${builderCount})</button>
             </div>
         </div>
     `;
@@ -1140,7 +1145,7 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
         currentGridSlots = [
             { name: 'ALL COMBAT', badge: 'SEL', action: () => selectUnitsByType('combat'), desc: 'Select all battle units' },
             { name: 'HARVESTERS', badge: 'SEL', action: () => selectUnitsByType('harvesters'), desc: 'Select all supply trucks and workers' },
-            { name: 'BUILDERS', badge: 'SEL', action: () => selectUnitsByType('builders'), desc: 'Select all construction dozers / workers' },
+            { name: 'BUILDERS', badge: 'CYCLE', action: () => cycleSelectBuilder(), desc: 'Cycle through construction dozers / workers' },
             { name: 'RECENTER', badge: 'BASE', action: () => recenterBase(), desc: 'Center camera on main Command Center' },
             { name: 'REPAIR MODE', badge: 'TOOL', action: () => toggleRepairMode(), desc: 'Click buildings to repair' },
             { name: 'SELL MODE', badge: 'TOOL', action: () => toggleSellMode(), desc: 'Click buildings to demolish for cash' },
@@ -1863,6 +1868,70 @@ function deselectAll() {
     updateHUD();
 }
 
+let _builderCycleIdx = 0;
+
+function cycleSelectBuilder(direction = 1) {
+    const myTeam = (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+    const builders = units.filter(u =>
+        (u.type === 'dozer' || u.type === 'worker') &&
+        u.health > 0 &&
+        !u.isDead &&
+        (typeof u.teamId === 'undefined' || u.teamId === myTeam)
+    );
+
+    if (builders.length === 0) {
+        showNotification('No construction units available.', 'warning');
+        return;
+    }
+
+    // Determine current index if a builder is already selected
+    const currentIdx = builders.findIndex(u => u.selected);
+    let nextIdx = 0;
+
+    if (currentIdx !== -1) {
+        // Cycle to next / previous builder
+        nextIdx = (currentIdx + direction + builders.length) % builders.length;
+    } else {
+        // None selected yet: use saved cycle index
+        if (typeof _builderCycleIdx !== 'number' || _builderCycleIdx >= builders.length) {
+            _builderCycleIdx = 0;
+        }
+        nextIdx = _builderCycleIdx;
+    }
+
+    _builderCycleIdx = (nextIdx + 1) % builders.length;
+
+    // Deselect everything else
+    deselectAll();
+
+    // Select target builder strictly alone
+    const chosen = builders[nextIdx];
+    chosen.selected = true;
+    addSelectionCircle(chosen);
+
+    // Pan camera to chosen builder
+    if (chosen.mesh) {
+        centerCameraOn(chosen.mesh.position);
+    }
+
+    // Audio unit voice feedback
+    if (typeof playUnitVoice === 'function') {
+        playUnitVoice(chosen.type, 'select');
+    }
+
+    if (builders.length > 1) {
+        showNotification(`Builder selected (${nextIdx + 1}/${builders.length}).`, 'info');
+    } else {
+        const typeName = chosen.type === 'worker' ? 'Worker' : 'Construction Dozer';
+        showNotification(`Builder selected: ${typeName}.`, 'info');
+    }
+
+    activeSidebarTab = 'production';
+    updateSidebar();
+    updateHUD();
+}
+window.cycleSelectBuilder = cycleSelectBuilder;
+
 window.addEventListener('keydown', e => {
     // Ignore input if typing in chat, text fields, or modal
     if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
@@ -2063,21 +2132,13 @@ window.addEventListener('keydown', e => {
         return;
     }
 
-    // 6. BUILDER CYCLING: Ctrl + Up / Down Arrow
+    // 6. BUILDER CYCLING: Ctrl + Up / Down Arrow, or 'D' hotkey
     if (isCtrl && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        const builders = units.filter(u => (u.type === 'dozer' || u.type === 'worker') && u.health > 0);
-        if (builders.length > 0) {
-            const currentIdx = builders.findIndex(u => u.selected);
-            let nextIdx = 0;
-            if (e.key === 'ArrowDown') nextIdx = (currentIdx + 1) % builders.length;
-            else nextIdx = (currentIdx - 1 + builders.length) % builders.length;
-            deselectAll();
-            builders[nextIdx].selected = true;
-            addSelectionCircle(builders[nextIdx]);
-            centerCameraOn(builders[nextIdx].mesh.position);
-            updateSidebar();
-            showNotification(`Builder selected (${nextIdx + 1}/${builders.length}).`, 'info');
-        }
+        cycleSelectBuilder(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+    }
+    if (k === 'd' && !isCtrl && !isAlt && !blueprintMesh) {
+        cycleSelectBuilder();
         return;
     }
 
@@ -2968,11 +3029,15 @@ function updateHUD() {
 
         function removeSelectionCircle(unit) {
             if (unit.selectionCircle) {
-                unit.mesh.remove(unit.selectionCircle);
-                unit.selectionCircle.traverse(c => {
-                    if (c.geometry) c.geometry.dispose();
-                    if (c.material) c.material.dispose();
-                });
+                if (unit.mesh && typeof unit.mesh.remove === 'function') {
+                    unit.mesh.remove(unit.selectionCircle);
+                }
+                if (typeof unit.selectionCircle.traverse === 'function') {
+                    unit.selectionCircle.traverse(c => {
+                        if (c.geometry && typeof c.geometry.dispose === 'function') c.geometry.dispose();
+                        if (c.material && typeof c.material.dispose === 'function') c.material.dispose();
+                    });
+                }
                 unit.selectionCircle = null;
             }
             if (unit.trajectoryLine) {
@@ -3021,59 +3086,14 @@ function triggerRallyPointMode() {
     }
 }
 
-let activeBuilderCategory = 'base';
-
-function showBuilderPalette() {
-    const pal = document.getElementById('builder-palette');
-    if (!pal) return;
-    pal.style.display = 'flex';
-    renderBuilderPaletteCards();
-}
-
+// Deprecated floating builder palette: structure building is now managed entirely via the bottom Generals command grid
+function showBuilderPalette() {}
 function hideBuilderPalette() {
     const pal = document.getElementById('builder-palette');
     if (pal) pal.style.display = 'none';
 }
-
-function switchBuilderCategory(cat) {
-    activeBuilderCategory = cat;
-    document.querySelectorAll('.bp-cat-btn').forEach(b => b.classList.remove('active'));
-    const activeBtn = document.getElementById(cat === 'base' ? 'bp-tab-base' : 'bp-tab-def');
-    if (activeBtn) activeBtn.classList.add('active');
-    renderBuilderPaletteCards();
-}
-
-function renderBuilderPaletteCards() {
-    const container = document.getElementById('bp-cards-grid');
-    if (!container) return;
-
-    const allBuildings = factionBuildings[selectedFaction] || [];
-    const defenseKeys = ['patriot', 'gatlingCannon', 'speakerTower', 'bunker', 'tunnel', 'stingerSite', 'demoTrap', 'particleCannon', 'nukeSilo', 'scudStorm'];
-    
-    const bList = activeBuilderCategory === 'defenses'
-        ? allBuildings.filter(([type]) => defenseKeys.includes(type))
-        : allBuildings.filter(([type]) => !defenseKeys.includes(type));
-
-    let html = '';
-    bList.forEach(([type, name, cost]) => {
-        const structReq = getStructureTechPrerequisite(type);
-        const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
-        const canAfford = playerResources >= cost;
-        const disabled = !hasTech || !canAfford;
-
-        const initials = name.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase();
-        html += `
-            <button class="bp-card-btn ${disabled ? 'disabled' : ''}" onclick="activateBlueprint('${type}')" ${disabled ? 'disabled' : ''}>
-                <div class="bp-card-icon">${initials}</div>
-                <div class="bp-card-info">
-                    <span class="bp-card-title">${name}</span>
-                    <span class="bp-card-cost">$${cost}</span>
-                </div>
-            </button>
-        `;
-    });
-    container.innerHTML = html;
-}
+function switchBuilderCategory() {}
+function renderBuilderPaletteCards() {}
 
 
 // =========================================================================

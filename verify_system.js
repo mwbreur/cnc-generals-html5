@@ -72,6 +72,7 @@ const THREE = {
         this.traverse = () => {};
         this.userData = {};
         this.add = () => {};
+        this.remove = () => {};
         this.getObjectByName = () => null;
     },
     Line: function(geo, mat) {
@@ -345,5 +346,68 @@ if (typeof isRadarOnline === 'function') {
     const radarResult = isRadarOnline('usa');
     console.log("✓ isRadarOnline function verified (returns boolean: " + radarResult + ").");
 }
+
+// 8. Test Builder Palette Removal & Builder Cycling Selection
+const bodyHtml = fs.readFileSync('src/html/body.html', 'utf8');
+if (bodyHtml.includes('id="builder-palette"') || bodyHtml.includes('class="builder-floating-palette"')) {
+    console.error("FAIL: #builder-palette is still present in src/html/body.html!");
+    process.exit(1);
+}
+console.log("✓ Verified #builder-palette DOM element is removed from body.html.");
+
+// Setup mock units for builder cycling
+const cycleSelectBuilder = vm.runInContext("cycleSelectBuilder", sandbox);
+const selectUnitsByType = vm.runInContext("selectUnitsByType", sandbox);
+
+if (typeof cycleSelectBuilder !== 'function') {
+    console.error("FAIL: cycleSelectBuilder is not a function!");
+    process.exit(1);
+}
+
+// Test with 0 builders
+vm.runInContext("units = [];", sandbox);
+cycleSelectBuilder();
+
+// Test with 2 builders
+vm.runInContext(`
+    units = [
+        { type: 'dozer', health: 200, isDead: false, selected: false, mesh: new THREE.Mesh() },
+        { type: 'dozer', health: 200, isDead: false, selected: false, mesh: new THREE.Mesh() },
+        { type: 'crusader', health: 400, isDead: false, selected: false, mesh: new THREE.Mesh() }
+    ];
+`, sandbox);
+
+// 1st cycle: should select strictly b1 (index 0)
+cycleSelectBuilder();
+const uAfter1 = vm.runInContext("units", sandbox);
+if (!uAfter1[0].selected || uAfter1[1].selected || uAfter1[2].selected) {
+    console.error("FAIL: 1st cycle did not select strictly b1!", { b1: uAfter1[0].selected, b2: uAfter1[1].selected, c1: uAfter1[2].selected });
+    process.exit(1);
+}
+
+// 2nd cycle: should select strictly b2 (index 1)
+cycleSelectBuilder();
+const uAfter2 = vm.runInContext("units", sandbox);
+if (uAfter2[0].selected || !uAfter2[1].selected || uAfter2[2].selected) {
+    console.error("FAIL: 2nd cycle did not select strictly b2!", { b1: uAfter2[0].selected, b2: uAfter2[1].selected, c1: uAfter2[2].selected });
+    process.exit(1);
+}
+
+// 3rd cycle: should wrap around and select strictly b1 (index 0)
+cycleSelectBuilder();
+const uAfter3 = vm.runInContext("units", sandbox);
+if (!uAfter3[0].selected || uAfter3[1].selected || uAfter3[2].selected) {
+    console.error("FAIL: 3rd cycle did not wrap around to b1!", { b1: uAfter3[0].selected, b2: uAfter3[1].selected, c1: uAfter3[2].selected });
+    process.exit(1);
+}
+
+// Test selectUnitsByType('builders'): should cycle, NOT select all
+selectUnitsByType('builders');
+const uAfter4 = vm.runInContext("units", sandbox);
+if (uAfter4[0].selected || !uAfter4[1].selected || uAfter4[2].selected) {
+    console.error("FAIL: selectUnitsByType('builders') did not cycle to single builder b2!", { b1: uAfter4[0].selected, b2: uAfter4[1].selected, c1: uAfter4[2].selected });
+    process.exit(1);
+}
+console.log("✓ Verified builder cycling: single-selects and cycles between multiple builders without selecting all.");
 
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

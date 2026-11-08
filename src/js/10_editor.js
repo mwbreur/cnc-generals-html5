@@ -880,6 +880,15 @@
         }
 
         function selectUnitsByType(category) {
+            if (category === 'builders') {
+                if (typeof cycleSelectBuilder === 'function') {
+                    cycleSelectBuilder();
+                    return;
+                } else if (typeof window.cycleSelectBuilder === 'function') {
+                    window.cycleSelectBuilder();
+                    return;
+                }
+            }
             units.forEach(u => { u.selected = false; removeSelectionCircle(u); });
             selectedStructure = null;
             let count = 0;
