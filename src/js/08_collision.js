@@ -3,6 +3,9 @@
         function resolveObstacleCollisions(unit) {
             if (unit.isAir) return; // Aircraft fly safely above ground structures and trees
 
+            let totalPushX = 0, totalPushZ = 0;
+            let colliderCount = 0;
+
             // 1. Structure Collisions
             for (let s of structures) {
                 if (s.health <= 0) continue;
@@ -26,6 +29,9 @@
                     const normZ = dz / dist2D;
                     unit.mesh.position.x += normX * push;
                     unit.mesh.position.z += normZ * push;
+                    totalPushX += normX * push;
+                    totalPushZ += normZ * push;
+                    colliderCount++;
 
                     // Tangent Vector Sliding: glides smoothly around building corners without sticking!
                     const toTargetX = unit.targetPosition.x - unit.mesh.position.x;
@@ -48,6 +54,18 @@
                             unit.mesh.position.z += bestTanZ * slideSpeed;
                         }
                     }
+                }
+            }
+
+            // Pinch Resolution: If squeezed between multiple structures, pop out into open clearance
+            if (collisionCount > 1) {
+                const pushMag = Math.hypot(totalPushX, totalPushZ);
+                if (pushMag < 0.01) {
+                    unit.mesh.position.x += 0.85;
+                    unit.mesh.position.z += 0.85;
+                } else {
+                    unit.mesh.position.x += (totalPushX / pushMag) * 0.75;
+                    unit.mesh.position.z += (totalPushZ / pushMag) * 0.75;
                 }
             }
 
@@ -97,24 +115,54 @@
             } else {
                 const waterLvl = currentWaterLevel;
                 const groundH = getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z);
-                if (groundH < waterLvl) {
-                    // Unit entered water without a bridge: push back to nearest dry land shore
-                    let bestX = unit.mesh.position.x;
-                    let bestZ = unit.mesh.position.z;
-                    let found = false;
-                    for (let r = 1; r <= 14; r += 1.5) {
-                        for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-                            const tx = unit.mesh.position.x + Math.cos(a) * r;
-                            const tz = unit.mesh.position.z + Math.sin(a) * r;
-                            if (getTerrainHeight(tx, tz) >= waterLvl) {
-                                bestX = tx; bestZ = tz; found = true; break;
-                            }
-                        }
-                        if (found) break;
+                const safeMargin = 0.35;
+                if (groundH < waterLvl + safeMargin) {
+                    // Sample terrain gradient to find uphill vector toward dry shore
+                    const delta = 1.8;
+                    const hL = getTerrainHeight(unit.mesh.position.x - delta, unit.mesh.position.z);
+                    const hR = getTerrainHeight(unit.mesh.position.x + delta, unit.mesh.position.z);
+                    const hD = getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z - delta);
+                    const hU = getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z + delta);
+                    let sNormX = hR - hL;
+                    let sNormZ = hU - hD;
+                    const sLen = Math.hypot(sNormX, sNormZ);
+                    if (sLen > 0.001) {
+                        sNormX /= sLen;
+                        sNormZ /= sLen;
+                    } else {
+                        sNormX = 0; sNormZ = 1;
                     }
-                    if (found) {
-                        unit.mesh.position.x = bestX;
-                        unit.mesh.position.z = bestZ;
+
+                    // Push firmly out of water onto dry ground
+                    const penetration = Math.max(0.25, (waterLvl + safeMargin) - groundH);
+                    unit.mesh.position.x += sNormX * (penetration * 2.5);
+                    unit.mesh.position.z += sNormZ * (penetration * 2.5);
+
+                    // Shoreline tangent deflection: glide along water margin without getting stuck
+                    const toTargetX = unit.targetPosition.x - unit.mesh.position.x;
+                    const toTargetZ = unit.targetPosition.z - unit.mesh.position.z;
+                    const toTargetDist = Math.hypot(toTargetX, toTargetZ);
+                    if (toTargetDist > 0.05) {
+                        const dirX = toTargetX / toTargetDist;
+                        const dirZ = toTargetZ / toTargetDist;
+                        const tan1X = -sNormZ, tan1Z = sNormX;
+                        const tan2X = sNormZ, tan2Z = -sNormX;
+                        const dot1 = dirX * tan1X + dirZ * tan1Z;
+                        const dot2 = dirX * tan2X + dirZ * tan2Z;
+                        const bestTanX = dot1 >= dot2 ? tan1X : tan2X;
+                        const bestTanZ = dot1 >= dot2 ? tan1Z : tan2Z;
+                        const slideSpeed = Math.min(unit.speed || 0.15, 0.20);
+                        unit.mesh.position.x += bestTanX * slideSpeed;
+                        unit.mesh.position.z += bestTanZ * slideSpeed;
+                    }
+
+                    // Automatic bridge rerouting if target is on other side of river
+                    if ((!unit.waypoints || unit.waypoints.length === 0) && typeof findBridgeCrossingsForPath === 'function') {
+                        const bridges = findBridgeCrossingsForPath(unit.mesh.position, unit.targetPosition);
+                        if (bridges) {
+                            unit.waypoints = [bridges[0], bridges[1], unit.targetPosition.clone()];
+                            unit.targetPosition.copy(unit.waypoints.shift());
+                        }
                     }
                 }
             }

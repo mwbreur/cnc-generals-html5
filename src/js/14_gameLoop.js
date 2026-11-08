@@ -1,3 +1,43 @@
+// Find an unoccupied staged slot at rally destination to prevent units bunching or pushing each other
+function getUnoccupiedRallySlot(baseRally, unitRadius, isInf, structureFacingAngle) {
+    const spacing = isInf ? 3.4 : Math.max(8.0, unitRadius * 2.5);
+    const cols = isInf ? 5 : 4;
+    for (let slotIdx = 0; slotIdx < 60; slotIdx++) {
+        const col = slotIdx % cols;
+        const row = Math.floor(slotIdx / cols);
+        const colOff = (col - (cols - 1) / 2) * spacing;
+        const rowOff = row * spacing;
+
+        const perpX = Math.cos(structureFacingAngle);
+        const perpZ = -Math.sin(structureFacingAngle);
+        const fwdX = Math.sin(structureFacingAngle);
+        const fwdZ = Math.cos(structureFacingAngle);
+
+        const slotX = baseRally.x + perpX * colOff + fwdX * rowOff;
+        const slotZ = baseRally.z + perpZ * colOff + fwdZ * rowOff;
+
+        // Skip slots submerged in water unless on a bridge
+        const onBridge = (typeof mapBridges !== 'undefined') && mapBridges.some(b => isPointOnBridge(slotX, slotZ, b));
+        if (!onBridge && typeof getTerrainHeight === 'function' && typeof currentWaterLevel !== 'undefined') {
+            if (getTerrainHeight(slotX, slotZ) < currentWaterLevel + 0.35) continue;
+        }
+
+        // Check if another friendly unit already occupies or is traveling to this slot
+        const isOccupied = units.some(u => {
+            if (u.isAir || u.garrisonedIn || u.health <= 0) return false;
+            const distCurrent = Math.hypot(u.mesh.position.x - slotX, u.mesh.position.z - slotZ);
+            const distTarget = Math.hypot(u.targetPosition.x - slotX, u.targetPosition.z - slotZ);
+            return (distCurrent < spacing * 0.72) || (distTarget < spacing * 0.72 && u.taskState === 'Moving');
+        });
+
+        if (!isOccupied) {
+            const slotY = typeof getTerrainHeight === 'function' ? getTerrainHeight(slotX, slotZ) : 0;
+            return new THREE.Vector3(slotX, slotY, slotZ);
+        }
+    }
+    return baseRally.clone();
+}
+
 function animate() {
             requestAnimationFrame(animate);
 
@@ -109,7 +149,11 @@ function animate() {
 
                         if (newUnit.isAir) {
                             if (structure.rallyPoint) {
-                                newUnit.targetPosition.copy(structure.rallyPoint);
+                                const airSpread = ((rallyIdx % 6) - 2.5) * 4.5;
+                                const targetAirX = structure.rallyPoint.x + airSpread;
+                                const targetAirZ = structure.rallyPoint.z + Math.floor(rallyIdx / 6) * 4.5;
+                                const targetAirY = (typeof getTerrainHeight === 'function' ? getTerrainHeight(targetAirX, targetAirZ) : 0) + (newUnit.mesh.userData.flightAltitude || 8.5);
+                                newUnit.targetPosition.set(targetAirX, targetAirY, targetAirZ);
                                 newUnit.patrolCenter.copy(structure.rallyPoint);
                                 newUnit.airState = 'flying';
                                 newUnit.taskState = 'Moving';
@@ -120,32 +164,22 @@ function animate() {
                                 newUnit.taskState = 'Idle';
                             }
                         } else {
-                            // Assign distinct staged formation slot at rally point
-                            const uRad = newUnit.radius || (isInf ? 0.8 : 3.6);
-                            const spacingX = isInf ? 3.2 : Math.max(7.5, uRad * 2.35);
-                            const spacingZ = isInf ? 3.5 : Math.max(8.0, uRad * 2.50);
-
-                            const cols = isInf ? 4 : 3;
-                            const col = rallyIdx % cols;
-                            const row = Math.floor(rallyIdx / cols) % 4; // up to 12-16 staging slots before recycle
-
-                            const colOff = (col - (cols - 1) / 2) * spacingX;
-                            const rowOff = row * spacingZ;
-
-                            // Default rally direction points away from structure
+                            // Assign distinct staged formation slot at rally point with bridge routing
                             const baseRally = structure.rallyPoint
                                 ? structure.rallyPoint.clone()
                                 : structure.position.clone().add(new THREE.Vector3(Math.sin(exitAngle), 0, Math.cos(exitAngle)).multiplyScalar(structure.radius + (isInf ? 8.0 : 14.0)));
 
-                            const perpX = Math.cos(exitAngle);
-                            const perpZ = -Math.sin(exitAngle);
-
-                            const targetRallyX = baseRally.x + perpX * colOff + Math.sin(exitAngle) * rowOff;
-                            const targetRallyZ = baseRally.z + perpZ * colOff + Math.cos(exitAngle) * rowOff;
-                            const targetRallyY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetRallyX, targetRallyZ) : 0;
-
-                            newUnit.targetPosition.set(targetRallyX, targetRallyY, targetRallyZ);
+                            const slotPos = getUnoccupiedRallySlot(baseRally, newUnit.radius || 1.8, isInf, exitAngle);
+                            newUnit.targetPosition.copy(slotPos);
                             newUnit.taskState = 'Moving';
+                            newUnit.waypoints = [];
+                            if (typeof findBridgeCrossingsForPath === 'function') {
+                                const bridges = findBridgeCrossingsForPath(newUnit.mesh.position, slotPos);
+                                if (bridges) {
+                                    newUnit.waypoints = [bridges[0], bridges[1], slotPos.clone()];
+                                    newUnit.targetPosition.copy(newUnit.waypoints.shift());
+                                }
+                            }
                         }
                         if (typeof playUnitReadySound === 'function') {
                             playUnitReadySound(item.type, typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
@@ -671,7 +705,23 @@ function animate() {
 
             units.forEach(unit => {
                 if ((unit.type === 'dozer' || unit.type === 'worker') && unit.taskState === 'MovingToBuild' && unit.targetStructure) {
-                    unit.targetPosition.copy(unit.targetStructure.position);
+                    const s = unit.targetStructure;
+                    if (s.health > 0 && s.isBuilding) {
+                        const dxB = unit.mesh.position.x - s.position.x;
+                        const dzB = unit.mesh.position.z - s.position.z;
+                        const distToS = Math.hypot(dxB, dzB);
+                        const workDist = s.radius + (unit.radius || 1.8) + 1.2;
+                        if (distToS > workDist) {
+                            const angleB = Math.atan2(dzB, dxB);
+                            const tX = s.position.x + Math.cos(angleB) * workDist;
+                            const tZ = s.position.z + Math.sin(angleB) * workDist;
+                            const tY = typeof getTerrainHeight === 'function' ? getTerrainHeight(tX, tZ) : 0;
+                            unit.targetPosition.set(tX, tY, tZ);
+                        }
+                    } else if (!s.isBuilding) {
+                        unit.taskState = 'Idle';
+                        unit.targetStructure = null;
+                    }
                 }
             });
 
@@ -1189,15 +1239,38 @@ function animate() {
                         }
                     }
 
-                    // Anti-Stuck Corner Watchdog: if stuck against a tight crevice or corner, nudge free!
+                    // Anti-Stuck Corner & Obstacle Watchdog: routes smoothly around blocking structures
                     if (!unit._lastPos) unit._lastPos = unit.mesh.position.clone();
                     if (!unit._stuckTimer) unit._stuckTimer = 0;
                     const dMoved = unit.mesh.position.distanceTo(unit._lastPos);
-                    if (dMoved < 0.05) {
+                    if (dMoved < 0.06) {
                         unit._stuckTimer++;
-                        if (unit._stuckTimer > 20) {
-                            unit.mesh.position.x += (Math.random() - 0.5) * 1.8;
-                            unit.mesh.position.z += (Math.random() - 0.5) * 1.8;
+                        if (unit._stuckTimer > 12) {
+                            // Find which structure is blocking the path
+                            const blocking = structures.find(s => s !== unit.targetStructure && s.health > 0 && Math.hypot(unit.mesh.position.x - s.position.x, unit.mesh.position.z - s.position.z) < (s.radius + unit.radius + 4.0));
+                            if (blocking) {
+                                const angleToS = Math.atan2(blocking.position.z - unit.mesh.position.z, blocking.position.x - unit.mesh.position.x);
+                                const bypassRadius = blocking.radius + unit.radius + 3.2;
+                                const p1X = blocking.position.x + Math.cos(angleToS + Math.PI / 2) * bypassRadius;
+                                const p1Z = blocking.position.z + Math.sin(angleToS + Math.PI / 2) * bypassRadius;
+                                const p2X = blocking.position.x + Math.cos(angleToS - Math.PI / 2) * bypassRadius;
+                                const p2Z = blocking.position.z + Math.sin(angleToS - Math.PI / 2) * bypassRadius;
+
+                                const d1 = Math.hypot(unit.targetPosition.x - p1X, unit.targetPosition.z - p1Z);
+                                const d2 = Math.hypot(unit.targetPosition.x - p2X, unit.targetPosition.z - p2Z);
+                                const detourX = d1 <= d2 ? p1X : p2X;
+                                const detourZ = d1 <= d2 ? p1Z : p2Z;
+                                const detourY = typeof getTerrainHeight === 'function' ? getTerrainHeight(detourX, detourZ) : 0;
+                                const detourPos = new THREE.Vector3(detourX, detourY, detourZ);
+
+                                if (!unit.waypoints) unit.waypoints = [];
+                                unit.waypoints.unshift(unit.targetPosition.clone());
+                                unit.targetPosition.copy(detourPos);
+                            } else {
+                                const rndA = Math.random() * Math.PI * 2;
+                                unit.mesh.position.x += Math.cos(rndA) * 1.5;
+                                unit.mesh.position.z += Math.sin(rndA) * 1.5;
+                            }
                             unit._stuckTimer = 0;
                         }
                     } else {
@@ -1252,32 +1325,39 @@ function animate() {
                     if (unit.waypoints && unit.waypoints.length > 0) {
                         const nextWp = unit.waypoints.shift();
                         unit.targetPosition.copy(nextWp);
-                    } else if (unit.isAir) {
-                        // Unit is at destination! Settle aircraft banking and pitch to zero without spinning or flipping
-                        unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
-                        unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
-                    } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
-                        unit.mesh.rotation.x = 0;
-                        unit.mesh.rotation.z = 0;
-                        unit._strideBob = 0;
-                        if (unit.mesh.userData && unit.mesh.userData.animatedMeshes) {
-                            unit.mesh.userData.animatedMeshes.forEach(m => {
-                                if (m.userData && m.userData.standVerts) {
-                                    const std = m.userData.standVerts;
-                                    const pos = m.geometry.attributes.position.array;
-                                    let changed = false;
-                                    for (let k = 0; k < pos.length; k++) {
-                                        const diff = std[k] - pos[k];
-                                        if (Math.abs(diff) > 0.001) {
-                                            pos[k] += diff * 0.25;
-                                            changed = true;
-                                        } else {
-                                            pos[k] = std[k];
+                    } else {
+                        // Reached final destination! Transition to Idle so it stops driving
+                        if (unit.taskState === 'Moving') {
+                            unit.taskState = 'Idle';
+                        }
+                        unit.targetPosition.copy(unit.mesh.position);
+                        if (unit.isAir) {
+                            // Unit is at destination! Settle aircraft banking and pitch to zero without spinning or flipping
+                            unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
+                            unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
+                        } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
+                            unit.mesh.rotation.x = 0;
+                            unit.mesh.rotation.z = 0;
+                            unit._strideBob = 0;
+                            if (unit.mesh.userData && unit.mesh.userData.animatedMeshes) {
+                                unit.mesh.userData.animatedMeshes.forEach(m => {
+                                    if (m.userData && m.userData.standVerts) {
+                                        const std = m.userData.standVerts;
+                                        const pos = m.geometry.attributes.position.array;
+                                        let changed = false;
+                                        for (let k = 0; k < pos.length; k++) {
+                                            const diff = std[k] - pos[k];
+                                            if (Math.abs(diff) > 0.001) {
+                                                pos[k] += diff * 0.25;
+                                                changed = true;
+                                            } else {
+                                                pos[k] = std[k];
+                                            }
                                         }
+                                        if (changed) m.geometry.attributes.position.needsUpdate = true;
                                     }
-                                    if (changed) m.geometry.attributes.position.needsUpdate = true;
-                                }
-                            });
+                                });
+                            }
                         }
                     }
                 }
@@ -1303,8 +1383,14 @@ function animate() {
                         const minU = (unit.radius || 1.3) + (other.radius || 1.3);
                         if (distU < minU && distU > 0.0001) {
                             const pushU = (minU - distU) * 0.25;
-                            unit.mesh.position.x += (ddx / distU) * pushU;
-                            unit.mesh.position.z += (ddz / distU) * pushU;
+                            const px = (ddx / distU) * pushU;
+                            const pz = (ddz / distU) * pushU;
+                            unit.mesh.position.x += px;
+                            unit.mesh.position.z += pz;
+                            // If unit is idle, lock targetPosition to current position so it doesn't fight the separation!
+                            if (unit.taskState === 'Idle') {
+                                unit.targetPosition.copy(unit.mesh.position);
+                            }
                         }
                     }
                 }

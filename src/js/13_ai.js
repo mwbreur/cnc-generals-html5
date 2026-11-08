@@ -621,9 +621,10 @@ function processEnemyAIEngine() {
 
         // River Crossing Bridge Waypoint Finder: detects if straight path hits water and routes via bridge
         function findBridgeCrossingsForPath(startPos, endPos) {
-            if (mapBridges.length === 0) return null;
+            if (!mapBridges || mapBridges.length === 0) return null;
             let crossesWater = false;
-            for (let t = 0.15; t <= 0.85; t += 0.1) {
+            // Dense 20-sample scan along trajectory to detect water channels
+            for (let t = 0.05; t <= 0.95; t += 0.05) {
                 const px = startPos.x + (endPos.x - startPos.x) * t;
                 const pz = startPos.z + (endPos.z - startPos.z) * t;
                 if (getTerrainHeight(px, pz) < currentWaterLevel && !mapBridges.some(b => isPointOnBridge(px, pz, b))) {
@@ -649,7 +650,7 @@ function processEnemyAIEngine() {
             // Compute bridge entry and exit ramps along its longitudinal axis
             const fwdX = Math.sin(bestBridge.rotationY);
             const fwdZ = Math.cos(bestBridge.rotationY);
-            const halfLen = bestBridge.length * 0.5 + 2.5;
+            const halfLen = bestBridge.length * 0.5 + 3.0;
 
             const ramp1 = new THREE.Vector3(bestBridge.position.x - fwdX * halfLen, bestBridge.deckY, bestBridge.position.z - fwdZ * halfLen);
             const ramp2 = new THREE.Vector3(bestBridge.position.x + fwdX * halfLen, bestBridge.deckY, bestBridge.position.z + fwdZ * halfLen);
@@ -662,6 +663,7 @@ function processEnemyAIEngine() {
 
             return [entryRamp, exitRamp];
         }
+        window.findBridgeCrossingsForPath = findBridgeCrossingsForPath;
 
         function issueMoveCommand(e) {
             // Check if player has a building selected and right-clicks on ground to set its rally point!
@@ -694,6 +696,47 @@ function processEnemyAIEngine() {
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
+
+            // 0. Check if right-clicking on a friendly structure (unfinished foundation or damaged building) with Dozers/Workers
+            const friendlyStructMeshes = structures.map(s => s.mesh).filter(Boolean);
+            const friendlyStructHits = raycaster.intersectObjects(friendlyStructMeshes, true);
+            if (friendlyStructHits.length > 0) {
+                let hitObj = friendlyStructHits[0].object;
+                while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
+                const targetedStruct = structures.find(s => s.mesh === hitObj);
+                const selectedBuilders = units.filter(u => u.selected && (u.type === 'dozer' || u.type === 'worker'));
+                if (targetedStruct && selectedBuilders.length > 0) {
+                    selectedBuilders.forEach(builder => {
+                        builder.taskState = 'MovingToBuild';
+                        builder.targetStructure = targetedStruct;
+                        targetedStruct.dozerRef = builder;
+                        
+                        // Aim for nearest reachable point on structure perimeter facing the builder
+                        const dxB = builder.mesh.position.x - targetedStruct.position.x;
+                        const dzB = builder.mesh.position.z - targetedStruct.position.z;
+                        const angleB = Math.atan2(dzB, dxB);
+                        const workDist = targetedStruct.radius + (builder.radius || 1.8) + 1.2;
+                        const targetX = targetedStruct.position.x + Math.cos(angleB) * workDist;
+                        const targetZ = targetedStruct.position.z + Math.sin(angleB) * workDist;
+                        const targetY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetX, targetZ) : 0;
+                        builder.targetPosition.set(targetX, targetY, targetZ);
+                        builder.waypoints = [];
+                        if (typeof findBridgeCrossingsForPath === 'function') {
+                            const bridges = findBridgeCrossingsForPath(builder.mesh.position, builder.targetPosition);
+                            if (bridges) {
+                                builder.waypoints = [bridges[0], bridges[1], builder.targetPosition.clone()];
+                                builder.targetPosition.copy(builder.waypoints.shift());
+                            }
+                        }
+                    });
+                    if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(targetedStruct.position, 'move');
+                    const actionName = targetedStruct.isBuilding ? 'construction' : (targetedStruct.health < targetedStruct.maxHealth ? 'repairs' : 'assignment');
+                    showNotification(`Construction crew dispatched to resume ${actionName} on ${targetedStruct.type.toUpperCase()}.`, 'success');
+                    if (typeof playUnitVoice === 'function') playUnitVoice(selectedBuilders[0].type, 'build');
+                    updateSidebar();
+                    return;
+                }
+            }
 
             // 1. Check if the player right-clicked directly on an enemy unit OR enemy building
             const targetableEnemyMeshes = [
@@ -1222,18 +1265,29 @@ function processEnemyAIEngine() {
                 (unit.type === 'dozer' || unit.type === 'worker') && unit.health > 0
             );
 
-            // Release foundations whose assigned builder was interrupted or removed.
+            // Maintain assigned builders and automatically re-engage if interrupted
             structures.forEach(structure => {
                 const builder = structure.dozerRef;
-                if (structure.isBuilding && builder &&
-                    (!builders.includes(builder) || builder.targetStructure !== structure ||
-                    !['MovingToBuild', 'Building'].includes(builder.taskState))) {
-                    structure.dozerRef = null;
+                if (structure.isBuilding && builder) {
+                    if (!builders.includes(builder) || builder.health <= 0) {
+                        structure.dozerRef = null;
+                    } else if (builder.targetStructure !== structure) {
+                        if (builder.taskState === 'Idle' || !builder.targetStructure) {
+                            builder.targetStructure = structure;
+                            builder.taskState = 'MovingToBuild';
+                        } else {
+                            structure.dozerRef = null;
+                        }
+                    } else if (builder.taskState !== 'MovingToBuild' && builder.taskState !== 'Building') {
+                        // Resume build order if builder was stopped or bumped
+                        builder.taskState = 'MovingToBuild';
+                    }
                 }
             });
 
             const availableBuilders = builders.filter(builder =>
-                builder.taskState === 'Idle' && !builder.targetStructure
+                (builder.taskState === 'Idle' && !builder.targetStructure) ||
+                (builder.targetStructure && !builder.targetStructure.isBuilding)
             );
             const waitingStructures = structures.filter(structure =>
                 structure.isBuilding && !structure.dozerRef
@@ -1254,7 +1308,23 @@ function processEnemyAIEngine() {
                     structure.dozerRef = nearestBuilder;
                     nearestBuilder.taskState = 'MovingToBuild';
                     nearestBuilder.targetStructure = structure;
-                    nearestBuilder.targetPosition.copy(structure.position);
+                    
+                    const dxB = nearestBuilder.mesh.position.x - structure.position.x;
+                    const dzB = nearestBuilder.mesh.position.z - structure.position.z;
+                    const angleB = Math.atan2(dzB, dxB);
+                    const workDist = structure.radius + (nearestBuilder.radius || 1.8) + 1.2;
+                    const tX = structure.position.x + Math.cos(angleB) * workDist;
+                    const tZ = structure.position.z + Math.sin(angleB) * workDist;
+                    const tY = typeof getTerrainHeight === 'function' ? getTerrainHeight(tX, tZ) : 0;
+                    nearestBuilder.targetPosition.set(tX, tY, tZ);
+                    nearestBuilder.waypoints = [];
+                    if (typeof findBridgeCrossingsForPath === 'function') {
+                        const bridges = findBridgeCrossingsForPath(nearestBuilder.mesh.position, nearestBuilder.targetPosition);
+                        if (bridges) {
+                            nearestBuilder.waypoints = [bridges[0], bridges[1], nearestBuilder.targetPosition.clone()];
+                            nearestBuilder.targetPosition.copy(nearestBuilder.waypoints.shift());
+                        }
+                    }
                     availableBuilders.splice(availableBuilders.indexOf(nearestBuilder), 1);
                 }
             });
