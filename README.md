@@ -1,6 +1,8 @@
-# Command & Conquer: Generals - HTML5 Edition
+# Command & Conquer: Generals ZH - HTML5 Edition
 
 A standalone, 100% browser-based 3D recreation of **Command & Conquer: Generals** built with Three.js, procedural Web Audio API, and WebRTC PeerJS.
+
+Work in progress.
 
 🎮 **Play Instantly in your Browser:** [https://mwbreur.github.io/cnc-generals-html5/](https://mwbreur.github.io/cnc-generals-html5/)
 
