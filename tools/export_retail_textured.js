@@ -95,29 +95,30 @@ const BUILDING_CONFIG = {
     'tech_refinery':        { file: 'CBOilRfny.W3D',    tex: 'cboilrfny.dds',  scale: 0.260, faction: 'tech' }
 };
 
-// Retail Westwood 3D Infantry Characters (calibrated to ~2.8 units tall, classic RTS visual readability)
+// Retail Westwood 3D Infantry Characters (calibrated to ~2.4-2.6 units tall, classic RTS visual readability)
 const INFANTRY_CONFIG = {
     // USA
-    'ranger':         { file: 'AIRNGR_SKN.W3D', tex: 'zhca_airanger.tga',   scale: 0.280, faction: 'usa' },
-    'missiledefender':{ file: 'INF4BRG_SKN.W3D', tex: 'zhca_aimsslguy.tga',  scale: 0.280, faction: 'usa' },
-    'pathfinder':     { file: 'AIPFDR_SKN.W3D', tex: 'zhca_aipthfindr.tga', scale: 0.280, faction: 'usa' },
-    'burton':         { file: 'AIHERO_SKN.W3D', tex: 'zhca_aihero2.tga',    scale: 0.300, faction: 'usa' },
+    'ranger':          { file: 'AIRNGR_SKN.W3D',  skl: 'AIRNGR_SKL.W3D',  submesh: null,              tex: 'zhca_airanger.tga',   scale: 0.160, faction: 'usa' },
+    'missiledefender': { file: 'INF4BRG_SKN.W3D', skl: 'INF4BRG_SKL.W3D', submesh: 'AIMSSL_SKIN_01', tex: 'zhca_aimsslguy.tga',  scale: 0.160, faction: 'usa' },
+    'pathfinder':      { file: 'AIPFDR_SKN.W3D',  skl: 'AIPFDR_SKL.W3D',  submesh: null,              tex: 'zhca_aipthfindr.tga', scale: 0.160, faction: 'usa' },
+    'burton':          { file: 'AIHERO_SKN.W3D',  skl: 'AIHERO_SKL.W3D',  submesh: null,              tex: 'zhca_aihero2.tga',    scale: 0.170, faction: 'usa' },
     // China
-    'redguard':   { file: 'NICNSC_SKN.W3D', tex: 'zhca_niconscrpt.tga', scale: 0.280, faction: 'china' },
-    'tankhunter': { file: 'NITHNT_SKN.W3D', tex: 'zhca_nithunter.tga',  scale: 0.280, faction: 'china' },
-    'hacker':     { file: 'NIHCKR_SKN.W3D', tex: 'zhca_nihacker.tga',   scale: 0.280, faction: 'china' },
-    'lotus':      { file: 'NIHERO_SKN.W3D', tex: 'zhca_niblotus.tga',   scale: 0.290, faction: 'china' },
+    'redguard':        { file: 'NICNSC_SKN.W3D',  skl: 'NICNSC_SKL.W3D',  submesh: null,              tex: 'zhca_niconscrpt.tga', scale: 0.160, faction: 'china' },
+    'tankhunter':      { file: 'NITHNT_SKN.W3D',  skl: 'NITHNT_SKL.W3D',  submesh: null,              tex: 'zhca_nithunter.tga',  scale: 0.160, faction: 'china' },
+    'hacker':          { file: 'NIHCKR_SKN.W3D',  skl: 'NIHCKR_SKL.W3D',  submesh: null,              tex: 'zhca_nihacker.tga',   scale: 0.160, faction: 'china' },
+    'lotus':           { file: 'NIHERO_SKN.W3D',  skl: 'NIHERO_SKL.W3D',  submesh: null,              tex: 'zhca_niblotus.tga',   scale: 0.165, faction: 'china' },
     // GLA
-    'rebel':      { file: 'UIRGRD_SKN.W3D', tex: 'zhca_uirguard.tga',   scale: 0.280, faction: 'gla' },
-    'rpg':        { file: 'UISMSD_SKN.W3D', tex: 'zhca_uirstnger.tga',  scale: 0.280, faction: 'gla' },
-    'terrorist':  { file: 'UITRST_SKN.W3D', tex: 'zhca_uiter.tga',      scale: 0.280, faction: 'gla' },
-    'jarmen':     { file: 'UIHERO_SKN.W3D', tex: 'zhca_uihero01.tga',   scale: 0.300, faction: 'gla' },
-    'worker':     { file: 'UIWRKR_SKN.W3D', tex: 'zhca_uiworker.tga',   scale: 0.270, faction: 'gla' }
+    'rebel':           { file: 'UIRGRD_SKN.W3D',  skl: 'UIRGRD_SKL.W3D',  submesh: null,              tex: 'zhca_uirguard.tga',   scale: 0.160, faction: 'gla' },
+    'rpg':             { file: 'UISMSD_SKN.W3D',  skl: 'UISMSD_SKL.W3D',  submesh: null,              tex: 'zhca_uirstnger.tga',  scale: 0.160, faction: 'gla' },
+    'terrorist':       { file: 'UITRST_SKN.W3D',  skl: 'UITRST_SKL.W3D',  submesh: null,              tex: 'zhca_uiter.tga',      scale: 0.160, faction: 'gla' },
+    'jarmen':          { file: 'UIHERO_SKN.W3D',  skl: 'UIHERO_SKL.W3D',  submesh: null,              tex: 'zhca_uihero01.tga',   scale: 0.170, faction: 'gla' },
+    'worker':          { file: 'UIWRKR_SKN.W3D',  skl: 'UIWRKR_SKL.W3D',  submesh: null,              tex: 'zhca_uiworker.tga',   scale: 0.155, faction: 'gla' }
 };
 
 // Additional architectural and detail textures
 const EXTRA_TEXTURES = {
     'gradient2': 'gradient2.dds',
+    'z_infxtras': 'z_infxtras.tga',
     'atcemwall01': 'atcemwall01.dds',
     'atcemblock02': 'atcemblock02.dds',
     'atsilverroof02': 'atsilverroof02.dds',
@@ -298,26 +299,6 @@ function processModels(map) {
             });
         }
 
-        // Infantry Standing Upright Calibration (Height to Y, boots to ground)
-        if (INFANTRY_CONFIG[key]) {
-            let minY = 1e9;
-            for (const m of Object.values(filteredMeshes)) {
-                for (let i = 0; i < m.v.length; i += 3) {
-                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                    const nx = ox, ny = oz, nz = -oy;
-                    m.v[i] = nx; m.v[i+1] = ny; m.v[i+2] = nz;
-                    if (ny < minY) minY = ny;
-                }
-            }
-            if (minY < 1e8) {
-                for (const m of Object.values(filteredMeshes)) {
-                    for (let i = 0; i < m.v.length; i += 3) {
-                        m.v[i+1] = parseFloat((m.v[i+1] - minY).toFixed(2));
-                    }
-                }
-            }
-        }
-
         let meshEntries;
         if (parsed.hlodSubObjects.length > 0) {
             meshEntries = parsed.hlodSubObjects.filter(h => filteredMeshes[h.name] !== undefined).map(h => [h.boneIndex, h.name]);
@@ -454,13 +435,301 @@ processTextures(BUILDING_CONFIG);
 processTextures(INFANTRY_CONFIG);
 processTextures(EXTRA_TEXTURES);
 
+function mat4Compose(pos, q) {
+    const x = q[0], y = q[1], z = q[2], w = q[3];
+    const x2 = x + x, y2 = y + y, z2 = z + z;
+    const xx = x * x2, xy = x * y2, xz = x * z2;
+    const yy = y * y2, yz = y * z2, zz = z * z2;
+    const wx = w * x2, wy = w * y2, wz = w * z2;
+
+    const te = new Float32Array(16);
+    te[0] = 1 - (yy + zz);
+    te[1] = xy + wz;
+    te[2] = xz - wy;
+    te[3] = 0;
+
+    te[4] = xy - wz;
+    te[5] = 1 - (xx + zz);
+    te[6] = yz + wx;
+    te[7] = 0;
+
+    te[8] = xz + wy;
+    te[9] = yz - wx;
+    te[10] = 1 - (xx + yy);
+    te[11] = 0;
+
+    te[12] = pos[0];
+    te[13] = pos[1];
+    te[14] = pos[2];
+    te[15] = 1;
+    return te;
+}
+
+function mat4Mul(a, b) {
+    const out = new Float32Array(16);
+    for (let i = 0; i < 4; i++) {
+        const ai0 = a[i], ai1 = a[i+4], ai2 = a[i+8], ai3 = a[i+12];
+        out[i]    = ai0 * b[0]  + ai1 * b[1]  + ai2 * b[2]  + ai3 * b[3];
+        out[i+4]  = ai0 * b[4]  + ai1 * b[5]  + ai2 * b[6]  + ai3 * b[7];
+        out[i+8]  = ai0 * b[8]  + ai1 * b[9]  + ai2 * b[10] + ai3 * b[11];
+        out[i+12] = ai0 * b[12] + ai1 * b[13] + ai2 * b[14] + ai3 * b[15];
+    }
+    return out;
+}
+
+const AXIS_SWAP = new Float32Array([
+    1, 0, 0, 0,
+    0, 0, 1, 0,
+    0, 1, 0, 0,
+    0, 0, 0, 1
+]);
+
+function transformPoint(m, p) {
+    const x = p[0], y = p[1], z = p[2];
+    return [
+        m[0] * x + m[4] * y + m[8]  * z + m[12],
+        m[1] * x + m[5] * y + m[9]  * z + m[13],
+        m[2] * x + m[6] * y + m[10] * z + m[14]
+    ];
+}
+
+function loadSkeleton(sklFileName) {
+    const sklPath = path.join(w3dDir, sklFileName);
+    if (!fs.existsSync(sklPath)) return null;
+    const buf = fs.readFileSync(sklPath);
+    let sklPivots = [];
+    let off = 0;
+    while (off < buf.length) {
+        const type = buf.readUInt32LE(off);
+        const size = buf.readUInt32LE(off + 4) & 0x7fffffff;
+        if (type === 0x100) { // W3D_CHUNK_HIERARCHY
+            let sub = off + 8;
+            let version = 0, pivotCount = 0;
+            while (sub < off + 8 + size) {
+                const st = buf.readUInt32LE(sub);
+                const ss = buf.readUInt32LE(sub + 4) & 0x7fffffff;
+                if (st === 0x101) { // W3D_CHUNK_HIERARCHY_HEADER
+                    version = buf.readUInt32LE(sub + 8);
+                    pivotCount = buf.readUInt32LE(sub + 28);
+                } else if (st === 0x102) { // W3D_CHUNK_PIVOTS (60 bytes per pivot)
+                    const pre30 = version < 0x00030000;
+                    if (pre30) {
+                        sklPivots.push({ name: 'RootTransform', parentIndex: -1, localThree: new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]) });
+                    }
+                    let po = sub + 8;
+                    for (let i = 0; i < pivotCount; i++) {
+                        const ne = buf.indexOf(0, po);
+                        const pName = buf.toString('ascii', po, Math.min(ne > po ? ne : po + 16, po + 16)).trim();
+                        let parentIndex = buf.readUInt32LE(po + 16);
+                        const tx = buf.readFloatLE(po + 20);
+                        const ty = buf.readFloatLE(po + 24);
+                        const tz = buf.readFloatLE(po + 28);
+                        const qx = buf.readFloatLE(po + 44);
+                        const qy = buf.readFloatLE(po + 48);
+                        const qz = buf.readFloatLE(po + 52);
+                        const qw = buf.readFloatLE(po + 56);
+                        if (pre30) {
+                            parentIndex = (parentIndex + 1) >>> 0;
+                        }
+                        const rawM = mat4Compose([tx, ty, tz], [qx, qy, qz, qw]);
+                        const localThree = mat4Mul(mat4Mul(AXIS_SWAP, rawM), AXIS_SWAP);
+                        sklPivots.push({
+                            name: pName,
+                            parentIndex: parentIndex === 0xffffffff ? -1 : parentIndex,
+                            localThree,
+                            worldMat: null
+                        });
+                        po += 60;
+                    }
+                }
+                sub += 8 + ss;
+            }
+        }
+        off += 8 + size;
+    }
+
+    for (let i = 0; i < sklPivots.length; i++) {
+        const p = sklPivots[i];
+        if (p.parentIndex === -1 || p.parentIndex >= i) {
+            p.worldMat = p.localThree;
+        } else {
+            p.worldMat = mat4Mul(sklPivots[p.parentIndex].worldMat, p.localThree);
+        }
+    }
+    return sklPivots;
+}
+
+function parseAndBakeSkinnedMesh(sknFileName, sklFileName, targetSubmesh = null) {
+    const skl = loadSkeleton(sklFileName);
+    if (!skl) {
+        console.warn(`Skeleton ${sklFileName} not found for ${sknFileName}`);
+        return null;
+    }
+    const sknPath = path.join(w3dDir, sknFileName);
+    if (!fs.existsSync(sknPath)) return null;
+    const buf = fs.readFileSync(sknPath);
+    let off = 0;
+    const resultMeshes = {};
+
+    while (off < buf.length) {
+        const type = buf.readUInt32LE(off);
+        const size = buf.readUInt32LE(off + 4) & 0x7fffffff;
+        if (type === 0) { // W3D_CHUNK_MESH
+            let sub = off + 8;
+            let meshName = '', numV = 0, numF = 0, attr = 0;
+            let vArr = [], infArr = [], triArr = [], uvArr = [];
+            while (sub < off + 8 + size) {
+                const st = buf.readUInt32LE(sub);
+                const ss = buf.readUInt32LE(sub + 4) & 0x7fffffff;
+                if (st === 0x1f) {
+                    let endMesh = sub + 8 + 8;
+                    while (endMesh < sub + 8 + 24 && buf[endMesh] !== 0) endMesh++;
+                    meshName = buf.toString('ascii', sub + 8 + 8, endMesh).trim();
+                    attr = buf.readUInt32LE(sub + 8 + 4);
+                    numF = buf.readUInt32LE(sub + 8 + 40);
+                    numV = buf.readUInt32LE(sub + 8 + 44);
+                } else if (st === 0x02) {
+                    const count = Math.floor(ss / 12);
+                    for (let i = 0; i < count; i++) {
+                        const vx = buf.readFloatLE(sub + 8 + i * 12 + 0);
+                        const vy = buf.readFloatLE(sub + 8 + i * 12 + 4);
+                        const vz = buf.readFloatLE(sub + 8 + i * 12 + 8);
+                        vArr.push([vx, vz, vy]);
+                    }
+                } else if (st === 0x0e) {
+                    const count = Math.floor(ss / 8);
+                    for (let i = 0; i < count; i++) {
+                        infArr.push(buf.readUInt16LE(sub + 8 + i * 8));
+                    }
+                } else if (st === 0x20) {
+                    const count = Math.floor(ss / 32);
+                    for (let i = 0; i < count; i++) {
+                        const v0 = buf.readUInt32LE(sub + 8 + i * 32 + 0);
+                        const v1 = buf.readUInt32LE(sub + 8 + i * 32 + 4);
+                        const v2 = buf.readUInt32LE(sub + 8 + i * 32 + 8);
+                        triArr.push(v0, v2, v1);
+                    }
+                } else if (st === 0x30) {
+                    const count = Math.floor(ss / 8);
+                    for (let i = 0; i < count; i++) {
+                        const u = buf.readFloatLE(sub + 8 + i * 8 + 0);
+                        const v = buf.readFloatLE(sub + 8 + i * 8 + 4);
+                        uvArr.push(parseFloat(u.toFixed(4)), parseFloat((1.0 - v).toFixed(4)));
+                    }
+                }
+                sub += 8 + ss;
+            }
+
+            const upper = meshName.toUpperCase();
+            if (upper.includes('MUZZLE') || upper.includes('FLASH')) {
+                off += 8 + size;
+                continue;
+            }
+
+            if (targetSubmesh && meshName !== targetSubmesh) {
+                off += 8 + size;
+                continue;
+            }
+
+            if (vArr.length > 0 && triArr.length > 0) {
+                resultMeshes[meshName || 'mesh'] = {
+                    rawV: vArr,
+                    inf: infArr,
+                    tri: triArr,
+                    uv: uvArr
+                };
+            }
+        }
+        off += 8 + size;
+    }
+
+    const finalMeshes = {};
+    let allWorldVerts = [];
+
+    for (const [mName, mData] of Object.entries(resultMeshes)) {
+        const bakedV = [];
+        for (let i = 0; i < mData.rawV.length; i++) {
+            const v = mData.rawV[i];
+            let bIdx = (mData.inf && mData.inf.length === mData.rawV.length) ? mData.inf[i] : 0;
+            const bone = skl[bIdx];
+            let wv = bone ? transformPoint(bone.worldMat, v) : v;
+            // Align heading facing forward (+Z): rotate 180 deg around Y (x' = -x, z' = -z)
+            const fwd = [-wv[0], wv[1], -wv[2]];
+            bakedV.push(fwd);
+            allWorldVerts.push(fwd);
+        }
+        finalMeshes[mName] = {
+            vList: bakedV,
+            i: mData.tri,
+            u: mData.uv
+        };
+    }
+
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minZ = 1e9, maxZ = -1e9;
+    for (const v of allWorldVerts) {
+        if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
+        if (v[1] < minY) minY = v[1]; if (v[1] > maxY) maxY = v[1];
+        if (v[2] < minZ) minZ = v[2]; if (v[2] > maxZ) maxZ = v[2];
+    }
+
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const height = maxY - minY;
+
+    const exportMeshes = {};
+    for (const [mName, m] of Object.entries(finalMeshes)) {
+        const flatV = [];
+        for (const v of m.vList) {
+            flatV.push(
+                parseFloat((v[0] - cx).toFixed(2)),
+                parseFloat((v[1] - minY).toFixed(2)),
+                parseFloat((v[2] - cz).toFixed(2))
+            );
+        }
+        exportMeshes[mName] = {
+            v: flatV,
+            i: m.i,
+            u: m.u
+        };
+    }
+
+    return {
+        meshes: exportMeshes,
+        bounds: {
+            xSpan: (maxX - minX).toFixed(2),
+            height: height.toFixed(2),
+            zSpan: (maxZ - minZ).toFixed(2)
+        }
+    };
+}
+
+function processInfantry(configMap) {
+    const results = {};
+    for (const [key, cfg] of Object.entries(configMap)) {
+        const baked = parseAndBakeSkinnedMesh(cfg.file, cfg.skl, cfg.submesh);
+        if (!baked || Object.keys(baked.meshes).length === 0) {
+            console.warn(`[W3D Infantry] Failed to bake skinned mesh for ${key}`);
+            continue;
+        }
+        results[key] = {
+            f: cfg.faction,
+            s: cfg.scale,
+            p: [],
+            h: Object.keys(baked.meshes).map(mName => [0, mName]),
+            m: baked.meshes
+        };
+        console.log(`[W3D Infantry] Baked ${key}: height ${baked.bounds.height}, submeshes: ${Object.keys(baked.meshes).join(', ')}`);
+    }
+    return results;
+}
+
 const vehicleData = processModels(VEHICLE_CONFIG);
 console.log(`Processed ${Object.keys(vehicleData).length} vehicles.`);
 
 const buildingData = processModels(BUILDING_CONFIG);
 console.log(`Processed ${Object.keys(buildingData).length} buildings.`);
 
-const infantryData = processModels(INFANTRY_CONFIG);
+const infantryData = processInfantry(INFANTRY_CONFIG);
 console.log(`Processed ${Object.keys(infantryData).length} infantry characters.`);
 
 // Scan and extract all submesh textures across vehicles, buildings, and infantry
@@ -989,7 +1258,7 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
     if (!window.W3D_INFANTRY_DATA || !window.W3D_INFANTRY_DATA[infantryKey]) {
         if (typeof fallbackFn === 'function') {
             const fallbackMesh = fallbackFn(isEnemy);
-            fallbackMesh.scale.set(0.38, 0.38, 0.38);
+            fallbackMesh.scale.set(0.16, 0.16, 0.16);
             return fallbackMesh;
         }
         return new THREE.Group();
@@ -997,7 +1266,7 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
 
     const data = window.W3D_INFANTRY_DATA[infantryKey];
     const faction = data.f;
-    const scale = data.s || 0.080;
+    const scale = data.s || 0.160;
     const iTex = getW3dTexture(infantryKey);
 
     let skinMat;
@@ -1006,11 +1275,12 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
             map: iTex,
             roughness: 0.72,
             metalness: 0.15,
+            side: THREE.DoubleSide,
             color: isEnemy ? 0xcc6666 : 0xffffff
         });
     } else {
         const col = (faction === 'usa') ? 0x1e3f66 : (faction === 'china') ? 0xcc0000 : 0x2e8b57;
-        skinMat = new THREE.MeshStandardMaterial({ color: isEnemy ? 0x882222 : col, roughness: 0.7 });
+        skinMat = new THREE.MeshStandardMaterial({ color: isEnemy ? 0x882222 : col, roughness: 0.7, side: THREE.DoubleSide });
     }
 
     const root = new THREE.Group();
