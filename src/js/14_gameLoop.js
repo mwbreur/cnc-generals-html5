@@ -526,22 +526,34 @@ function animate() {
             structures.forEach(s => {
                 if (!s.isBuilding) return;
                 
-                if (s.dozerRef) {
+                if (s.dozerRef && s.dozerRef.health > 0) {
                     const dPos = s.dozerRef.mesh.position;
-                    if (dPos.distanceTo(s.position) < (s.radius + 3.0)) {
+                    const dist2D = Math.hypot(dPos.x - s.position.x, dPos.z - s.position.z);
+                    const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 2.5;
+                    if (dist2D <= buildThreshold) {
                         s.dozerRef.taskState = 'Building';
                         s.buildProgress += 0.35;
+
+                        // Rotate builder to face the building under construction
+                        const toX = s.position.x - dPos.x;
+                        const toZ = s.position.z - dPos.z;
+                        if (Math.hypot(toX, toZ) > 0.05) {
+                            s.dozerRef.mesh.rotation.y = Math.atan2(-toZ, toX) + Math.PI / 2;
+                        }
                         
                         constructionActive = true;
                         const wp = s.position.clone(); wp.y += 4; wp.project(camera);
                         const sX = (wp.x * 0.5 + 0.5) * window.innerWidth; const sY = (-(wp.y * 0.5) + 0.5) * window.innerHeight;
                         
-                        progressContainer.style.display = 'block';
-                        progressContainer.style.left = sX + 'px'; progressContainer.style.top = sY + 'px';
-                        progressFill.style.width = Math.min(100, s.buildProgress) + '%';
+                        if (wp.z >= -1 && wp.z <= 1) {
+                            progressContainer.style.display = 'block';
+                            progressContainer.style.left = sX + 'px'; progressContainer.style.top = sY + 'px';
+                            progressFill.style.width = Math.min(100, s.buildProgress) + '%';
+                        }
 
                         if (s.buildProgress >= 100) {
                             s.isBuilding = false;
+                            s.buildProgress = 100;
                             if (s.dozerRef) {
                                 s.dozerRef.taskState = 'Idle';
                                 s.dozerRef.targetStructure = null;
@@ -552,6 +564,10 @@ function animate() {
                             if (typeof playBuildingCompleteSound === 'function') {
                                 playBuildingCompleteSound(s.type, bFaction);
                             }
+                            const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                            if (s.type !== 'supplyCenter' && !isAiStruct) {
+                                showNotification(`${(s.type || 'Building').toUpperCase()} construction completed!`, 'success');
+                            }
 
                             // Automatic Harvester Deployment upon Supply Center / Stash completion
                             if (!s.spawnedHarvester) {
@@ -559,7 +575,6 @@ function animate() {
                                 if (s.type === 'supplyCenter') {
                                     if (bFaction === 'usa') {
                                         const spawnPos = s.position.clone().add(new THREE.Vector3(0, 4.5, 7.5));
-                                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
                                         const chinook = (typeof spawnUnit === 'function') ? spawnUnit('chinook', spawnPos) : null;
                                         if (chinook) {
                                             chinook.teamId = s.teamId || (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
@@ -614,7 +629,7 @@ function animate() {
                                 }
                             }
                         }
-                    } else { s.dozerRef.targetPosition.copy(s.position); }
+                    }
                 }
             });
             if (!constructionActive) progressContainer.style.display = 'none';
@@ -707,18 +722,12 @@ function animate() {
                 if ((unit.type === 'dozer' || unit.type === 'worker') && unit.taskState === 'MovingToBuild' && unit.targetStructure) {
                     const s = unit.targetStructure;
                     if (s.health > 0 && s.isBuilding) {
-                        const dxB = unit.mesh.position.x - s.position.x;
-                        const dzB = unit.mesh.position.z - s.position.z;
-                        const distToS = Math.hypot(dxB, dzB);
-                        const workDist = s.radius + (unit.radius || 1.8) + 1.2;
-                        if (distToS > workDist) {
-                            const angleB = Math.atan2(dzB, dxB);
-                            const tX = s.position.x + Math.cos(angleB) * workDist;
-                            const tZ = s.position.z + Math.sin(angleB) * workDist;
-                            const tY = typeof getTerrainHeight === 'function' ? getTerrainHeight(tX, tZ) : 0;
-                            unit.targetPosition.set(tX, tY, tZ);
+                        const distToS = Math.hypot(unit.mesh.position.x - s.position.x, unit.mesh.position.z - s.position.z);
+                        const buildThreshold = s.radius + (unit.radius || 1.8) + 2.5;
+                        if ((!unit.waypoints || unit.waypoints.length === 0) && distToS <= buildThreshold) {
+                            unit.taskState = 'Building';
                         }
-                    } else if (!s.isBuilding) {
+                    } else if (!s.isBuilding || s.health <= 0) {
                         unit.taskState = 'Idle';
                         unit.targetStructure = null;
                     }
@@ -1198,9 +1207,7 @@ function animate() {
                     idleTurret.rotation.y += (0 - idleTurret.rotation.y) * 0.1;
                 }
 
-                const stopBuffer = unit.taskState === 'MovingToBuild' && unit.targetStructure
-                    ? unit.targetStructure.radius + 1.0
-                    : (unit.isAir ? 1.0 : 0.4);
+                const stopBuffer = unit.isAir ? 1.0 : 0.4;
 
                 // Use horizontal distance on XZ plane so altitude Y does not cause infinite distance overshoot/jitter
                 const dx = unit.targetPosition.x - unit.mesh.position.x;
@@ -1387,8 +1394,8 @@ function animate() {
                             const pz = (ddz / distU) * pushU;
                             unit.mesh.position.x += px;
                             unit.mesh.position.z += pz;
-                            // If unit is idle, lock targetPosition to current position so it doesn't fight the separation!
-                            if (unit.taskState === 'Idle') {
+                            // If unit is idle or building, lock targetPosition to current position so it doesn't fight the separation!
+                            if (unit.taskState === 'Idle' || unit.taskState === 'Building') {
                                 unit.targetPosition.copy(unit.mesh.position);
                             }
                         }

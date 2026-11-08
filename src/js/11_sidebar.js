@@ -3262,7 +3262,10 @@ function applyGroupFormationMove(selectedList, groundHit) {
             unit.targetPosition.copy(groundHit);
         }
         unit.combatTarget = null;
-        unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+        unit.taskState = 'Moving';
+        if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
+            unit.targetStructure.dozerRef = null; unit.targetStructure = null;
+        }
         if (unit.isAir) {
             unit.airState = (unit.airState === 'landed') ? 'taking_off' : (unit.type === 'comanche' || unit.type === 'chinook' ? 'flying' : 'flying');
             unit.patrolCenter.copy(groundHit);
@@ -3347,7 +3350,10 @@ function applyGroupFormationMove(selectedList, groundHit) {
         }
 
         unit.combatTarget = null;
-        unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+        unit.taskState = 'Moving';
+        if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
+            unit.targetStructure.dozerRef = null; unit.targetStructure = null;
+        }
         if (unit.isAir) {
             unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
             unit.patrolCenter.copy(destV);
