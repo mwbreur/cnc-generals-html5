@@ -1,37 +1,42 @@
 // BUILDING AND OBSTACLE COLLISION RESOLUTION
-        // =========================================================================
-        function resolveObstacleCollisions(unit) {
-            if (unit.isAir) return; // Aircraft fly safely above ground structures and trees
+// =========================================================================
+var collisionCount = 0;
+window.collisionCount = 0;
 
-            let totalPushX = 0, totalPushZ = 0;
-            let colliderCount = 0;
+function resolveObstacleCollisions(unit) {
+    if (unit.isAir) return; // Aircraft fly safely above ground structures and trees
 
-            // 1. Structure Collisions
-            for (let s of structures) {
-                if (s.health <= 0) continue;
-                // Allow assigned builder to reach foundation perimeter
-                if (unit.targetStructure === s && (unit.taskState === 'Building' || unit.taskState === 'MovingToBuild')) continue;
+    let totalPushX = 0, totalPushZ = 0;
+    let colliderCount = 0;
+    var collisionCount = 0;
 
-                // CRITICAL HARVESTER FIX: Allow trucks and workers delivering supplies to reach docking bays!
-                if ((unit.type === 'truck' || unit.type === 'worker') && (unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing')) {
-                    const dropoffPos = getSupplyDropoffPosition(unit.mesh.position);
-                    if (Math.hypot(s.position.x - dropoffPos.x, s.position.z - dropoffPos.z) < 1.0) continue;
-                }
+    // 1. Structure Collisions
+    for (let s of structures) {
+        if (s.health <= 0) continue;
+        // Allow assigned builder to reach foundation perimeter
+        if (unit.targetStructure === s && (unit.taskState === 'Building' || unit.taskState === 'MovingToBuild')) continue;
 
-                const minDist = s.radius + unit.radius;
-                const dx = unit.mesh.position.x - s.position.x;
-                const dz = unit.mesh.position.z - s.position.z;
-                const dist2D = Math.hypot(dx, dz);
+        // CRITICAL HARVESTER FIX: Allow trucks and workers delivering supplies to reach docking bays!
+        if ((unit.type === 'truck' || unit.type === 'worker') && (unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing')) {
+            const dropoffPos = getSupplyDropoffPosition(unit.mesh.position);
+            if (Math.hypot(s.position.x - dropoffPos.x, s.position.z - dropoffPos.z) < 1.0) continue;
+        }
 
-                if (dist2D < minDist && dist2D > 0.0001) {
-                    const push = minDist - dist2D;
-                    const normX = dx / dist2D;
-                    const normZ = dz / dist2D;
-                    unit.mesh.position.x += normX * push;
-                    unit.mesh.position.z += normZ * push;
-                    totalPushX += normX * push;
-                    totalPushZ += normZ * push;
-                    colliderCount++;
+        const minDist = s.radius + unit.radius;
+        const dx = unit.mesh.position.x - s.position.x;
+        const dz = unit.mesh.position.z - s.position.z;
+        const dist2D = Math.hypot(dx, dz);
+
+        if (dist2D < minDist && dist2D > 0.0001) {
+            const push = minDist - dist2D;
+            const normX = dx / dist2D;
+            const normZ = dz / dist2D;
+            unit.mesh.position.x += normX * push;
+            unit.mesh.position.z += normZ * push;
+            totalPushX += normX * push;
+            totalPushZ += normZ * push;
+            colliderCount++;
+            collisionCount++;
 
                     // Tangent Vector Sliding: glides smoothly around building corners without sticking!
                     const toTargetX = unit.targetPosition.x - unit.mesh.position.x;
@@ -58,7 +63,7 @@
             }
 
             // Pinch Resolution: If squeezed between multiple structures, pop out into open clearance
-            if (colliderCount > 1) {
+            if (colliderCount > 1 || collisionCount > 1) {
                 const pushMag = Math.hypot(totalPushX, totalPushZ);
                 if (pushMag < 0.01) {
                     unit.mesh.position.x += 0.85;
