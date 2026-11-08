@@ -61,12 +61,16 @@ function initRadarMinimap() {
             const selectedList = units.filter(u => u.selected);
             if (selectedList.length > 0) {
                 const targetPos = new THREE.Vector3(worldX, getTerrainHeight(worldX, worldZ), worldZ);
-                selectedList.forEach(u => {
-                    u.targetPosition.copy(targetPos);
-                    u.waypoints = [];
-                    u.combatTarget = null;
-                    u.taskState = 'Idle';
-                });
+                if (typeof applyGroupFormationMove === 'function') {
+                    applyGroupFormationMove(selectedList, targetPos);
+                } else {
+                    selectedList.forEach(u => {
+                        u.targetPosition.copy(targetPos);
+                        u.waypoints = [];
+                        u.combatTarget = null;
+                        u.taskState = 'Idle';
+                    });
+                }
                 playUSASound('acknowledge');
                 showNotification(`Tactical rally order to coordinates [${Math.round(worldX)}, ${Math.round(worldZ)}]`, 'info');
                 spawnPingEffect(targetPos);
@@ -3213,3 +3217,113 @@ function openStartMenuFromEndGame() {
     dismissEndGameModal();
     if (typeof showStartSetupCard === 'function') showStartSetupCard();
 }
+
+function applyGroupFormationMove(selectedList, groundHit) {
+    if (!selectedList || selectedList.length === 0) return;
+    if (selectedList.length === 1) {
+        const unit = selectedList[0];
+        const bridges = !unit.isAir && typeof findBridgeCrossingsForPath === 'function' ? findBridgeCrossingsForPath(unit.mesh.position, groundHit) : null;
+        if (bridges) {
+            unit.waypoints = [bridges[0], bridges[1], groundHit.clone()];
+            unit.targetPosition.copy(unit.waypoints.shift());
+        } else {
+            unit.waypoints = [];
+            unit.targetPosition.copy(groundHit);
+        }
+        unit.combatTarget = null;
+        unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+        if (unit.isAir) {
+            unit.airState = (unit.airState === 'landed') ? 'taking_off' : (unit.type === 'comanche' || unit.type === 'chinook' ? 'flying' : 'flying');
+            unit.patrolCenter.copy(groundHit);
+        }
+        return;
+    }
+
+    // FORMATION MOVEMENT: Organize multiple units into disciplined rank-and-file lines
+    let sumX = 0, sumZ = 0;
+    selectedList.forEach(u => {
+        sumX += u.mesh.position.x;
+        sumZ += u.mesh.position.z;
+    });
+    const squadCenterX = sumX / selectedList.length;
+    const squadCenterZ = sumZ / selectedList.length;
+
+    const moveDx = groundHit.x - squadCenterX;
+    const moveDz = groundHit.z - squadCenterZ;
+    const moveDist = Math.hypot(moveDx, moveDz);
+
+    let fwdX = 0, fwdZ = 1;
+    if (moveDist > 0.001) {
+        fwdX = moveDx / moveDist;
+        fwdZ = moveDz / moveDist;
+    }
+    const rightX = -fwdZ;
+    const rightZ = fwdX;
+
+    // Sort laterally along squad right vector to prevent crossing paths
+    selectedList.sort((a, b) => {
+        const projA = (a.mesh.position.x - squadCenterX) * rightX + (a.mesh.position.z - squadCenterZ) * rightZ;
+        const projB = (b.mesh.position.x - squadCenterX) * rightX + (b.mesh.position.z - squadCenterZ) * rightZ;
+        return projA - projB;
+    });
+
+    const count = selectedList.length;
+    const cols = count <= 4 ? count : Math.min(6, Math.ceil(Math.sqrt(count) * 1.4));
+
+    // Dynamic spacious separation based on unit radius (prevents tank overlap!)
+    const maxRadius = Math.max(...selectedList.map(u => u.radius || 1.2));
+    const isAllInf = selectedList.every(u => isInfantryType(u.type));
+    const spacingX = isAllInf ? 3.2 : Math.max(7.5, maxRadius * 2.35);
+    const spacingZ = isAllInf ? 3.5 : Math.max(8.0, maxRadius * 2.50);
+
+    selectedList.forEach((unit, idx) => {
+        const row = Math.floor(idx / cols);
+        const col = idx % cols;
+        const unitsInThisRow = Math.min(cols, count - row * cols);
+        const colOffset = (col - (unitsInThisRow - 1) / 2) * spacingX;
+        const rowOffset = -row * spacingZ;
+
+        let destX = groundHit.x + rightX * colOffset + fwdX * rowOffset;
+        let destZ = groundHit.z + rightZ * colOffset + fwdZ * rowOffset;
+
+        const maxCoord = (typeof currentMapSize !== 'undefined' ? currentMapSize : 600) * 0.45;
+        destX = THREE.MathUtils.clamp(destX, -maxCoord, maxCoord);
+        destZ = THREE.MathUtils.clamp(destZ, -maxCoord, maxCoord);
+
+        const onBridge = (typeof mapBridges !== 'undefined') ? mapBridges.find(b => isPointOnBridge(destX, destZ, b)) : null;
+        if (!onBridge && typeof getTerrainHeight === 'function' && typeof currentWaterLevel !== 'undefined' && getTerrainHeight(destX, destZ) < currentWaterLevel) {
+            for (let t = 0.8; t >= 0.1; t -= 0.15) {
+                const testX = groundHit.x + (destX - groundHit.x) * t;
+                const testZ = groundHit.z + (destZ - groundHit.z) * t;
+                if (getTerrainHeight(testX, testZ) >= currentWaterLevel || (typeof mapBridges !== 'undefined' && mapBridges.some(b => isPointOnBridge(testX, testZ, b)))) {
+                    destX = testX;
+                    destZ = testZ;
+                    break;
+                }
+            }
+        }
+
+        const destY = typeof getTerrainHeight === 'function' ? getTerrainHeight(destX, destZ) : 0;
+        const destV = new THREE.Vector3(destX, destY, destZ);
+
+        const bridges = !unit.isAir && typeof findBridgeCrossingsForPath === 'function' ? findBridgeCrossingsForPath(unit.mesh.position, destV) : null;
+        if (bridges) {
+            unit.waypoints = [bridges[0], bridges[1], destV];
+            unit.targetPosition.copy(unit.waypoints.shift());
+        } else {
+            unit.waypoints = [];
+            unit.targetPosition.copy(destV);
+        }
+
+        unit.combatTarget = null;
+        unit.taskState = unit.isAir ? 'Moving' : 'Idle';
+        if (unit.isAir) {
+            unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
+            unit.patrolCenter.copy(destV);
+        }
+        if (unit.type === 'truck' || unit.type === 'worker') {
+            unit.aiState = 'Idle';
+        }
+    });
+}
+window.applyGroupFormationMove = applyGroupFormationMove;

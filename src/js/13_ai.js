@@ -939,93 +939,9 @@ function processEnemyAIEngine() {
                         unit.aiState = 'Idle';
                     }
                 } else if (selectedList.length > 1) {
-                    // FORMATION MOVEMENT: Organize multiple units into disciplined rank-and-file lines!
-                    // 1. Calculate squad center
-                    let sumX = 0, sumZ = 0;
-                    selectedList.forEach(u => {
-                        sumX += u.mesh.position.x;
-                        sumZ += u.mesh.position.z;
-                    });
-                    const squadCenterX = sumX / selectedList.length;
-                    const squadCenterZ = sumZ / selectedList.length;
-
-                    // 2. Vector from squad center to target
-                    const moveDx = groundHit.x - squadCenterX;
-                    const moveDz = groundHit.z - squadCenterZ;
-                    const moveDist = Math.hypot(moveDx, moveDz);
-
-                    let fwdX = 0, fwdZ = 1;
-                    if (moveDist > 0.001) {
-                        fwdX = moveDx / moveDist;
-                        fwdZ = moveDz / moveDist;
+                    if (typeof applyGroupFormationMove === 'function') {
+                        applyGroupFormationMove(selectedList, groundHit);
                     }
-                    const rightX = -fwdZ;
-                    const rightZ = fwdX;
-
-                    // 3. Sort units laterally along squad right vector to maintain relative position & prevent path crossing
-                    selectedList.sort((a, b) => {
-                        const projA = (a.mesh.position.x - squadCenterX) * rightX + (a.mesh.position.z - squadCenterZ) * rightZ;
-                        const projB = (b.mesh.position.x - squadCenterX) * rightX + (b.mesh.position.z - squadCenterZ) * rightZ;
-                        return projA - projB;
-                    });
-
-                    // 4. Arrange in disciplined lines
-                    const count = selectedList.length;
-                    const cols = count <= 5 ? count : Math.min(6, Math.ceil(Math.sqrt(count) * 1.5));
-                    const spacingX = 4.4; // Lateral spacing between units in rank
-                    const spacingZ = 4.8; // Depth spacing between ranks
-
-                    selectedList.forEach((unit, idx) => {
-                        const row = Math.floor(idx / cols);
-                        const col = idx % cols;
-                        const unitsInThisRow = Math.min(cols, count - row * cols);
-                        const colOffset = (col - (unitsInThisRow - 1) / 2) * spacingX;
-                        const rowOffset = -row * spacingZ;
-
-                        let destX = groundHit.x + rightX * colOffset + fwdX * rowOffset;
-                        let destZ = groundHit.z + rightZ * colOffset + fwdZ * rowOffset;
-
-                        // Clamp to playable map boundaries
-                        const maxCoord = currentMapSize * 0.45;
-                        destX = THREE.MathUtils.clamp(destX, -maxCoord, maxCoord);
-                        destZ = THREE.MathUtils.clamp(destZ, -maxCoord, maxCoord);
-
-                        // If formation slot falls in water without bridge, slide inward along rank toward dry land
-                        const onBridge = mapBridges.find(b => isPointOnBridge(destX, destZ, b));
-                        if (!onBridge && getTerrainHeight(destX, destZ) < currentWaterLevel) {
-                            for (let t = 0.8; t >= 0.1; t -= 0.15) {
-                                const testX = groundHit.x + (destX - groundHit.x) * t;
-                                const testZ = groundHit.z + (destZ - groundHit.z) * t;
-                                if (getTerrainHeight(testX, testZ) >= currentWaterLevel || mapBridges.some(b => isPointOnBridge(testX, testZ, b))) {
-                                    destX = testX;
-                                    destZ = testZ;
-                                    break;
-                                }
-                            }
-                        }
-
-                        const destV = new THREE.Vector3(destX, getTerrainHeight(destX, destZ), destZ);
-                        const bridges = !unit.isAir ? findBridgeCrossingsForPath(unit.mesh.position, destV) : null;
-                        if (bridges) {
-                            unit.waypoints = [bridges[0], bridges[1], destV];
-                            unit.targetPosition.copy(unit.waypoints.shift());
-                        } else {
-                            unit.waypoints = [];
-                            unit.targetPosition.copy(destV);
-                        }
-                        unit.combatTarget = null;
-                        unit.taskState = unit.isAir ? 'Moving' : 'Idle';
-                        if (unit.isAir) {
-                            unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
-                            unit.patrolCenter.copy(destV);
-                        }
-                        if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
-                            unit.targetStructure.dozerRef = null; unit.targetStructure = null;
-                        }
-                        if (unit.type === 'truck' || unit.type === 'worker') {
-                            unit.aiState = 'Idle';
-                        }
-                    });
                 }
 
                 if (isMultiplayerActive && netConn && netConn.open) {

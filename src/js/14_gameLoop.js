@@ -90,10 +90,23 @@ function animate() {
                     }
 
                     if (item.progress >= 1.0) {
-                        // Training complete! Deploy unit at rally point or structure entrance
-                        const spawnPos = structure.position.clone().add(new THREE.Vector3(structure.radius + 3.5, 0, structure.radius + 3.5));
-                        spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
+                        // Training complete! Deploy unit in neat rank-and-file rally grid
+                        const rallyIdx = (structure._producedCount || 0);
+                        structure._producedCount = rallyIdx + 1;
+
+                        const isInf = typeof isInfantryType === 'function' && isInfantryType(item.type);
+                        const isAir = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig'].includes(item.type);
+
+                        // Clear spawn point just outside structure perimeter
+                        const exitAngle = (structure.mesh && structure.mesh.rotation) ? structure.mesh.rotation.y + Math.PI / 4 : Math.PI / 4;
+                        const spawnDist = structure.radius + (isInf ? 2.5 : 4.5);
+                        const spawnX = structure.position.x + Math.sin(exitAngle) * spawnDist;
+                        const spawnZ = structure.position.z + Math.cos(exitAngle) * spawnDist;
+                        const spawnY = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnX, spawnZ) : 0;
+                        const spawnPos = new THREE.Vector3(spawnX, spawnY, spawnZ);
+
                         const newUnit = spawnUnit(item.type, spawnPos);
+
                         if (newUnit.isAir) {
                             if (structure.rallyPoint) {
                                 newUnit.targetPosition.copy(structure.rallyPoint);
@@ -103,12 +116,36 @@ function animate() {
                             } else {
                                 newUnit.targetPosition.copy(spawnPos);
                                 newUnit.patrolCenter.copy(spawnPos);
-                                newUnit.airState = 'circling';
+                                newUnit.airState = (newUnit.type === 'comanche' || newUnit.type === 'chinook') ? 'hovering' : 'landed';
                                 newUnit.taskState = 'Idle';
                             }
                         } else {
-                            const targetRally = structure.rallyPoint ? structure.rallyPoint.clone() : spawnPos.clone().add(new THREE.Vector3(6, 0, 6));
-                            newUnit.targetPosition.copy(targetRally);
+                            // Assign distinct staged formation slot at rally point
+                            const uRad = newUnit.radius || (isInf ? 0.8 : 3.6);
+                            const spacingX = isInf ? 3.2 : Math.max(7.5, uRad * 2.35);
+                            const spacingZ = isInf ? 3.5 : Math.max(8.0, uRad * 2.50);
+
+                            const cols = isInf ? 4 : 3;
+                            const col = rallyIdx % cols;
+                            const row = Math.floor(rallyIdx / cols) % 4; // up to 12-16 staging slots before recycle
+
+                            const colOff = (col - (cols - 1) / 2) * spacingX;
+                            const rowOff = row * spacingZ;
+
+                            // Default rally direction points away from structure
+                            const baseRally = structure.rallyPoint
+                                ? structure.rallyPoint.clone()
+                                : structure.position.clone().add(new THREE.Vector3(Math.sin(exitAngle), 0, Math.cos(exitAngle)).multiplyScalar(structure.radius + (isInf ? 8.0 : 14.0)));
+
+                            const perpX = Math.cos(exitAngle);
+                            const perpZ = -Math.sin(exitAngle);
+
+                            const targetRallyX = baseRally.x + perpX * colOff + Math.sin(exitAngle) * rowOff;
+                            const targetRallyZ = baseRally.z + perpZ * colOff + Math.cos(exitAngle) * rowOff;
+                            const targetRallyY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetRallyX, targetRallyZ) : 0;
+
+                            newUnit.targetPosition.set(targetRallyX, targetRallyY, targetRallyZ);
+                            newUnit.taskState = 'Moving';
                         }
                         if (typeof playUnitReadySound === 'function') {
                             playUnitReadySound(item.type, typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
@@ -497,13 +534,48 @@ function animate() {
             for (let i = 0; i < units.length; i++) {
                 for (let j = i + 1; j < units.length; j++) {
                     const u1 = units[i]; const u2 = units[j];
-                    if (u1.isAir !== u2.isAir) continue; // Air units and ground units fly on different layers
-                    const d2D = new THREE.Vector2(u1.mesh.position.x, u1.mesh.position.z).distanceTo(new THREE.Vector2(u2.mesh.position.x, u2.mesh.position.z));
-                    const min = u1.radius + u2.radius;
-                    if (d2D < min) {
-                        const pMag = (min - d2D) * 0.5;
-                        const pVec = new THREE.Vector3().subVectors(u1.mesh.position, u2.mesh.position); pVec.y = 0; pVec.normalize();
-                        u1.mesh.position.addScaledVector(pVec, pMag); u2.mesh.position.addScaledVector(pVec, -pMag);
+                    if (u1.isAir || u2.isAir) continue; // Air units fly in air, don't collide with ground
+                    const dx = u1.mesh.position.x - u2.mesh.position.x;
+                    const dz = u1.mesh.position.z - u2.mesh.position.z;
+                    const d2D = Math.hypot(dx, dz);
+                    const min = (u1.radius + u2.radius) * 0.95;
+                    if (d2D < min && d2D > 0.0001) {
+                        const overlap = min - d2D;
+                        const pMag = overlap * 0.22; // Smooth damped spring separation
+                        const nx = dx / d2D;
+                        const nz = dz / d2D;
+
+                        const u1Moving = (u1.taskState === 'Moving' || u1.taskState === 'MovingToAttack' || Math.hypot(u1.targetPosition.x - u1.mesh.position.x, u1.targetPosition.z - u1.mesh.position.z) > 1.2);
+                        const u2Moving = (u2.taskState === 'Moving' || u2.taskState === 'MovingToAttack' || Math.hypot(u2.targetPosition.x - u2.mesh.position.x, u2.targetPosition.z - u2.mesh.position.z) > 1.2);
+
+                        if (!u1Moving && u2Moving) {
+                            // u1 is parked idle: u2 does 85% of the separation
+                            u1.mesh.position.x += nx * (pMag * 0.15);
+                            u1.mesh.position.z += nz * (pMag * 0.15);
+                            u1.targetPosition.copy(u1.mesh.position);
+
+                            u2.mesh.position.x -= nx * (pMag * 0.85);
+                            u2.mesh.position.z -= nz * (pMag * 0.85);
+                        } else if (u1Moving && !u2Moving) {
+                            // u2 is parked idle: u1 does 85% of the separation
+                            u1.mesh.position.x += nx * (pMag * 0.85);
+                            u1.mesh.position.z += nz * (pMag * 0.85);
+
+                            u2.mesh.position.x -= nx * (pMag * 0.15);
+                            u2.mesh.position.z -= nz * (pMag * 0.15);
+                            u2.targetPosition.copy(u2.mesh.position);
+                        } else {
+                            // Both moving or both idle: equal gentle separation
+                            u1.mesh.position.x += nx * (pMag * 0.5);
+                            u1.mesh.position.z += nz * (pMag * 0.5);
+                            u2.mesh.position.x -= nx * (pMag * 0.5);
+                            u2.mesh.position.z -= nz * (pMag * 0.5);
+
+                            if (!u1Moving && !u2Moving) {
+                                u1.targetPosition.copy(u1.mesh.position);
+                                u2.targetPosition.copy(u2.mesh.position);
+                            }
+                        }
                     }
                 }
             }
@@ -745,6 +817,21 @@ function animate() {
                         const dx = unit.targetPosition.x - unit.mesh.position.x;
                         const dz = unit.targetPosition.z - unit.mesh.position.z;
                         const dist2D = Math.hypot(dx, dz);
+
+                // Soft Arrival: If approaching destination, check if destination area is already occupied by a resting friendly unit
+                if (!unit.isAir && dist2D <= (unit.radius * 1.6)) {
+                    const occupied = units.some(other => {
+                        if (other === unit || other.isAir || other.teamId !== unit.teamId) return false;
+                        const distToOther = Math.hypot(unit.mesh.position.x - other.mesh.position.x, unit.mesh.position.z - other.mesh.position.z);
+                        if (distToOther > (unit.radius + other.radius + 1.2)) return false;
+                        const otherAtDest = Math.hypot(unit.targetPosition.x - other.mesh.position.x, unit.targetPosition.z - other.mesh.position.z);
+                        return otherAtDest < (other.radius + 1.5) && other.taskState === 'Idle';
+                    });
+                    if (occupied) {
+                        unit.taskState = 'Idle';
+                        unit.targetPosition.copy(unit.mesh.position);
+                    }
+                }
                         const stopThreshold = isHeli ? 1.5 : 4.0;
 
                         if (dist2D > stopThreshold) {
