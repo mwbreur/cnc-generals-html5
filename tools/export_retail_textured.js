@@ -8,41 +8,42 @@ const texDir = path.join(__dirname, '..', 'extracted_assets', 'textures');
 // Vehicles: scaled between 0.08 and 0.10 so tanks are ~2.7-3.9 units (sleek and proportional)
 const VEHICLE_CONFIG = {
     // USA
-    'crusader':       { file: 'avleopard.W3D',   tex: 'avleopard.dds',   scale: 0.090, faction: 'usa' },
-    'paladin':        { file: 'avPaladin.W3D',    tex: 'avpaladin.dds',    scale: 0.090, faction: 'usa' },
-    'humvee':         { file: 'AvHummer.W3D',     tex: 'avhummer.dds',     scale: 0.080, faction: 'usa' },
-    'ambulance':      { file: 'AvAmbulance.W3D',  tex: 'avhummer.dds',     scale: 0.085, faction: 'usa' },
-    'tomahawk':       { file: 'avtomahawk.W3D',   tex: 'avtomahawk.dds',   scale: 0.090, faction: 'usa' },
-    'dozer':          { file: 'avconstdoz.W3D',   tex: 'avconstdoz.dds',   scale: 0.085, faction: 'usa' },
-    'chinook':        { file: 'AVChinook.W3D',    tex: 'avchinook.dds',    scale: 0.085, faction: 'usa' },
-    'comanche':       { file: 'AVComanche.W3D',   tex: 'avcomanche.dds',   scale: 0.080, faction: 'usa' },
-    'raptor':         { file: 'avraptor.W3D',     tex: 'avraptor.dds',     scale: 0.085, faction: 'usa' },
-    'stealthfighter': { file: 'avstealth.W3D',    tex: 'avstealth.dds',    scale: 0.085, faction: 'usa' },
-    'aurora':         { file: 'AVAurora.W3D',     tex: 'avaurora.dds',     scale: 0.085, faction: 'usa' },
-    'drone_battle':   { file: 'avbattledr.W3D',   tex: 'avbattledr.dds',   scale: 0.075, faction: 'usa' },
-    'drone_scout':    { file: 'avscoutdr.W3D',    tex: 'avrepairdr.dds',   scale: 0.075, faction: 'usa' },
+    'crusader':       { file: 'avleopard.W3D',   tex: 'avleopard.dds',   scale: 0.320, faction: 'usa' },
+    'paladin':        { file: 'avPaladin.W3D',    tex: 'avpaladin.dds',    scale: 0.320, faction: 'usa' },
+    'humvee':         { file: 'AvHummer.W3D',     tex: 'avhummer.dds',     scale: 0.280, faction: 'usa' },
+    'ambulance':      { file: 'AvAmbulance.W3D',  tex: 'avhummer.dds',     scale: 0.290, faction: 'usa' },
+    'tomahawk':       { file: 'avtomahawk.W3D',   tex: 'avtomahawk.dds',   scale: 0.320, faction: 'usa' },
+    'dozer':          { file: 'avconstdoz.W3D',   tex: 'avconstdoz.dds',   scale: 0.290, faction: 'usa' },
+    'chinook':        { file: 'AVChinook.W3D',    tex: 'avchinook.dds',    scale: 0.300, faction: 'usa' },
+    'comanche':       { file: 'AVComanche.W3D',   tex: 'avcomanche.dds',   scale: 0.280, faction: 'usa' },
+    'raptor':         { file: 'avraptor.W3D',     tex: 'avraptor.dds',     scale: 0.300, faction: 'usa' },
+    'stealthfighter': { file: 'avstealth.W3D',    tex: 'avstealth.dds',    scale: 0.300, faction: 'usa' },
+    'aurora':         { file: 'AVAurora.W3D',     tex: 'avaurora.dds',     scale: 0.300, faction: 'usa' },
+    'drone_battle':   { file: 'avbattledr.W3D',   tex: 'avbattledr.dds',   scale: 0.200, faction: 'usa' },
+    'drone_scout':    { file: 'avscoutdr.W3D',    tex: 'avrepairdr.dds',   scale: 0.200, faction: 'usa' },
+    'drone_hellfire': { file: 'avhelldrone.w3d',  tex: 'avhelldrone.dds',  scale: 0.200, faction: 'usa' },
 
     // China
-    'battlemaster':   { file: 'NVBtMstr.W3D',     tex: 'nvbtmstr.dds',     scale: 0.090, faction: 'china' },
-    'overlord':       { file: 'NVOvrlrd.W3D',     tex: 'nvovrlrd.dds',     scale: 0.100, faction: 'china' },
-    'gatling':        { file: 'NVGattTank.W3D',   tex: 'nvgatttank.dds',   scale: 0.085, faction: 'china' },
-    'dragon':         { file: 'NVDragon.W3D',     tex: 'nvdragon.dds',     scale: 0.090, faction: 'china' },
-    'crawler':        { file: 'NVTCrawler.W3D',   tex: 'nvtcrawler.dds',   scale: 0.090, faction: 'china' },
-    'inferno':        { file: 'NVInferno.W3D',    tex: 'nvinferno.dds',    scale: 0.090, faction: 'china' },
-    'nukecannon':     { file: 'NVNukeCn.W3D',     tex: 'nvnukecn.dds',     scale: 0.095, faction: 'china' },
-    'truck':          { file: 'NVSSupplyTk.W3D',  tex: 'avsupplytk.dds',   scale: 0.085, faction: 'china' },
-    'mig':            { file: 'NVMig.W3D',        tex: 'nvmig.dds',        scale: 0.085, faction: 'china' },
+    'battlemaster':   { file: 'NVBtMstr.W3D',     tex: 'nvbtmstr.dds',     scale: 0.320, faction: 'china' },
+    'overlord':       { file: 'NVOvrlrd.W3D',     tex: 'nvovrlrd.dds',     scale: 0.360, faction: 'china' },
+    'gatling':        { file: 'NVGattTank.W3D',   tex: 'nvgatttank.dds',   scale: 0.290, faction: 'china' },
+    'dragon':         { file: 'NVDragon.W3D',     tex: 'nvdragon.dds',     scale: 0.310, faction: 'china' },
+    'crawler':        { file: 'NVTCrawler.W3D',   tex: 'nvtcrawler.dds',   scale: 0.320, faction: 'china' },
+    'inferno':        { file: 'NVInferno.W3D',    tex: 'nvinferno.dds',    scale: 0.320, faction: 'china' },
+    'nukecannon':     { file: 'NVNukeCn.W3D',     tex: 'nvnukecn.dds',     scale: 0.340, faction: 'china' },
+    'truck':          { file: 'NVSSupplyTk.W3D',  tex: 'avsupplytk.dds',   scale: 0.290, faction: 'china' },
+    'mig':            { file: 'NVMig.W3D',        tex: 'nvmig.dds',        scale: 0.300, faction: 'china' },
 
     // GLA
-    'scorpion':       { file: 'UVLiteTank.W3D',   tex: 'uvlitetank.dds',   scale: 0.090, faction: 'gla' },
-    'marauder':       { file: 'UVMarauder.W3D',   tex: 'uvmarauder.dds',   scale: 0.090, faction: 'gla' },
-    'technical':      { file: 'UVTechTrck.W3D',   tex: 'uvtechtrck.dds',   scale: 0.080, faction: 'gla' },
-    'quad':           { file: 'UVQuadCann.W3D',   tex: 'uvquadcann.dds',   scale: 0.085, faction: 'gla' },
-    'buggy':          { file: 'UVRockBug.W3D',    tex: 'uvrockbug.dds',    scale: 0.080, faction: 'gla' },
-    'toxintractor':   { file: 'UVToxinTrk.W3D',   tex: 'uvtoxintrk.dds',   scale: 0.085, faction: 'gla' },
-    'bombtruck':      { file: 'UVBmbtruk.W3D',    tex: 'uvbmbtruk.dds',    scale: 0.085, faction: 'gla' },
-    'scud':           { file: 'UVScudLchr.W3D',   tex: 'uvscudlchr.dds',   scale: 0.095, faction: 'gla' },
-    'radarvan':       { file: 'UVRadarVan.W3D',   tex: 'uvradarvan.dds',   scale: 0.085, faction: 'gla' }
+    'scorpion':       { file: 'UVLiteTank.W3D',   tex: 'uvlitetank.dds',   scale: 0.310, faction: 'gla' },
+    'marauder':       { file: 'UVMarauder.W3D',   tex: 'uvmarauder.dds',   scale: 0.320, faction: 'gla' },
+    'technical':      { file: 'UVTechTrck.W3D',   tex: 'uvtechtrck.dds',   scale: 0.270, faction: 'gla' },
+    'quad':           { file: 'UVQuadCann.W3D',   tex: 'uvquadcann.dds',   scale: 0.290, faction: 'gla' },
+    'buggy':          { file: 'UVRockBug.W3D',    tex: 'uvrockbug.dds',    scale: 0.270, faction: 'gla' },
+    'toxintractor':   { file: 'UVToxinTrk.W3D',   tex: 'uvtoxintrk.dds',   scale: 0.290, faction: 'gla' },
+    'bombtruck':      { file: 'UVBmbtruk.W3D',    tex: 'uvbmbtruk.dds',    scale: 0.290, faction: 'gla' },
+    'scud':           { file: 'UVScudLchr.W3D',   tex: 'uvscudlchr.dds',   scale: 0.340, faction: 'gla' },
+    'radarvan':       { file: 'UVRadarVan.W3D',   tex: 'uvradarvan.dds',   scale: 0.290, faction: 'gla' }
 };
 
 // Buildings: calibrated scale (0.26-0.27) so Command Centers are ~34 units, War Factories ~32 units, Power Plants ~16.5 units
@@ -1133,7 +1134,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         if (r2) r2.name = 'chinook_rotor2';
     }
 
-    const isAirUnit = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig', 'drone_battle', 'drone_scout'].includes(modelKey);
+    const isAirUnit = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig', 'drone_battle', 'drone_scout', 'drone_hellfire'].includes(modelKey);
     if (!isAirUnit) {
         let minY = 1e9;
         root.traverse(c => {

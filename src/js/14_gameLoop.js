@@ -143,23 +143,63 @@ function animate() {
                     else if (unit.veterancy === 3) unit.health = Math.min(unit.maxHealth, unit.health + 6); // +6 HP/s
                 }
 
-                // 2. USA Vehicle Drones
+                // 2. USA Vehicle Drones (Scout, Battle, Hellfire)
                 if (unit.drone && unit.drone.mesh) {
                     const drone = unit.drone;
                     const dMesh = drone.mesh;
-
-                    // Hover position tracking above vehicle
-                    const targetDroneY = unit.mesh.position.y + (drone.type === 'scout' ? 4.2 : 2.2) + Math.sin(Date.now() * 0.006) * 0.25;
-                    dMesh.position.x += (unit.mesh.position.x - dMesh.position.x) * 0.18;
-                    dMesh.position.z += (unit.mesh.position.z - dMesh.position.z) * 0.18;
-                    dMesh.position.y += (targetDroneY - dMesh.position.y) * 0.18;
-                    dMesh.rotation.y = unit.mesh.rotation.y;
-
-                    if (dMesh.userData && dMesh.userData.rotors) {
-                        dMesh.userData.rotors.rotation.y += 0.45;
-                    }
-
                     drone.timer = (drone.timer || 0) + 1;
+
+                    if (drone.type === 'scout') {
+                        // Scout Drone: continuous circular orbit around the host vehicle at high reconnaissance altitude
+                        drone.orbitAngle = (drone.orbitAngle !== undefined ? drone.orbitAngle : Math.random() * Math.PI * 2) + 0.038;
+                        const orbitRadius = 7.5;
+                        const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * orbitRadius;
+                        const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * orbitRadius;
+                        const targetY = unit.mesh.position.y + 8.5 + Math.sin(drone.orbitAngle * 1.5) * 0.35;
+
+                        dMesh.position.x += (targetX - dMesh.position.x) * 0.12;
+                        dMesh.position.z += (targetZ - dMesh.position.z) * 0.12;
+                        dMesh.position.y += (targetY - dMesh.position.y) * 0.12;
+
+                        // Tangential heading facing orbit direction + inward banking roll
+                        dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
+                        dMesh.rotation.z = -0.22;
+                        dMesh.rotation.x = 0.08;
+
+                        // Fast spinning reconnaissance propeller
+                        dMesh.traverse(c => {
+                            if (c.name && c.name.toLowerCase().includes('prop')) {
+                                c.rotation.y += 0.65;
+                            }
+                        });
+                    } else {
+                        // Battle Drone & Hellfire Drone: random wandering orbit around the tank, pointing down at ground targets
+                        if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
+                        drone.orbitAngle += 0.022 + Math.sin(drone.timer * 0.015) * 0.008;
+
+                        const baseDist = drone.type === 'battle' ? 4.4 : 5.0;
+                        const dynamicDist = baseDist + Math.sin(drone.timer * 0.035) * 1.3;
+                        const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * dynamicDist + Math.cos(drone.timer * 0.02) * 0.7;
+                        const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * dynamicDist + Math.sin(drone.timer * 0.025) * 0.7;
+                        const baseAlt = drone.type === 'battle' ? 4.8 : 5.2;
+                        const targetY = unit.mesh.position.y + baseAlt + Math.sin(drone.timer * 0.08) * 0.32;
+
+                        dMesh.position.x += (targetX - dMesh.position.x) * 0.10;
+                        dMesh.position.z += (targetZ - dMesh.position.z) * 0.10;
+                        dMesh.position.y += (targetY - dMesh.position.y) * 0.10;
+
+                        // Coordinated downward pitch (~28 degrees down) so weapons/sensors look down at battlefield
+                        dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
+                        dMesh.rotation.x = 0.48 + Math.sin(drone.timer * 0.06) * 0.04;
+                        dMesh.rotation.z = Math.sin(drone.timer * 0.07) * 0.08;
+
+                        // Small animation: Lift fan spin for Battle Drone
+                        dMesh.traverse(c => {
+                            if (c.name && (c.name.toLowerCase().includes('fan') || c.name.toLowerCase().includes('ducted'))) {
+                                c.rotation.y += 0.55;
+                            }
+                        });
+                    }
 
                     // Battle Drone: Repairs vehicle + fires micro-gun at hostile infantry
                     if (drone.type === 'battle') {
@@ -318,23 +358,6 @@ function animate() {
                 if (u.isAir && u.health > 0) {
                     const flightY = u.mesh.userData.flightAltitude || 8.5;
                     u.mesh.position.y += (flightY - u.mesh.position.y) * 0.06;
-                }
-            });
-
-            // Paladin Tank Battle Drone Hover Animation & Field Repair
-            units.forEach(u => {
-                if (u.type === 'paladin' && u.health > 0) {
-                    const drone = u.mesh.getObjectByName('paladinBattleDrone');
-                    if (drone) {
-                        drone.position.y = (2.4 / 0.09) + Math.sin(animTime * 3.5 + u.mesh.id) * 1.5;
-                        const fan = drone.getObjectByName('fan') || drone.getObjectByName('FAN') || drone.getObjectByName('avbattledr.fan');
-                        if (fan) fan.rotation.y += 0.55;
-
-                        // Field repair: Battle Drone slowly repairs damaged Paladin (+3 HP per second)
-                        if (u.health < u.maxHealth && buildingTick % 20 === 0) {
-                            u.health = Math.min(u.maxHealth, u.health + 3);
-                        }
-                    }
                 }
             });
 
@@ -1011,6 +1034,17 @@ function animate() {
             units = units.filter(unit => {
                 if (unit.health > 0) return true;
                 removeSelectionCircle(unit);
+                if (unit.drone && unit.drone.mesh) {
+                    scene.remove(unit.drone.mesh);
+                    unit.drone.mesh.traverse(c => {
+                        if (c.geometry) c.geometry.dispose();
+                        if (c.material) {
+                            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                            else c.material.dispose();
+                        }
+                    });
+                    unit.drone = null;
+                }
                 scene.remove(unit.mesh);
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
                 if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(unit.type))) {

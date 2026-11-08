@@ -1057,7 +1057,10 @@
 
         function createDroneMesh(droneType) {
             if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA) {
-                const modelKey = (droneType === 'scout') ? 'drone_scout' : 'drone_battle';
+                let modelKey = 'drone_battle';
+                if (droneType === 'scout') modelKey = 'drone_scout';
+                else if (droneType === 'hellfire') modelKey = 'drone_hellfire';
+
                 if (window.W3D_VEHICLE_DATA[modelKey]) {
                     const droneMesh = createW3DVehicleMesh(modelKey, false);
                     droneMesh.userData.droneType = droneType;
