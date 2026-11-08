@@ -854,11 +854,27 @@ function animate() {
                             unit.mesh.rotation.x = 0;
                         }
                     } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
-                        unit._animTime = (unit._animTime || 0) + 0.28;
-                        const stride = unit._animTime;
-                        unit.mesh.rotation.x = 0.14 + Math.sin(stride * 2.0) * 0.04;
-                        unit.mesh.rotation.z = Math.sin(stride) * 0.08;
-                        unit._strideBob = Math.abs(Math.sin(stride)) * 0.14;
+                        unit.mesh.rotation.x = 0;
+                        unit.mesh.rotation.z = 0;
+                        unit._strideBob = 0;
+                        if (unit.mesh.userData && unit.mesh.userData.animatedMeshes) {
+                            unit._runCycle = ((unit._runCycle || 0) + 0.38) % 8;
+                            const c = unit._runCycle;
+                            const f0 = Math.floor(c);
+                            const f1 = (f0 + 1) % 8;
+                            const frac = c - f0;
+                            unit.mesh.userData.animatedMeshes.forEach(m => {
+                                if (m.userData && m.userData.runFrames && m.userData.runFrames[f0] && m.userData.runFrames[f1]) {
+                                    const arr0 = m.userData.runFrames[f0];
+                                    const arr1 = m.userData.runFrames[f1];
+                                    const pos = m.geometry.attributes.position.array;
+                                    for (let k = 0; k < pos.length; k++) {
+                                        pos[k] = arr0[k] * (1 - frac) + arr1[k] * frac;
+                                    }
+                                    m.geometry.attributes.position.needsUpdate = true;
+                                }
+                            });
+                        }
                     }
                 } else {
                     // Reached waypoint: advance to next waypoint if routing across bridges!
@@ -870,10 +886,28 @@ function animate() {
                         unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
                         unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
                     } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
-                        unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.15;
-                        unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.15;
-                        unit._idleTime = (unit._idleTime || (unit.mesh.id ? unit.mesh.id * 1.5 : 0)) + 0.05;
-                        unit._strideBob = Math.sin(unit._idleTime) * 0.02;
+                        unit.mesh.rotation.x = 0;
+                        unit.mesh.rotation.z = 0;
+                        unit._strideBob = 0;
+                        if (unit.mesh.userData && unit.mesh.userData.animatedMeshes) {
+                            unit.mesh.userData.animatedMeshes.forEach(m => {
+                                if (m.userData && m.userData.standVerts) {
+                                    const std = m.userData.standVerts;
+                                    const pos = m.geometry.attributes.position.array;
+                                    let changed = false;
+                                    for (let k = 0; k < pos.length; k++) {
+                                        const diff = std[k] - pos[k];
+                                        if (Math.abs(diff) > 0.001) {
+                                            pos[k] += diff * 0.25;
+                                            changed = true;
+                                        } else {
+                                            pos[k] = std[k];
+                                        }
+                                    }
+                                    if (changed) m.geometry.attributes.position.needsUpdate = true;
+                                }
+                            });
+                        }
                     }
                 }
 
@@ -1184,18 +1218,52 @@ function processEnemyMovement() {
             }
             enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
             if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(enemy.type)) {
-                enemy._animTime = (enemy._animTime || 0) + 0.28;
-                const stride = enemy._animTime;
-                enemy.mesh.rotation.x = 0.14 + Math.sin(stride * 2.0) * 0.04;
-                enemy.mesh.rotation.z = Math.sin(stride) * 0.08;
-                enemy._strideBob = Math.abs(Math.sin(stride)) * 0.14;
+                enemy.mesh.rotation.x = 0;
+                enemy.mesh.rotation.z = 0;
+                enemy._strideBob = 0;
+                if (enemy.mesh.userData && enemy.mesh.userData.animatedMeshes) {
+                    enemy._runCycle = ((enemy._runCycle || 0) + 0.38) % 8;
+                    const c = enemy._runCycle;
+                    const f0 = Math.floor(c);
+                    const f1 = (f0 + 1) % 8;
+                    const frac = c - f0;
+                    enemy.mesh.userData.animatedMeshes.forEach(m => {
+                        if (m.userData && m.userData.runFrames && m.userData.runFrames[f0] && m.userData.runFrames[f1]) {
+                            const arr0 = m.userData.runFrames[f0];
+                            const arr1 = m.userData.runFrames[f1];
+                            const pos = m.geometry.attributes.position.array;
+                            for (let k = 0; k < pos.length; k++) {
+                                pos[k] = arr0[k] * (1 - frac) + arr1[k] * frac;
+                            }
+                            m.geometry.attributes.position.needsUpdate = true;
+                        }
+                    });
+                }
             }
         } else {
             if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(enemy.type)) {
-                enemy.mesh.rotation.x += (0 - enemy.mesh.rotation.x) * 0.15;
-                enemy.mesh.rotation.z += (0 - enemy.mesh.rotation.z) * 0.15;
-                enemy._idleTime = (enemy._idleTime || (enemy.mesh.id ? enemy.mesh.id * 1.5 : 0)) + 0.05;
-                enemy._strideBob = Math.sin(enemy._idleTime) * 0.02;
+                enemy.mesh.rotation.x = 0;
+                enemy.mesh.rotation.z = 0;
+                enemy._strideBob = 0;
+                if (enemy.mesh.userData && enemy.mesh.userData.animatedMeshes) {
+                    enemy.mesh.userData.animatedMeshes.forEach(m => {
+                        if (m.userData && m.userData.standVerts) {
+                            const std = m.userData.standVerts;
+                            const pos = m.geometry.attributes.position.array;
+                            let changed = false;
+                            for (let k = 0; k < pos.length; k++) {
+                                const diff = std[k] - pos[k];
+                                if (Math.abs(diff) > 0.001) {
+                                    pos[k] += diff * 0.25;
+                                    changed = true;
+                                } else {
+                                    pos[k] = std[k];
+                                }
+                            }
+                            if (changed) m.geometry.attributes.position.needsUpdate = true;
+                        }
+                    });
+                }
             }
         }
 

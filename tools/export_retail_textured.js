@@ -98,21 +98,21 @@ const BUILDING_CONFIG = {
 // Retail Westwood 3D Infantry Characters (calibrated to ~2.4-2.6 units tall, classic RTS visual readability)
 const INFANTRY_CONFIG = {
     // USA
-    'ranger':          { file: 'AIRNGR_SKN.W3D',  skl: 'AIRNGR_SKL.W3D',  anim: 'AIRNGR_STA.W3D',  submesh: null,              tex: 'zhca_airanger.tga',   scale: 0.160, faction: 'usa' },
-    'missiledefender': { file: 'INF4BRG_SKN.W3D', skl: 'INF4BRG_SKL.W3D', anim: null,              submesh: 'AIMSSL_SKIN_01', tex: 'zhca_aimsslguy.tga',  scale: 0.160, faction: 'usa' },
-    'pathfinder':      { file: 'AIPFDR_SKN.W3D',  skl: 'AIPFDR_SKL.W3D',  anim: 'AIPFDR_STA.W3D',  submesh: null,              tex: 'zhca_aipthfindr.tga', scale: 0.160, faction: 'usa' },
-    'burton':          { file: 'AIHERO_SKN.W3D',  skl: 'AIHERO_SKL.W3D',  anim: 'AIHERO_STA.W3D',  submesh: null,              tex: 'zhca_aihero2.tga',    scale: 0.170, faction: 'usa' },
+    'ranger':          { file: 'AIRNGR_SKN.W3D',  skl: 'AIRNGR_SKL.W3D',  sta: 'AIRNGR_STA.W3D',  rna: 'AIRNGR_RNA.W3D',  submesh: null, tex: 'zhca_airanger.tga',   scale: 0.280, faction: 'usa' },
+    'missiledefender': { file: 'NITHNT_SKN.W3D',  skl: 'NITHNT_SKL.W3D',  sta: 'NITHNT_STA.W3D',  rna: 'NITHNT_RNA.W3D',  submesh: null, tex: 'zhca_aimsslguy.tga',  scale: 0.280, faction: 'usa' },
+    'pathfinder':      { file: 'AIPFDR_SKN.W3D',  skl: 'AIPFDR_SKL.W3D',  sta: 'AIPFDR_STA.W3D',  rna: 'AIPFDR_RNA.W3D',  submesh: null, tex: 'zhca_aipthfindr.tga', scale: 0.280, faction: 'usa' },
+    'burton':          { file: 'AIHERO_SKN.W3D',  skl: 'AIHERO_SKL.W3D',  sta: 'AIHERO_STA.W3D',  rna: 'AIHERO_RNA.W3D',  submesh: null, tex: 'zhca_aihero2.tga',    scale: 0.290, faction: 'usa' },
     // China
-    'redguard':        { file: 'NICNSC_SKN.W3D',  skl: 'NICNSC_SKL.W3D',  anim: 'NICNSC_STA.W3D',  submesh: null,              tex: 'zhca_niconscrpt.tga', scale: 0.160, faction: 'china' },
-    'tankhunter':      { file: 'NITHNT_SKN.W3D',  skl: 'NITHNT_SKL.W3D',  anim: 'NITHNT_STA.W3D',  submesh: null,              tex: 'zhca_nithunter.tga',  scale: 0.160, faction: 'china' },
-    'hacker':          { file: 'NIHCKR_SKN.W3D',  skl: 'NIHCKR_SKL.W3D',  anim: 'NIHCKR_STA.W3D',  submesh: null,              tex: 'zhca_nihacker.tga',   scale: 0.160, faction: 'china' },
-    'lotus':           { file: 'NIHERO_SKN.W3D',  skl: 'NIHERO_SKL.W3D',  anim: 'NIHERO_STA.W3D',  submesh: null,              tex: 'zhca_niblotus.tga',   scale: 0.165, faction: 'china' },
+    'redguard':        { file: 'NICNSC_SKN.W3D',  skl: 'NICNSC_SKL.W3D',  sta: 'NICNSC_STA.W3D',  rna: 'NICNSC_RNA.W3D',  submesh: null, tex: 'zhca_niconscrpt.tga', scale: 0.280, faction: 'china' },
+    'tankhunter':      { file: 'NITHNT_SKN.W3D',  skl: 'NITHNT_SKL.W3D',  sta: 'NITHNT_STA.W3D',  rna: 'NITHNT_RNA.W3D',  submesh: null, tex: 'zhca_nithunter.tga',  scale: 0.280, faction: 'china' },
+    'hacker':          { file: 'NIHCKR_SKN.W3D',  skl: 'NIHCKR_SKL.W3D',  sta: 'NIHCKR_STA.W3D',  rna: 'NIHCKR_RNA.W3D',  submesh: null, tex: 'zhca_nihacker.tga',   scale: 0.280, faction: 'china' },
+    'lotus':           { file: 'NIHERO_SKN.W3D',  skl: 'NIHERO_SKL.W3D',  sta: 'NIHERO_STA.W3D',  rna: 'NIHERO_RNA.W3D',  submesh: null, tex: 'zhca_niblotus.tga',   scale: 0.285, faction: 'china' },
     // GLA
-    'rebel':           { file: 'UIRGRD_SKN.W3D',  skl: 'UIRGRD_SKL.W3D',  anim: 'UIRGRD_STB.W3D',  submesh: null,              tex: 'zhca_uirguard.tga',   scale: 0.160, faction: 'gla' },
-    'rpg':             { file: 'UISMSD_SKN.W3D',  skl: 'UISMSD_SKL.W3D',  anim: 'UISMSD_STA.W3D',  submesh: null,              tex: 'zhca_uirstnger.tga',  scale: 0.160, faction: 'gla' },
-    'terrorist':       { file: 'UITRST_SKN.W3D',  skl: 'UITRST_SKL.W3D',  anim: 'UITRST_STA.W3D',  submesh: null,              tex: 'zhca_uiter.tga',      scale: 0.160, faction: 'gla' },
-    'jarmen':          { file: 'UIHERO_SKN.W3D',  skl: 'UIHERO_SKL.W3D',  anim: 'UIHERO_STA.W3D',  submesh: null,              tex: 'zhca_uihero01.tga',   scale: 0.170, faction: 'gla' },
-    'worker':          { file: 'UIWRKR_SKN.W3D',  skl: 'UIWRKR_SKL.W3D',  anim: 'UIWRKR_STA.W3D',  submesh: null,              tex: 'zhca_uiworker.tga',   scale: 0.155, faction: 'gla' }
+    'rebel':           { file: 'UIRGRD_SKN.W3D',  skl: 'UIRGRD_SKL.W3D',  sta: 'UIRGRD_STB.W3D',  rna: 'UIRGRD_RNA.W3D',  submesh: null, tex: 'zhca_uirguard.tga',   scale: 0.280, faction: 'gla' },
+    'rpg':             { file: 'UISMSD_SKN.W3D',  skl: 'UISMSD_SKL.W3D',  sta: 'UISMSD_STA.W3D',  rna: 'UISMSD_WKB.W3D',  submesh: null, tex: 'zhca_uirstnger.tga',  scale: 0.280, faction: 'gla' },
+    'terrorist':       { file: 'UITRST_SKN.W3D',  skl: 'UITRST_SKL.W3D',  sta: 'UITRST_STA.W3D',  rna: 'UITRST_RNA.W3D',  submesh: null, tex: 'zhca_uiter.tga',      scale: 0.280, faction: 'gla' },
+    'jarmen':          { file: 'UIHERO_SKN.W3D',  skl: 'UIHERO_SKL.W3D',  sta: 'UIHERO_STA.W3D',  rna: 'UIHERO_RNA2.W3D', submesh: null, tex: 'zhca_uihero01.tga',   scale: 0.290, faction: 'gla' },
+    'worker':          { file: 'UIWRKR_SKN.W3D',  skl: 'UIWRKR_SKL.W3D',  sta: 'UIWRKR_STA.W3D',  rna: 'UIWRKR_RNA.W3D',  submesh: null, tex: 'zhca_uiworker.tga',   scale: 0.270, faction: 'gla' }
 };
 
 // Additional architectural and detail textures
@@ -223,50 +223,29 @@ function processModels(map) {
         }
 
         // Canonical 3D Axis Alignment for Aircraft, Helicopters, and Drones (+Z forward, +Y up, +X right):
-        if (key === 'comanche' || key === 'chinook') {
-            // Fuselage meshes and sub-pivots were authored in bone space with 90° roll rotation.
-            // Rotate fuselage meshes and child pivots (x' = y, y' = -x, z' = z) so fuselage is upright and matches horizontal rotor discs.
-            for (const [mName, m] of Object.entries(filteredMeshes)) {
-                if (!mName.includes('prop')) {
-                    for (let i = 0; i < m.v.length; i += 3) {
-                        const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                        m.v[i] = oy;
-                        m.v[i+1] = -ox;
-                        m.v[i+2] = oz;
-                    }
-                }
-            }
-            parsed.pivots.forEach(p => {
-                if (p.name !== 'ROOTTRANSFORM' && p.name !== 'CHASSIS') {
-                    const ox = p.tx, oy = p.ty, oz = p.tz;
-                    p.tx = oy;
-                    p.ty = -ox;
-                    p.tz = oz;
-                }
-            });
-        } else if (key === 'raptor') {
-            // Proper right-handed pure rotation (det = +1): Y is canopy UP (+ox), Z is nose FORWARD (+oy), X is wingspan (+oz)
+        if (key === 'raptor') {
+            // Right-handed pure rotation (det = +1): Y is canopy UP (-ox), Z is nose FORWARD (+oy), X is wingspan (-oz)
             for (const m of Object.values(filteredMeshes)) {
                 for (let i = 0; i < m.v.length; i += 3) {
                     const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                    m.v[i] = oz; m.v[i+1] = ox; m.v[i+2] = oy;
+                    m.v[i] = -oz; m.v[i+1] = -ox; m.v[i+2] = oy;
                 }
             }
             parsed.pivots.forEach(p => {
                 const ox = p.tx, oy = p.ty, oz = p.tz;
-                p.tx = oz; p.ty = ox; p.tz = oy;
+                p.tx = -oz; p.ty = -ox; p.tz = oy;
             });
         } else if (key === 'aurora') {
-            // Proper rotation (det = +1): Y is UP (+oz), Z is nose FORWARD (+ox), X is wingspan (+oy)
+            // Pure rotation (det = +1): Y is UP (-oz), Z is nose FORWARD (+ox), X is wingspan (-oy)
             for (const m of Object.values(filteredMeshes)) {
                 for (let i = 0; i < m.v.length; i += 3) {
                     const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
-                    m.v[i] = oy; m.v[i+1] = oz; m.v[i+2] = ox;
+                    m.v[i] = -oy; m.v[i+1] = -oz; m.v[i+2] = ox;
                 }
             }
             parsed.pivots.forEach(p => {
                 const ox = p.tx, oy = p.ty, oz = p.tz;
-                p.tx = oy; p.ty = oz; p.tz = ox;
+                p.tx = -oy; p.ty = -oz; p.tz = ox;
             });
         } else if (key === 'drone_battle') {
             // Center Battle Drone body in Z and align machine gun turret pointing +Z forward
@@ -494,7 +473,7 @@ function transformPoint(m, p) {
     ];
 }
 
-function loadSkeletonWithPose(sklFileName, animFileName = null) {
+function loadSkeleton(sklFileName) {
     const sklPath = path.join(w3dDir, sklFileName);
     if (!fs.existsSync(sklPath)) return null;
     const buf = fs.readFileSync(sklPath);
@@ -513,15 +492,11 @@ function loadSkeletonWithPose(sklFileName, animFileName = null) {
                     version = buf.readUInt32LE(sub + 8);
                     pivotCount = buf.readUInt32LE(sub + 28);
                 } else if (st === 0x102) { // W3D_CHUNK_PIVOTS (60 bytes per pivot)
-                    const pre30 = version < 0x00030000;
-                    if (pre30) {
-                        sklPivots.push({ name: 'RootTransform', parentIndex: -1, localThree: new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]), tx: 0, ty: 0, tz: 0 });
-                    }
                     let po = sub + 8;
                     for (let i = 0; i < pivotCount; i++) {
                         const ne = buf.indexOf(0, po);
                         const pName = buf.toString('ascii', po, Math.min(ne > po ? ne : po + 16, po + 16)).trim();
-                        let parentIndex = buf.readUInt32LE(po + 16);
+                        let parentIndex = buf.readInt32LE(po + 16);
                         const tx = buf.readFloatLE(po + 20);
                         const ty = buf.readFloatLE(po + 24);
                         const tz = buf.readFloatLE(po + 28);
@@ -529,17 +504,14 @@ function loadSkeletonWithPose(sklFileName, animFileName = null) {
                         const qy = buf.readFloatLE(po + 48);
                         const qz = buf.readFloatLE(po + 52);
                         const qw = buf.readFloatLE(po + 56);
-                        if (pre30) {
-                            parentIndex = (parentIndex + 1) >>> 0;
-                        }
                         const rawM = mat4Compose([tx, ty, tz], [qx, qy, qz, qw]);
                         const localThree = mat4Mul(mat4Mul(AXIS_SWAP, rawM), AXIS_SWAP);
                         sklPivots.push({
                             name: pName,
-                            parentIndex: parentIndex === 0xffffffff ? -1 : parentIndex,
+                            parentIndex: parentIndex,
                             localThree,
                             tx, ty, tz,
-                            worldMat: null
+                            rawM
                         });
                         po += 60;
                     }
@@ -549,6 +521,41 @@ function loadSkeletonWithPose(sklFileName, animFileName = null) {
         }
         off += 8 + size;
     }
+    return sklPivots;
+}
+
+function getAnimNumFrames(animFileName) {
+    if (!animFileName) return 1;
+    const animPath = path.join(w3dDir, animFileName);
+    if (!fs.existsSync(animPath)) return 1;
+    const animBuf = fs.readFileSync(animPath);
+    let aoff = 0;
+    while (aoff < animBuf.length) {
+        const atype = animBuf.readUInt32LE(aoff);
+        const asize = animBuf.readUInt32LE(aoff + 4) & 0x7fffffff;
+        if (atype === 0x200) {
+            let asub = aoff + 8;
+            while (asub < aoff + 8 + asize) {
+                const ast = animBuf.readUInt32LE(asub);
+                const ass = animBuf.readUInt32LE(asub + 4) & 0x7fffffff;
+                if (ast === 0x201) {
+                    return animBuf.readUInt32LE(asub + 8 + 36);
+                }
+                asub += 8 + ass;
+            }
+        }
+        aoff += 8 + asize;
+    }
+    return 1;
+}
+
+function getBonesForAnimFrame(basePivots, animFileName, frame) {
+    const pivots = basePivots.map(p => ({
+        name: p.name,
+        parentIndex: p.parentIndex,
+        localThree: new Float32Array(p.localThree),
+        worldMat: null
+    }));
 
     if (animFileName) {
         const animPath = path.join(w3dDir, animFileName);
@@ -559,23 +566,25 @@ function loadSkeletonWithPose(sklFileName, animFileName = null) {
             while (aoff < animBuf.length) {
                 const atype = animBuf.readUInt32LE(aoff);
                 const asize = animBuf.readUInt32LE(aoff + 4) & 0x7fffffff;
-                if (atype === 0x200) { // W3D_CHUNK_ANIMATION
+                if (atype === 0x200) {
                     let asub = aoff + 8;
                     while (asub < aoff + 8 + asize) {
                         const ast = animBuf.readUInt32LE(asub);
                         const ass = animBuf.readUInt32LE(asub + 4) & 0x7fffffff;
                         if (ast === 0x202) { // ANIMATION_CHANNEL
+                            const firstFrame = animBuf.readUInt16LE(asub + 8);
+                            const lastFrame = animBuf.readUInt16LE(asub + 10);
                             const channelType = animBuf.readUInt16LE(asub + 14);
-                            let pivotIndex = animBuf.readUInt16LE(asub + 16);
-                            pivotIndex = pivotIndex + 1; // pre30 offset
+                            const pivotIndex = animBuf.readUInt16LE(asub + 16); // Direct 0-based pivot index
                             if (!pivotDeltas[pivotIndex]) {
                                 pivotDeltas[pivotIndex] = { t: [0,0,0], q: [0,0,0,1] };
                             }
-                            const valOff = asub + 20; // frame 0
-                            if (channelType === 0) pivotDeltas[pivotIndex].t[0] = animBuf.readFloatLE(valOff);
-                            else if (channelType === 1) pivotDeltas[pivotIndex].t[1] = animBuf.readFloatLE(valOff);
-                            else if (channelType === 2) pivotDeltas[pivotIndex].t[2] = animBuf.readFloatLE(valOff);
+                            const frameIdx = Math.max(0, Math.min(frame - firstFrame, lastFrame - firstFrame));
+                            if (channelType === 0) pivotDeltas[pivotIndex].t[0] = animBuf.readFloatLE(asub + 20 + frameIdx * 4);
+                            else if (channelType === 1) pivotDeltas[pivotIndex].t[1] = animBuf.readFloatLE(asub + 20 + frameIdx * 4);
+                            else if (channelType === 2) pivotDeltas[pivotIndex].t[2] = animBuf.readFloatLE(asub + 20 + frameIdx * 4);
                             else if (channelType === 6) {
+                                const valOff = asub + 20 + frameIdx * 16;
                                 pivotDeltas[pivotIndex].q = [
                                     animBuf.readFloatLE(valOff + 0),
                                     animBuf.readFloatLE(valOff + 4),
@@ -592,53 +601,47 @@ function loadSkeletonWithPose(sklFileName, animFileName = null) {
 
             for (const [piStr, delta] of Object.entries(pivotDeltas)) {
                 const pi = parseInt(piStr);
-                if (pi < sklPivots.length) {
+                if (pi < pivots.length) {
                     const rawDelta = mat4Compose(delta.t, delta.q);
                     const deltaThree = mat4Mul(mat4Mul(AXIS_SWAP, rawDelta), AXIS_SWAP);
-                    sklPivots[pi].localThree = mat4Mul(sklPivots[pi].localThree, deltaThree);
+                    pivots[pi].localThree = mat4Mul(pivots[pi].localThree, deltaThree);
                 }
             }
         }
     }
 
-    // Special case adjustments (e.g. Missile Defender launcher seated directly on right shoulder)
-    if (sklFileName === 'INF4BRG_SKL.W3D') {
-        const roktBone = sklPivots[239];
-        if (roktBone) {
-            const rawM = mat4Compose([-0.55, 35.97, 12.35], [0, 0, 0, 1]);
-            roktBone.localThree = mat4Mul(mat4Mul(AXIS_SWAP, rawM), AXIS_SWAP);
-        }
-    }
-
-    for (let i = 0; i < sklPivots.length; i++) {
-        const p = sklPivots[i];
+    for (let i = 0; i < pivots.length; i++) {
+        const p = pivots[i];
         if (p.parentIndex === -1 || p.parentIndex >= i) {
             p.worldMat = p.localThree;
         } else {
-            p.worldMat = mat4Mul(sklPivots[p.parentIndex].worldMat, p.localThree);
+            p.worldMat = mat4Mul(pivots[p.parentIndex].worldMat, p.localThree);
         }
     }
-    return sklPivots;
+    return pivots;
 }
 
-function parseAndBakeSkinnedMesh(sknFileName, sklFileName, animFileName = null, targetSubmesh = null) {
-    const skl = loadSkeletonWithPose(sklFileName, animFileName);
-    if (!skl) {
-        console.warn(`Skeleton ${sklFileName} not found for ${sknFileName}`);
+function parseAndBakeSkinnedMesh(cfg) {
+    const basePivots = loadSkeleton(cfg.skl);
+    if (!basePivots) {
+        console.warn(`Skeleton ${cfg.skl} not found for ${cfg.file}`);
         return null;
     }
-    const sknPath = path.join(w3dDir, sknFileName);
+
+    const standBones = getBonesForAnimFrame(basePivots, cfg.sta, 0);
+
+    const sknPath = path.join(w3dDir, cfg.file);
     if (!fs.existsSync(sknPath)) return null;
     const buf = fs.readFileSync(sknPath);
     let off = 0;
-    const resultMeshes = {};
+    const rawMeshes = {};
 
     while (off < buf.length) {
         const type = buf.readUInt32LE(off);
         const size = buf.readUInt32LE(off + 4) & 0x7fffffff;
         if (type === 0) { // W3D_CHUNK_MESH
             let sub = off + 8;
-            let meshName = '', numV = 0, numF = 0, attr = 0;
+            let meshName = '', numV = 0, numF = 0;
             let vArr = [], infArr = [], triArr = [], uvArr = [], meshTex = null;
             while (sub < off + 8 + size) {
                 const st = buf.readUInt32LE(sub);
@@ -647,9 +650,6 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, animFileName = null, 
                     let endMesh = sub + 8 + 8;
                     while (endMesh < sub + 8 + 24 && buf[endMesh] !== 0) endMesh++;
                     meshName = buf.toString('ascii', sub + 8 + 8, endMesh).trim();
-                    attr = buf.readUInt32LE(sub + 8 + 4);
-                    numF = buf.readUInt32LE(sub + 8 + 40);
-                    numV = buf.readUInt32LE(sub + 8 + 44);
                 } else if (st === 0x02) {
                     const count = Math.floor(ss / 12);
                     for (let i = 0; i < count; i++) {
@@ -717,73 +717,96 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, animFileName = null, 
                 continue;
             }
 
-            if (targetSubmesh && meshName !== targetSubmesh) {
+            if (cfg.submesh && meshName !== cfg.submesh) {
                 off += 8 + size;
                 continue;
             }
 
             if (vArr.length > 0 && triArr.length > 0) {
-                resultMeshes[meshName || 'mesh'] = {
+                rawMeshes[meshName || 'mesh'] = {
                     rawV: vArr,
                     inf: infArr,
                     tri: triArr,
                     uv: uvArr,
-                    tex: meshTex
+                    tex: meshTex || cfg.tex
                 };
             }
         }
         off += 8 + size;
     }
 
-    const finalMeshes = {};
-    let allWorldVerts = [];
+    // Step 1: Compute stand pose vertices and determine global bounding box
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minZ = 1e9, maxZ = -1e9;
+    const standTransformed = {};
 
-    for (const [mName, mData] of Object.entries(resultMeshes)) {
-        const bakedV = [];
+    for (const [mName, mData] of Object.entries(rawMeshes)) {
+        const list = [];
         for (let i = 0; i < mData.rawV.length; i++) {
             const v = mData.rawV[i];
-            let bIdx = (mData.inf && mData.inf.length === mData.rawV.length) ? mData.inf[i] : 0;
-            const bone = skl[bIdx];
-            let wv = bone ? transformPoint(bone.worldMat, v) : v;
-            // Align heading facing forward (+Z): rotate 180 deg around Y (x' = -x, z' = -z)
+            const bIdx = (mData.inf && mData.inf.length === mData.rawV.length) ? mData.inf[i] : 0;
+            const bone = standBones[bIdx];
+            const wv = bone ? transformPoint(bone.worldMat, v) : v;
             const fwd = [-wv[0], wv[1], -wv[2]];
-            bakedV.push(fwd);
-            allWorldVerts.push(fwd);
-        }
-        finalMeshes[mName] = {
-            vList: bakedV,
-            i: mData.tri,
-            u: mData.uv,
-            tex: mData.tex
-        };
-    }
+            list.push(fwd);
 
-    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minZ = 1e9, maxZ = -1e9;
-    for (const v of allWorldVerts) {
-        if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
-        if (v[1] < minY) minY = v[1]; if (v[1] > maxY) maxY = v[1];
-        if (v[2] < minZ) minZ = v[2]; if (v[2] > maxZ) maxZ = v[2];
+            if (fwd[0] < minX) minX = fwd[0]; if (fwd[0] > maxX) maxX = fwd[0];
+            if (fwd[1] < minY) minY = fwd[1]; if (fwd[1] > maxY) maxY = fwd[1];
+            if (fwd[2] < minZ) minZ = fwd[2]; if (fwd[2] > maxZ) maxZ = fwd[2];
+        }
+        standTransformed[mName] = list;
     }
 
     const cx = (minX + maxX) / 2;
     const cz = (minZ + maxZ) / 2;
     const height = maxY - minY;
 
+    // Step 2: Sample 8 animation frames across run animation (rna)
+    const runFramesCount = 8;
+    const totalRnaFrames = getAnimNumFrames(cfg.rna);
+    const runSampledBones = [];
+    for (let s = 0; s < runFramesCount; s++) {
+        const frame = cfg.rna ? Math.floor(s * (totalRnaFrames - 1) / (runFramesCount - 1)) : 0;
+        runSampledBones.push(cfg.rna ? getBonesForAnimFrame(basePivots, cfg.rna, frame) : standBones);
+    }
+
     const exportMeshes = {};
-    for (const [mName, m] of Object.entries(finalMeshes)) {
+    for (const [mName, mData] of Object.entries(rawMeshes)) {
+        // Flatten stand vertices
         const flatV = [];
-        for (const v of m.vList) {
+        for (const fwd of standTransformed[mName]) {
             flatV.push(
-                parseFloat((v[0] - cx).toFixed(2)),
-                parseFloat((v[1] - minY).toFixed(2)),
-                parseFloat((v[2] - cz).toFixed(2))
+                parseFloat((fwd[0] - cx).toFixed(2)),
+                parseFloat((fwd[1] - minY).toFixed(2)),
+                parseFloat((fwd[2] - cz).toFixed(2))
             );
         }
+
+        // Bake 8 run frames
+        const bakedRun = [];
+        for (let s = 0; s < runFramesCount; s++) {
+            const bones = runSampledBones[s];
+            const flatRun = [];
+            for (let i = 0; i < mData.rawV.length; i++) {
+                const v = mData.rawV[i];
+                const bIdx = (mData.inf && mData.inf.length === mData.rawV.length) ? mData.inf[i] : 0;
+                const bone = bones[bIdx];
+                const wv = bone ? transformPoint(bone.worldMat, v) : v;
+                const fwd = [-wv[0], wv[1], -wv[2]];
+                flatRun.push(
+                    parseFloat((fwd[0] - cx).toFixed(2)),
+                    parseFloat((fwd[1] - minY).toFixed(2)),
+                    parseFloat((fwd[2] - cz).toFixed(2))
+                );
+            }
+            bakedRun.push(flatRun);
+        }
+
         exportMeshes[mName] = {
             v: flatV,
-            i: m.i,
-            u: m.u,
-            tex: m.tex
+            run: bakedRun,
+            i: mData.tri,
+            u: mData.uv,
+            tex: mData.tex
         };
     }
 
@@ -800,7 +823,7 @@ function parseAndBakeSkinnedMesh(sknFileName, sklFileName, animFileName = null, 
 function processInfantry(configMap) {
     const results = {};
     for (const [key, cfg] of Object.entries(configMap)) {
-        const baked = parseAndBakeSkinnedMesh(cfg.file, cfg.skl, cfg.anim, cfg.submesh);
+        const baked = parseAndBakeSkinnedMesh(cfg);
         if (!baked || Object.keys(baked.meshes).length === 0) {
             console.warn(`[W3D Infantry] Failed to bake skinned mesh for ${key}`);
             continue;
@@ -816,7 +839,6 @@ function processInfantry(configMap) {
     }
     return results;
 }
-
 const vehicleData = processModels(VEHICLE_CONFIG);
 console.log(`Processed ${Object.keys(vehicleData).length} vehicles.`);
 
@@ -1334,7 +1356,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         }
     });
     if (minBldY < 1e8 && minBldY < 0) {
-        const shiftY = -minBldY;
+        const shiftY = -minBldY + 0.35;
         root.children.forEach(child => {
             child.position.y += shiftY;
         });
@@ -1352,7 +1374,7 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
     if (!window.W3D_INFANTRY_DATA || !window.W3D_INFANTRY_DATA[infantryKey]) {
         if (typeof fallbackFn === 'function') {
             const fallbackMesh = fallbackFn(isEnemy);
-            fallbackMesh.scale.set(0.16, 0.16, 0.16);
+            fallbackMesh.scale.set(0.28, 0.28, 0.28);
             return fallbackMesh;
         }
         return new THREE.Group();
@@ -1360,7 +1382,7 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
 
     const data = window.W3D_INFANTRY_DATA[infantryKey];
     const faction = data.f;
-    const scale = data.s || 0.160;
+    const scale = data.s || 0.280;
     const iTex = getW3dTexture(infantryKey);
 
     let skinMat;
@@ -1378,12 +1400,14 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
     }
 
     const root = new THREE.Group();
+    root.userData.animatedMeshes = [];
+
     data.h.forEach(([_, meshName]) => {
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
 
         const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v, 3));
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v.slice(), 3));
         if (mdata.u && mdata.u.length > 0) {
             geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
         }
@@ -1407,6 +1431,10 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
         const mesh = new THREE.Mesh(geom, subMat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+
+        mesh.userData.runFrames = mdata.run;
+        mesh.userData.standVerts = mdata.v;
+        root.userData.animatedMeshes.push(mesh);
         root.add(mesh);
     });
 
@@ -1414,7 +1442,6 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
     root.scale.set(scale, scale, scale);
     return root;
 }
-
 window.createW3DVehicleMesh = createW3DVehicleMesh;
 window.createW3DBuildingMesh = createW3DBuildingMesh;
 window.createW3DInfantryMesh = createW3DInfantryMesh;

@@ -3,7 +3,7 @@ const path = require('path');
 
 function isFxGlitchMesh(name, tex = '') {
     const n = (name + ' ' + (tex || '')).toLowerCase();
-    return /headlight|lightbeam|muzzlefx|turretfx|smokefx|exnk|exhaustfx|treadfx|firepoint|runwaylight|redlight|greenlight|burnerfx|nvbuggy|cxpolicecar005|weapona\d+|mesh12|mesh78|mesh10|^abarfrccmd\.plane|^abbtcmdhq\.plane|line02|abwarfact\.mesh01|abwarfact\.pyramid|abbtcmdhq\.object17|abbtcmdhq\.object22|extnkmzl|avpaladin\.housecolor0[23]|absupplyct\.fan0[568]|atgradient|abpatriot\.housecolor02|avaurora\.housecolor01|wingtip\d+/i.test(n);
+    return /headlight|lightbeam|muzzlefx|turretfx|smokefx|exnk|exhaustfx|treadfx|firepoint|runwaylight|redlight|greenlight|burnerfx|nvbuggy|cxpolicecar005|weapona\d+|mesh12|mesh78|mesh10|^abarfrccmd\.plane|^abbtcmdhq\.plane|line02|abwarfact\.mesh01|abwarfact\.pyramid|abbtcmdhq\.object17|abbtcmdhq\.object22|extnkmzl|avpaladin\.housecolor0[123]|absupplyct\.fan0[568]|atgradient|abpatriot\.housecolor02|avaurora\.housecolor01|wingtip\d+/i.test(n);
 }
 
 function parseW3dModel(filePath) {
