@@ -410,4 +410,37 @@ if (uAfter4[0].selected || !uAfter4[1].selected || uAfter4[2].selected) {
 }
 console.log("✓ Verified builder cycling: single-selects and cycles between multiple builders without selecting all.");
 
+// 9. Test resolveObstacleCollisions & Pinch Resolution
+const resolveObstacleCollisions = vm.runInContext("resolveObstacleCollisions", sandbox);
+if (typeof resolveObstacleCollisions !== 'function') {
+    console.error("FAIL: resolveObstacleCollisions is not a function!");
+    process.exit(1);
+}
+
+// Create a mock unit colliding with 2 structures to test colliderCount > 1
+const mockMovingUnit = {
+    type: 'crusader',
+    radius: 1.5,
+    mesh: new THREE.Mesh(),
+    targetPosition: new THREE.Vector3(0, 0, 10),
+    speed: 0.2
+};
+mockMovingUnit.mesh.position.set(0, 0, 0);
+
+// Set up 2 overlapping structures to trigger pinch resolution (colliderCount = 2)
+vm.runInContext(`
+    structures = [
+        { health: 1000, radius: 3.0, position: new THREE.Vector3(1, 0, 0) },
+        { health: 1000, radius: 3.0, position: new THREE.Vector3(-1, 0, 0) }
+    ];
+`, sandbox);
+
+try {
+    resolveObstacleCollisions(mockMovingUnit);
+    console.log("✓ Verified resolveObstacleCollisions executed successfully with multiple colliders (pinch resolution).");
+} catch (err) {
+    console.error("FAIL: resolveObstacleCollisions threw an error:", err);
+    process.exit(1);
+}
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

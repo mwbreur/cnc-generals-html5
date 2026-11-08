@@ -58,7 +58,7 @@
             }
 
             // Pinch Resolution: If squeezed between multiple structures, pop out into open clearance
-            if (collisionCount > 1) {
+            if (colliderCount > 1) {
                 const pushMag = Math.hypot(totalPushX, totalPushZ);
                 if (pushMag < 0.01) {
                     unit.mesh.position.x += 0.85;
