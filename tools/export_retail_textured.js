@@ -294,23 +294,69 @@ function processModels(map) {
                 }
             }
         } else if (key === 'comanche') {
-            // Comanche RAH-66: center main rotor mast and tail fenestron on fuselage centerline
+            // Comanche RAH-66: Rotate airframe upright (in W3D raw, CHASSIS had a 90-deg roll quaternion that was omitted during parsing).
+            // Pure rotation (det = +1): X_new = Y_old, Y_new = -X_old, Z_new = Z_old.
+            // Airframe wingspan aligns horizontally along X [-7.87..7.87], height along Y [-4.05..5.05], length along Z [-21.48..22.58].
+            for (const [mName, m] of Object.entries(filteredMeshes)) {
+                if (mName.includes('avcomanche_prop') || mName.includes('propeller01')) {
+                    // Rotor blades and hub are already horizontal in local X-Z space
+                    continue;
+                }
+                for (let i = 0; i < m.v.length; i += 3) {
+                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                    m.v[i] = oy;
+                    m.v[i+1] = -ox;
+                    m.v[i+2] = oz;
+                }
+            }
             parsed.pivots.forEach(p => {
-                if (p.name === 'PROPELLER01') {
+                if (p.name === 'ROOTTRANSFORM' || p.name === 'CHASSIS' || p.name === 'HOUSECOLOR01') {
+                    p.tx = 0; p.ty = 0; p.tz = 0;
+                } else if (p.name === 'PROPELLER01') {
                     p.tx = 0; p.ty = 4.92; p.tz = 5.16;
+                } else if (p.name === 'AVCOMANCHE_PROP') {
+                    p.tx = 0; p.ty = 0; p.tz = 0;
                 } else if (p.name === 'PROPELLER02') {
-                    p.tx = 0; p.ty = 2.40; p.tz = -16.85;
+                    p.tx = 0; p.ty = 1.13; p.tz = -16.85;
                 } else if (p.name === 'MUZZLE01') {
                     p.tx = 0; p.ty = -3.86; p.tz = 22.58;
+                } else if (p.name === 'MISSILEUPGRADE') {
+                    p.tx = 0; p.ty = 0; p.tz = 6.71;
+                } else {
+                    const ox = p.tx, oy = p.ty, oz = p.tz;
+                    p.tx = oy; p.ty = -ox; p.tz = oz;
                 }
             });
         } else if (key === 'chinook') {
-            // Chinook CH-47: center front and rear tandem rotor pylons on fuselage centerline
+            // Chinook CH-47: Rotate airframe upright (in W3D raw, CHASSIS had a 90-deg roll quaternion).
+            // Pure rotation (det = +1): X_new = Y_old, Y_new = -X_old, Z_new = Z_old.
+            // Airframe width aligns horizontally along X [-4.98..4.98], height along Y [-8.54..6.84], length along Z [-20.92..20.02].
+            for (const [mName, m] of Object.entries(filteredMeshes)) {
+                if (mName.includes('props') || mName.includes('propeller')) {
+                    // Tandem rotor blades and hubs are already horizontal in local X-Z space
+                    continue;
+                }
+                for (let i = 0; i < m.v.length; i += 3) {
+                    const ox = m.v[i], oy = m.v[i+1], oz = m.v[i+2];
+                    m.v[i] = oy;
+                    m.v[i+1] = -ox;
+                    m.v[i+2] = oz;
+                }
+            }
             parsed.pivots.forEach(p => {
-                if (p.name === 'PROPELLER01') {
+                if (p.name === 'ROOTTRANSFORM' || p.name === 'CHASSIS' || p.name === 'HOUSECOLOR01') {
+                    p.tx = 0; p.ty = 0; p.tz = 0;
+                } else if (p.name === 'PROPELLER01') {
                     p.tx = 0; p.ty = 5.21; p.tz = 12.74;
+                } else if (p.name === 'PROPS01') {
+                    p.tx = 0; p.ty = 0.33; p.tz = 0;
                 } else if (p.name === 'PROPELLER02') {
                     p.tx = 0; p.ty = 7.20; p.tz = -17.06;
+                } else if (p.name === 'PROPS02') {
+                    p.tx = 0; p.ty = 0.33; p.tz = 0;
+                } else {
+                    const ox = p.tx, oy = p.ty, oz = p.tz;
+                    p.tx = oy; p.ty = -ox; p.tz = oz;
                 }
             });
         }
