@@ -881,6 +881,7 @@
             showNotification(`Selected ${count} ${category} unit(s).`, 'info');
             updateSidebar();
         }
+        window.selectUnitsByType = selectUnitsByType;
 
         // =========================================================================
         

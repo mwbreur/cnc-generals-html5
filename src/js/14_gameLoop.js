@@ -110,8 +110,12 @@ function animate() {
                             const targetRally = structure.rallyPoint ? structure.rallyPoint.clone() : spawnPos.clone().add(new THREE.Vector3(6, 0, 6));
                             newUnit.targetPosition.copy(targetRally);
                         }
-                        playUSASound('construction');
-                        showNotification('Unit deployed: ' + item.name, 'success');
+                        if (typeof playUnitReadySound === 'function') {
+                            playUnitReadySound(item.type, typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+                        } else {
+                            playUSASound('construction');
+                        }
+                        showNotification('Unit ready: ' + item.name, 'success');
                         structure.productionQueue.shift();
                         updateSidebar();
                     }
@@ -381,6 +385,9 @@ function animate() {
                             s.isBuilding = false; s.dozerRef.taskState = 'Idle';
                             s.dozerRef.targetStructure = null; s.dozerRef = null;
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
+                            if (typeof playBuildingCompleteSound === 'function') {
+                                playBuildingCompleteSound(s.type, typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+                            }
                         }
                     } else { s.dozerRef.targetPosition.copy(s.position); }
                 }
