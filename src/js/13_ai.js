@@ -506,7 +506,9 @@ function initAICommanders() {
             const tmp = candidateWaypoints[i]; candidateWaypoints[i] = candidateWaypoints[j]; candidateWaypoints[j] = tmp;
         }
 
-        const startCredits = difficulty === 'hard' ? 10000 : difficulty === 'easy' ? 5000 : 7500;
+        const startMoneyEl = typeof document !== 'undefined' ? document.getElementById('starting-money') : null;
+        const lobbyMoney = startMoneyEl ? parseInt(startMoneyEl.value, 10) : 10000;
+        const startCredits = (!isNaN(lobbyMoney) && lobbyMoney > 0) ? lobbyMoney : (difficulty === 'hard' ? 12000 : difficulty === 'easy' ? 7500 : 10000);
         aiCommanders[ownerId] = {
             ownerId: ownerId,
             teamId: teamId,
@@ -651,13 +653,13 @@ function chooseAICounterUnitType(cmd, facilityType) {
         if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'nukecannon';
         return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'overlord' : (Math.random() < 0.35 ? 'gatling' : 'battlemaster');
     } else if (f === 'gla') {
-        if (counter === 'anti_air') return Math.random() < 0.75 ? 'quadcannon' : 'scorpion';
-        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'quadcannon' : 'buggy';
+        if (counter === 'anti_air') return Math.random() < 0.75 ? 'quad' : 'scorpion';
+        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'quad' : 'buggy';
         if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.5) ? 'marauder' : 'scorpion';
-        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'scudlauncher';
-        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'marauder' : (Math.random() < 0.35 ? 'quadcannon' : 'scorpion');
+        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'scud';
+        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'marauder' : (Math.random() < 0.35 ? 'quad' : 'scorpion');
     } else {
-        if (counter === 'anti_air') return Math.random() < 0.75 ? 'avenger' : 'humvee';
+        if (counter === 'anti_air') return Math.random() < 0.75 ? 'humvee' : 'paladin';
         if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'humvee' : 'tank';
         if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.55) ? 'paladin' : 'tank';
         if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'tomahawk';
@@ -665,10 +667,19 @@ function chooseAICounterUnitType(cmd, facilityType) {
     }
 }
 
-// Spawn AI structure for base reconstruction or base perimeter defense (AIPlayer.cpp::processBaseBuilding)
-function spawnAIStructure(cmd, type, pos) {
+// Spawn AI structure for base construction or base perimeter defense (Requires active AI Builder: Dozer / Worker!)
+function spawnAIStructure(cmd, type, pos, builderUnit) {
     if (typeof createStructureMeshForFaction !== 'function' || typeof scene === 'undefined') return null;
     const f = cmd.faction || 'china';
+    const bType = (f === 'gla') ? 'worker' : 'dozer';
+    const activeBuilder = builderUnit || (typeof enemyUnits !== 'undefined' ? enemyUnits.find(u =>
+        u.ownerId === cmd.ownerId && u.health > 0 && (u.type === 'dozer' || u.type === 'worker') &&
+        !u.targetStructure && u.taskState !== 'Building' && u.taskState !== 'MovingToBuild'
+    ) : null);
+
+    // Authentic C&C Generals Rule: AI CANNOT construct buildings without a live Dozer / Worker!
+    if (!activeBuilder || activeBuilder.health <= 0) return null;
+
     const group = createStructureMeshForFaction(type, f);
     if (!group.userData || !group.userData.isW3D) {
         group.scale.set(1.35, 1.35, 1.35);
@@ -677,6 +688,14 @@ function spawnAIStructure(cmd, type, pos) {
     const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : 0;
     pos.y = groundY + 0.05;
     group.position.copy(pos);
+
+    // Apply construction wireframe material until the AI Dozer/Worker completes construction (0% -> 100%)
+    group.traverse(child => {
+        if (child.isMesh) {
+            child.savedMaterial = child.material;
+            child.material = new THREE.MeshBasicMaterial({ color: 0xff9f43, wireframe: true, transparent: true, opacity: 0.45 });
+        }
+    });
     scene.add(group);
 
     const maxHp = (type === 'patriot' || type === 'gatlingCannon' || type === 'stingerSite') ? 900 : 1200;
@@ -692,29 +711,34 @@ function spawnAIStructure(cmd, type, pos) {
         ownerId: cmd.ownerId,
         faction: f,
         isAI: true,
-        isBuilding: false,
-        buildProgress: 100
+        isBuilding: true,
+        buildProgress: 0,
+        dozerRef: null,
+        spawnedHarvester: false
     };
     enemyStructures.push(esObj);
     if (typeof clearFoundationFootprint === 'function') clearFoundationFootprint(esObj);
     markPathfindGridDirty();
+    if (typeof assignDozerToStructure === 'function') {
+        assignDozerToStructure(activeBuilder, esObj);
+    }
     return esObj;
 }
 
 // AI Economy, Harvester/Dozer Replacement & Base Defense Construction (AIPlayer.cpp)
 function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnits) {
     // 1. Supply Center income + active harvester maintenance (queueSupplyTruck / queueDozer)
-    const supplyStruct = myStructures.find(s => s.type === 'supplyCenter' || s.type === 'supplyStash');
-    const cmdCenter = myStructures.find(s => s.type === 'center' || s.type === 'commandCenter');
+    const supplyStruct = myStructures.find(s => !s.isBuilding && (s.type === 'supplyCenter' || s.type === 'supplyStash'));
+    const cmdCenter = myStructures.find(s => !s.isBuilding && (s.type === 'center' || s.type === 'commandCenter'));
     const incomeTick = cmd.difficulty === 'hard' ? 180 : cmd.difficulty === 'easy' ? 95 : 135;
     if (supplyStruct || cmdCenter) {
         cmd.resources = Math.min(25000, (cmd.resources || 0) + incomeTick);
     }
 
     const desiredGatherers = ZERO_HOUR_AI_DATA.resourceGatherers[cmd.difficulty] || 1;
-    const myGatherers = myUnits.filter(u => u.type === 'truck' || (u.type === 'worker' && u.aiState && u.aiState !== 'Idle'));
+    const myGatherers = myUnits.filter(u => u.type === 'truck' || u.type === 'chinook' || (u.type === 'worker' && u.aiState && u.aiState !== 'Idle'));
     if (supplyStruct && myGatherers.length < desiredGatherers && cmd.resources >= 600) {
-        const hType = (cmd.faction === 'gla') ? 'worker' : 'truck';
+        const hType = (cmd.faction === 'gla') ? 'worker' : (cmd.faction === 'usa' ? 'chinook' : 'truck');
         const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
         const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
         if (harv) {
@@ -728,6 +752,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             harv.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(harv.mesh.position) : null;
             if (harv.supplyTarget) {
                 harv.targetPosition.copy(getSupplyDockSlotPosition(harv.supplyTarget, harv, false));
+                if (hType === 'chinook') harv.airState = 'flying';
             }
         }
     }
@@ -746,33 +771,52 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             bUnit.difficulty = cmd.difficulty;
             bUnit.taskState = 'Idle';
             bUnit.aiState = 'Idle';
+            myBuilders.push(bUnit);
         }
     }
 
-    // 2. Periodic Base Reconstruction & Perimeter Defense Placement (structureSeconds)
+    // Find an available idle AI builder (Dozer or Worker)
+    const availBuilder = myBuilders.find(b =>
+        b.health > 0 && !b.targetStructure && b.taskState !== 'Building' && b.taskState !== 'MovingToBuild'
+    );
+    if (!availBuilder) return;
+
+    // If an existing AI foundation lost its builder, dispatch the idle builder to finish it first!
+    const unfinishedStruct = myStructures.find(s => s.isBuilding && (!s.dozerRef || s.dozerRef.health <= 0));
+    if (unfinishedStruct) {
+        if (typeof assignDozerToStructure === 'function') {
+            assignDozerToStructure(availBuilder, unfinishedStruct);
+        }
+        return;
+    }
+
+    // 2. Periodic Base Construction & Perimeter Defense Placement
     cmd.structureTimer = (cmd.structureTimer || 0) + 1;
-    if (cmd.structureTimer < 6) return;
+    const buildCheckInterval = myStructures.length < 5 ? 2 : 5;
+    if (cmd.structureTimer < buildCheckInterval) return;
     cmd.structureTimer = 0;
 
     // Do not build if enemies are directly inside base (underAttack check from AIPlayer.cpp)
     const baseUnderAttack = hostileUnits.some(hu => hu.mesh && hu.mesh.position.distanceTo(cmd.basePos) < 35);
-    if (baseUnderAttack || cmd.resources < ZERO_HOUR_AI_DATA.resourcesPoor) return;
+    if (baseUnderAttack || cmd.resources < 600) return;
 
-    // Essential base structures to reconstruct if destroyed
+    // Essential base structures to construct / reconstruct in priority order
     const f = cmd.faction || 'china';
     const essentialList = [
-        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-18, 0, -14) },
-        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(18, 0, -14) },
-        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-18, 0, 16) },
-        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(18, 0, 16) }
+        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-22, 0, -18) },
+        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(22, 0, -18) },
+        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-22, 0, 20) },
+        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(24, 0, 20) }
     ];
 
     for (let item of essentialList) {
         if (f === 'gla' && (item.build === 'power' || item.build === 'nuclearReactor')) continue;
         if (!myStructures.some(item.check) && cmd.resources >= item.cost) {
             const candidatePos = adjustToPossibleDestination(cmd.basePos.clone().add(item.offset));
-            spawnAIStructure(cmd, item.build, candidatePos);
-            cmd.resources -= item.cost;
+            const built = spawnAIStructure(cmd, item.build, candidatePos, availBuilder);
+            if (built) {
+                cmd.resources -= item.cost;
+            }
             return;
         }
     }
@@ -781,7 +825,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     const defType = f === 'china' ? 'gatlingCannon' : f === 'gla' ? 'stingerSite' : 'patriot';
     const maxDefenses = cmd.difficulty === 'hard' ? 4 : cmd.difficulty === 'easy' ? 1 : 2;
     const currentDefenses = myStructures.filter(s => s.type === 'patriot' || s.type === 'gatlingCannon' || s.type === 'stingerSite' || s.type === 'bunker' || s.type === 'tunnel');
-    if (currentDefenses.length < maxDefenses && cmd.resources >= 2800) {
+    if (currentDefenses.length < maxDefenses && cmd.resources >= 1800) {
         const enemyRef = (cmd.discoveredEnemyBases.length > 0) ? cmd.discoveredEnemyBases[0].position : new THREE.Vector3(0, 0, 0);
         const frontDir = new THREE.Vector3().subVectors(enemyRef, cmd.basePos);
         if (frontDir.lengthSq() < 1) frontDir.set(-cmd.basePos.x, 0, -cmd.basePos.z);
@@ -793,8 +837,10 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             .addScaledVector(frontDir, 24)
             .addScaledVector(sideDir, spread);
         const clearPos = adjustToPossibleDestination(defPos);
-        spawnAIStructure(cmd, defType, clearPos);
-        cmd.resources -= 1000;
+        const builtDef = spawnAIStructure(cmd, defType, clearPos, availBuilder);
+        if (builtDef) {
+            cmd.resources -= 1000;
+        }
     }
 }
 
@@ -836,10 +882,10 @@ function processEnemyAIEngine() {
         const prodInterval = isWealthy ? Math.max(4, Math.floor(baseProdInterval * 0.65)) : baseProdInterval;
         const maxUnits = cmd.difficulty === 'hard' ? 24 : cmd.difficulty === 'easy' ? 10 : 15;
 
-        const combatUnits = myUnits.filter(u => u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck');
+        const combatUnits = myUnits.filter(u => u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck' && u.type !== 'chinook');
         if (cmd.productionTimer % prodInterval === 0 && combatUnits.length < maxUnits && (cmd.resources || 0) >= 500) {
-            const fac = myStructures.find(es => es.type === 'factory' && es.health > 0);
-            const bar = myStructures.find(es => es.type === 'barracks' && es.health > 0);
+            const fac = myStructures.find(es => !es.isBuilding && es.type === 'factory' && es.health > 0);
+            const bar = myStructures.find(es => !es.isBuilding && es.type === 'barracks' && es.health > 0);
             // Combined arms: mix 70% armor/vehicles + 30% counter infantry when both facilities exist
             const chosenFacility = (fac && bar) ? (Math.random() < 0.72 ? fac : bar) : (fac || bar);
             if (chosenFacility) {
@@ -2208,13 +2254,21 @@ function processEnemyAIEngine() {
                 }
             });
 
-            // 4. AI Dozers/Workers Auto-Repair with AIDozerBoredRadiusModifier (2.0x radius from Zero Hour AI.h)
+            // 4. AI Dozers/Workers Auto-Build Unfinished Foundations & Auto-Repair with AIDozerBoredRadiusModifier
             if (typeof enemyUnits !== 'undefined' && typeof enemyStructures !== 'undefined') {
                 const aiBuilders = enemyUnits.filter(u =>
                     (u.type === 'dozer' || (u.type === 'worker' && (!u.aiState || u.aiState === 'Idle'))) && u.health > 0
                 );
                 aiBuilders.forEach(aiBuilder => {
-                    if (aiBuilder.taskState === 'Repairing' || aiBuilder.taskState === 'MovingToRepair') return;
+                    if (aiBuilder.taskState === 'Building' || aiBuilder.taskState === 'MovingToBuild' || aiBuilder.taskState === 'Repairing' || aiBuilder.taskState === 'MovingToRepair') return;
+                    // First priority: finish any unfinished AI structure foundation owned by this AI
+                    const unfinished = enemyStructures.find(es =>
+                        es && es.ownerId === aiBuilder.ownerId && es.isBuilding && es.health > 0 && (!es.dozerRef || es.dozerRef.health <= 0)
+                    );
+                    if (unfinished) {
+                        assignDozerToStructure(aiBuilder, unfinished);
+                        return;
+                    }
                     aiBuilder._boredTimer = (aiBuilder._boredTimer || 0) + 1;
                     if (aiBuilder._boredTimer < 30) return;
                     const aiBoredRange = 75.0 * (ZERO_HOUR_AI_DATA.aiDozerBoredRadiusModifier || 2.0);

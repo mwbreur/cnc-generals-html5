@@ -447,9 +447,10 @@ function scatterSelectedUnits() {
 }
 
 function purchaseVehicleDrone(droneType, cost) {
-    const selectedVehicles = units.filter(u => u.selected && ['crusader', 'paladin', 'humvee'].includes(u.type));
+    const usaDroneVehicles = ['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk'];
+    const selectedVehicles = units.filter(u => u.selected && usaDroneVehicles.includes(u.type));
     if (selectedVehicles.length === 0) {
-        showNotification('Select a Crusader Tank, Paladin Tank, or Humvee first.', 'error');
+        showNotification('Select a USA Vehicle (Crusader, Paladin, Humvee, Ambulance, or Tomahawk) first.', 'error');
         return;
     }
     if (playerResources < cost) {
@@ -461,6 +462,118 @@ function purchaseVehicleDrone(droneType, cost) {
     playUSASound('radio_chirp');
     showNotification(`${droneType.toUpperCase()} Drone attached to vehicle!`, 'success');
     updateSidebar();
+}
+
+function unloadTransportPassengers(transport) {
+    const targets = transport ? [transport] : units.filter(u => u.selected && u.garrisoned && u.garrisoned.length > 0);
+    let count = 0;
+    targets.forEach(t => {
+        if (!t.garrisoned || t.garrisoned.length === 0) return;
+        const passengers = t.garrisoned.slice();
+        t.garrisoned = [];
+        passengers.forEach((p, idx) => {
+            p.garrisonedIn = null;
+            const angle = (idx / Math.max(1, passengers.length)) * Math.PI * 2;
+            const dropPos = t.mesh.position.clone().add(new THREE.Vector3(Math.cos(angle) * (t.radius + 1.8), 0, Math.sin(angle) * (t.radius + 1.8)));
+            dropPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropPos.x, dropPos.z) : 0;
+            p.mesh.position.copy(dropPos);
+            p.targetPosition.copy(dropPos);
+            p.mesh.visible = true;
+            count++;
+        });
+    });
+    if (count > 0) {
+        playAudio('click');
+        showNotification(`Disembarked ${count} passenger(s)!`, 'info');
+        updateSidebar();
+    }
+}
+
+function triggerHeroOrUnitAbility(unit, abilityType) {
+    if (!unit || unit.health <= 0) return;
+    if (abilityType === 'c4') {
+        const allHostile = [...enemyStructures, ...enemyUnits].filter(e => e.health > 0);
+        let nearest = null, bestD = 16;
+        allHostile.forEach(e => {
+            const p = e.position || (e.mesh && e.mesh.position);
+            if (!p) return;
+            const d = unit.mesh.position.distanceTo(p);
+            if (d < bestD) { bestD = d; nearest = e; }
+        });
+        if (!nearest) {
+            showNotification('Move Col. Burton closer to an enemy structure or vehicle to plant C4!', 'error');
+            return;
+        }
+        const tPos = (nearest.position || nearest.mesh.position).clone();
+        showNotification('Col. Burton planted Timed C4 Charge! Detonation in 2s...', 'warning');
+        setTimeout(() => {
+            if (nearest && nearest.health > 0) {
+                spawnExplosion(tPos, 0xff4757);
+                if (typeof triggerScreenShake === 'function') triggerScreenShake(1.0);
+                applyCalculatedDamage(unit, nearest, 450, 'EXPLOSIVE');
+            }
+        }, 2000);
+    } else if (abilityType === 'snipeDriver') {
+        const enemyVehicles = enemyUnits.filter(e => e.health > 0 && !e.isAir && !e.isUnmanned && typeof isInfantryType === 'function' && !isInfantryType(e.type));
+        let nearest = null, bestD = 36;
+        enemyVehicles.forEach(e => {
+            const d = unit.mesh.position.distanceTo(e.mesh.position);
+            if (d < bestD) { bestD = d; nearest = e; }
+        });
+        if (!nearest) {
+            showNotification('No enemy ground vehicle within Jarmen Kell snipe range!', 'error');
+            return;
+        }
+        spawnLaserBeam(unit.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), nearest.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xffffff, 4);
+        nearest.isUnmanned = true;
+        nearest.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 999999;
+        nearest.combatTarget = null;
+        showNotification(`Jarmen Kell sniped the driver of ${nearest.type.toUpperCase()}! Send any infantry to capture it!`, 'success');
+    } else if (abilityType === 'lotusHack') {
+        const allHostile = [...enemyStructures, ...enemyUnits].filter(e => e.health > 0);
+        let nearest = null, bestD = 26;
+        allHostile.forEach(e => {
+            const p = e.position || (e.mesh && e.mesh.position);
+            if (!p) return;
+            const d = unit.mesh.position.distanceTo(p);
+            if (d < bestD) { bestD = d; nearest = e; }
+        });
+        if (!nearest) {
+            showNotification('Move Black Lotus within range of an enemy structure or vehicle!', 'error');
+            return;
+        }
+        unit.combatTarget = nearest;
+        showNotification(`Black Lotus initiating cyber-link on ${nearest.type.toUpperCase()}...`, 'info');
+    } else if (abilityType === 'detonate') {
+        const pos = unit.mesh.position.clone();
+        const isBio = unit.bioBomb;
+        const dmg = (unit.type === 'bombtruck' ? (unit.highExplosive ? 480 : 340) : 220);
+        const rad = (unit.type === 'bombtruck' ? (unit.highExplosive ? 16 : 12) : 8);
+        spawnExplosion(pos, isBio ? 0x2ecc71 : 0xff4757);
+        if (isBio && typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(pos);
+        if (typeof triggerScreenShake === 'function') triggerScreenShake(unit.type === 'bombtruck' ? 1.3 : 0.7);
+        [...enemyUnits, ...enemyStructures].forEach(e => {
+            const ep = e.position || (e.mesh && e.mesh.position);
+            if (ep && ep.distanceTo(pos) <= rad) {
+                applyCalculatedDamage(unit, e, dmg, isBio ? 'TOXIN' : 'EXPLOSIVE');
+            }
+        });
+        unit.health = 0;
+    } else if (abilityType === 'flameWall') {
+        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), unit.mesh.rotation.y);
+        for (let i = -2; i <= 2; i++) {
+            const fPos = unit.mesh.position.clone().add(forward.clone().multiplyScalar(10)).add(new THREE.Vector3(i * 3.5, 0, 0));
+            if (typeof spawnFlamethrowerBurst === 'function') spawnFlamethrowerBurst(unit.mesh.position.clone(), fPos);
+            if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(fPos);
+        }
+        [...enemyUnits, ...enemyStructures].forEach(e => {
+            const ep = e.position || (e.mesh && e.mesh.position);
+            if (ep && ep.distanceTo(unit.mesh.position) <= 16) {
+                applyCalculatedDamage(unit, e, 55, 'FLAME');
+            }
+        });
+        showNotification('Dragon Tank unleashed Flame Wall!', 'warning');
+    }
 }
 
 function purchaseOverlordUpgrade(upgType, cost) {
@@ -750,6 +863,16 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                     desc: `Construct ${bName}`
                 };
             });
+            if (u.type === 'worker') {
+                currentGridSlots[9] = {
+                    id: 'harvest',
+                    name: 'HARVEST',
+                    badge: 'GATHER',
+                    disabled: false,
+                    action: () => orderSelectedHarvestersToGather(),
+                    desc: 'Dispatch Worker to gather supplies from Supply Stash / Dock'
+                };
+            }
             currentGridSlots[10] = {
                 id: 'stop',
                 name: 'STOP',
@@ -775,27 +898,59 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             ];
         }
 
-        // Vehicle Upgrades & Drones
-        if (['crusader', 'paladin', 'humvee'].includes(u.type)) {
+        // Vehicle Upgrades, Drones & Special Unit Abilities
+        if (['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk'].includes(u.type)) {
+            const activeDrone = u.drone ? u.drone.type : null;
             currentGridSlots.push(
-                { name: 'BATTLE DRONE', cost: 300, badge: 'DRONE', action: () => purchaseVehicleDrone('battle', 300), desc: 'Repairs hull (+3 HP/s) and suppresses infantry' },
-                { name: 'SCOUT DRONE', cost: 100, badge: 'VISION', action: () => purchaseVehicleDrone('scout', 100), desc: '+50% Sight range & reconnaissance sweep' },
-                { name: 'HELLFIRE DRONE', cost: 500, badge: 'MISSILE', action: () => purchaseVehicleDrone('hellfire', 500), desc: 'Launches miniature guided anti-tank missiles' }
+                { name: 'BATTLE DRONE', cost: 300, badge: activeDrone === 'battle' ? 'ACTIVE' : 'DRONE', action: () => purchaseVehicleDrone('battle', 300), desc: 'Orbiting combat & repair drone: MG suppresses infantry, PDL intercepts missiles, repairs hull (+5 HP/s)' },
+                { name: 'SCOUT DRONE', cost: 100, badge: activeDrone === 'scout' ? 'ACTIVE' : 'VISION', action: () => purchaseVehicleDrone('scout', 100), desc: '+50% Sight/Scan range & detects stealth units/mines' },
+                { name: 'HELLFIRE DRONE', cost: 500, badge: activeDrone === 'hellfire' ? 'ACTIVE' : 'MISSILE', action: () => purchaseVehicleDrone('hellfire', 500), desc: 'Launches guided armor-piercing Hellfire missiles at vehicles & structures' }
             );
         } else if (u.type === 'overlord') {
             currentGridSlots.push(
-                { name: 'BUNKER TOWER', cost: 500, badge: 'TOWER', action: () => purchaseOverlordUpgrade('bunker', 500), desc: 'Garrison bunker pillbox for troops firing 360°' },
-                { name: 'GATLING TOWER', cost: 1200, badge: 'TOWER', action: () => purchaseOverlordUpgrade('gatling', 1200), desc: 'Twin 20mm rotary anti-air/anti-infantry turret' },
-                { name: 'PROPAGANDA', cost: 500, badge: 'TOWER', action: () => purchaseOverlordUpgrade('propaganda', 500), desc: 'Heals friendly armor (+4 HP/s) & buffs fire rate 25%' }
+                { name: 'BUNKER TOWER', cost: 500, badge: u.overlordUpgrade === 'bunker' ? 'ACTIVE' : 'TOWER', action: () => purchaseOverlordUpgrade('bunker', 500), desc: 'Garrison bunker pillbox for up to 5 troops firing 360°' },
+                { name: 'GATLING TOWER', cost: 1200, badge: u.overlordUpgrade === 'gatling' ? 'ACTIVE' : 'TOWER', action: () => purchaseOverlordUpgrade('gatling', 1200), desc: 'Twin 20mm rotary anti-air/anti-infantry turret & stealth detection' },
+                { name: 'PROPAGANDA', cost: 500, badge: u.overlordUpgrade === 'propaganda' ? 'ACTIVE' : 'TOWER', action: () => purchaseOverlordUpgrade('propaganda', 500), desc: 'Heals friendly armor (+4 HP/s) & buffs fire rate +25%' }
             );
         } else if (u.type === 'nukecannon' || u.type === 'nuketank') {
             currentGridSlots.push(
                 { name: 'OUTRIGGERS', badge: 'DEPLOY', action: () => deployNukeCannonOutriggers(u), desc: 'Deploy hydraulic stabilization legs for siege artillery' },
-                { name: 'NEUTRON SHELLS', cost: 1000, badge: 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
+                { name: 'NEUTRON SHELLS', cost: 1000, badge: u.neutronShells ? 'ACTIVE' : 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
             );
-        } else if (u.type === 'truck' || u.type === 'worker') {
+        } else if (u.type === 'truck' || u.type === 'chinook') {
             currentGridSlots.push(
                 { name: 'HARVEST', badge: 'GATHER', action: () => orderSelectedHarvestersToGather(), desc: 'Dispatch to nearest supply depot' }
+            );
+        } else if (u.type === 'burton') {
+            currentGridSlots.push(
+                { name: 'TIMED C4', badge: 'DEMO', action: () => triggerHeroOrUnitAbility(u, 'c4'), desc: 'Plant Timed C4 Charge on nearest enemy structure or vehicle (450 Demo Damage)' }
+            );
+        } else if (u.type === 'jarmen') {
+            currentGridSlots.push(
+                { name: 'SNIPE DRIVER', badge: 'SNIPE', action: () => triggerHeroOrUnitAbility(u, 'snipeDriver'), desc: 'Eliminate enemy vehicle driver so any friendly infantry can capture it' }
+            );
+        } else if (u.type === 'blacklotus') {
+            currentGridSlots.push(
+                { name: 'CYBER HACK', badge: 'HACK', action: () => triggerHeroOrUnitAbility(u, 'lotusHack'), desc: 'Capture building, steal $1000 from Supply Center, or disable enemy vehicle' }
+            );
+        } else if (u.type === 'terrorist' || u.type === 'bombtruck') {
+            currentGridSlots.push(
+                { name: 'DETONATE', badge: 'BOOM', action: () => triggerHeroOrUnitAbility(u, 'detonate'), desc: 'Detonate explosive payload immediately' }
+            );
+            if (u.type === 'bombtruck') {
+                currentGridSlots.push(
+                    { name: 'HIGH EXPLOSIVE', cost: 500, badge: u.highExplosive ? 'ACTIVE' : 'UPGRADE', action: () => { if (playerResources >= 500 && !u.highExplosive) { playerResources -= 500; u.highExplosive = true; showNotification('High-Explosive payload installed on Bomb Truck!', 'success'); updateSidebar(); } }, desc: 'Boosts blast damage and radius by +40%' },
+                    { name: 'BIO-BOMB', cost: 500, badge: u.bioBomb ? 'ACTIVE' : 'TOXIN', action: () => { if (playerResources >= 500 && !u.bioBomb) { playerResources -= 500; u.bioBomb = true; showNotification('Anthrax Bio-Bomb payload installed on Bomb Truck!', 'success'); updateSidebar(); } }, desc: 'Releases lethal Anthrax toxin cloud on detonation' }
+                );
+            }
+        } else if (u.type === 'dragon' || u.type === 'dragonTank') {
+            currentGridSlots.push(
+                { name: 'FLAME WALL', badge: 'FIRESTORM', action: () => triggerHeroOrUnitAbility(u, 'flameWall'), desc: 'Unleash a sweeping arc of napalm fire across the front sector' }
+            );
+        }
+        if (u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0) {
+            currentGridSlots.push(
+                { name: `EVACUATE (${u.garrisoned.length})`, badge: 'UNLOAD', action: () => unloadTransportPassengers(u), desc: 'Disembark all embarked passengers immediately' }
             );
         }
     } else {
@@ -2990,7 +3145,7 @@ function updateHUD() {
             if (type === 'tank' || type === 'crusader') { mesh = createCrusaderTankMesh(false); radius = 3.6; speed = 0.15; health = 480; scanRange = 24; }
             else if (type === 'paladin') { mesh = createPaladinTankMesh(false); radius = 3.6; speed = 0.14; health = 550; scanRange = 26; }
             else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; capacity = 5; garrisoned = []; }
-            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 15; }
+            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 18; capacity = 4; garrisoned = []; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 3.2; speed = 0.11; health = 220; scanRange = 38; }
             else if (type === 'dozer') { mesh = createUSADozerMesh(); radius = 3.2; speed = 0.10; health = 300; }
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; }
@@ -3089,19 +3244,24 @@ function updateHUD() {
 
             const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
             const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
+            const isNaturalStealth = ['stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker'].includes(type) ||
+                (type === 'comanche' && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche'));
             const newUnitObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
                 speed: speed, radius: radius, selectionCircle: null, taskState: 'Idle',
-                aiState: isGatherer ? 'MovingToDock' : 'Idle',
+                aiState: isGatherer ? (type === 'worker' ? 'Idle' : 'MovingToDock') : 'Idle',
                 cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
-                health: health, maxHealth: health, scanRange: scanRange, netId: myNetId,
+                health: health, maxHealth: health, scanRange: scanRange, _baseScanRange: scanRange, netId: myNetId,
                 attackCooldown: 0, combatTarget: null, isAir: isAir,
                 airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
                 patrolCenter: position ? position.clone() : new THREE.Vector3(),
                 circleAngle: Math.random() * Math.PI * 2,
                 circleRadius: (type === 'comanche' || type === 'chinook') ? 11.0 : 15.0,
                 capacity: capacity || 0, garrisoned: garrisoned || [], waypoints: [],
+                kills: 0,
                 veterancy: initialVeterancy,
+                isStealthed: isNaturalStealth,
+                detectsStealth: ['crawler', 'dozer', 'worker', 'pathfinder', 'blacklotus', 'burton', 'jarmen', 'radarvan'].includes(type),
                 compositeArmor: (typeof researchedTechs !== 'undefined' && researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')),
                 shoesApplied: (typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes') && type === 'worker')
             };
@@ -3117,6 +3277,16 @@ function updateHUD() {
             newUnitObj.ownerId = 'player';
             newUnitObj.isAI = false;
             units.push(newUnitObj);
+            if (type === 'crawler') {
+                for (let rg = 0; rg < 4; rg++) {
+                    const passenger = spawnUnit('redguard', position.clone());
+                    if (passenger) {
+                        passenger.mesh.visible = false;
+                        passenger.garrisonedIn = newUnitObj;
+                        newUnitObj.garrisoned.push(passenger);
+                    }
+                }
+            }
             if (isMultiplayerActive && netConn && netConn.open) {
                 broadcastNetPacket({
                     type: 'spawn_unit',

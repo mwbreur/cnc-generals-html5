@@ -755,7 +755,7 @@
         }
 
         function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium') {
-            // Enemy Command Center
+            // Authentic C&C Generals Skirmish Start: Enemy starts with 1 Command Center + 1 Construction Builder (Dozer / Worker)
             const ccType = 'center';
             const ccGroup = faction === 'china' ? createChinaCommandCenter() : faction === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
             if (!ccGroup.userData || !ccGroup.userData.isW3D) ccGroup.scale.set(1.35, 1.35, 1.35);
@@ -768,92 +768,38 @@
                 netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
             });
 
-            // Enemy Power / Reactor / Supply Stash
-            const pwrPos = pos.clone().add(new THREE.Vector3(faction === 'gla' ? -22 : -25, 0, -22));
-            pwrPos.y = getTerrainHeight(pwrPos.x, pwrPos.z);
-            let pwrGroup;
-            if (faction === 'china') pwrGroup = createChinaNuclearReactor();
-            else if (faction === 'gla') pwrGroup = createGLASupplyStash();
-            else pwrGroup = createUSAColdFusionReactor();
-            if (!pwrGroup.userData || !pwrGroup.userData.isW3D) pwrGroup.scale.set(1.35, 1.35, 1.35);
-            pwrGroup.position.copy(pwrPos);
-            pwrGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(pwrGroup);
-            enemyStructures.push({
-                type: faction === 'gla' ? 'supplyStash' : 'power', faction: faction, position: pwrPos, mesh: pwrGroup,
-                health: 1200, maxHealth: 1200, radius: 8 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
-
-            // Enemy War Factory / Arms Dealer
-            const facPos = pos.clone().add(new THREE.Vector3(26, 0, -20));
-            facPos.y = getTerrainHeight(facPos.x, facPos.z);
-            const facGroup = faction === 'china' ? createChinaWarFactory() : faction === 'gla' ? createGLAArmsDealer(false) : createUSAWarFactory();
-            if (!facGroup.userData || !facGroup.userData.isW3D) facGroup.scale.set(1.35, 1.35, 1.35);
-            facGroup.position.copy(facPos);
-            facGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(facGroup);
-            enemyStructures.push({
-                type: 'factory', faction: faction, position: facPos, mesh: facGroup,
-                health: 1600, maxHealth: 1600, radius: 10 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
-
-            // Enemy Barracks
-            const barPos = pos.clone().add(new THREE.Vector3(-22, 0, 22));
-            barPos.y = getTerrainHeight(barPos.x, barPos.z);
-            const barGroup = faction === 'china' ? createChinaBarracks() : faction === 'gla' ? createGLABarracks(false) : createUSABarracks();
-            if (!barGroup.userData || !barGroup.userData.isW3D) barGroup.scale.set(1.35, 1.35, 1.35);
-            barGroup.position.copy(barPos);
-            barGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(barGroup);
-            enemyStructures.push({
-                type: 'barracks', faction: faction, position: barPos, mesh: barGroup,
-                health: 1000, maxHealth: 1000, radius: 8 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
-
-            // Enemy Perimeter Defense
-            const defPos = pos.clone().add(new THREE.Vector3(18, 0, 26));
-            defPos.y = getTerrainHeight(defPos.x, defPos.z);
-            let defGroup;
-            if (faction === 'china') defGroup = createChinaGatlingCannon();
-            else if (faction === 'gla') defGroup = createGLAStingerSite();
-            else defGroup = createUSAPatriotBattery();
-            if (!defGroup.userData || !defGroup.userData.isW3D) defGroup.scale.set(1.35, 1.35, 1.35);
-            defGroup.position.copy(defPos);
-            defGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(defGroup);
-            enemyStructures.push({
-                type: faction === 'china' ? 'gatlingCannon' : faction === 'gla' ? 'stingerSite' : 'patriot',
-                faction: faction, position: defPos, mesh: defGroup,
-                health: 900, maxHealth: 900, radius: 5.5 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
             matchStartTime = Date.now();
 
-            // Spawn Initial Guard units for AI
-            const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'tank';
-            for (let i = 0; i < 2; i++) {
-                const uPos = pos.clone().add(new THREE.Vector3(10 + i * 5, 0, 10 + i * 4));
-                const eu = spawnEnemyUnit(tankType, uPos);
-                if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
+            // Spawn AI Starting Construction Builder (Dozer for USA/China, Worker for GLA)
+            const builderType = faction === 'gla' ? 'worker' : 'dozer';
+            const startUnitsEl = document.getElementById('starting-units');
+            const startMode = startUnitsEl ? startUnitsEl.value : 'standard';
+            const numBuilders = startMode === 'heavy' ? 2 : 1;
+
+            for (let b = 0; b < numBuilders; b++) {
+                const bPos = pos.clone().add(new THREE.Vector3(14 + b * 5, 0, 12));
+                bPos.y = getTerrainHeight(bPos.x, bPos.z);
+                const builderUnit = spawnEnemyUnit(builderType, bPos, null, faction);
+                if (builderUnit) {
+                    builderUnit.teamId = teamId;
+                    builderUnit.ownerId = ownerId;
+                    builderUnit.isAI = true;
+                    builderUnit.difficulty = difficulty;
+                    builderUnit.aiState = 'Idle';
+                    builderUnit.taskState = 'Idle';
+                }
             }
-            if (faction === 'usa') {
-                const cPos = pos.clone().add(new THREE.Vector3(12, 4.5, 12));
-                const eu = spawnEnemyUnit('chinook', cPos);
-                if (eu) {
-                    eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty;
-                    eu.aiState = 'MovingToDock';
-                    eu.taskState = 'Idle';
-                    eu.airState = 'hovering';
-                    eu.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(eu.mesh.position) : null;
-                    if (eu.supplyTarget) {
-                        eu.targetPosition.copy(eu.supplyTarget.position);
-                        eu.airState = 'flying';
-                    }
+
+            if (startMode === 'light' || startMode === 'heavy') {
+                const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'crusader';
+                const numTanks = startMode === 'heavy' ? 2 : 1;
+                for (let i = 0; i < numTanks; i++) {
+                    const uPos = pos.clone().add(new THREE.Vector3(10 + i * 5, 0, -14));
+                    uPos.y = getTerrainHeight(uPos.x, uPos.z);
+                    const eu = spawnEnemyUnit(tankType, uPos, null, faction);
+                    if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
                 }
             }
         }

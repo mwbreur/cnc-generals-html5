@@ -1109,6 +1109,10 @@
         }
 
         function attachVehicleDrone(vehicle, droneType) {
+            if (!vehicle || !vehicle.mesh) return;
+            if (!vehicle._baseScanRange) {
+                vehicle._baseScanRange = vehicle.scanRange || 25;
+            }
             if (vehicle.drone && vehicle.drone.mesh) {
                 scene.remove(vehicle.drone.mesh);
                 vehicle.drone.mesh.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
@@ -1123,12 +1127,18 @@
                 type: droneType,
                 mesh: mesh,
                 timer: 0,
-                cooldown: 0
+                cooldown: 0,
+                pdlCooldown: 0,
+                repairCooldown: 0
             };
 
-            // Scout drone boosts vision
+            // Scout drone boosts vision (+50% sight/scan range & stealth detection)
             if (droneType === 'scout') {
-                vehicle.scanRange = Math.round(vehicle.scanRange * 1.5);
+                vehicle.scanRange = Math.round(vehicle._baseScanRange * 1.5);
+                vehicle.detectsStealth = true;
+            } else {
+                vehicle.scanRange = vehicle._baseScanRange;
+                vehicle.detectsStealth = false;
             }
 
             playAudio('radio_chirp');

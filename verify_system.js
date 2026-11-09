@@ -729,4 +729,95 @@ vm.runInContext(`
 `, sandbox);
 console.log("✓ Verified 195 official cameos, 25 shell/HUD graphics, all 12 official EA skirmish maps (HeightMapData + spawns + supply docks + TGA previews), SAGE dry-valley water fix, and minimap terrain + fog radar rendering.");
 
+// 14. Test Veterancy Kill Counter, USA Vehicle Drones, Special Unit Mechanics & AI Builder Requirement
+vm.runInContext(`
+    {
+        units = [];
+        enemyUnits = [];
+        structures = [];
+        enemyStructures = [];
+        researchedTechs.clear();
+
+        // A. Verify Kills = 0 Initialization & Veterancy Promotion on Kill
+        const paladin = spawnUnit('paladin', new THREE.Vector3(0, 0, 0));
+        if (paladin.kills !== 0 || paladin.veterancy !== 0) {
+            throw new Error("Expected new Paladin to start with kills: 0, veterancy: 0, got: " + JSON.stringify({ kills: paladin.kills, vet: paladin.veterancy }));
+        }
+        for (let k = 1; k <= 2; k++) {
+            const victim = spawnEnemyUnit('rebel', new THREE.Vector3(5, 0, 0));
+            applyCalculatedDamage(paladin, victim, 500, 'EXPLOSIVE');
+        }
+        if (paladin.kills !== 2 || paladin.veterancy < 1) {
+            throw new Error("Expected Paladin to reach 2 kills and Veteran rank (veterancy >= 1), got kills=" + paladin.kills + ", vet=" + paladin.veterancy);
+        }
+
+        // B. Verify Passenger Fireport Kill Credit (Rockvee: Missile Defender inside Humvee)
+        const humvee = spawnUnit('humvee', new THREE.Vector3(10, 0, 0));
+        const md = spawnUnit('rocket', new THREE.Vector3(10, 0, 0));
+        md.garrisonedIn = humvee;
+        humvee.garrisoned.push(md);
+        const enemyTank = spawnEnemyUnit('scorpion', new THREE.Vector3(18, 0, 0));
+        applyCalculatedDamage(md, enemyTank, 999, 'EXPLOSIVE');
+        if (md.kills !== 1 || humvee.kills !== 1) {
+            throw new Error("Expected passenger kill to credit both passenger and transport Humvee! Got md.kills=" + md.kills + ", humvee.kills=" + humvee.kills);
+        }
+
+        // C. Verify USA Vehicle Drones (Scout, Battle, Hellfire)
+        const baseRange = paladin._baseScanRange;
+        attachVehicleDrone(paladin, 'scout');
+        if (!paladin.drone || paladin.drone.type !== 'scout' || !paladin.detectsStealth || paladin.scanRange !== Math.round(baseRange * 1.5)) {
+            throw new Error("Scout drone failed to boost scanRange by 1.5x or enable detectsStealth!");
+        }
+        // Re-attaching scout drone must not stack scanRange infinitely
+        attachVehicleDrone(paladin, 'scout');
+        if (paladin.scanRange !== Math.round(baseRange * 1.5)) {
+            throw new Error("Scout drone stacked scanRange improperly: " + paladin.scanRange);
+        }
+        attachVehicleDrone(paladin, 'battle');
+        if (paladin.drone.type !== 'battle' || paladin.scanRange !== baseRange) {
+            throw new Error("Battle drone switch failed to restore base scanRange!");
+        }
+        attachVehicleDrone(paladin, 'hellfire');
+        if (paladin.drone.type !== 'hellfire') {
+            throw new Error("Hellfire drone failed to attach!");
+        }
+
+        // D. Verify Special Unit Mechanics (Troop Crawler pre-loaded Red Guards, Jarmen Kell Driver Snipe, Hijacker)
+        const crawler = spawnUnit('crawler', new THREE.Vector3(0, 0, 20));
+        if (!crawler.garrisoned || crawler.garrisoned.length !== 4 || !crawler.detectsStealth) {
+            throw new Error("China Troop Crawler should spawn with 4 garrisoned Red Guards and stealth detection!");
+        }
+        const jarmen = spawnUnit('jarmen', new THREE.Vector3(0, 0, 0));
+        const targetEnemyTank = spawnEnemyUnit('battlemaster', new THREE.Vector3(10, 0, 0));
+        executeWeaponFire(jarmen, targetEnemyTank);
+        if (!targetEnemyTank.isUnmanned) {
+            throw new Error("Jarmen Kell failed to snipe enemy vehicle driver (targetEnemyTank.isUnmanned should be true)!");
+        }
+
+        // E. Verify Skirmish AI Builder Requirement (Cannot build without a live Dozer/Worker!)
+        enemyUnits = [];
+        enemyStructures = [];
+        deployEnemyBase(new THREE.Vector3(100, 0, 100), 'china', 'ai_test', 2, 'medium');
+        const aiCC = enemyStructures.filter(es => es.ownerId === 'ai_test');
+        const aiBuilders = enemyUnits.filter(eu => eu.ownerId === 'ai_test' && eu.type === 'dozer');
+        if (aiCC.length !== 1 || aiCC[0].type !== 'center' || aiBuilders.length < 1) {
+            throw new Error("deployEnemyBase should spawn 1 Command Center and at least 1 Builder Dozer, got structures=" + aiCC.length + ", dozers=" + aiBuilders.length);
+        }
+
+        const testCmd = { ownerId: 'ai_test', teamId: 2, faction: 'china', difficulty: 'medium', basePos: new THREE.Vector3(100, 0, 100), resources: 10000 };
+        // 1. With live AI Dozer: spawnAIStructure creates an unfinished foundation (isBuilding: true, buildProgress: 0) and assigns the Dozer!
+        const builtReactor = spawnAIStructure(testCmd, 'nuclearReactor', new THREE.Vector3(80, 0, 80), aiBuilders[0]);
+        if (!builtReactor || !builtReactor.isBuilding || builtReactor.buildProgress !== 0 || builtReactor.dozerRef !== aiBuilders[0]) {
+            throw new Error("spawnAIStructure should create an unfinished foundation (isBuilding: true, buildProgress: 0) with dozerRef assigned!");
+        }
+        // 2. Kill all AI Dozers: spawnAIStructure MUST return null (cannot build without a builder!)
+        aiBuilders.forEach(b => { b.health = 0; });
+        const blockedStruct = spawnAIStructure(testCmd, 'barracks', new THREE.Vector3(80, 0, 120), null);
+        if (blockedStruct !== null) {
+            throw new Error("spawnAIStructure allowed AI to place a structure with 0 live builders!");
+        }
+    }
+`, sandbox);
+console.log("✓ Verified Veterancy Kill Counter, Passenger Fireports, USA Vehicle Drones (Scout/Battle/Hellfire), Special Unit Mechanics, and AI Builder Requirement.");
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

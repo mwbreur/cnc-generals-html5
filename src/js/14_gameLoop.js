@@ -388,6 +388,32 @@ function animate() {
                             dMesh.traverse(c => { if (c.name && c.name.toLowerCase().includes('prop')) drone._propNodes.push(c); });
                         }
                         for (let pi = 0; pi < drone._propNodes.length; pi++) drone._propNodes[pi].rotation.y += 0.65;
+
+                        // Scout Drone Function: +50% Sight/Scan Range & Active Stealth/Mine Detection within 32 units
+                        unit.detectsStealth = true;
+                        if (unit._baseScanRange) unit.scanRange = Math.round(unit._baseScanRange * 1.5);
+                        if (drone.timer % 20 === 0) {
+                            const detectR2 = 32.0 * 32.0;
+                            const uX = unit.mesh.position.x, uZ = unit.mesh.position.z;
+                            enemyUnits.forEach(eu => {
+                                if (eu.health > 0 && eu.mesh && !isFriendly(unit, eu)) {
+                                    const dx = eu.mesh.position.x - uX, dz = eu.mesh.position.z - uZ;
+                                    if (dx * dx + dz * dz <= detectR2) {
+                                        eu.isStealthed = false;
+                                        eu.revealedUntil = buildingTick + 120;
+                                    }
+                                }
+                            });
+                            enemyStructures.forEach(es => {
+                                if (es.health > 0 && es.position && !isFriendly(unit, es)) {
+                                    const dx = es.position.x - uX, dz = es.position.z - uZ;
+                                    if (dx * dx + dz * dz <= detectR2) {
+                                        es.isStealthed = false;
+                                        es.revealedUntil = buildingTick + 120;
+                                    }
+                                }
+                            });
+                        }
                     } else if (drone.type === 'hellfire') {
                         // Hellfire Drone: flies like the recon drone with horizontal flight attitude, circling the host vehicle
                         if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
@@ -478,12 +504,16 @@ function animate() {
                         }
                     }
 
-                    // Battle Drone: Repairs vehicle + fires micro-gun at hostile infantry
+                    // Battle Drone: Repairs host vehicle (+5 HP/s with welding arc) + fires micro-MG at hostile targets (credits kills to host!)
                     if (drone.type === 'battle') {
                         if (drone.timer % 60 === 0 && unit.health < unit.maxHealth) {
-                            unit.health = Math.min(unit.maxHealth, unit.health + 3);
+                            unit.health = Math.min(unit.maxHealth, unit.health + 5);
+                            if (typeof spawnLaserBeam === 'function') {
+                                spawnLaserBeam(dMesh.position.clone(), unit.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0x00d2d3, 1.5);
+                            }
+                            if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
                         }
-                        if (drone.timer % 40 === 0) {
+                        if (drone.timer % 35 === 0) {
                             const dmX = dMesh.position.x;
                             const dmZ = dMesh.position.z;
                             const maxDistSq = 18.0 * 18.0;
@@ -499,30 +529,44 @@ function animate() {
                                 if (muzzleNode) muzzleNode.getWorldPosition(muzzlePos);
                                 spawnBulletTracer(muzzlePos, enemyInf.mesh.position, 0x00d2d3, 1.5);
                                 playAudio('machine_gun');
-                                enemyInf.health -= 12;
+                                applyCalculatedDamage(unit, enemyInf, 16, 'SMALL_ARMS');
                             }
                         }
                     }
 
-                    // Hellfire Drone: Launches mini-Hellfire rockets at hostile armor
+                    // Hellfire Drone: Launches guided armor-piercing Hellfire missiles at hostile vehicles & structures (credits kills to host!)
                     if (drone.type === 'hellfire') {
-                        if (drone.timer % 90 === 0) {
+                        if (drone.timer % 80 === 0) {
                             const dmX = dMesh.position.x;
                             const dmZ = dMesh.position.z;
-                            const maxDistSq = 22.0 * 22.0;
-                            const enemyArmor = getLivingUnits().find(e => {
+                            const maxDistSq = 24.0 * 24.0;
+                            let hellfireTarget = getLivingUnits().find(e => {
                                 if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
                                 const dx = e.mesh.position.x - dmX;
                                 const dz = e.mesh.position.z - dmZ;
                                 return (dx * dx + dz * dz) <= maxDistSq;
                             });
-                            if (enemyArmor) {
+                            if (!hellfireTarget) {
+                                hellfireTarget = enemyStructures.find(es => {
+                                    if (es.health <= 0 || !es.position || isFriendly(unit, es)) return false;
+                                    const dx = es.position.x - dmX;
+                                    const dz = es.position.z - dmZ;
+                                    return (dx * dx + dz * dz) <= maxDistSq;
+                                });
+                            }
+                            if (hellfireTarget) {
                                 let launchPos = dMesh.position.clone();
                                 const pylonNode = getCachedNode(dMesh, 'WEAPONA');
                                 if (pylonNode) pylonNode.getWorldPosition(launchPos);
-                                spawnRocketProjectile(launchPos, enemyArmor.mesh.position, false, false);
+                                const tPos = (hellfireTarget.position || hellfireTarget.mesh.position).clone();
+                                spawnRocketProjectile(launchPos, tPos, false, false, {
+                                    attacker: unit,
+                                    target: hellfireTarget,
+                                    damage: 48,
+                                    damageType: 'ARMOR_PIERCING',
+                                    splashRadius: 1.5
+                                });
                                 playAudio('missile_launch');
-                                enemyArmor.health -= 35;
                             }
                         }
                     }
@@ -534,9 +578,9 @@ function animate() {
                     const uX = unit.mesh.position.x;
                     const uZ = unit.mesh.position.z;
 
-                    // Overlord Bunker: 2 troops shoot 360 degrees
+                    // Overlord Bunker: Garrisoned troops or default bunker crew shoot 360 degrees
                     if (unit.overlordUpgrade === 'bunker' && unit.upgTimer % 45 === 0) {
-                        const maxDistSq = 18.0 * 18.0;
+                        const maxDistSq = 20.0 * 20.0;
                         const target = getLivingUnits().find(e => {
                             if (e.health <= 0 || isFriendly(unit, e)) return false;
                             const dx = e.mesh.position.x - uX;
@@ -546,39 +590,137 @@ function animate() {
                         if (target) {
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf39c12, 2.5);
                             playAudio('china_cannon', {}, 'china');
-                            target.health -= 22;
+                            applyCalculatedDamage(unit, target, 24, 'SMALL_ARMS');
                         }
                     }
 
-                    // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret
-                    if (unit.overlordUpgrade === 'gatling' && unit.upgTimer % 12 === 0) {
-                        const maxDistSq = 20.0 * 20.0;
-                        const target = getLivingUnits().find(e => {
-                            if (e.health <= 0 || isFriendly(unit, e)) return false;
-                            const dx = e.mesh.position.x - uX;
-                            const dz = e.mesh.position.z - uZ;
-                            return (dx * dx + dz * dz) <= maxDistSq;
-                        });
-                        if (target) {
-                            spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
-                            spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
-                            playAudio('gatling_fire', {}, 'china');
-                            target.health -= 18;
+                    // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret + stealth detection
+                    if (unit.overlordUpgrade === 'gatling') {
+                        unit.detectsStealth = true;
+                        if (unit.upgTimer % 15 === 0) {
+                            const maxDistSq = 22.0 * 22.0;
+                            const target = getLivingUnits().find(e => {
+                                if (e.health <= 0 || isFriendly(unit, e)) return false;
+                                const dx = e.mesh.position.x - uX;
+                                const dz = e.mesh.position.z - uZ;
+                                return (dx * dx + dz * dz) <= maxDistSq;
+                            });
+                            if (target) {
+                                spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
+                                spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
+                                playAudio('gatling_fire', {}, 'china');
+                                applyCalculatedDamage(unit, target, 18, 'GATLING');
+                            }
                         }
                     }
 
-                    // Overlord Propaganda Tower: Heals nearby allies (+3 HP/s) and pulses soundwaves
+                    // Overlord Propaganda Tower: Heals nearby allies (+4 HP/s) and grants Horde fire-rate buff (+25%)
                     if (unit.overlordUpgrade === 'propaganda' && unit.upgTimer % 60 === 0) {
                         const maxDistSq = 18.0 * 18.0;
                         units.forEach(ally => {
-                            if (ally.health > 0) {
+                            if (ally.health > 0 && ally.mesh) {
                                 const dx = ally.mesh.position.x - uX;
                                 const dz = ally.mesh.position.z - uZ;
                                 if ((dx * dx + dz * dz) <= maxDistSq) {
                                     ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                                    ally.isHordeActive = true;
                                 }
                             }
                         });
+                    }
+                }
+
+                // 4. USA Ambulance Field Medic & Decontamination Aura
+                if (unit.type === 'ambulance' && unit.health > 0 && buildingTick % 30 === 0) {
+                    const ambX = unit.mesh.position.x, ambZ = unit.mesh.position.z;
+                    const healR2 = 16.0 * 16.0;
+                    const myTeamList = unit.isAI ? enemyUnits : units;
+                    myTeamList.forEach(ally => {
+                        if (ally.health > 0 && ally.health < ally.maxHealth && ally.mesh) {
+                            const dx = ally.mesh.position.x - ambX, dz = ally.mesh.position.z - ambZ;
+                            if (dx * dx + dz * dz <= healR2) {
+                                ally.health = Math.min(ally.maxHealth, ally.health + 6);
+                            }
+                        }
+                    });
+                    if (unit.garrisoned && unit.garrisoned.length > 0) {
+                        unit.garrisoned.forEach(p => {
+                            if (p.health > 0 && p.health < p.maxHealth) p.health = Math.min(p.maxHealth, p.health + 8);
+                        });
+                    }
+                }
+
+                // 5. China Hacker Autonomous Internet Cash Hacking (when stationary)
+                if (unit.type === 'hacker' && unit.health > 0 && !unit.combatTarget) {
+                    const moveDist = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                    if (moveDist < 0.8) {
+                        unit._hackTimer = (unit._hackTimer || 0) + 1;
+                        if (unit._hackTimer >= 120) {
+                            unit._hackTimer = 0;
+                            const hackGain = 6 + (unit.veterancy || 0) * 2;
+                            if (!unit.isAI) {
+                                playerResources += hackGain;
+                                if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(unit.mesh.position, hackGain);
+                                if (typeof updateHUD === 'function') updateHUD();
+                            }
+                        }
+                    }
+                }
+
+                // 6. Dozer & Worker Mine / Demo Trap Sweeping + China Troop Crawler Stealth Detection
+                if ((unit.type === 'dozer' || unit.type === 'worker' || unit.type === 'crawler') && unit.health > 0 && buildingTick % 30 === 0) {
+                    const sweepR2 = (unit.type === 'crawler' ? 28.0 * 28.0 : 12.0 * 12.0);
+                    const uX = unit.mesh.position.x, uZ = unit.mesh.position.z;
+                    enemyUnits.forEach(eu => {
+                        if (eu.health > 0 && eu.mesh && !isFriendly(unit, eu)) {
+                            const dx = eu.mesh.position.x - uX, dz = eu.mesh.position.z - uZ;
+                            if (dx * dx + dz * dz <= sweepR2) {
+                                eu.isStealthed = false;
+                                eu.revealedUntil = buildingTick + 90;
+                            }
+                        }
+                    });
+                    if ((unit.type === 'dozer' || unit.type === 'worker') && typeof landmines !== 'undefined' && landmines.length > 0) {
+                        for (let mi = landmines.length - 1; mi >= 0; mi--) {
+                            const mine = landmines[mi];
+                            if (mine && !isFriendly(unit, mine) && mine.position) {
+                                const dx = mine.position.x - uX, dz = mine.position.z - uZ;
+                                if (dx * dx + dz * dz <= 12.0 * 12.0) {
+                                    if (mine.mesh) scene.remove(mine.mesh);
+                                    landmines.splice(mi, 1);
+                                    if (!unit.isAI && typeof showNotification === 'function') {
+                                        showNotification(`${unit.type.toUpperCase()} disarmed hostile landmine!`, 'info');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 7. Unmanned Vehicle Re-Crewing (Any infantry touching a vehicle whose driver was sniped by Jarmen Kell captures it!)
+                if (typeof isInfantryType === 'function' && isInfantryType(unit.type) && unit.health > 0 && !unit.garrisonedIn) {
+                    const allVehicles = [...enemyUnits, ...units].filter(v => v.isUnmanned && v.health > 0 && v.mesh);
+                    for (let uv of allVehicles) {
+                        if (unit.mesh.position.distanceTo(uv.mesh.position) <= (uv.radius || 2.5) + 2.0) {
+                            if (enemyUnits.includes(uv) && !unit.isAI) {
+                                enemyUnits.splice(enemyUnits.indexOf(uv), 1);
+                                units.push(uv);
+                            } else if (units.includes(uv) && unit.isAI) {
+                                units.splice(units.indexOf(uv), 1);
+                                enemyUnits.push(uv);
+                            }
+                            uv.teamId = unit.teamId;
+                            uv.ownerId = unit.ownerId;
+                            uv.isAI = unit.isAI;
+                            uv.isUnmanned = false;
+                            uv.disabledUntil = 0;
+                            uv.combatTarget = null;
+                            unit.health = 0;
+                            if (!unit.isAI && typeof showNotification === 'function') {
+                                showNotification(`${unit.type.toUpperCase()} crewed and captured unmanned ${uv.type.toUpperCase()}!`, 'success');
+                            }
+                            break;
+                        }
                     }
                 }
             });
@@ -676,8 +818,9 @@ function animate() {
             processBuildingFunctions();
 
             let constructionActive = false;
-            structures.forEach(s => {
-                if (!s.isBuilding) return;
+            const allConstructing = [...structures, ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+            allConstructing.forEach(s => {
+                if (!s || !s.isBuilding || s.health <= 0) return;
                 
                 if (s.dozerRef && s.dozerRef.health > 0) {
                     const dPos = s.dozerRef.mesh.position;
@@ -694,14 +837,17 @@ function animate() {
                             s.dozerRef.mesh.rotation.y = Math.atan2(-toZ, toX) + Math.PI / 2;
                         }
                         
-                        constructionActive = true;
-                        const wp = s.position.clone(); wp.y += 4; wp.project(camera);
-                        const sX = (wp.x * 0.5 + 0.5) * window.innerWidth; const sY = (-(wp.y * 0.5) + 0.5) * window.innerHeight;
-                        
-                        if (wp.z >= -1 && wp.z <= 1) {
-                            progressContainer.style.display = 'block';
-                            progressContainer.style.left = sX + 'px'; progressContainer.style.top = sY + 'px';
-                            progressFill.style.width = Math.min(100, s.buildProgress) + '%';
+                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                        if (!isAiStruct) {
+                            constructionActive = true;
+                            const wp = s.position.clone(); wp.y += 4; wp.project(camera);
+                            const sX = (wp.x * 0.5 + 0.5) * window.innerWidth; const sY = (-(wp.y * 0.5) + 0.5) * window.innerHeight;
+                            
+                            if (wp.z >= -1 && wp.z <= 1) {
+                                progressContainer.style.display = 'block';
+                                progressContainer.style.left = sX + 'px'; progressContainer.style.top = sY + 'px';
+                                progressFill.style.width = Math.min(100, s.buildProgress) + '%';
+                            }
                         }
 
                         if (s.buildProgress >= 100) {
@@ -714,24 +860,25 @@ function animate() {
                             }
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
                             const bFaction = s.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
-                            if (typeof playBuildingCompleteSound === 'function') {
+                            if (!isAiStruct && typeof playBuildingCompleteSound === 'function') {
                                 playBuildingCompleteSound(s.type, bFaction);
                             }
-                            const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
                             if (s.type !== 'supplyCenter' && !isAiStruct) {
                                 showNotification(`${(s.type || 'Building').toUpperCase()} construction completed!`, 'success');
                             }
 
-                            // Automatic Harvester Deployment upon Supply Center / Stash completion
+                            // Automatic Harvester Deployment upon Supply Center / Stash completion (Player & AI)
                             if (!s.spawnedHarvester) {
                                 s.spawnedHarvester = true;
                                 if (s.type === 'supplyCenter') {
                                     if (bFaction === 'usa') {
                                         const spawnPos = s.position.clone().add(new THREE.Vector3(0, 4.5, 7.5));
-                                        const chinook = (typeof spawnUnit === 'function') ? spawnUnit('chinook', spawnPos) : null;
+                                        const chinook = isAiStruct
+                                            ? (typeof spawnEnemyUnit === 'function' ? spawnEnemyUnit('chinook', spawnPos, null, 'usa') : null)
+                                            : (typeof spawnUnit === 'function' ? spawnUnit('chinook', spawnPos) : null);
                                         if (chinook) {
                                             chinook.teamId = s.teamId || (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
-                                            chinook.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            chinook.ownerId = s.ownerId || (isAiStruct ? 'ai_1' : 'player');
                                             chinook.isAI = isAiStruct;
                                             chinook.aiState = 'MovingToDock';
                                             chinook.taskState = 'Idle';
@@ -741,43 +888,43 @@ function animate() {
                                                 chinook.targetPosition.copy(chinook.supplyTarget.position);
                                                 chinook.airState = 'flying';
                                             }
-                                            if (typeof playUnitReadyAudio === 'function') {
-                                                playUnitReadyAudio('chinook', 'usa');
-                                            }
                                             if (!isAiStruct) {
+                                                if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('chinook', 'usa');
                                                 showNotification('USA Supply Depot constructed! Chinook transport deployed to harvest supplies.', 'success');
                                             }
                                         }
                                     } else if (bFaction === 'china') {
                                         const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.5));
                                         spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
-                                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
-                                        const truck = (typeof spawnUnit === 'function') ? spawnUnit('truck', spawnPos) : null;
+                                        const truck = isAiStruct
+                                            ? (typeof spawnEnemyUnit === 'function' ? spawnEnemyUnit('truck', spawnPos, null, 'china') : null)
+                                            : (typeof spawnUnit === 'function' ? spawnUnit('truck', spawnPos) : null);
                                         if (truck) {
                                             truck.teamId = s.teamId || 1;
-                                            truck.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            truck.ownerId = s.ownerId || (isAiStruct ? 'ai_1' : 'player');
                                             truck.isAI = isAiStruct;
                                             truck.aiState = 'MovingToDock';
                                             truck.taskState = 'Idle';
                                             truck.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(truck.mesh.position) : null;
                                             if (truck.supplyTarget) truck.targetPosition.copy(truck.supplyTarget.position);
-                                            if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('truck', 'china');
+                                            if (!isAiStruct && typeof playUnitReadyAudio === 'function') playUnitReadyAudio('truck', 'china');
                                         }
                                     }
                                 } else if (s.type === 'supplyStash') {
                                     const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.0));
                                     spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
-                                    const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
-                                    const worker = (typeof spawnUnit === 'function') ? spawnUnit('worker', spawnPos) : null;
+                                    const worker = isAiStruct
+                                        ? (typeof spawnEnemyUnit === 'function' ? spawnEnemyUnit('worker', spawnPos, null, 'gla') : null)
+                                        : (typeof spawnUnit === 'function' ? spawnUnit('worker', spawnPos) : null);
                                     if (worker) {
                                         worker.teamId = s.teamId || 1;
-                                        worker.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                        worker.ownerId = s.ownerId || (isAiStruct ? 'ai_1' : 'player');
                                         worker.isAI = isAiStruct;
                                         worker.aiState = 'MovingToDock';
                                         worker.taskState = 'Idle';
                                         worker.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(worker.mesh.position) : null;
                                         if (worker.supplyTarget) worker.targetPosition.copy(worker.supplyTarget.position);
-                                        if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('worker', 'gla');
+                                        if (!isAiStruct && typeof playUnitReadyAudio === 'function') playUnitReadyAudio('worker', 'gla');
                                     }
                                 }
                             }
@@ -1113,7 +1260,9 @@ function animate() {
                             const dxA = tPos.x - unit.mesh.position.x;
                             const dzA = tPos.z - unit.mesh.position.z;
                             const distToEnemy = Math.hypot(dxA, dzA);
-                            const planeSpeed = ((unit.type === 'aurora') ? unit.speed * 1.60 : unit.speed) * combatDeltaScale;
+                            const isAuroraInbound = (unit.type === 'aurora' && unit.planeAttackPhase === 'inbound');
+                            unit.invulnerableInbound = isAuroraInbound;
+                            const planeSpeed = ((unit.type === 'aurora') ? (isAuroraInbound ? unit.speed * 1.85 : unit.speed * 0.65) : unit.speed) * combatDeltaScale;
 
                             if (unit.planeAttackPhase === 'inbound') {
                                 // Phase 1: High-speed approach directly at the target
@@ -1379,6 +1528,7 @@ function animate() {
                                     const toZ = enemy.mesh.position.z - unit.mesh.position.z;
                                     if (toX * dirX + toZ * dirZ > 0) { // moving towards infantry
                                         enemy.health = 0;
+                                        enemy._killCredited = true;
                                         if (typeof spawnSquishDecal === 'function') spawnSquishDecal(enemy.mesh.position);
                                         playAudio('infantry_squish');
                                         if (typeof showNotification === 'function') {
@@ -1386,6 +1536,7 @@ function animate() {
                                         }
                                         unit.kills = (unit.kills || 0) + 1;
                                         if (typeof checkVeterancyPromotion === 'function') checkVeterancyPromotion(unit);
+                                        if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
                                     }
                                 }
                             }
@@ -2005,9 +2156,9 @@ function processEnemyCombat() {
 // AUTHENTIC POINT DEFENSE LASER SYSTEM (PointDefenseLaserUpdate.cpp)
 // =========================================================================
 function processPointDefenseLasers() {
-    if (typeof activeMissiles === 'undefined' || activeMissiles.length === 0) return;
     const allLivingUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
         ? [...units, ...enemyUnits] : [];
+    if (allLivingUnits.length === 0) return;
 
     allLivingUnits.forEach(defender => {
         if (defender.health <= 0 || !defender.mesh) return;
@@ -2023,28 +2174,50 @@ function processPointDefenseLasers() {
         const scanRange = (defender.type === 'paladin') ? 22.0 : 16.0;
         const myPos = defender.mesh.position;
 
-        for (let missile of activeMissiles) {
-            if (missile.intercepted) continue;
-            const attacker = missile.metadata ? missile.metadata.attacker : null;
-            if (attacker && typeof isFriendly === 'function' && isFriendly(defender, attacker)) continue;
+        if (typeof activeMissiles !== 'undefined' && activeMissiles.length > 0) {
+            for (let missile of activeMissiles) {
+                if (missile.intercepted) continue;
+                const attacker = missile.metadata ? missile.metadata.attacker : null;
+                if (attacker && typeof isFriendly === 'function' && isFriendly(defender, attacker)) continue;
 
-            const dist = myPos.distanceTo(missile.curPos);
-            if (dist <= scanRange) {
-                // Intercept missile in mid-air!
-                missile.intercepted = true;
-                const laserOrigin = (defender.drone && defender.drone.mesh)
-                    ? defender.drone.mesh.position.clone()
-                    : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
+                const dist = myPos.distanceTo(missile.curPos);
+                if (dist <= scanRange) {
+                    // Intercept missile in mid-air!
+                    missile.intercepted = true;
+                    const laserOrigin = (defender.drone && defender.drone.mesh)
+                        ? defender.drone.mesh.position.clone()
+                        : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
 
-                if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
-                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
-                playAudio('laser_point_defense');
-                defender.pdlCooldown = (defender.type === 'paladin') ? 65 : 85;
+                    if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
+                    playAudio('laser_point_defense');
+                    defender.pdlCooldown = (defender.type === 'paladin') ? 65 : 85;
 
-                if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
-                    showNotification('★ Paladin Point Defense Laser intercepted hostile missile!', 'info');
+                    if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
+                        showNotification('★ Point Defense Laser intercepted hostile missile!', 'info');
+                    }
+                    return;
                 }
-                break;
+            }
+        }
+
+        // Authentic Paladin Tank Anti-Infantry Laser Zap (when no missiles need interception)
+        if (defender.type === 'paladin' && defender.pdlCooldown === 0) {
+            const infRangeSq = 14.0 * 14.0;
+            const hostileInf = allLivingUnits.find(e =>
+                e.health > 0 && e.mesh && !e.isAir && !isFriendly(defender, e) &&
+                (typeof getArmorCategory === 'function' ? getArmorCategory(e) === 'infantry' : false) &&
+                myPos.distanceToSquared(e.mesh.position) <= infRangeSq
+            );
+            if (hostileInf) {
+                const laserOrigin = myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
+                if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, hostileInf.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 0x00ffff, 2.5);
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.35);
+                playAudio('laser_point_defense');
+                defender.pdlCooldown = 75;
+                if (typeof applyCalculatedDamage === 'function') {
+                    applyCalculatedDamage(defender, hostileInf, 40, 'SNIPER');
+                }
             }
         }
     });

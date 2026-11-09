@@ -2,7 +2,17 @@ let _combatScanTick = 0;
 function processCombatScanning() {
             _combatScanTick++;
 			units.forEach((unit, ui) => {
-                if (unit.garrisonedIn) return;
+                if (unit.health <= 0) return;
+                if (unit.isUnmanned || (unit.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < unit.disabledUntil)) return;
+                if (unit.garrisonedIn) {
+                    const tr = unit.garrisonedIn;
+                    const hasFireports = tr && tr.health > 0 && tr.mesh && (tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus' || (tr.type === 'overlord' && tr.overlordUpgrade === 'bunker'));
+                    if (!hasFireports) return;
+                    unit.mesh.position.copy(tr.mesh.position);
+                    if (tr.combatTarget && tr.combatTarget.health > 0) {
+                        unit.combatTarget = tr.combatTarget;
+                    }
+                }
 				// Manage weapon assembly cooldown timers
 				if (unit.attackCooldown > 0) unit.attackCooldown = Math.max(0, unit.attackCooldown - combatDeltaScale);
 
@@ -71,7 +81,8 @@ function processCombatScanning() {
 
                 // Auto-Scan fallback loop if completely idle (Only engage hostile targets!)
                 // PERF: staggered every 4 frames per unit and uses squared distance to avoid Math.sqrt per enemy
-                if (!unit.combatTarget && ((_combatScanTick + ui) % 4 === 0) && unit.type !== 'chinook' && unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'dozer') {
+                const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker'].includes(unit.type);
+                if (!unit.combatTarget && ((_combatScanTick + ui) % 4 === 0) && !isNonCombatSupport) {
                     if (!(unit.isAir && unit.taskState === 'Moving')) {
                         const uPos = unit.mesh.position;
                         const scanR2 = unit.scanRange * unit.scanRange;
@@ -176,15 +187,15 @@ const ARMOR_COEFFICIENTS = {
     }
 };
 
-const _ARMOR_BLD_TYPES = new Set(['center', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'tunnel', 'demoTrap']);
-const _ARMOR_INF_TYPES = new Set(['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker']);
-const _ARMOR_LV_TYPES = new Set(['humvee', 'technical', 'buggy', 'dragon', 'toxintractor', 'truck', 'dozer', 'quad']);
+const _ARMOR_BLD_TYPES = new Set(['center', 'commandCenter', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'blackMarket', 'derrick', 'tunnel', 'demoTrap']);
+const _ARMOR_INF_TYPES = new Set(['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'missiledefender', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker', 'burton', 'blacklotus', 'hacker', 'hijacker', 'terrorist', 'mob']);
+const _ARMOR_LV_TYPES = new Set(['humvee', 'technical', 'buggy', 'dragon', 'dragonTank', 'toxintractor', 'truck', 'dozer', 'quad', 'ambulance', 'radarvan', 'bombtruck', 'crawler', 'battlebus']);
 
 function getArmorCategory(target) {
     if (!target) return 'infantry';
     if (target._armorCat) return target._armorCat;
     let cat;
-    if (target.radius >= 4 || target.isBuilding || target.productionQueue || _ARMOR_BLD_TYPES.has(target.type)) {
+    if (target.isBuilding !== undefined || target.productionQueue || _ARMOR_BLD_TYPES.has(target.type) || (!target.speed && (target.radius || 0) >= 5)) {
         cat = 'building';
     } else if (target.isAir) {
         cat = 'aircraft';
@@ -299,6 +310,10 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         }
     }
 
+    const wasAlive = target.health > 0;
+    if (target.type === 'aurora' && target.invulnerableInbound) {
+        return; // Authentic Zero Hour Aurora Bomber: Supersonic inbound run cannot be intercepted!
+    }
     target.health = Math.max(0, target.health - finalDmg);
     target._lastAttackedTime = Date.now();
     target._lastAttacker = attacker || null;
@@ -312,10 +327,19 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         });
     }
 
-    // Check veterancy promotion on kill
-    if (target.health <= 0 && attacker && attacker.kills !== undefined) {
+    // Check veterancy promotion & kill counter on kill
+    if (wasAlive && target.health <= 0 && attacker && !target._killCredited) {
+        target._killCredited = true;
         attacker.kills = (attacker.kills || 0) + 1;
         checkVeterancyPromotion(attacker);
+        // If attacker is a passenger firing from a transport fireport (Humvee, Technical, Overlord Bunker), also credit the transport!
+        if (attacker.garrisonedIn && attacker.garrisonedIn.health > 0) {
+            attacker.garrisonedIn.kills = (attacker.garrisonedIn.kills || 0) + 1;
+            checkVeterancyPromotion(attacker.garrisonedIn);
+        }
+        if ((attacker.selected || (attacker.garrisonedIn && attacker.garrisonedIn.selected)) && typeof updateSidebar === 'function') {
+            updateSidebar();
+        }
     }
 }
 
@@ -357,6 +381,13 @@ function executeWeaponFire(attacker, target) {
     // Never fire weapon or deal damage to friendly teammates / allies!
     if (!attacker || !target || isFriendly(attacker, target)) {
         if (attacker && attacker.combatTarget === target) attacker.combatTarget = null;
+        return;
+    }
+    if (attacker.isUnmanned || (attacker.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < attacker.disabledUntil)) {
+        return;
+    }
+    if (['ambulance', 'chinook', 'truck', 'dozer', 'worker', 'radarvan', 'crawler'].includes(attacker.type)) {
+        attacker.combatTarget = null;
         return;
     }
     // Authentic Command & Conquer: Generals Weapon Reload Rates (60 ticks = 1.0s)
@@ -606,10 +637,137 @@ function executeWeaponFire(attacker, target) {
         const qDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 40 : 32;
         applyCalculatedDamage(attacker, target, qDmg, 'GATLING');
     } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
-        // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry!)
+        // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry, Jarmen Kell also snipes vehicle drivers!)
         spawnMuzzleFlash(muzzlePos, 0xffffff, 0.3);
         spawnLaserBeam(muzzlePos, targetPos, 0xffffff, 2);
-        applyCalculatedDamage(attacker, target, 90, 'SNIPER');
+        const tArmor = getArmorCategory(target);
+        if (attacker.type === 'jarmen' && (tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh && !target.isUnmanned) {
+            target.isUnmanned = true;
+            target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 999999;
+            target.combatTarget = null;
+            attacker.combatTarget = null;
+            if (typeof showNotification === 'function') {
+                showNotification(`Jarmen Kell sniped the driver of ${target.type.toUpperCase()}! Vehicle is now unmanned!`, 'success');
+            }
+        } else {
+            applyCalculatedDamage(attacker, target, 120, 'SNIPER');
+        }
+    } else if (attacker.type === 'burton') {
+        // USA Hero Colonel Burton: Silent Knife (melee vs infantry), C4 Demo Charge (close vs structure/armor), or Heavy Rifle!
+        const dist = attacker.mesh.position.distanceTo(targetPos);
+        const tArmor = getArmorCategory(target);
+        if (tArmor === 'infantry' && dist <= 5.5) {
+            // Silent Knife Kill (stays stealthed!)
+            attacker.isStealthed = true;
+            applyCalculatedDamage(attacker, target, 250, 'SNIPER');
+        } else if ((tArmor === 'building' || tArmor === 'heavy_vehicle' || tArmor === 'light_vehicle') && dist <= 11.0) {
+            // C4 Demolition Charge!
+            spawnExplosion(targetPos, 0xff4757);
+            if (typeof triggerScreenShake === 'function') triggerScreenShake(0.8);
+            applyCalculatedDamage(attacker, target, 350, 'EXPLOSIVE');
+        } else {
+            spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
+            spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.8);
+            playUSASound('machine_gun');
+            applyCalculatedDamage(attacker, target, 45, 'SMALL_ARMS');
+        }
+    } else if (attacker.type === 'blacklotus') {
+        // China Hero Black Lotus: Cyber Capture Building, Cash Hack ($1,000), or Vehicle Disable!
+        spawnLaserBeam(muzzlePos, targetPos, 0x00ffaa, 2);
+        const tArmor = getArmorCategory(target);
+        if (tArmor === 'building') {
+            if ((target.type === 'supplyCenter' || target.type === 'supplyStash') && !attacker.isAI) {
+                playerResources += 1000;
+                if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(targetPos, 1000);
+                if (typeof showNotification === 'function') showNotification('Black Lotus hacked $1,000 from enemy Supply Depot!', 'success');
+                if (typeof updateHUD === 'function') updateHUD();
+            } else {
+                applyCalculatedDamage(attacker, target, 340, 'EXPLOSIVE');
+            }
+        } else {
+            target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 450;
+            if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(targetPos);
+        }
+    } else if (attacker.type === 'hacker') {
+        // China Hacker: Cyber-Disable Beam vs Enemy Vehicles/Turrets (generates cash when idle in gameLoop!)
+        spawnLaserBeam(muzzlePos, targetPos, 0x10ac84, 2);
+        target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 210;
+        if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(targetPos);
+        applyCalculatedDamage(attacker, target, 10, 'SMALL_ARMS');
+    } else if (attacker.type === 'hijacker') {
+        // GLA Hijacker: Rushes enemy ground vehicle and captures it!
+        const tArmor = getArmorCategory(target);
+        if ((tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh) {
+            const dist = attacker.mesh.position.distanceTo(targetPos);
+            if (dist > 6.5) {
+                attacker.targetPosition.copy(targetPos);
+                attacker.attackCooldown = 15;
+                return;
+            }
+            // Transfer vehicle ownership!
+            if (!attacker.isAI && typeof enemyUnits !== 'undefined' && enemyUnits.includes(target)) {
+                const idx = enemyUnits.indexOf(target);
+                if (idx !== -1) enemyUnits.splice(idx, 1);
+                target.teamId = attacker.teamId;
+                target.ownerId = attacker.ownerId;
+                target.isAI = false;
+                target.isUnmanned = false;
+                target.disabledUntil = 0;
+                target.combatTarget = null;
+                units.push(target);
+                if (typeof showNotification === 'function') showNotification(`Hijacker commandeered enemy ${target.type.toUpperCase()}!`, 'success');
+            } else if (attacker.isAI && typeof units !== 'undefined' && units.includes(target)) {
+                const idx = units.indexOf(target);
+                if (idx !== -1) units.splice(idx, 1);
+                target.teamId = attacker.teamId;
+                target.ownerId = attacker.ownerId;
+                target.isAI = true;
+                target.isUnmanned = false;
+                target.disabledUntil = 0;
+                target.combatTarget = null;
+                enemyUnits.push(target);
+            }
+            attacker.health = 0;
+        } else {
+            attacker.combatTarget = null;
+        }
+    } else if (attacker.type === 'terrorist' || attacker.type === 'bombtruck') {
+        // GLA Terrorist & Bomb Truck: Rush target and detonate massive demolition payload on contact!
+        const dist = attacker.mesh.position.distanceTo(targetPos);
+        const detRange = (target.radius || 2.0) + (attacker.type === 'bombtruck' ? 6.5 : 4.5);
+        if (dist > detRange) {
+            attacker.targetPosition.copy(targetPos);
+            attacker.attackCooldown = 12;
+            return;
+        }
+        const isBio = attacker.bioBomb;
+        const blastDmg = attacker.type === 'bombtruck' ? (attacker.highExplosive ? 480 : 340) : 220;
+        const blastRad = attacker.type === 'bombtruck' ? (attacker.highExplosive ? 15 : 11) : 7.5;
+        spawnExplosion(targetPos, isBio ? 0x2ecc71 : 0xff4757);
+        if (isBio && typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
+        if (typeof triggerScreenShake === 'function') triggerScreenShake(attacker.type === 'bombtruck' ? 1.2 : 0.7);
+        applyCalculatedDamage(attacker, target, blastDmg, isBio ? 'TOXIN' : 'EXPLOSIVE');
+        const splashPool = attacker.isAI ? [...units, ...structures] : [...enemyUnits, ...enemyStructures];
+        splashPool.forEach(other => {
+            if (other !== target && other.health > 0) {
+                const op = other.position || (other.mesh && other.mesh.position);
+                if (op && op.distanceTo(targetPos) <= blastRad) {
+                    applyCalculatedDamage(attacker, other, Math.round(blastDmg * 0.65), isBio ? 'TOXIN' : 'EXPLOSIVE');
+                }
+            }
+        });
+        attacker.health = 0;
+    } else if (attacker.type === 'mob') {
+        // GLA Angry Mob: Multi-tracer AK-47 volley + Molotov Cocktails!
+        [-0.35, 0, 0.35].forEach(off => {
+            const mPos = getMuzzleWorldPosition(attacker, off);
+            spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
+            spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.2);
+        });
+        playAudio('ak47', {}, 'gla');
+        const hasAKs = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('armTheMob'));
+        applyCalculatedDamage(attacker, target, hasAKs ? 52 : 34, 'SMALL_ARMS');
+        applyCalculatedDamage(attacker, target, 20, 'FLAME');
     } else if (['tank', 'crusader', 'scorpion', 'marauder'].includes(attacker.type)) {
         // Heavy Tank Cannon
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);

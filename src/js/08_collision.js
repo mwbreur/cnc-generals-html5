@@ -428,21 +428,36 @@ function resolveObstacleCollisions(unit) {
 
             const enemyNetId = netId || ((isMultiplayerActive ? (isMultiplayerHost ? 'C_' : 'H_') : 'E_') + (++netIdSequence));
             const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
+            const isBuilder = (type === 'dozer' || type === 'worker');
+            const isTransport = (type === 'humvee' || type === 'chinook' || type === 'crawler' || type === 'battlebus' || type === 'technical' || type === 'ambulance');
+            const isNaturalStealth = ['stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker'].includes(type);
+            let cap = 0;
+            if (isTransport) {
+                if (type === 'crawler' || type === 'battlebus' || type === 'chinook') cap = 8;
+                else if (type === 'ambulance') cap = 4;
+                else cap = 5;
+            }
             const enemyObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: mesh.position.clone(),
                 speed: speed, radius: radius, health: health, maxHealth: health,
-                scanRange: scanRange, attackCooldown: 0, combatTarget: null,
+                scanRange: scanRange, _baseScanRange: scanRange, attackCooldown: 0, combatTarget: null,
+                kills: 0, veterancy: 0,
+                isStealthed: isNaturalStealth,
+                detectsStealth: (type === 'crawler' || type === 'dozer' || type === 'worker' || type === 'pathfinder' || type === 'blacklotus' || type === 'burton' || type === 'jarmen'),
+                capacity: cap,
+                garrisoned: [],
                 netId: enemyNetId,
                 teamId: 2,
                 ownerId: 'ai_1',
                 isAI: true,
                 isAir: isAir,
                 airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
-                aiState: isGatherer ? 'MovingToDock' : 'Idle',
+                aiState: isGatherer ? (type === 'worker' ? 'Idle' : 'MovingToDock') : 'Idle',
+                taskState: isBuilder ? 'Idle' : (isGatherer ? 'MovingToDock' : 'Idle'),
                 cargoLoaded: 0, timerState: 0, supplyTarget: null,
                 patrolCenter: mesh.position.clone()
             };
-            if (isGatherer) {
+            if (isGatherer && type !== 'worker') {
                 const sTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(mesh.position) : null;
                 if (sTarget) {
                     enemyObj.supplyTarget = sTarget;
@@ -451,6 +466,16 @@ function resolveObstacleCollisions(unit) {
                 }
             }
             enemyUnits.push(enemyObj);
+            if (type === 'crawler') {
+                for (let rg = 0; rg < 4; rg++) {
+                    const passenger = spawnEnemyUnit('redguard', position.clone(), null, faction || 'china');
+                    if (passenger) {
+                        passenger.mesh.visible = false;
+                        passenger.garrisonedIn = enemyObj;
+                        enemyObj.garrisoned.push(passenger);
+                    }
+                }
+            }
             return enemyObj;
         }
 

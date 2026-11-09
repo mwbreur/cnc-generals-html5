@@ -8737,6 +8737,10 @@ window.playBuildingCompleteSound = playBuildingCompleteSound;
         }
 
         function attachVehicleDrone(vehicle, droneType) {
+            if (!vehicle || !vehicle.mesh) return;
+            if (!vehicle._baseScanRange) {
+                vehicle._baseScanRange = vehicle.scanRange || 25;
+            }
             if (vehicle.drone && vehicle.drone.mesh) {
                 scene.remove(vehicle.drone.mesh);
                 vehicle.drone.mesh.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
@@ -8751,12 +8755,18 @@ window.playBuildingCompleteSound = playBuildingCompleteSound;
                 type: droneType,
                 mesh: mesh,
                 timer: 0,
-                cooldown: 0
+                cooldown: 0,
+                pdlCooldown: 0,
+                repairCooldown: 0
             };
 
-            // Scout drone boosts vision
+            // Scout drone boosts vision (+50% sight/scan range & stealth detection)
             if (droneType === 'scout') {
-                vehicle.scanRange = Math.round(vehicle.scanRange * 1.5);
+                vehicle.scanRange = Math.round(vehicle._baseScanRange * 1.5);
+                vehicle.detectsStealth = true;
+            } else {
+                vehicle.scanRange = vehicle._baseScanRange;
+                vehicle.detectsStealth = false;
             }
 
             playAudio('radio_chirp');
@@ -10808,21 +10818,36 @@ function resolveObstacleCollisions(unit) {
 
             const enemyNetId = netId || ((isMultiplayerActive ? (isMultiplayerHost ? 'C_' : 'H_') : 'E_') + (++netIdSequence));
             const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
+            const isBuilder = (type === 'dozer' || type === 'worker');
+            const isTransport = (type === 'humvee' || type === 'chinook' || type === 'crawler' || type === 'battlebus' || type === 'technical' || type === 'ambulance');
+            const isNaturalStealth = ['stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker'].includes(type);
+            let cap = 0;
+            if (isTransport) {
+                if (type === 'crawler' || type === 'battlebus' || type === 'chinook') cap = 8;
+                else if (type === 'ambulance') cap = 4;
+                else cap = 5;
+            }
             const enemyObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: mesh.position.clone(),
                 speed: speed, radius: radius, health: health, maxHealth: health,
-                scanRange: scanRange, attackCooldown: 0, combatTarget: null,
+                scanRange: scanRange, _baseScanRange: scanRange, attackCooldown: 0, combatTarget: null,
+                kills: 0, veterancy: 0,
+                isStealthed: isNaturalStealth,
+                detectsStealth: (type === 'crawler' || type === 'dozer' || type === 'worker' || type === 'pathfinder' || type === 'blacklotus' || type === 'burton' || type === 'jarmen'),
+                capacity: cap,
+                garrisoned: [],
                 netId: enemyNetId,
                 teamId: 2,
                 ownerId: 'ai_1',
                 isAI: true,
                 isAir: isAir,
                 airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
-                aiState: isGatherer ? 'MovingToDock' : 'Idle',
+                aiState: isGatherer ? (type === 'worker' ? 'Idle' : 'MovingToDock') : 'Idle',
+                taskState: isBuilder ? 'Idle' : (isGatherer ? 'MovingToDock' : 'Idle'),
                 cargoLoaded: 0, timerState: 0, supplyTarget: null,
                 patrolCenter: mesh.position.clone()
             };
-            if (isGatherer) {
+            if (isGatherer && type !== 'worker') {
                 const sTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(mesh.position) : null;
                 if (sTarget) {
                     enemyObj.supplyTarget = sTarget;
@@ -10831,6 +10856,16 @@ function resolveObstacleCollisions(unit) {
                 }
             }
             enemyUnits.push(enemyObj);
+            if (type === 'crawler') {
+                for (let rg = 0; rg < 4; rg++) {
+                    const passenger = spawnEnemyUnit('redguard', position.clone(), null, faction || 'china');
+                    if (passenger) {
+                        passenger.mesh.visible = false;
+                        passenger.garrisonedIn = enemyObj;
+                        enemyObj.garrisoned.push(passenger);
+                    }
+                }
+            }
             return enemyObj;
         }
 
@@ -12999,7 +13034,7 @@ function resolveObstacleCollisions(unit) {
         }
 
         function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium') {
-            // Enemy Command Center
+            // Authentic C&C Generals Skirmish Start: Enemy starts with 1 Command Center + 1 Construction Builder (Dozer / Worker)
             const ccType = 'center';
             const ccGroup = faction === 'china' ? createChinaCommandCenter() : faction === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
             if (!ccGroup.userData || !ccGroup.userData.isW3D) ccGroup.scale.set(1.35, 1.35, 1.35);
@@ -13012,92 +13047,38 @@ function resolveObstacleCollisions(unit) {
                 netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
             });
 
-            // Enemy Power / Reactor / Supply Stash
-            const pwrPos = pos.clone().add(new THREE.Vector3(faction === 'gla' ? -22 : -25, 0, -22));
-            pwrPos.y = getTerrainHeight(pwrPos.x, pwrPos.z);
-            let pwrGroup;
-            if (faction === 'china') pwrGroup = createChinaNuclearReactor();
-            else if (faction === 'gla') pwrGroup = createGLASupplyStash();
-            else pwrGroup = createUSAColdFusionReactor();
-            if (!pwrGroup.userData || !pwrGroup.userData.isW3D) pwrGroup.scale.set(1.35, 1.35, 1.35);
-            pwrGroup.position.copy(pwrPos);
-            pwrGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(pwrGroup);
-            enemyStructures.push({
-                type: faction === 'gla' ? 'supplyStash' : 'power', faction: faction, position: pwrPos, mesh: pwrGroup,
-                health: 1200, maxHealth: 1200, radius: 8 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
-
-            // Enemy War Factory / Arms Dealer
-            const facPos = pos.clone().add(new THREE.Vector3(26, 0, -20));
-            facPos.y = getTerrainHeight(facPos.x, facPos.z);
-            const facGroup = faction === 'china' ? createChinaWarFactory() : faction === 'gla' ? createGLAArmsDealer(false) : createUSAWarFactory();
-            if (!facGroup.userData || !facGroup.userData.isW3D) facGroup.scale.set(1.35, 1.35, 1.35);
-            facGroup.position.copy(facPos);
-            facGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(facGroup);
-            enemyStructures.push({
-                type: 'factory', faction: faction, position: facPos, mesh: facGroup,
-                health: 1600, maxHealth: 1600, radius: 10 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
-
-            // Enemy Barracks
-            const barPos = pos.clone().add(new THREE.Vector3(-22, 0, 22));
-            barPos.y = getTerrainHeight(barPos.x, barPos.z);
-            const barGroup = faction === 'china' ? createChinaBarracks() : faction === 'gla' ? createGLABarracks(false) : createUSABarracks();
-            if (!barGroup.userData || !barGroup.userData.isW3D) barGroup.scale.set(1.35, 1.35, 1.35);
-            barGroup.position.copy(barPos);
-            barGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(barGroup);
-            enemyStructures.push({
-                type: 'barracks', faction: faction, position: barPos, mesh: barGroup,
-                health: 1000, maxHealth: 1000, radius: 8 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
-
-            // Enemy Perimeter Defense
-            const defPos = pos.clone().add(new THREE.Vector3(18, 0, 26));
-            defPos.y = getTerrainHeight(defPos.x, defPos.z);
-            let defGroup;
-            if (faction === 'china') defGroup = createChinaGatlingCannon();
-            else if (faction === 'gla') defGroup = createGLAStingerSite();
-            else defGroup = createUSAPatriotBattery();
-            if (!defGroup.userData || !defGroup.userData.isW3D) defGroup.scale.set(1.35, 1.35, 1.35);
-            defGroup.position.copy(defPos);
-            defGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-            scene.add(defGroup);
-            enemyStructures.push({
-                type: faction === 'china' ? 'gatlingCannon' : faction === 'gla' ? 'stingerSite' : 'patriot',
-                faction: faction, position: defPos, mesh: defGroup,
-                health: 900, maxHealth: 900, radius: 5.5 * 1.35, buildProgress: 100, isBuilding: false,
-                netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
-            });
             hasSpawnedInitialEnemyBase = true;
             isMatchActive = true;
             matchStartTime = Date.now();
 
-            // Spawn Initial Guard units for AI
-            const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'tank';
-            for (let i = 0; i < 2; i++) {
-                const uPos = pos.clone().add(new THREE.Vector3(10 + i * 5, 0, 10 + i * 4));
-                const eu = spawnEnemyUnit(tankType, uPos);
-                if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
+            // Spawn AI Starting Construction Builder (Dozer for USA/China, Worker for GLA)
+            const builderType = faction === 'gla' ? 'worker' : 'dozer';
+            const startUnitsEl = document.getElementById('starting-units');
+            const startMode = startUnitsEl ? startUnitsEl.value : 'standard';
+            const numBuilders = startMode === 'heavy' ? 2 : 1;
+
+            for (let b = 0; b < numBuilders; b++) {
+                const bPos = pos.clone().add(new THREE.Vector3(14 + b * 5, 0, 12));
+                bPos.y = getTerrainHeight(bPos.x, bPos.z);
+                const builderUnit = spawnEnemyUnit(builderType, bPos, null, faction);
+                if (builderUnit) {
+                    builderUnit.teamId = teamId;
+                    builderUnit.ownerId = ownerId;
+                    builderUnit.isAI = true;
+                    builderUnit.difficulty = difficulty;
+                    builderUnit.aiState = 'Idle';
+                    builderUnit.taskState = 'Idle';
+                }
             }
-            if (faction === 'usa') {
-                const cPos = pos.clone().add(new THREE.Vector3(12, 4.5, 12));
-                const eu = spawnEnemyUnit('chinook', cPos);
-                if (eu) {
-                    eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty;
-                    eu.aiState = 'MovingToDock';
-                    eu.taskState = 'Idle';
-                    eu.airState = 'hovering';
-                    eu.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(eu.mesh.position) : null;
-                    if (eu.supplyTarget) {
-                        eu.targetPosition.copy(eu.supplyTarget.position);
-                        eu.airState = 'flying';
-                    }
+
+            if (startMode === 'light' || startMode === 'heavy') {
+                const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'crusader';
+                const numTanks = startMode === 'heavy' ? 2 : 1;
+                for (let i = 0; i < numTanks; i++) {
+                    const uPos = pos.clone().add(new THREE.Vector3(10 + i * 5, 0, -14));
+                    uPos.y = getTerrainHeight(uPos.x, uPos.z);
+                    const eu = spawnEnemyUnit(tankType, uPos, null, faction);
+                    if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
                 }
             }
         }
@@ -13846,9 +13827,10 @@ function scatterSelectedUnits() {
 }
 
 function purchaseVehicleDrone(droneType, cost) {
-    const selectedVehicles = units.filter(u => u.selected && ['crusader', 'paladin', 'humvee'].includes(u.type));
+    const usaDroneVehicles = ['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk'];
+    const selectedVehicles = units.filter(u => u.selected && usaDroneVehicles.includes(u.type));
     if (selectedVehicles.length === 0) {
-        showNotification('Select a Crusader Tank, Paladin Tank, or Humvee first.', 'error');
+        showNotification('Select a USA Vehicle (Crusader, Paladin, Humvee, Ambulance, or Tomahawk) first.', 'error');
         return;
     }
     if (playerResources < cost) {
@@ -13860,6 +13842,118 @@ function purchaseVehicleDrone(droneType, cost) {
     playUSASound('radio_chirp');
     showNotification(`${droneType.toUpperCase()} Drone attached to vehicle!`, 'success');
     updateSidebar();
+}
+
+function unloadTransportPassengers(transport) {
+    const targets = transport ? [transport] : units.filter(u => u.selected && u.garrisoned && u.garrisoned.length > 0);
+    let count = 0;
+    targets.forEach(t => {
+        if (!t.garrisoned || t.garrisoned.length === 0) return;
+        const passengers = t.garrisoned.slice();
+        t.garrisoned = [];
+        passengers.forEach((p, idx) => {
+            p.garrisonedIn = null;
+            const angle = (idx / Math.max(1, passengers.length)) * Math.PI * 2;
+            const dropPos = t.mesh.position.clone().add(new THREE.Vector3(Math.cos(angle) * (t.radius + 1.8), 0, Math.sin(angle) * (t.radius + 1.8)));
+            dropPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropPos.x, dropPos.z) : 0;
+            p.mesh.position.copy(dropPos);
+            p.targetPosition.copy(dropPos);
+            p.mesh.visible = true;
+            count++;
+        });
+    });
+    if (count > 0) {
+        playAudio('click');
+        showNotification(`Disembarked ${count} passenger(s)!`, 'info');
+        updateSidebar();
+    }
+}
+
+function triggerHeroOrUnitAbility(unit, abilityType) {
+    if (!unit || unit.health <= 0) return;
+    if (abilityType === 'c4') {
+        const allHostile = [...enemyStructures, ...enemyUnits].filter(e => e.health > 0);
+        let nearest = null, bestD = 16;
+        allHostile.forEach(e => {
+            const p = e.position || (e.mesh && e.mesh.position);
+            if (!p) return;
+            const d = unit.mesh.position.distanceTo(p);
+            if (d < bestD) { bestD = d; nearest = e; }
+        });
+        if (!nearest) {
+            showNotification('Move Col. Burton closer to an enemy structure or vehicle to plant C4!', 'error');
+            return;
+        }
+        const tPos = (nearest.position || nearest.mesh.position).clone();
+        showNotification('Col. Burton planted Timed C4 Charge! Detonation in 2s...', 'warning');
+        setTimeout(() => {
+            if (nearest && nearest.health > 0) {
+                spawnExplosion(tPos, 0xff4757);
+                if (typeof triggerScreenShake === 'function') triggerScreenShake(1.0);
+                applyCalculatedDamage(unit, nearest, 450, 'EXPLOSIVE');
+            }
+        }, 2000);
+    } else if (abilityType === 'snipeDriver') {
+        const enemyVehicles = enemyUnits.filter(e => e.health > 0 && !e.isAir && !e.isUnmanned && typeof isInfantryType === 'function' && !isInfantryType(e.type));
+        let nearest = null, bestD = 36;
+        enemyVehicles.forEach(e => {
+            const d = unit.mesh.position.distanceTo(e.mesh.position);
+            if (d < bestD) { bestD = d; nearest = e; }
+        });
+        if (!nearest) {
+            showNotification('No enemy ground vehicle within Jarmen Kell snipe range!', 'error');
+            return;
+        }
+        spawnLaserBeam(unit.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), nearest.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xffffff, 4);
+        nearest.isUnmanned = true;
+        nearest.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 999999;
+        nearest.combatTarget = null;
+        showNotification(`Jarmen Kell sniped the driver of ${nearest.type.toUpperCase()}! Send any infantry to capture it!`, 'success');
+    } else if (abilityType === 'lotusHack') {
+        const allHostile = [...enemyStructures, ...enemyUnits].filter(e => e.health > 0);
+        let nearest = null, bestD = 26;
+        allHostile.forEach(e => {
+            const p = e.position || (e.mesh && e.mesh.position);
+            if (!p) return;
+            const d = unit.mesh.position.distanceTo(p);
+            if (d < bestD) { bestD = d; nearest = e; }
+        });
+        if (!nearest) {
+            showNotification('Move Black Lotus within range of an enemy structure or vehicle!', 'error');
+            return;
+        }
+        unit.combatTarget = nearest;
+        showNotification(`Black Lotus initiating cyber-link on ${nearest.type.toUpperCase()}...`, 'info');
+    } else if (abilityType === 'detonate') {
+        const pos = unit.mesh.position.clone();
+        const isBio = unit.bioBomb;
+        const dmg = (unit.type === 'bombtruck' ? (unit.highExplosive ? 480 : 340) : 220);
+        const rad = (unit.type === 'bombtruck' ? (unit.highExplosive ? 16 : 12) : 8);
+        spawnExplosion(pos, isBio ? 0x2ecc71 : 0xff4757);
+        if (isBio && typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(pos);
+        if (typeof triggerScreenShake === 'function') triggerScreenShake(unit.type === 'bombtruck' ? 1.3 : 0.7);
+        [...enemyUnits, ...enemyStructures].forEach(e => {
+            const ep = e.position || (e.mesh && e.mesh.position);
+            if (ep && ep.distanceTo(pos) <= rad) {
+                applyCalculatedDamage(unit, e, dmg, isBio ? 'TOXIN' : 'EXPLOSIVE');
+            }
+        });
+        unit.health = 0;
+    } else if (abilityType === 'flameWall') {
+        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), unit.mesh.rotation.y);
+        for (let i = -2; i <= 2; i++) {
+            const fPos = unit.mesh.position.clone().add(forward.clone().multiplyScalar(10)).add(new THREE.Vector3(i * 3.5, 0, 0));
+            if (typeof spawnFlamethrowerBurst === 'function') spawnFlamethrowerBurst(unit.mesh.position.clone(), fPos);
+            if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(fPos);
+        }
+        [...enemyUnits, ...enemyStructures].forEach(e => {
+            const ep = e.position || (e.mesh && e.mesh.position);
+            if (ep && ep.distanceTo(unit.mesh.position) <= 16) {
+                applyCalculatedDamage(unit, e, 55, 'FLAME');
+            }
+        });
+        showNotification('Dragon Tank unleashed Flame Wall!', 'warning');
+    }
 }
 
 function purchaseOverlordUpgrade(upgType, cost) {
@@ -14149,6 +14243,16 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                     desc: `Construct ${bName}`
                 };
             });
+            if (u.type === 'worker') {
+                currentGridSlots[9] = {
+                    id: 'harvest',
+                    name: 'HARVEST',
+                    badge: 'GATHER',
+                    disabled: false,
+                    action: () => orderSelectedHarvestersToGather(),
+                    desc: 'Dispatch Worker to gather supplies from Supply Stash / Dock'
+                };
+            }
             currentGridSlots[10] = {
                 id: 'stop',
                 name: 'STOP',
@@ -14174,27 +14278,59 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             ];
         }
 
-        // Vehicle Upgrades & Drones
-        if (['crusader', 'paladin', 'humvee'].includes(u.type)) {
+        // Vehicle Upgrades, Drones & Special Unit Abilities
+        if (['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk'].includes(u.type)) {
+            const activeDrone = u.drone ? u.drone.type : null;
             currentGridSlots.push(
-                { name: 'BATTLE DRONE', cost: 300, badge: 'DRONE', action: () => purchaseVehicleDrone('battle', 300), desc: 'Repairs hull (+3 HP/s) and suppresses infantry' },
-                { name: 'SCOUT DRONE', cost: 100, badge: 'VISION', action: () => purchaseVehicleDrone('scout', 100), desc: '+50% Sight range & reconnaissance sweep' },
-                { name: 'HELLFIRE DRONE', cost: 500, badge: 'MISSILE', action: () => purchaseVehicleDrone('hellfire', 500), desc: 'Launches miniature guided anti-tank missiles' }
+                { name: 'BATTLE DRONE', cost: 300, badge: activeDrone === 'battle' ? 'ACTIVE' : 'DRONE', action: () => purchaseVehicleDrone('battle', 300), desc: 'Orbiting combat & repair drone: MG suppresses infantry, PDL intercepts missiles, repairs hull (+5 HP/s)' },
+                { name: 'SCOUT DRONE', cost: 100, badge: activeDrone === 'scout' ? 'ACTIVE' : 'VISION', action: () => purchaseVehicleDrone('scout', 100), desc: '+50% Sight/Scan range & detects stealth units/mines' },
+                { name: 'HELLFIRE DRONE', cost: 500, badge: activeDrone === 'hellfire' ? 'ACTIVE' : 'MISSILE', action: () => purchaseVehicleDrone('hellfire', 500), desc: 'Launches guided armor-piercing Hellfire missiles at vehicles & structures' }
             );
         } else if (u.type === 'overlord') {
             currentGridSlots.push(
-                { name: 'BUNKER TOWER', cost: 500, badge: 'TOWER', action: () => purchaseOverlordUpgrade('bunker', 500), desc: 'Garrison bunker pillbox for troops firing 360°' },
-                { name: 'GATLING TOWER', cost: 1200, badge: 'TOWER', action: () => purchaseOverlordUpgrade('gatling', 1200), desc: 'Twin 20mm rotary anti-air/anti-infantry turret' },
-                { name: 'PROPAGANDA', cost: 500, badge: 'TOWER', action: () => purchaseOverlordUpgrade('propaganda', 500), desc: 'Heals friendly armor (+4 HP/s) & buffs fire rate 25%' }
+                { name: 'BUNKER TOWER', cost: 500, badge: u.overlordUpgrade === 'bunker' ? 'ACTIVE' : 'TOWER', action: () => purchaseOverlordUpgrade('bunker', 500), desc: 'Garrison bunker pillbox for up to 5 troops firing 360°' },
+                { name: 'GATLING TOWER', cost: 1200, badge: u.overlordUpgrade === 'gatling' ? 'ACTIVE' : 'TOWER', action: () => purchaseOverlordUpgrade('gatling', 1200), desc: 'Twin 20mm rotary anti-air/anti-infantry turret & stealth detection' },
+                { name: 'PROPAGANDA', cost: 500, badge: u.overlordUpgrade === 'propaganda' ? 'ACTIVE' : 'TOWER', action: () => purchaseOverlordUpgrade('propaganda', 500), desc: 'Heals friendly armor (+4 HP/s) & buffs fire rate +25%' }
             );
         } else if (u.type === 'nukecannon' || u.type === 'nuketank') {
             currentGridSlots.push(
                 { name: 'OUTRIGGERS', badge: 'DEPLOY', action: () => deployNukeCannonOutriggers(u), desc: 'Deploy hydraulic stabilization legs for siege artillery' },
-                { name: 'NEUTRON SHELLS', cost: 1000, badge: 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
+                { name: 'NEUTRON SHELLS', cost: 1000, badge: u.neutronShells ? 'ACTIVE' : 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
             );
-        } else if (u.type === 'truck' || u.type === 'worker') {
+        } else if (u.type === 'truck' || u.type === 'chinook') {
             currentGridSlots.push(
                 { name: 'HARVEST', badge: 'GATHER', action: () => orderSelectedHarvestersToGather(), desc: 'Dispatch to nearest supply depot' }
+            );
+        } else if (u.type === 'burton') {
+            currentGridSlots.push(
+                { name: 'TIMED C4', badge: 'DEMO', action: () => triggerHeroOrUnitAbility(u, 'c4'), desc: 'Plant Timed C4 Charge on nearest enemy structure or vehicle (450 Demo Damage)' }
+            );
+        } else if (u.type === 'jarmen') {
+            currentGridSlots.push(
+                { name: 'SNIPE DRIVER', badge: 'SNIPE', action: () => triggerHeroOrUnitAbility(u, 'snipeDriver'), desc: 'Eliminate enemy vehicle driver so any friendly infantry can capture it' }
+            );
+        } else if (u.type === 'blacklotus') {
+            currentGridSlots.push(
+                { name: 'CYBER HACK', badge: 'HACK', action: () => triggerHeroOrUnitAbility(u, 'lotusHack'), desc: 'Capture building, steal $1000 from Supply Center, or disable enemy vehicle' }
+            );
+        } else if (u.type === 'terrorist' || u.type === 'bombtruck') {
+            currentGridSlots.push(
+                { name: 'DETONATE', badge: 'BOOM', action: () => triggerHeroOrUnitAbility(u, 'detonate'), desc: 'Detonate explosive payload immediately' }
+            );
+            if (u.type === 'bombtruck') {
+                currentGridSlots.push(
+                    { name: 'HIGH EXPLOSIVE', cost: 500, badge: u.highExplosive ? 'ACTIVE' : 'UPGRADE', action: () => { if (playerResources >= 500 && !u.highExplosive) { playerResources -= 500; u.highExplosive = true; showNotification('High-Explosive payload installed on Bomb Truck!', 'success'); updateSidebar(); } }, desc: 'Boosts blast damage and radius by +40%' },
+                    { name: 'BIO-BOMB', cost: 500, badge: u.bioBomb ? 'ACTIVE' : 'TOXIN', action: () => { if (playerResources >= 500 && !u.bioBomb) { playerResources -= 500; u.bioBomb = true; showNotification('Anthrax Bio-Bomb payload installed on Bomb Truck!', 'success'); updateSidebar(); } }, desc: 'Releases lethal Anthrax toxin cloud on detonation' }
+                );
+            }
+        } else if (u.type === 'dragon' || u.type === 'dragonTank') {
+            currentGridSlots.push(
+                { name: 'FLAME WALL', badge: 'FIRESTORM', action: () => triggerHeroOrUnitAbility(u, 'flameWall'), desc: 'Unleash a sweeping arc of napalm fire across the front sector' }
+            );
+        }
+        if (u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0) {
+            currentGridSlots.push(
+                { name: `EVACUATE (${u.garrisoned.length})`, badge: 'UNLOAD', action: () => unloadTransportPassengers(u), desc: 'Disembark all embarked passengers immediately' }
             );
         }
     } else {
@@ -16389,7 +16525,7 @@ function updateHUD() {
             if (type === 'tank' || type === 'crusader') { mesh = createCrusaderTankMesh(false); radius = 3.6; speed = 0.15; health = 480; scanRange = 24; }
             else if (type === 'paladin') { mesh = createPaladinTankMesh(false); radius = 3.6; speed = 0.14; health = 550; scanRange = 26; }
             else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; capacity = 5; garrisoned = []; }
-            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 15; }
+            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 18; capacity = 4; garrisoned = []; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 3.2; speed = 0.11; health = 220; scanRange = 38; }
             else if (type === 'dozer') { mesh = createUSADozerMesh(); radius = 3.2; speed = 0.10; health = 300; }
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; }
@@ -16488,19 +16624,24 @@ function updateHUD() {
 
             const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
             const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
+            const isNaturalStealth = ['stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker'].includes(type) ||
+                (type === 'comanche' && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche'));
             const newUnitObj = {
                 type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
                 speed: speed, radius: radius, selectionCircle: null, taskState: 'Idle',
-                aiState: isGatherer ? 'MovingToDock' : 'Idle',
+                aiState: isGatherer ? (type === 'worker' ? 'Idle' : 'MovingToDock') : 'Idle',
                 cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
-                health: health, maxHealth: health, scanRange: scanRange, netId: myNetId,
+                health: health, maxHealth: health, scanRange: scanRange, _baseScanRange: scanRange, netId: myNetId,
                 attackCooldown: 0, combatTarget: null, isAir: isAir,
                 airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
                 patrolCenter: position ? position.clone() : new THREE.Vector3(),
                 circleAngle: Math.random() * Math.PI * 2,
                 circleRadius: (type === 'comanche' || type === 'chinook') ? 11.0 : 15.0,
                 capacity: capacity || 0, garrisoned: garrisoned || [], waypoints: [],
+                kills: 0,
                 veterancy: initialVeterancy,
+                isStealthed: isNaturalStealth,
+                detectsStealth: ['crawler', 'dozer', 'worker', 'pathfinder', 'blacklotus', 'burton', 'jarmen', 'radarvan'].includes(type),
                 compositeArmor: (typeof researchedTechs !== 'undefined' && researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')),
                 shoesApplied: (typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes') && type === 'worker')
             };
@@ -16516,6 +16657,16 @@ function updateHUD() {
             newUnitObj.ownerId = 'player';
             newUnitObj.isAI = false;
             units.push(newUnitObj);
+            if (type === 'crawler') {
+                for (let rg = 0; rg < 4; rg++) {
+                    const passenger = spawnUnit('redguard', position.clone());
+                    if (passenger) {
+                        passenger.mesh.visible = false;
+                        passenger.garrisonedIn = newUnitObj;
+                        newUnitObj.garrisoned.push(passenger);
+                    }
+                }
+            }
             if (isMultiplayerActive && netConn && netConn.open) {
                 broadcastNetPacket({
                     type: 'spawn_unit',
@@ -16935,7 +17086,17 @@ let _combatScanTick = 0;
 function processCombatScanning() {
             _combatScanTick++;
 			units.forEach((unit, ui) => {
-                if (unit.garrisonedIn) return;
+                if (unit.health <= 0) return;
+                if (unit.isUnmanned || (unit.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < unit.disabledUntil)) return;
+                if (unit.garrisonedIn) {
+                    const tr = unit.garrisonedIn;
+                    const hasFireports = tr && tr.health > 0 && tr.mesh && (tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus' || (tr.type === 'overlord' && tr.overlordUpgrade === 'bunker'));
+                    if (!hasFireports) return;
+                    unit.mesh.position.copy(tr.mesh.position);
+                    if (tr.combatTarget && tr.combatTarget.health > 0) {
+                        unit.combatTarget = tr.combatTarget;
+                    }
+                }
 				// Manage weapon assembly cooldown timers
 				if (unit.attackCooldown > 0) unit.attackCooldown = Math.max(0, unit.attackCooldown - combatDeltaScale);
 
@@ -17004,7 +17165,8 @@ function processCombatScanning() {
 
                 // Auto-Scan fallback loop if completely idle (Only engage hostile targets!)
                 // PERF: staggered every 4 frames per unit and uses squared distance to avoid Math.sqrt per enemy
-                if (!unit.combatTarget && ((_combatScanTick + ui) % 4 === 0) && unit.type !== 'chinook' && unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'dozer') {
+                const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker'].includes(unit.type);
+                if (!unit.combatTarget && ((_combatScanTick + ui) % 4 === 0) && !isNonCombatSupport) {
                     if (!(unit.isAir && unit.taskState === 'Moving')) {
                         const uPos = unit.mesh.position;
                         const scanR2 = unit.scanRange * unit.scanRange;
@@ -17109,15 +17271,15 @@ const ARMOR_COEFFICIENTS = {
     }
 };
 
-const _ARMOR_BLD_TYPES = new Set(['center', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'tunnel', 'demoTrap']);
-const _ARMOR_INF_TYPES = new Set(['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker']);
-const _ARMOR_LV_TYPES = new Set(['humvee', 'technical', 'buggy', 'dragon', 'toxintractor', 'truck', 'dozer', 'quad']);
+const _ARMOR_BLD_TYPES = new Set(['center', 'commandCenter', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'blackMarket', 'derrick', 'tunnel', 'demoTrap']);
+const _ARMOR_INF_TYPES = new Set(['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'missiledefender', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker', 'burton', 'blacklotus', 'hacker', 'hijacker', 'terrorist', 'mob']);
+const _ARMOR_LV_TYPES = new Set(['humvee', 'technical', 'buggy', 'dragon', 'dragonTank', 'toxintractor', 'truck', 'dozer', 'quad', 'ambulance', 'radarvan', 'bombtruck', 'crawler', 'battlebus']);
 
 function getArmorCategory(target) {
     if (!target) return 'infantry';
     if (target._armorCat) return target._armorCat;
     let cat;
-    if (target.radius >= 4 || target.isBuilding || target.productionQueue || _ARMOR_BLD_TYPES.has(target.type)) {
+    if (target.isBuilding !== undefined || target.productionQueue || _ARMOR_BLD_TYPES.has(target.type) || (!target.speed && (target.radius || 0) >= 5)) {
         cat = 'building';
     } else if (target.isAir) {
         cat = 'aircraft';
@@ -17232,6 +17394,10 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         }
     }
 
+    const wasAlive = target.health > 0;
+    if (target.type === 'aurora' && target.invulnerableInbound) {
+        return; // Authentic Zero Hour Aurora Bomber: Supersonic inbound run cannot be intercepted!
+    }
     target.health = Math.max(0, target.health - finalDmg);
     target._lastAttackedTime = Date.now();
     target._lastAttacker = attacker || null;
@@ -17245,10 +17411,19 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         });
     }
 
-    // Check veterancy promotion on kill
-    if (target.health <= 0 && attacker && attacker.kills !== undefined) {
+    // Check veterancy promotion & kill counter on kill
+    if (wasAlive && target.health <= 0 && attacker && !target._killCredited) {
+        target._killCredited = true;
         attacker.kills = (attacker.kills || 0) + 1;
         checkVeterancyPromotion(attacker);
+        // If attacker is a passenger firing from a transport fireport (Humvee, Technical, Overlord Bunker), also credit the transport!
+        if (attacker.garrisonedIn && attacker.garrisonedIn.health > 0) {
+            attacker.garrisonedIn.kills = (attacker.garrisonedIn.kills || 0) + 1;
+            checkVeterancyPromotion(attacker.garrisonedIn);
+        }
+        if ((attacker.selected || (attacker.garrisonedIn && attacker.garrisonedIn.selected)) && typeof updateSidebar === 'function') {
+            updateSidebar();
+        }
     }
 }
 
@@ -17290,6 +17465,13 @@ function executeWeaponFire(attacker, target) {
     // Never fire weapon or deal damage to friendly teammates / allies!
     if (!attacker || !target || isFriendly(attacker, target)) {
         if (attacker && attacker.combatTarget === target) attacker.combatTarget = null;
+        return;
+    }
+    if (attacker.isUnmanned || (attacker.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < attacker.disabledUntil)) {
+        return;
+    }
+    if (['ambulance', 'chinook', 'truck', 'dozer', 'worker', 'radarvan', 'crawler'].includes(attacker.type)) {
+        attacker.combatTarget = null;
         return;
     }
     // Authentic Command & Conquer: Generals Weapon Reload Rates (60 ticks = 1.0s)
@@ -17539,10 +17721,137 @@ function executeWeaponFire(attacker, target) {
         const qDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 40 : 32;
         applyCalculatedDamage(attacker, target, qDmg, 'GATLING');
     } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
-        // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry!)
+        // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry, Jarmen Kell also snipes vehicle drivers!)
         spawnMuzzleFlash(muzzlePos, 0xffffff, 0.3);
         spawnLaserBeam(muzzlePos, targetPos, 0xffffff, 2);
-        applyCalculatedDamage(attacker, target, 90, 'SNIPER');
+        const tArmor = getArmorCategory(target);
+        if (attacker.type === 'jarmen' && (tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh && !target.isUnmanned) {
+            target.isUnmanned = true;
+            target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 999999;
+            target.combatTarget = null;
+            attacker.combatTarget = null;
+            if (typeof showNotification === 'function') {
+                showNotification(`Jarmen Kell sniped the driver of ${target.type.toUpperCase()}! Vehicle is now unmanned!`, 'success');
+            }
+        } else {
+            applyCalculatedDamage(attacker, target, 120, 'SNIPER');
+        }
+    } else if (attacker.type === 'burton') {
+        // USA Hero Colonel Burton: Silent Knife (melee vs infantry), C4 Demo Charge (close vs structure/armor), or Heavy Rifle!
+        const dist = attacker.mesh.position.distanceTo(targetPos);
+        const tArmor = getArmorCategory(target);
+        if (tArmor === 'infantry' && dist <= 5.5) {
+            // Silent Knife Kill (stays stealthed!)
+            attacker.isStealthed = true;
+            applyCalculatedDamage(attacker, target, 250, 'SNIPER');
+        } else if ((tArmor === 'building' || tArmor === 'heavy_vehicle' || tArmor === 'light_vehicle') && dist <= 11.0) {
+            // C4 Demolition Charge!
+            spawnExplosion(targetPos, 0xff4757);
+            if (typeof triggerScreenShake === 'function') triggerScreenShake(0.8);
+            applyCalculatedDamage(attacker, target, 350, 'EXPLOSIVE');
+        } else {
+            spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
+            spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.8);
+            playUSASound('machine_gun');
+            applyCalculatedDamage(attacker, target, 45, 'SMALL_ARMS');
+        }
+    } else if (attacker.type === 'blacklotus') {
+        // China Hero Black Lotus: Cyber Capture Building, Cash Hack ($1,000), or Vehicle Disable!
+        spawnLaserBeam(muzzlePos, targetPos, 0x00ffaa, 2);
+        const tArmor = getArmorCategory(target);
+        if (tArmor === 'building') {
+            if ((target.type === 'supplyCenter' || target.type === 'supplyStash') && !attacker.isAI) {
+                playerResources += 1000;
+                if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(targetPos, 1000);
+                if (typeof showNotification === 'function') showNotification('Black Lotus hacked $1,000 from enemy Supply Depot!', 'success');
+                if (typeof updateHUD === 'function') updateHUD();
+            } else {
+                applyCalculatedDamage(attacker, target, 340, 'EXPLOSIVE');
+            }
+        } else {
+            target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 450;
+            if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(targetPos);
+        }
+    } else if (attacker.type === 'hacker') {
+        // China Hacker: Cyber-Disable Beam vs Enemy Vehicles/Turrets (generates cash when idle in gameLoop!)
+        spawnLaserBeam(muzzlePos, targetPos, 0x10ac84, 2);
+        target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 210;
+        if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(targetPos);
+        applyCalculatedDamage(attacker, target, 10, 'SMALL_ARMS');
+    } else if (attacker.type === 'hijacker') {
+        // GLA Hijacker: Rushes enemy ground vehicle and captures it!
+        const tArmor = getArmorCategory(target);
+        if ((tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh) {
+            const dist = attacker.mesh.position.distanceTo(targetPos);
+            if (dist > 6.5) {
+                attacker.targetPosition.copy(targetPos);
+                attacker.attackCooldown = 15;
+                return;
+            }
+            // Transfer vehicle ownership!
+            if (!attacker.isAI && typeof enemyUnits !== 'undefined' && enemyUnits.includes(target)) {
+                const idx = enemyUnits.indexOf(target);
+                if (idx !== -1) enemyUnits.splice(idx, 1);
+                target.teamId = attacker.teamId;
+                target.ownerId = attacker.ownerId;
+                target.isAI = false;
+                target.isUnmanned = false;
+                target.disabledUntil = 0;
+                target.combatTarget = null;
+                units.push(target);
+                if (typeof showNotification === 'function') showNotification(`Hijacker commandeered enemy ${target.type.toUpperCase()}!`, 'success');
+            } else if (attacker.isAI && typeof units !== 'undefined' && units.includes(target)) {
+                const idx = units.indexOf(target);
+                if (idx !== -1) units.splice(idx, 1);
+                target.teamId = attacker.teamId;
+                target.ownerId = attacker.ownerId;
+                target.isAI = true;
+                target.isUnmanned = false;
+                target.disabledUntil = 0;
+                target.combatTarget = null;
+                enemyUnits.push(target);
+            }
+            attacker.health = 0;
+        } else {
+            attacker.combatTarget = null;
+        }
+    } else if (attacker.type === 'terrorist' || attacker.type === 'bombtruck') {
+        // GLA Terrorist & Bomb Truck: Rush target and detonate massive demolition payload on contact!
+        const dist = attacker.mesh.position.distanceTo(targetPos);
+        const detRange = (target.radius || 2.0) + (attacker.type === 'bombtruck' ? 6.5 : 4.5);
+        if (dist > detRange) {
+            attacker.targetPosition.copy(targetPos);
+            attacker.attackCooldown = 12;
+            return;
+        }
+        const isBio = attacker.bioBomb;
+        const blastDmg = attacker.type === 'bombtruck' ? (attacker.highExplosive ? 480 : 340) : 220;
+        const blastRad = attacker.type === 'bombtruck' ? (attacker.highExplosive ? 15 : 11) : 7.5;
+        spawnExplosion(targetPos, isBio ? 0x2ecc71 : 0xff4757);
+        if (isBio && typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
+        if (typeof triggerScreenShake === 'function') triggerScreenShake(attacker.type === 'bombtruck' ? 1.2 : 0.7);
+        applyCalculatedDamage(attacker, target, blastDmg, isBio ? 'TOXIN' : 'EXPLOSIVE');
+        const splashPool = attacker.isAI ? [...units, ...structures] : [...enemyUnits, ...enemyStructures];
+        splashPool.forEach(other => {
+            if (other !== target && other.health > 0) {
+                const op = other.position || (other.mesh && other.mesh.position);
+                if (op && op.distanceTo(targetPos) <= blastRad) {
+                    applyCalculatedDamage(attacker, other, Math.round(blastDmg * 0.65), isBio ? 'TOXIN' : 'EXPLOSIVE');
+                }
+            }
+        });
+        attacker.health = 0;
+    } else if (attacker.type === 'mob') {
+        // GLA Angry Mob: Multi-tracer AK-47 volley + Molotov Cocktails!
+        [-0.35, 0, 0.35].forEach(off => {
+            const mPos = getMuzzleWorldPosition(attacker, off);
+            spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
+            spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.2);
+        });
+        playAudio('ak47', {}, 'gla');
+        const hasAKs = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('armTheMob'));
+        applyCalculatedDamage(attacker, target, hasAKs ? 52 : 34, 'SMALL_ARMS');
+        applyCalculatedDamage(attacker, target, 20, 'FLAME');
     } else if (['tank', 'crusader', 'scorpion', 'marauder'].includes(attacker.type)) {
         // Heavy Tank Cannon
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
@@ -18215,7 +18524,9 @@ function initAICommanders() {
             const tmp = candidateWaypoints[i]; candidateWaypoints[i] = candidateWaypoints[j]; candidateWaypoints[j] = tmp;
         }
 
-        const startCredits = difficulty === 'hard' ? 10000 : difficulty === 'easy' ? 5000 : 7500;
+        const startMoneyEl = typeof document !== 'undefined' ? document.getElementById('starting-money') : null;
+        const lobbyMoney = startMoneyEl ? parseInt(startMoneyEl.value, 10) : 10000;
+        const startCredits = (!isNaN(lobbyMoney) && lobbyMoney > 0) ? lobbyMoney : (difficulty === 'hard' ? 12000 : difficulty === 'easy' ? 7500 : 10000);
         aiCommanders[ownerId] = {
             ownerId: ownerId,
             teamId: teamId,
@@ -18360,13 +18671,13 @@ function chooseAICounterUnitType(cmd, facilityType) {
         if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'nukecannon';
         return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'overlord' : (Math.random() < 0.35 ? 'gatling' : 'battlemaster');
     } else if (f === 'gla') {
-        if (counter === 'anti_air') return Math.random() < 0.75 ? 'quadcannon' : 'scorpion';
-        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'quadcannon' : 'buggy';
+        if (counter === 'anti_air') return Math.random() < 0.75 ? 'quad' : 'scorpion';
+        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'quad' : 'buggy';
         if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.5) ? 'marauder' : 'scorpion';
-        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'scudlauncher';
-        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'marauder' : (Math.random() < 0.35 ? 'quadcannon' : 'scorpion');
+        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'scud';
+        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'marauder' : (Math.random() < 0.35 ? 'quad' : 'scorpion');
     } else {
-        if (counter === 'anti_air') return Math.random() < 0.75 ? 'avenger' : 'humvee';
+        if (counter === 'anti_air') return Math.random() < 0.75 ? 'humvee' : 'paladin';
         if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'humvee' : 'tank';
         if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.55) ? 'paladin' : 'tank';
         if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'tomahawk';
@@ -18374,10 +18685,19 @@ function chooseAICounterUnitType(cmd, facilityType) {
     }
 }
 
-// Spawn AI structure for base reconstruction or base perimeter defense (AIPlayer.cpp::processBaseBuilding)
-function spawnAIStructure(cmd, type, pos) {
+// Spawn AI structure for base construction or base perimeter defense (Requires active AI Builder: Dozer / Worker!)
+function spawnAIStructure(cmd, type, pos, builderUnit) {
     if (typeof createStructureMeshForFaction !== 'function' || typeof scene === 'undefined') return null;
     const f = cmd.faction || 'china';
+    const bType = (f === 'gla') ? 'worker' : 'dozer';
+    const activeBuilder = builderUnit || (typeof enemyUnits !== 'undefined' ? enemyUnits.find(u =>
+        u.ownerId === cmd.ownerId && u.health > 0 && (u.type === 'dozer' || u.type === 'worker') &&
+        !u.targetStructure && u.taskState !== 'Building' && u.taskState !== 'MovingToBuild'
+    ) : null);
+
+    // Authentic C&C Generals Rule: AI CANNOT construct buildings without a live Dozer / Worker!
+    if (!activeBuilder || activeBuilder.health <= 0) return null;
+
     const group = createStructureMeshForFaction(type, f);
     if (!group.userData || !group.userData.isW3D) {
         group.scale.set(1.35, 1.35, 1.35);
@@ -18386,6 +18706,14 @@ function spawnAIStructure(cmd, type, pos) {
     const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : 0;
     pos.y = groundY + 0.05;
     group.position.copy(pos);
+
+    // Apply construction wireframe material until the AI Dozer/Worker completes construction (0% -> 100%)
+    group.traverse(child => {
+        if (child.isMesh) {
+            child.savedMaterial = child.material;
+            child.material = new THREE.MeshBasicMaterial({ color: 0xff9f43, wireframe: true, transparent: true, opacity: 0.45 });
+        }
+    });
     scene.add(group);
 
     const maxHp = (type === 'patriot' || type === 'gatlingCannon' || type === 'stingerSite') ? 900 : 1200;
@@ -18401,29 +18729,34 @@ function spawnAIStructure(cmd, type, pos) {
         ownerId: cmd.ownerId,
         faction: f,
         isAI: true,
-        isBuilding: false,
-        buildProgress: 100
+        isBuilding: true,
+        buildProgress: 0,
+        dozerRef: null,
+        spawnedHarvester: false
     };
     enemyStructures.push(esObj);
     if (typeof clearFoundationFootprint === 'function') clearFoundationFootprint(esObj);
     markPathfindGridDirty();
+    if (typeof assignDozerToStructure === 'function') {
+        assignDozerToStructure(activeBuilder, esObj);
+    }
     return esObj;
 }
 
 // AI Economy, Harvester/Dozer Replacement & Base Defense Construction (AIPlayer.cpp)
 function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnits) {
     // 1. Supply Center income + active harvester maintenance (queueSupplyTruck / queueDozer)
-    const supplyStruct = myStructures.find(s => s.type === 'supplyCenter' || s.type === 'supplyStash');
-    const cmdCenter = myStructures.find(s => s.type === 'center' || s.type === 'commandCenter');
+    const supplyStruct = myStructures.find(s => !s.isBuilding && (s.type === 'supplyCenter' || s.type === 'supplyStash'));
+    const cmdCenter = myStructures.find(s => !s.isBuilding && (s.type === 'center' || s.type === 'commandCenter'));
     const incomeTick = cmd.difficulty === 'hard' ? 180 : cmd.difficulty === 'easy' ? 95 : 135;
     if (supplyStruct || cmdCenter) {
         cmd.resources = Math.min(25000, (cmd.resources || 0) + incomeTick);
     }
 
     const desiredGatherers = ZERO_HOUR_AI_DATA.resourceGatherers[cmd.difficulty] || 1;
-    const myGatherers = myUnits.filter(u => u.type === 'truck' || (u.type === 'worker' && u.aiState && u.aiState !== 'Idle'));
+    const myGatherers = myUnits.filter(u => u.type === 'truck' || u.type === 'chinook' || (u.type === 'worker' && u.aiState && u.aiState !== 'Idle'));
     if (supplyStruct && myGatherers.length < desiredGatherers && cmd.resources >= 600) {
-        const hType = (cmd.faction === 'gla') ? 'worker' : 'truck';
+        const hType = (cmd.faction === 'gla') ? 'worker' : (cmd.faction === 'usa' ? 'chinook' : 'truck');
         const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
         const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
         if (harv) {
@@ -18437,6 +18770,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             harv.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(harv.mesh.position) : null;
             if (harv.supplyTarget) {
                 harv.targetPosition.copy(getSupplyDockSlotPosition(harv.supplyTarget, harv, false));
+                if (hType === 'chinook') harv.airState = 'flying';
             }
         }
     }
@@ -18455,33 +18789,52 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             bUnit.difficulty = cmd.difficulty;
             bUnit.taskState = 'Idle';
             bUnit.aiState = 'Idle';
+            myBuilders.push(bUnit);
         }
     }
 
-    // 2. Periodic Base Reconstruction & Perimeter Defense Placement (structureSeconds)
+    // Find an available idle AI builder (Dozer or Worker)
+    const availBuilder = myBuilders.find(b =>
+        b.health > 0 && !b.targetStructure && b.taskState !== 'Building' && b.taskState !== 'MovingToBuild'
+    );
+    if (!availBuilder) return;
+
+    // If an existing AI foundation lost its builder, dispatch the idle builder to finish it first!
+    const unfinishedStruct = myStructures.find(s => s.isBuilding && (!s.dozerRef || s.dozerRef.health <= 0));
+    if (unfinishedStruct) {
+        if (typeof assignDozerToStructure === 'function') {
+            assignDozerToStructure(availBuilder, unfinishedStruct);
+        }
+        return;
+    }
+
+    // 2. Periodic Base Construction & Perimeter Defense Placement
     cmd.structureTimer = (cmd.structureTimer || 0) + 1;
-    if (cmd.structureTimer < 6) return;
+    const buildCheckInterval = myStructures.length < 5 ? 2 : 5;
+    if (cmd.structureTimer < buildCheckInterval) return;
     cmd.structureTimer = 0;
 
     // Do not build if enemies are directly inside base (underAttack check from AIPlayer.cpp)
     const baseUnderAttack = hostileUnits.some(hu => hu.mesh && hu.mesh.position.distanceTo(cmd.basePos) < 35);
-    if (baseUnderAttack || cmd.resources < ZERO_HOUR_AI_DATA.resourcesPoor) return;
+    if (baseUnderAttack || cmd.resources < 600) return;
 
-    // Essential base structures to reconstruct if destroyed
+    // Essential base structures to construct / reconstruct in priority order
     const f = cmd.faction || 'china';
     const essentialList = [
-        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-18, 0, -14) },
-        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(18, 0, -14) },
-        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-18, 0, 16) },
-        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(18, 0, 16) }
+        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-22, 0, -18) },
+        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(22, 0, -18) },
+        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-22, 0, 20) },
+        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(24, 0, 20) }
     ];
 
     for (let item of essentialList) {
         if (f === 'gla' && (item.build === 'power' || item.build === 'nuclearReactor')) continue;
         if (!myStructures.some(item.check) && cmd.resources >= item.cost) {
             const candidatePos = adjustToPossibleDestination(cmd.basePos.clone().add(item.offset));
-            spawnAIStructure(cmd, item.build, candidatePos);
-            cmd.resources -= item.cost;
+            const built = spawnAIStructure(cmd, item.build, candidatePos, availBuilder);
+            if (built) {
+                cmd.resources -= item.cost;
+            }
             return;
         }
     }
@@ -18490,7 +18843,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     const defType = f === 'china' ? 'gatlingCannon' : f === 'gla' ? 'stingerSite' : 'patriot';
     const maxDefenses = cmd.difficulty === 'hard' ? 4 : cmd.difficulty === 'easy' ? 1 : 2;
     const currentDefenses = myStructures.filter(s => s.type === 'patriot' || s.type === 'gatlingCannon' || s.type === 'stingerSite' || s.type === 'bunker' || s.type === 'tunnel');
-    if (currentDefenses.length < maxDefenses && cmd.resources >= 2800) {
+    if (currentDefenses.length < maxDefenses && cmd.resources >= 1800) {
         const enemyRef = (cmd.discoveredEnemyBases.length > 0) ? cmd.discoveredEnemyBases[0].position : new THREE.Vector3(0, 0, 0);
         const frontDir = new THREE.Vector3().subVectors(enemyRef, cmd.basePos);
         if (frontDir.lengthSq() < 1) frontDir.set(-cmd.basePos.x, 0, -cmd.basePos.z);
@@ -18502,8 +18855,10 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             .addScaledVector(frontDir, 24)
             .addScaledVector(sideDir, spread);
         const clearPos = adjustToPossibleDestination(defPos);
-        spawnAIStructure(cmd, defType, clearPos);
-        cmd.resources -= 1000;
+        const builtDef = spawnAIStructure(cmd, defType, clearPos, availBuilder);
+        if (builtDef) {
+            cmd.resources -= 1000;
+        }
     }
 }
 
@@ -18545,10 +18900,10 @@ function processEnemyAIEngine() {
         const prodInterval = isWealthy ? Math.max(4, Math.floor(baseProdInterval * 0.65)) : baseProdInterval;
         const maxUnits = cmd.difficulty === 'hard' ? 24 : cmd.difficulty === 'easy' ? 10 : 15;
 
-        const combatUnits = myUnits.filter(u => u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck');
+        const combatUnits = myUnits.filter(u => u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck' && u.type !== 'chinook');
         if (cmd.productionTimer % prodInterval === 0 && combatUnits.length < maxUnits && (cmd.resources || 0) >= 500) {
-            const fac = myStructures.find(es => es.type === 'factory' && es.health > 0);
-            const bar = myStructures.find(es => es.type === 'barracks' && es.health > 0);
+            const fac = myStructures.find(es => !es.isBuilding && es.type === 'factory' && es.health > 0);
+            const bar = myStructures.find(es => !es.isBuilding && es.type === 'barracks' && es.health > 0);
             // Combined arms: mix 70% armor/vehicles + 30% counter infantry when both facilities exist
             const chosenFacility = (fac && bar) ? (Math.random() < 0.72 ? fac : bar) : (fac || bar);
             if (chosenFacility) {
@@ -19917,13 +20272,21 @@ function processEnemyAIEngine() {
                 }
             });
 
-            // 4. AI Dozers/Workers Auto-Repair with AIDozerBoredRadiusModifier (2.0x radius from Zero Hour AI.h)
+            // 4. AI Dozers/Workers Auto-Build Unfinished Foundations & Auto-Repair with AIDozerBoredRadiusModifier
             if (typeof enemyUnits !== 'undefined' && typeof enemyStructures !== 'undefined') {
                 const aiBuilders = enemyUnits.filter(u =>
                     (u.type === 'dozer' || (u.type === 'worker' && (!u.aiState || u.aiState === 'Idle'))) && u.health > 0
                 );
                 aiBuilders.forEach(aiBuilder => {
-                    if (aiBuilder.taskState === 'Repairing' || aiBuilder.taskState === 'MovingToRepair') return;
+                    if (aiBuilder.taskState === 'Building' || aiBuilder.taskState === 'MovingToBuild' || aiBuilder.taskState === 'Repairing' || aiBuilder.taskState === 'MovingToRepair') return;
+                    // First priority: finish any unfinished AI structure foundation owned by this AI
+                    const unfinished = enemyStructures.find(es =>
+                        es && es.ownerId === aiBuilder.ownerId && es.isBuilding && es.health > 0 && (!es.dozerRef || es.dozerRef.health <= 0)
+                    );
+                    if (unfinished) {
+                        assignDozerToStructure(aiBuilder, unfinished);
+                        return;
+                    }
                     aiBuilder._boredTimer = (aiBuilder._boredTimer || 0) + 1;
                     if (aiBuilder._boredTimer < 30) return;
                     const aiBoredRange = 75.0 * (ZERO_HOUR_AI_DATA.aiDozerBoredRadiusModifier || 2.0);
@@ -20338,6 +20701,32 @@ function animate() {
                             dMesh.traverse(c => { if (c.name && c.name.toLowerCase().includes('prop')) drone._propNodes.push(c); });
                         }
                         for (let pi = 0; pi < drone._propNodes.length; pi++) drone._propNodes[pi].rotation.y += 0.65;
+
+                        // Scout Drone Function: +50% Sight/Scan Range & Active Stealth/Mine Detection within 32 units
+                        unit.detectsStealth = true;
+                        if (unit._baseScanRange) unit.scanRange = Math.round(unit._baseScanRange * 1.5);
+                        if (drone.timer % 20 === 0) {
+                            const detectR2 = 32.0 * 32.0;
+                            const uX = unit.mesh.position.x, uZ = unit.mesh.position.z;
+                            enemyUnits.forEach(eu => {
+                                if (eu.health > 0 && eu.mesh && !isFriendly(unit, eu)) {
+                                    const dx = eu.mesh.position.x - uX, dz = eu.mesh.position.z - uZ;
+                                    if (dx * dx + dz * dz <= detectR2) {
+                                        eu.isStealthed = false;
+                                        eu.revealedUntil = buildingTick + 120;
+                                    }
+                                }
+                            });
+                            enemyStructures.forEach(es => {
+                                if (es.health > 0 && es.position && !isFriendly(unit, es)) {
+                                    const dx = es.position.x - uX, dz = es.position.z - uZ;
+                                    if (dx * dx + dz * dz <= detectR2) {
+                                        es.isStealthed = false;
+                                        es.revealedUntil = buildingTick + 120;
+                                    }
+                                }
+                            });
+                        }
                     } else if (drone.type === 'hellfire') {
                         // Hellfire Drone: flies like the recon drone with horizontal flight attitude, circling the host vehicle
                         if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
@@ -20428,12 +20817,16 @@ function animate() {
                         }
                     }
 
-                    // Battle Drone: Repairs vehicle + fires micro-gun at hostile infantry
+                    // Battle Drone: Repairs host vehicle (+5 HP/s with welding arc) + fires micro-MG at hostile targets (credits kills to host!)
                     if (drone.type === 'battle') {
                         if (drone.timer % 60 === 0 && unit.health < unit.maxHealth) {
-                            unit.health = Math.min(unit.maxHealth, unit.health + 3);
+                            unit.health = Math.min(unit.maxHealth, unit.health + 5);
+                            if (typeof spawnLaserBeam === 'function') {
+                                spawnLaserBeam(dMesh.position.clone(), unit.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0x00d2d3, 1.5);
+                            }
+                            if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
                         }
-                        if (drone.timer % 40 === 0) {
+                        if (drone.timer % 35 === 0) {
                             const dmX = dMesh.position.x;
                             const dmZ = dMesh.position.z;
                             const maxDistSq = 18.0 * 18.0;
@@ -20449,30 +20842,44 @@ function animate() {
                                 if (muzzleNode) muzzleNode.getWorldPosition(muzzlePos);
                                 spawnBulletTracer(muzzlePos, enemyInf.mesh.position, 0x00d2d3, 1.5);
                                 playAudio('machine_gun');
-                                enemyInf.health -= 12;
+                                applyCalculatedDamage(unit, enemyInf, 16, 'SMALL_ARMS');
                             }
                         }
                     }
 
-                    // Hellfire Drone: Launches mini-Hellfire rockets at hostile armor
+                    // Hellfire Drone: Launches guided armor-piercing Hellfire missiles at hostile vehicles & structures (credits kills to host!)
                     if (drone.type === 'hellfire') {
-                        if (drone.timer % 90 === 0) {
+                        if (drone.timer % 80 === 0) {
                             const dmX = dMesh.position.x;
                             const dmZ = dMesh.position.z;
-                            const maxDistSq = 22.0 * 22.0;
-                            const enemyArmor = getLivingUnits().find(e => {
+                            const maxDistSq = 24.0 * 24.0;
+                            let hellfireTarget = getLivingUnits().find(e => {
                                 if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
                                 const dx = e.mesh.position.x - dmX;
                                 const dz = e.mesh.position.z - dmZ;
                                 return (dx * dx + dz * dz) <= maxDistSq;
                             });
-                            if (enemyArmor) {
+                            if (!hellfireTarget) {
+                                hellfireTarget = enemyStructures.find(es => {
+                                    if (es.health <= 0 || !es.position || isFriendly(unit, es)) return false;
+                                    const dx = es.position.x - dmX;
+                                    const dz = es.position.z - dmZ;
+                                    return (dx * dx + dz * dz) <= maxDistSq;
+                                });
+                            }
+                            if (hellfireTarget) {
                                 let launchPos = dMesh.position.clone();
                                 const pylonNode = getCachedNode(dMesh, 'WEAPONA');
                                 if (pylonNode) pylonNode.getWorldPosition(launchPos);
-                                spawnRocketProjectile(launchPos, enemyArmor.mesh.position, false, false);
+                                const tPos = (hellfireTarget.position || hellfireTarget.mesh.position).clone();
+                                spawnRocketProjectile(launchPos, tPos, false, false, {
+                                    attacker: unit,
+                                    target: hellfireTarget,
+                                    damage: 48,
+                                    damageType: 'ARMOR_PIERCING',
+                                    splashRadius: 1.5
+                                });
                                 playAudio('missile_launch');
-                                enemyArmor.health -= 35;
                             }
                         }
                     }
@@ -20484,9 +20891,9 @@ function animate() {
                     const uX = unit.mesh.position.x;
                     const uZ = unit.mesh.position.z;
 
-                    // Overlord Bunker: 2 troops shoot 360 degrees
+                    // Overlord Bunker: Garrisoned troops or default bunker crew shoot 360 degrees
                     if (unit.overlordUpgrade === 'bunker' && unit.upgTimer % 45 === 0) {
-                        const maxDistSq = 18.0 * 18.0;
+                        const maxDistSq = 20.0 * 20.0;
                         const target = getLivingUnits().find(e => {
                             if (e.health <= 0 || isFriendly(unit, e)) return false;
                             const dx = e.mesh.position.x - uX;
@@ -20496,39 +20903,137 @@ function animate() {
                         if (target) {
                             spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf39c12, 2.5);
                             playAudio('china_cannon', {}, 'china');
-                            target.health -= 22;
+                            applyCalculatedDamage(unit, target, 24, 'SMALL_ARMS');
                         }
                     }
 
-                    // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret
-                    if (unit.overlordUpgrade === 'gatling' && unit.upgTimer % 12 === 0) {
-                        const maxDistSq = 20.0 * 20.0;
-                        const target = getLivingUnits().find(e => {
-                            if (e.health <= 0 || isFriendly(unit, e)) return false;
-                            const dx = e.mesh.position.x - uX;
-                            const dz = e.mesh.position.z - uZ;
-                            return (dx * dx + dz * dz) <= maxDistSq;
-                        });
-                        if (target) {
-                            spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
-                            spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
-                            playAudio('gatling_fire', {}, 'china');
-                            target.health -= 18;
+                    // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret + stealth detection
+                    if (unit.overlordUpgrade === 'gatling') {
+                        unit.detectsStealth = true;
+                        if (unit.upgTimer % 15 === 0) {
+                            const maxDistSq = 22.0 * 22.0;
+                            const target = getLivingUnits().find(e => {
+                                if (e.health <= 0 || isFriendly(unit, e)) return false;
+                                const dx = e.mesh.position.x - uX;
+                                const dz = e.mesh.position.z - uZ;
+                                return (dx * dx + dz * dz) <= maxDistSq;
+                            });
+                            if (target) {
+                                spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
+                                spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
+                                playAudio('gatling_fire', {}, 'china');
+                                applyCalculatedDamage(unit, target, 18, 'GATLING');
+                            }
                         }
                     }
 
-                    // Overlord Propaganda Tower: Heals nearby allies (+3 HP/s) and pulses soundwaves
+                    // Overlord Propaganda Tower: Heals nearby allies (+4 HP/s) and grants Horde fire-rate buff (+25%)
                     if (unit.overlordUpgrade === 'propaganda' && unit.upgTimer % 60 === 0) {
                         const maxDistSq = 18.0 * 18.0;
                         units.forEach(ally => {
-                            if (ally.health > 0) {
+                            if (ally.health > 0 && ally.mesh) {
                                 const dx = ally.mesh.position.x - uX;
                                 const dz = ally.mesh.position.z - uZ;
                                 if ((dx * dx + dz * dz) <= maxDistSq) {
                                     ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                                    ally.isHordeActive = true;
                                 }
                             }
                         });
+                    }
+                }
+
+                // 4. USA Ambulance Field Medic & Decontamination Aura
+                if (unit.type === 'ambulance' && unit.health > 0 && buildingTick % 30 === 0) {
+                    const ambX = unit.mesh.position.x, ambZ = unit.mesh.position.z;
+                    const healR2 = 16.0 * 16.0;
+                    const myTeamList = unit.isAI ? enemyUnits : units;
+                    myTeamList.forEach(ally => {
+                        if (ally.health > 0 && ally.health < ally.maxHealth && ally.mesh) {
+                            const dx = ally.mesh.position.x - ambX, dz = ally.mesh.position.z - ambZ;
+                            if (dx * dx + dz * dz <= healR2) {
+                                ally.health = Math.min(ally.maxHealth, ally.health + 6);
+                            }
+                        }
+                    });
+                    if (unit.garrisoned && unit.garrisoned.length > 0) {
+                        unit.garrisoned.forEach(p => {
+                            if (p.health > 0 && p.health < p.maxHealth) p.health = Math.min(p.maxHealth, p.health + 8);
+                        });
+                    }
+                }
+
+                // 5. China Hacker Autonomous Internet Cash Hacking (when stationary)
+                if (unit.type === 'hacker' && unit.health > 0 && !unit.combatTarget) {
+                    const moveDist = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
+                    if (moveDist < 0.8) {
+                        unit._hackTimer = (unit._hackTimer || 0) + 1;
+                        if (unit._hackTimer >= 120) {
+                            unit._hackTimer = 0;
+                            const hackGain = 6 + (unit.veterancy || 0) * 2;
+                            if (!unit.isAI) {
+                                playerResources += hackGain;
+                                if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(unit.mesh.position, hackGain);
+                                if (typeof updateHUD === 'function') updateHUD();
+                            }
+                        }
+                    }
+                }
+
+                // 6. Dozer & Worker Mine / Demo Trap Sweeping + China Troop Crawler Stealth Detection
+                if ((unit.type === 'dozer' || unit.type === 'worker' || unit.type === 'crawler') && unit.health > 0 && buildingTick % 30 === 0) {
+                    const sweepR2 = (unit.type === 'crawler' ? 28.0 * 28.0 : 12.0 * 12.0);
+                    const uX = unit.mesh.position.x, uZ = unit.mesh.position.z;
+                    enemyUnits.forEach(eu => {
+                        if (eu.health > 0 && eu.mesh && !isFriendly(unit, eu)) {
+                            const dx = eu.mesh.position.x - uX, dz = eu.mesh.position.z - uZ;
+                            if (dx * dx + dz * dz <= sweepR2) {
+                                eu.isStealthed = false;
+                                eu.revealedUntil = buildingTick + 90;
+                            }
+                        }
+                    });
+                    if ((unit.type === 'dozer' || unit.type === 'worker') && typeof landmines !== 'undefined' && landmines.length > 0) {
+                        for (let mi = landmines.length - 1; mi >= 0; mi--) {
+                            const mine = landmines[mi];
+                            if (mine && !isFriendly(unit, mine) && mine.position) {
+                                const dx = mine.position.x - uX, dz = mine.position.z - uZ;
+                                if (dx * dx + dz * dz <= 12.0 * 12.0) {
+                                    if (mine.mesh) scene.remove(mine.mesh);
+                                    landmines.splice(mi, 1);
+                                    if (!unit.isAI && typeof showNotification === 'function') {
+                                        showNotification(`${unit.type.toUpperCase()} disarmed hostile landmine!`, 'info');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 7. Unmanned Vehicle Re-Crewing (Any infantry touching a vehicle whose driver was sniped by Jarmen Kell captures it!)
+                if (typeof isInfantryType === 'function' && isInfantryType(unit.type) && unit.health > 0 && !unit.garrisonedIn) {
+                    const allVehicles = [...enemyUnits, ...units].filter(v => v.isUnmanned && v.health > 0 && v.mesh);
+                    for (let uv of allVehicles) {
+                        if (unit.mesh.position.distanceTo(uv.mesh.position) <= (uv.radius || 2.5) + 2.0) {
+                            if (enemyUnits.includes(uv) && !unit.isAI) {
+                                enemyUnits.splice(enemyUnits.indexOf(uv), 1);
+                                units.push(uv);
+                            } else if (units.includes(uv) && unit.isAI) {
+                                units.splice(units.indexOf(uv), 1);
+                                enemyUnits.push(uv);
+                            }
+                            uv.teamId = unit.teamId;
+                            uv.ownerId = unit.ownerId;
+                            uv.isAI = unit.isAI;
+                            uv.isUnmanned = false;
+                            uv.disabledUntil = 0;
+                            uv.combatTarget = null;
+                            unit.health = 0;
+                            if (!unit.isAI && typeof showNotification === 'function') {
+                                showNotification(`${unit.type.toUpperCase()} crewed and captured unmanned ${uv.type.toUpperCase()}!`, 'success');
+                            }
+                            break;
+                        }
                     }
                 }
             });
@@ -20626,8 +21131,9 @@ function animate() {
             processBuildingFunctions();
 
             let constructionActive = false;
-            structures.forEach(s => {
-                if (!s.isBuilding) return;
+            const allConstructing = [...structures, ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+            allConstructing.forEach(s => {
+                if (!s || !s.isBuilding || s.health <= 0) return;
                 
                 if (s.dozerRef && s.dozerRef.health > 0) {
                     const dPos = s.dozerRef.mesh.position;
@@ -20644,14 +21150,17 @@ function animate() {
                             s.dozerRef.mesh.rotation.y = Math.atan2(-toZ, toX) + Math.PI / 2;
                         }
                         
-                        constructionActive = true;
-                        const wp = s.position.clone(); wp.y += 4; wp.project(camera);
-                        const sX = (wp.x * 0.5 + 0.5) * window.innerWidth; const sY = (-(wp.y * 0.5) + 0.5) * window.innerHeight;
-                        
-                        if (wp.z >= -1 && wp.z <= 1) {
-                            progressContainer.style.display = 'block';
-                            progressContainer.style.left = sX + 'px'; progressContainer.style.top = sY + 'px';
-                            progressFill.style.width = Math.min(100, s.buildProgress) + '%';
+                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
+                        if (!isAiStruct) {
+                            constructionActive = true;
+                            const wp = s.position.clone(); wp.y += 4; wp.project(camera);
+                            const sX = (wp.x * 0.5 + 0.5) * window.innerWidth; const sY = (-(wp.y * 0.5) + 0.5) * window.innerHeight;
+                            
+                            if (wp.z >= -1 && wp.z <= 1) {
+                                progressContainer.style.display = 'block';
+                                progressContainer.style.left = sX + 'px'; progressContainer.style.top = sY + 'px';
+                                progressFill.style.width = Math.min(100, s.buildProgress) + '%';
+                            }
                         }
 
                         if (s.buildProgress >= 100) {
@@ -20664,24 +21173,25 @@ function animate() {
                             }
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
                             const bFaction = s.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
-                            if (typeof playBuildingCompleteSound === 'function') {
+                            if (!isAiStruct && typeof playBuildingCompleteSound === 'function') {
                                 playBuildingCompleteSound(s.type, bFaction);
                             }
-                            const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
                             if (s.type !== 'supplyCenter' && !isAiStruct) {
                                 showNotification(`${(s.type || 'Building').toUpperCase()} construction completed!`, 'success');
                             }
 
-                            // Automatic Harvester Deployment upon Supply Center / Stash completion
+                            // Automatic Harvester Deployment upon Supply Center / Stash completion (Player & AI)
                             if (!s.spawnedHarvester) {
                                 s.spawnedHarvester = true;
                                 if (s.type === 'supplyCenter') {
                                     if (bFaction === 'usa') {
                                         const spawnPos = s.position.clone().add(new THREE.Vector3(0, 4.5, 7.5));
-                                        const chinook = (typeof spawnUnit === 'function') ? spawnUnit('chinook', spawnPos) : null;
+                                        const chinook = isAiStruct
+                                            ? (typeof spawnEnemyUnit === 'function' ? spawnEnemyUnit('chinook', spawnPos, null, 'usa') : null)
+                                            : (typeof spawnUnit === 'function' ? spawnUnit('chinook', spawnPos) : null);
                                         if (chinook) {
                                             chinook.teamId = s.teamId || (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
-                                            chinook.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            chinook.ownerId = s.ownerId || (isAiStruct ? 'ai_1' : 'player');
                                             chinook.isAI = isAiStruct;
                                             chinook.aiState = 'MovingToDock';
                                             chinook.taskState = 'Idle';
@@ -20691,43 +21201,43 @@ function animate() {
                                                 chinook.targetPosition.copy(chinook.supplyTarget.position);
                                                 chinook.airState = 'flying';
                                             }
-                                            if (typeof playUnitReadyAudio === 'function') {
-                                                playUnitReadyAudio('chinook', 'usa');
-                                            }
                                             if (!isAiStruct) {
+                                                if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('chinook', 'usa');
                                                 showNotification('USA Supply Depot constructed! Chinook transport deployed to harvest supplies.', 'success');
                                             }
                                         }
                                     } else if (bFaction === 'china') {
                                         const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.5));
                                         spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
-                                        const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
-                                        const truck = (typeof spawnUnit === 'function') ? spawnUnit('truck', spawnPos) : null;
+                                        const truck = isAiStruct
+                                            ? (typeof spawnEnemyUnit === 'function' ? spawnEnemyUnit('truck', spawnPos, null, 'china') : null)
+                                            : (typeof spawnUnit === 'function' ? spawnUnit('truck', spawnPos) : null);
                                         if (truck) {
                                             truck.teamId = s.teamId || 1;
-                                            truck.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                            truck.ownerId = s.ownerId || (isAiStruct ? 'ai_1' : 'player');
                                             truck.isAI = isAiStruct;
                                             truck.aiState = 'MovingToDock';
                                             truck.taskState = 'Idle';
                                             truck.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(truck.mesh.position) : null;
                                             if (truck.supplyTarget) truck.targetPosition.copy(truck.supplyTarget.position);
-                                            if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('truck', 'china');
+                                            if (!isAiStruct && typeof playUnitReadyAudio === 'function') playUnitReadyAudio('truck', 'china');
                                         }
                                     }
                                 } else if (s.type === 'supplyStash') {
                                     const spawnPos = s.position.clone().add(new THREE.Vector3(0, 0, 7.0));
                                     spawnPos.y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(spawnPos.x, spawnPos.z) : spawnPos.y;
-                                    const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
-                                    const worker = (typeof spawnUnit === 'function') ? spawnUnit('worker', spawnPos) : null;
+                                    const worker = isAiStruct
+                                        ? (typeof spawnEnemyUnit === 'function' ? spawnEnemyUnit('worker', spawnPos, null, 'gla') : null)
+                                        : (typeof spawnUnit === 'function' ? spawnUnit('worker', spawnPos) : null);
                                     if (worker) {
                                         worker.teamId = s.teamId || 1;
-                                        worker.ownerId = s.ownerId || (isAiStruct ? 'ai' : 'player');
+                                        worker.ownerId = s.ownerId || (isAiStruct ? 'ai_1' : 'player');
                                         worker.isAI = isAiStruct;
                                         worker.aiState = 'MovingToDock';
                                         worker.taskState = 'Idle';
                                         worker.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(worker.mesh.position) : null;
                                         if (worker.supplyTarget) worker.targetPosition.copy(worker.supplyTarget.position);
-                                        if (typeof playUnitReadyAudio === 'function') playUnitReadyAudio('worker', 'gla');
+                                        if (!isAiStruct && typeof playUnitReadyAudio === 'function') playUnitReadyAudio('worker', 'gla');
                                     }
                                 }
                             }
@@ -21063,7 +21573,9 @@ function animate() {
                             const dxA = tPos.x - unit.mesh.position.x;
                             const dzA = tPos.z - unit.mesh.position.z;
                             const distToEnemy = Math.hypot(dxA, dzA);
-                            const planeSpeed = ((unit.type === 'aurora') ? unit.speed * 1.60 : unit.speed) * combatDeltaScale;
+                            const isAuroraInbound = (unit.type === 'aurora' && unit.planeAttackPhase === 'inbound');
+                            unit.invulnerableInbound = isAuroraInbound;
+                            const planeSpeed = ((unit.type === 'aurora') ? (isAuroraInbound ? unit.speed * 1.85 : unit.speed * 0.65) : unit.speed) * combatDeltaScale;
 
                             if (unit.planeAttackPhase === 'inbound') {
                                 // Phase 1: High-speed approach directly at the target
@@ -21329,6 +21841,7 @@ function animate() {
                                     const toZ = enemy.mesh.position.z - unit.mesh.position.z;
                                     if (toX * dirX + toZ * dirZ > 0) { // moving towards infantry
                                         enemy.health = 0;
+                                        enemy._killCredited = true;
                                         if (typeof spawnSquishDecal === 'function') spawnSquishDecal(enemy.mesh.position);
                                         playAudio('infantry_squish');
                                         if (typeof showNotification === 'function') {
@@ -21336,6 +21849,7 @@ function animate() {
                                         }
                                         unit.kills = (unit.kills || 0) + 1;
                                         if (typeof checkVeterancyPromotion === 'function') checkVeterancyPromotion(unit);
+                                        if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
                                     }
                                 }
                             }
@@ -21955,9 +22469,9 @@ function processEnemyCombat() {
 // AUTHENTIC POINT DEFENSE LASER SYSTEM (PointDefenseLaserUpdate.cpp)
 // =========================================================================
 function processPointDefenseLasers() {
-    if (typeof activeMissiles === 'undefined' || activeMissiles.length === 0) return;
     const allLivingUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
         ? [...units, ...enemyUnits] : [];
+    if (allLivingUnits.length === 0) return;
 
     allLivingUnits.forEach(defender => {
         if (defender.health <= 0 || !defender.mesh) return;
@@ -21973,28 +22487,50 @@ function processPointDefenseLasers() {
         const scanRange = (defender.type === 'paladin') ? 22.0 : 16.0;
         const myPos = defender.mesh.position;
 
-        for (let missile of activeMissiles) {
-            if (missile.intercepted) continue;
-            const attacker = missile.metadata ? missile.metadata.attacker : null;
-            if (attacker && typeof isFriendly === 'function' && isFriendly(defender, attacker)) continue;
+        if (typeof activeMissiles !== 'undefined' && activeMissiles.length > 0) {
+            for (let missile of activeMissiles) {
+                if (missile.intercepted) continue;
+                const attacker = missile.metadata ? missile.metadata.attacker : null;
+                if (attacker && typeof isFriendly === 'function' && isFriendly(defender, attacker)) continue;
 
-            const dist = myPos.distanceTo(missile.curPos);
-            if (dist <= scanRange) {
-                // Intercept missile in mid-air!
-                missile.intercepted = true;
-                const laserOrigin = (defender.drone && defender.drone.mesh)
-                    ? defender.drone.mesh.position.clone()
-                    : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
+                const dist = myPos.distanceTo(missile.curPos);
+                if (dist <= scanRange) {
+                    // Intercept missile in mid-air!
+                    missile.intercepted = true;
+                    const laserOrigin = (defender.drone && defender.drone.mesh)
+                        ? defender.drone.mesh.position.clone()
+                        : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
 
-                if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
-                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
-                playAudio('laser_point_defense');
-                defender.pdlCooldown = (defender.type === 'paladin') ? 65 : 85;
+                    if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
+                    playAudio('laser_point_defense');
+                    defender.pdlCooldown = (defender.type === 'paladin') ? 65 : 85;
 
-                if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
-                    showNotification('★ Paladin Point Defense Laser intercepted hostile missile!', 'info');
+                    if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
+                        showNotification('★ Point Defense Laser intercepted hostile missile!', 'info');
+                    }
+                    return;
                 }
-                break;
+            }
+        }
+
+        // Authentic Paladin Tank Anti-Infantry Laser Zap (when no missiles need interception)
+        if (defender.type === 'paladin' && defender.pdlCooldown === 0) {
+            const infRangeSq = 14.0 * 14.0;
+            const hostileInf = allLivingUnits.find(e =>
+                e.health > 0 && e.mesh && !e.isAir && !isFriendly(defender, e) &&
+                (typeof getArmorCategory === 'function' ? getArmorCategory(e) === 'infantry' : false) &&
+                myPos.distanceToSquared(e.mesh.position) <= infRangeSq
+            );
+            if (hostileInf) {
+                const laserOrigin = myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
+                if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, hostileInf.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 0x00ffff, 2.5);
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.35);
+                playAudio('laser_point_defense');
+                defender.pdlCooldown = 75;
+                if (typeof applyCalculatedDamage === 'function') {
+                    applyCalculatedDamage(defender, hostileInf, 40, 'SNIPER');
+                }
             }
         }
     });
