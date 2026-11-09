@@ -17,8 +17,8 @@ function resolveObstacleCollisions(unit) {
     // 1. Structure Collisions
     for (let s of structures) {
         if (s.health <= 0) continue;
-        // Allow assigned builder to reach foundation perimeter
-        if (unit.targetStructure === s && (unit.taskState === 'Building' || unit.taskState === 'MovingToBuild')) continue;
+        // Allow assigned builder to reach foundation or repair perimeter
+        if (unit.targetStructure === s && (unit.taskState === 'Building' || unit.taskState === 'MovingToBuild' || unit.taskState === 'Repairing' || unit.taskState === 'MovingToRepair')) continue;
 
         // CRITICAL HARVESTER FIX: Allow trucks and workers delivering supplies to reach docking bays!
         if (dropoffPos && Math.hypot(s.position.x - dropoffPos.x, s.position.z - dropoffPos.z) < 1.0) continue;
@@ -344,6 +344,8 @@ function resolveObstacleCollisions(unit) {
 
             scene.add(group);
             structures.push(structObj);
+            if (typeof clearFoundationFootprint === 'function') clearFoundationFootprint(structObj);
+            if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
             return structObj;
         }
 

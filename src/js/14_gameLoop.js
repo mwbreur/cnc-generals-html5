@@ -787,18 +787,23 @@ function animate() {
             });
             if (!constructionActive) progressContainer.style.display = 'none';
 
-            units.forEach(unit => {
+            // Ported from SupplyTruckAIUpdate.cpp & AIDock.cpp: Multi-slot harvester gathering for both Player and AI
+            const updateHarvesterUnit = (unit, isAIUnit = false) => {
+                if (!unit || unit.health <= 0 || !unit.mesh) return;
                 if ((unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'chinook') || unit.taskState !== 'Idle') return;
                 const cargoHold = getCachedNode(unit.mesh, "cargoHold");
                 switch (unit.aiState) {
-                    case 'MovingToDock':
+                    case 'MovingToDock': {
                         if (!unit.supplyTarget || unit.supplyTarget.stock <= 0) {
                             unit.supplyTarget = findNearestSupplyPoint(unit.mesh.position);
                         }
                         if (unit.supplyTarget) {
-                            unit.targetPosition.copy(unit.supplyTarget.position);
+                            const dockSlotPos = (typeof getSupplyDockSlotPosition === 'function' && unit.type !== 'chinook')
+                                ? getSupplyDockSlotPosition(unit.supplyTarget, unit, false)
+                                : unit.supplyTarget.position;
+                            unit.targetPosition.copy(dockSlotPos);
                             const distToDock = Math.hypot(unit.mesh.position.x - unit.supplyTarget.position.x, unit.mesh.position.z - unit.supplyTarget.position.z);
-                            const dockDistThreshold = (unit.type === 'chinook') ? 14.0 : 11.0;
+                            const dockDistThreshold = (unit.type === 'chinook') ? 14.0 : 11.5;
                             if (distToDock < dockDistThreshold) {
                                 unit.aiState = 'Harvesting';
                                 unit.timerState = 0;
@@ -809,13 +814,14 @@ function animate() {
                             unit.targetPosition.copy(unit.mesh.position);
                         }
                         break;
+                    }
                     case 'Harvesting':
                         if (!unit.supplyTarget || unit.supplyTarget.stock <= 0) {
                             unit.supplyTarget = null;
                             unit.aiState = 'MovingToDock';
                             break;
                         }
-                        unit.timerState += 1;
+                        unit.timerState = (unit.timerState || 0) + 1;
                         if (unit.timerState > 80) {
                             const loadCap = (unit.type === 'worker') ? 100 : (unit.type === 'chinook' ? 600 : 200);
                             unit.cargoLoaded = Math.min(loadCap, unit.supplyTarget.stock);
@@ -835,11 +841,24 @@ function animate() {
                         }
                         break;
                     case 'MovingToCenter': {
-                        const dropoffPosition = getSupplyDropoffPosition(unit.mesh.position);
+                        let dropoffPosition = null;
+                        if (isAIUnit) {
+                            const aiStructs = enemyStructures.filter(s => s.ownerId === unit.ownerId && s.health > 0 && (s.type === 'supplyCenter' || s.type === 'supplyStash' || s.type === 'center' || s.type === 'commandCenter'));
+                            const bestCenter = aiStructs[0];
+                            if (bestCenter) {
+                                dropoffPosition = (typeof getSupplyDockSlotPosition === 'function' && unit.type !== 'chinook')
+                                    ? getSupplyDockSlotPosition(bestCenter, unit, true)
+                                    : bestCenter.position;
+                            } else {
+                                dropoffPosition = unit.mesh.position;
+                            }
+                        } else {
+                            dropoffPosition = getSupplyDropoffPosition(unit.mesh.position);
+                        }
                         unit.targetPosition.copy(dropoffPosition);
                         if (cargoHold && cargoHold.scale.y < 1.0) cargoHold.scale.y += 0.015;
                         const distToDropoff = Math.hypot(unit.mesh.position.x - dropoffPosition.x, unit.mesh.position.z - dropoffPosition.z);
-                        const centerDistThreshold = (unit.type === 'chinook') ? 14.0 : 9.0;
+                        const centerDistThreshold = (unit.type === 'chinook') ? 14.0 : 9.5;
                         if (distToDropoff < centerDistThreshold) {
                             unit.aiState = 'Depositing';
                             unit.timerState = 0;
@@ -850,15 +869,17 @@ function animate() {
                     }
                     case 'Depositing':
                         if (unit.type === 'chinook') unit.airState = 'hovering';
-                        unit.timerState += 1;
+                        unit.timerState = (unit.timerState || 0) + 1;
                         if (unit.timerState > 40) {
                             const earned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? 100 : 200));
-                            if (unit.teamId === (typeof playerTeamId !== 'undefined' ? playerTeamId : 1)) {
+                            if (!isAIUnit && unit.teamId === (typeof playerTeamId !== 'undefined' ? playerTeamId : 1)) {
                                 playerResources += earned;
                                 const resEl = document.getElementById('resource-display');
                                 if (resEl) resEl.innerText = '$' + playerResources;
                                 showNotification('Supplies delivered: +$' + earned, 'success');
                                 updateSidebar();
+                            } else if (unit.ownerId && typeof aiCommanders !== 'undefined' && aiCommanders[unit.ownerId]) {
+                                aiCommanders[unit.ownerId].resources = (aiCommanders[unit.ownerId].resources || 0) + earned;
                             } else if (typeof aiResources !== 'undefined') {
                                 aiResources += earned;
                             }
@@ -869,11 +890,16 @@ function animate() {
                         }
                         break;
                 }
-            });
+            };
+            units.forEach(unit => updateHarvesterUnit(unit, false));
+            enemyUnits.forEach(unit => updateHarvesterUnit(unit, true));
 
-            units.forEach(unit => {
-                if ((unit.type === 'dozer' || unit.type === 'worker') && unit.taskState === 'MovingToBuild' && unit.targetStructure) {
-                    const s = unit.targetStructure;
+            // Ported from DozerAIUpdate.cpp: DOZER_TASK_BUILD & DOZER_TASK_REPAIR state transitions
+            const updateBuilderTaskUnit = (unit) => {
+                if (!unit || unit.health <= 0 || !unit.mesh) return;
+                if (unit.type !== 'dozer' && unit.type !== 'worker') return;
+                const s = unit.targetStructure;
+                if (unit.taskState === 'MovingToBuild' && s) {
                     if (s.health > 0 && s.isBuilding) {
                         const distToS = Math.hypot(unit.mesh.position.x - s.position.x, unit.mesh.position.z - s.position.z);
                         const buildThreshold = s.radius + (unit.radius || 1.8) + 2.5;
@@ -884,8 +910,36 @@ function animate() {
                         unit.taskState = 'Idle';
                         unit.targetStructure = null;
                     }
+                } else if ((unit.taskState === 'MovingToRepair' || unit.taskState === 'Repairing') && s) {
+                    // Sole-benefactor check (DozerAIUpdate.cpp:723 attemptHealingFromSoleBenefactor)
+                    if (s.health <= 0 || s.isBuilding || s.health >= s.maxHealth || (s.soleRepairer && s.soleRepairer !== unit)) {
+                        if (s.soleRepairer === unit) s.soleRepairer = null;
+                        unit.taskState = 'Idle';
+                        unit.targetStructure = null;
+                        return;
+                    }
+                    s.soleRepairer = unit;
+                    const distToS = Math.hypot(unit.mesh.position.x - s.position.x, unit.mesh.position.z - s.position.z);
+                    const repairThreshold = s.radius + (unit.radius || 1.8) + 2.6;
+                    if ((!unit.waypoints || unit.waypoints.length === 0) && distToS <= repairThreshold) {
+                        unit.taskState = 'Repairing';
+                        unit.targetPosition.copy(unit.mesh.position);
+                        const repairRate = (typeof ZERO_HOUR_AI_DATA !== 'undefined' && ZERO_HOUR_AI_DATA.repairHealthPercentPerSecond) ? ZERO_HOUR_AI_DATA.repairHealthPercentPerSecond : 0.02;
+                        const healPerFrame = Math.max(0.4, (s.maxHealth * repairRate) / 60) * combatDeltaScale;
+                        s.health = Math.min(s.maxHealth, s.health + healPerFrame);
+                        if (Math.random() < 0.25 && typeof spawnWeldingSpark === 'function') {
+                            spawnWeldingSpark(unit.mesh.position, s.position);
+                        }
+                        if (s.health >= s.maxHealth) {
+                            s.soleRepairer = null;
+                            unit.taskState = 'Idle';
+                            unit.targetStructure = null;
+                        }
+                    }
                 }
-            });
+            };
+            units.forEach(updateBuilderTaskUnit);
+            enemyUnits.forEach(updateBuilderTaskUnit);
 
             // PERF: single ground-unit separation pass using a spatial hash grid
             // (was two full O(N^2) passes per frame that fought each other)
@@ -916,7 +970,7 @@ function animate() {
                     }
                 }
 
-                if (unit.garrisonedIn || unit.taskState === 'Building') return;
+                if (unit.garrisonedIn || unit.taskState === 'Building' || unit.taskState === 'Repairing') return;
 
                 // =========================================================
                 // AIRPLANE & HELICOPTER FLIGHT, LANDING & CIRCLING ENGINE
@@ -1876,6 +1930,10 @@ function processEnemyMovement() {
                 }
             }
         } else {
+            if (enemy.waypoints && enemy.waypoints.length > 0) {
+                const nextWp = enemy.waypoints.shift();
+                enemy.targetPosition.copy(nextWp);
+            }
             if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(enemy.type)) {
                 enemy.mesh.rotation.x = 0;
                 enemy.mesh.rotation.z = 0;

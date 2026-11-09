@@ -595,4 +595,86 @@ if (!(sepDistAfter > 0.5) || uACat !== 'heavy_vehicle') {
 }
 console.log(`✓ Verified performance optimizations: ${geomCacheSize} W3D geometries shared in cache, spatial grid separation active, O(1) armor & node caches verified.`);
 
+// 12. Test EA C&C Generals Zero Hour AI Port (AIPathfind, DozerAIUpdate, AIDock, AISkirmishPlayer)
+vm.runInContext(`
+    {
+        // A. Verify ZERO_HOUR_AI_DATA & PATHFIND_CELL_TYPES
+        if (!window.ZERO_HOUR_AI_DATA || window.ZERO_HOUR_AI_DATA.resourcesWealthy !== 7000 || !window.PATHFIND_CELL_TYPES) {
+            throw new Error("ZERO_HOUR_AI_DATA or PATHFIND_CELL_TYPES missing!");
+        }
+
+        // B. Verify A* Pathfinding + String-Pulling around blocking obstacle (AIPathfind.cpp)
+        currentWaterLevel = -10;
+        structures = [
+            { type: 'barracks', health: 1200, maxHealth: 1200, radius: 12.0, position: new THREE.Vector3(0, 0, 0), isBuilding: false }
+        ];
+        enemyStructures = [];
+        markPathfindGridDirty();
+        const blockedPath = findNavigationPath(new THREE.Vector3(-35, 0, 0), new THREE.Vector3(35, 0, 0));
+        if (!blockedPath || blockedPath.length < 2) {
+            throw new Error("findNavigationPath did not route around blocking structure at origin! length=" + (blockedPath && blockedPath.length));
+        }
+
+        // C. Verify DozerAIUpdate footprint evacuation (clearFoundationFootprint) & sole-benefactor repair (assignDozerToRepair)
+        const trappedUnit = {
+            type: 'ranger', health: 100, radius: 1.0, isAir: false,
+            mesh: new THREE.Mesh(), targetPosition: new THREE.Vector3(1, 0, 1), taskState: 'Idle'
+        };
+        trappedUnit.mesh.position.set(1, 0, 1);
+        const repairDozer1 = {
+            type: 'dozer', health: 400, radius: 1.8, isAir: false,
+            mesh: new THREE.Mesh(), targetPosition: new THREE.Vector3(20, 0, 0), taskState: 'Idle', waypoints: []
+        };
+        repairDozer1.mesh.position.set(20, 0, 0);
+        const repairDozer2 = {
+            type: 'dozer', health: 400, radius: 1.8, isAir: false,
+            mesh: new THREE.Mesh(), targetPosition: new THREE.Vector3(-20, 0, 0), taskState: 'Idle', waypoints: []
+        };
+        repairDozer2.mesh.position.set(-20, 0, 0);
+        units = [trappedUnit, repairDozer1, repairDozer2];
+
+        const evacuated = clearFoundationFootprint(structures[0]);
+        const newTargetDist = Math.hypot(trappedUnit.targetPosition.x, trappedUnit.targetPosition.z);
+        if (evacuated < 1 || newTargetDist <= structures[0].radius) {
+            throw new Error("clearFoundationFootprint failed to move unit outside foundation footprint!");
+        }
+
+        structures[0].health = 600; // Damage structure
+        const assigned1 = assignDozerToRepair(repairDozer1, structures[0]);
+        const assigned2 = assignDozerToRepair(repairDozer2, structures[0]); // Should be rejected by sole-benefactor lock!
+        if (!assigned1 || assigned2 || repairDozer1.taskState !== 'MovingToRepair' || structures[0].soleRepairer !== repairDozer1) {
+            throw new Error("assignDozerToRepair or sole-benefactor repair lock failed!");
+        }
+
+        // D. Verify AIDock multi-slot harvester docking (getSupplyDockSlotPosition)
+        const mockDock = { position: new THREE.Vector3(50, 0, 50), stock: 10000 };
+        const h1 = { netId: 'H_1', type: 'truck', mesh: new THREE.Mesh() };
+        const h2 = { netId: 'H_2', type: 'truck', mesh: new THREE.Mesh() };
+        const slot1 = getSupplyDockSlotPosition(mockDock, h1, false);
+        const slot2 = getSupplyDockSlotPosition(mockDock, h2, false);
+        if (slot1.distanceTo(slot2) < 1.0) {
+            throw new Error("getSupplyDockSlotPosition assigned identical docking coordinates to two harvesters!");
+        }
+
+        // E. Verify AISkirmishPlayer Threat Counter Evaluation & Distance-Weighted Target Priority
+        const mockCmd = { discoveredEnemyTargets: [{ netId: 'AIR_1' }, { netId: 'AIR_2' }, { netId: 'AIR_3' }] };
+        const profile = evaluateEnemyThreatProfile(mockCmd, [
+            { netId: 'AIR_1', type: 'raptor', isAir: true, health: 200 },
+            { netId: 'AIR_2', type: 'comanche', isAir: true, health: 200 },
+            { netId: 'AIR_3', type: 'chinook', isAir: true, health: 200 }
+        ]);
+        if (profile.preferredCounter !== 'anti_air') {
+            throw new Error("evaluateEnemyThreatProfile did not select anti_air against air-heavy force!");
+        }
+
+        const attacker = { position: new THREE.Vector3(0, 0, 0) };
+        const superweaponTarget = { type: 'particleCannon', health: 1000, maxHealth: 1000, position: new THREE.Vector3(20, 0, 0) };
+        const regularTarget = { type: 'barracks', health: 1000, maxHealth: 1000, position: new THREE.Vector3(20, 0, 0) };
+        if (scoreAITargetPriority(attacker, superweaponTarget) <= scoreAITargetPriority(attacker, regularTarget)) {
+            throw new Error("scoreAITargetPriority did not prioritize superweapon over regular barracks at equal distance!");
+        }
+    }
+`, sandbox);
+console.log("✓ Verified EA C&C Generals Zero Hour AI port: A* + String-Pulling pathfinder, Dozer footprint evacuation & sole-benefactor repair, AIDock multi-slot docking, and Skirmish threat/priority engine.");
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

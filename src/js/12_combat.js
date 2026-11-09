@@ -300,6 +300,8 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     }
 
     target.health = Math.max(0, target.health - finalDmg);
+    target._lastAttackedTime = Date.now();
+    target._lastAttacker = attacker || null;
 
     // Sync damage dealt over WebRTC DataChannel
     if (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive && typeof netConn !== 'undefined' && netConn && netConn.open && typeof units !== 'undefined' && units.includes(attacker) && target && target.netId) {

@@ -5,7 +5,457 @@
         let lastRightPointerPos = { x: 0, y: 0 };
 
 // =========================================================================
-// ADVANCED AI COMMANDER ENGINE: FOG OF WAR, RECON SCOUTS, TEAM INTELLIGENCE
+// EA C&C GENERALS ZERO HOUR AI ENGINE PORT
+// Ported from:
+// - GeneralsMD/Code/GameEngine/Include/GameLogic/AI.h (TAiData)
+// - GeneralsMD/Code/GameEngine/Source/GameLogic/AI/AIPathfind.cpp (A* + String-Pulling + Cell Classification)
+// - GeneralsMD/Code/GameEngine/Source/GameLogic/AI/AISkirmishPlayer.cpp & AIPlayer.cpp (Economy, Defenses, Teams, Retaliation)
+// - GeneralsMD/Code/GameEngine/Source/GameLogic/Object/Update/AIUpdate/DozerAIUpdate.cpp (Build/Repair/Footprint/Bored)
+// - GeneralsMD/Code/GameEngine/Source/GameLogic/AI/AIDock.cpp (Multi-Slot Harvester Docking)
+// =========================================================================
+
+const ZERO_HOUR_AI_DATA = {
+    structureSeconds: 10.0,
+    teamSeconds: 12.0,
+    resourcesWealthy: 7000,
+    resourcesPoor: 2000,
+    guardInnerModifierAI: 1.1,
+    guardOuterModifierAI: 1.4,
+    attackPriorityDistanceModifier: 100.0,
+    skirmishGroupFudgeValue: 5.0,
+    maxRetaliateDistance: 210.0,
+    retaliateFriendsRadius: 70.0,
+    aiDozerBoredRadiusModifier: 2.0,
+    repairHealthPercentPerSecond: 0.02,
+    resourceGatherers: { easy: 1, medium: 2, hard: 2 },
+    maxStrikeTeamSize: { easy: 3, medium: 4, hard: 5 }
+};
+window.ZERO_HOUR_AI_DATA = ZERO_HOUR_AI_DATA;
+
+// =========================================================================
+// 1. AIPATHFIND.CPP: 2D PASSABILITY GRID, A* SEARCH & LINE-OF-SIGHT STRING PULLING
+// =========================================================================
+const PATHFIND_CELL_TYPES = {
+    CLEAR: 0,
+    WATER: 1,
+    CLIFF: 2,
+    RUBBLE: 3,
+    OBSTACLE: 4,
+    BRIDGE: 5
+};
+window.PATHFIND_CELL_TYPES = PATHFIND_CELL_TYPES;
+
+let _pathfindGridState = {
+    dirty: true,
+    gridDim: 100,
+    cellSize: 6.0,
+    halfExtent: 300,
+    cells: null,
+    lastStructCount: -1,
+    lastEnemyStructCount: -1
+};
+
+function markPathfindGridDirty() {
+    _pathfindGridState.dirty = true;
+}
+window.markPathfindGridDirty = markPathfindGridDirty;
+
+function classifyPathfindPosition(wx, wz, ignoreStruct = null, extraClearance = 1.6) {
+    // Bridge cells override water/cliff underneath (AIPathfind.cpp classifyMap)
+    if (typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0 && typeof isPointOnBridge === 'function') {
+        for (let i = 0; i < mapBridges.length; i++) {
+            if (isPointOnBridge(wx, wz, mapBridges[i])) return PATHFIND_CELL_TYPES.BRIDGE;
+        }
+    }
+    // Check water passability
+    const waterLvl = (typeof currentWaterLevel !== 'undefined') ? currentWaterLevel : -10;
+    const h = (typeof getTerrainHeight === 'function') ? getTerrainHeight(wx, wz) : 0;
+    if (h < waterLvl + 0.15) return PATHFIND_CELL_TYPES.WATER;
+
+    // Check slope/cliff passability
+    if (typeof getTerrainHeight === 'function') {
+        const d = 2.5;
+        const hX = getTerrainHeight(wx + d, wz);
+        const hZ = getTerrainHeight(wx, wz + d);
+        if (Math.abs(hX - h) / d > 1.35 || Math.abs(hZ - h) / d > 1.35) {
+            return PATHFIND_CELL_TYPES.CLIFF;
+        }
+    }
+
+    // Check player & AI structures
+    const checkStructList = (list) => {
+        if (!list) return false;
+        for (let i = 0; i < list.length; i++) {
+            const s = list[i];
+            if (!s || s === ignoreStruct || s.health <= 0) continue;
+            const sp = s.position || (s.mesh && s.mesh.position);
+            if (!sp) continue;
+            const r = (s.radius || 6.0) + extraClearance;
+            const dx = wx - sp.x;
+            const dz = wz - sp.z;
+            if (dx * dx + dz * dz < r * r) return true;
+        }
+        return false;
+    };
+    if (typeof structures !== 'undefined' && checkStructList(structures)) return PATHFIND_CELL_TYPES.OBSTACLE;
+    if (typeof enemyStructures !== 'undefined' && checkStructList(enemyStructures)) return PATHFIND_CELL_TYPES.OBSTACLE;
+
+    // Check map obstacles
+    if (typeof mapObstacles !== 'undefined' && mapObstacles) {
+        for (let i = 0; i < mapObstacles.length; i++) {
+            const obs = mapObstacles[i];
+            if (!obs || !obs.position) continue;
+            const r = (obs.radius || 2.5) + extraClearance * 0.8;
+            const dx = wx - obs.position.x;
+            const dz = wz - obs.position.z;
+            if (dx * dx + dz * dz < r * r) return PATHFIND_CELL_TYPES.OBSTACLE;
+        }
+    }
+
+    return PATHFIND_CELL_TYPES.CLEAR;
+}
+window.classifyPathfindPosition = classifyPathfindPosition;
+
+function rebuildPathfindGrid() {
+    const mapSize = (typeof currentMapSize !== 'undefined' && currentMapSize > 0) ? currentMapSize : 600;
+    const halfExtent = Math.min(360, mapSize * 0.46);
+    const gridDim = 100;
+    const cellSize = (halfExtent * 2) / gridDim;
+    if (!_pathfindGridState.cells || _pathfindGridState.cells.length !== gridDim * gridDim) {
+        _pathfindGridState.cells = new Uint8Array(gridDim * gridDim);
+    }
+    _pathfindGridState.gridDim = gridDim;
+    _pathfindGridState.cellSize = cellSize;
+    _pathfindGridState.halfExtent = halfExtent;
+
+    const cells = _pathfindGridState.cells;
+    for (let gz = 0; gz < gridDim; gz++) {
+        const wz = -halfExtent + (gz + 0.5) * cellSize;
+        for (let gx = 0; gx < gridDim; gx++) {
+            const wx = -halfExtent + (gx + 0.5) * cellSize;
+            cells[gz * gridDim + gx] = classifyPathfindPosition(wx, wz, null, 1.5);
+        }
+    }
+    _pathfindGridState.dirty = false;
+    _pathfindGridState.lastStructCount = (typeof structures !== 'undefined' && structures) ? structures.length : 0;
+    _pathfindGridState.lastEnemyStructCount = (typeof enemyStructures !== 'undefined' && enemyStructures) ? enemyStructures.length : 0;
+}
+window.rebuildPathfindGrid = rebuildPathfindGrid;
+
+function isCellPassableOnGround(cellType) {
+    return cellType === PATHFIND_CELL_TYPES.CLEAR || cellType === PATHFIND_CELL_TYPES.BRIDGE;
+}
+
+// Line-of-sight raymarch check between two world positions (AIPathfind.cpp optimizeGroundPath helper)
+function isPathfindSegmentClear(startPos, endPos, ignoreStruct = null, clearance = 1.4) {
+    if (!startPos || !endPos) return true;
+    const dx = endPos.x - startPos.x;
+    const dz = endPos.z - startPos.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 0.5) return true;
+
+    const steps = Math.max(4, Math.min(48, Math.ceil(dist / 2.5)));
+    for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const px = startPos.x + dx * t;
+        const pz = startPos.z + dz * t;
+        const cell = classifyPathfindPosition(px, pz, ignoreStruct, clearance);
+        if (!isCellPassableOnGround(cell)) return false;
+    }
+    return true;
+}
+window.isPathfindSegmentClear = isPathfindSegmentClear;
+
+// String-Pulling Path Optimizer (ported from AIPathfind.cpp::optimizeGroundPath)
+function optimizeGroundPath(waypoints, ignoreStruct = null) {
+    if (!waypoints || waypoints.length <= 2) return waypoints ? waypoints.slice() : [];
+    const result = [waypoints[0].clone()];
+    let anchorIdx = 0;
+    while (anchorIdx < waypoints.length - 1) {
+        let furthestVisible = anchorIdx + 1;
+        for (let probe = waypoints.length - 1; probe > anchorIdx + 1; probe--) {
+            if (isPathfindSegmentClear(waypoints[anchorIdx], waypoints[probe], ignoreStruct, 1.3)) {
+                furthestVisible = probe;
+                break;
+            }
+        }
+        result.push(waypoints[furthestVisible].clone());
+        anchorIdx = furthestVisible;
+    }
+    return result;
+}
+window.optimizeGroundPath = optimizeGroundPath;
+
+// Adjust destination outside impassable obstacles/water (ported from AIPathfind.cpp::adjustToPossibleDestination)
+function adjustToPossibleDestination(destPos, ignoreStruct = null) {
+    if (!destPos) return new THREE.Vector3();
+    const cell = classifyPathfindPosition(destPos.x, destPos.z, ignoreStruct, 1.2);
+    if (isCellPassableOnGround(cell)) return destPos.clone();
+
+    for (let r = 3.0; r <= 24.0; r += 3.0) {
+        for (let step = 0; step < 12; step++) {
+            const angle = (step / 12) * Math.PI * 2;
+            const tx = destPos.x + Math.cos(angle) * r;
+            const tz = destPos.z + Math.sin(angle) * r;
+            if (isCellPassableOnGround(classifyPathfindPosition(tx, tz, ignoreStruct, 1.2))) {
+                const ty = (typeof getTerrainHeight === 'function') ? getTerrainHeight(tx, tz) : (destPos.y || 0);
+                return new THREE.Vector3(tx, ty, tz);
+            }
+        }
+    }
+    return destPos.clone();
+}
+window.adjustToPossibleDestination = adjustToPossibleDestination;
+
+// A* Ground Pathfinding with String-Pulling (ported from AIPathfind.cpp::findGroundPath)
+function findNavigationPath(startPos, endPos, options = {}) {
+    if (!startPos || !endPos) return [];
+    const ignoreStruct = options.ignoreStruct || null;
+
+    // Fast path: if direct line-of-sight is clear, no intermediate waypoints needed
+    if (isPathfindSegmentClear(startPos, endPos, ignoreStruct, 1.4)) {
+        return [endPos.clone()];
+    }
+
+    const sCount = (typeof structures !== 'undefined' && structures) ? structures.length : 0;
+    const esCount = (typeof enemyStructures !== 'undefined' && enemyStructures) ? enemyStructures.length : 0;
+    if (_pathfindGridState.dirty || sCount !== _pathfindGridState.lastStructCount || esCount !== _pathfindGridState.lastEnemyStructCount || !_pathfindGridState.cells) {
+        rebuildPathfindGrid();
+    }
+
+    const { gridDim, cellSize, halfExtent, cells } = _pathfindGridState;
+    const toGrid = (wVal) => Math.max(0, Math.min(gridDim - 1, Math.floor((wVal + halfExtent) / cellSize)));
+    const toWorld = (gIdx) => -halfExtent + (gIdx + 0.5) * cellSize;
+
+    const safeGoal = adjustToPossibleDestination(endPos, ignoreStruct);
+    const sx = toGrid(startPos.x);
+    const sz = toGrid(startPos.z);
+    const gx = toGrid(safeGoal.x);
+    const gz = toGrid(safeGoal.z);
+
+    if (sx === gx && sz === gz) {
+        return [endPos.clone()];
+    }
+
+    const totalCells = gridDim * gridDim;
+    const gScore = new Float32Array(totalCells);
+    gScore.fill(Infinity);
+    const parent = new Int32Array(totalCells);
+    parent.fill(-1);
+    const closed = new Uint8Array(totalCells);
+
+    const startIdx = sz * gridDim + sx;
+    const goalIdx = gz * gridDim + gx;
+    gScore[startIdx] = 0;
+
+    // Compact binary min-heap for A* open set
+    const heapNodes = [startIdx];
+    const heapPriorities = [Math.hypot(gx - sx, gz - sz)];
+
+    const pushOpen = (idx, prio) => {
+        let i = heapNodes.length;
+        heapNodes.push(idx);
+        heapPriorities.push(prio);
+        while (i > 0) {
+            const p = (i - 1) >> 1;
+            if (heapPriorities[p] <= prio) break;
+            heapNodes[i] = heapNodes[p];
+            heapPriorities[i] = heapPriorities[p];
+            i = p;
+        }
+        heapNodes[i] = idx;
+        heapPriorities[i] = prio;
+    };
+
+    const popOpen = () => {
+        const top = heapNodes[0];
+        const lastIdx = heapNodes.pop();
+        const lastPrio = heapPriorities.pop();
+        const len = heapNodes.length;
+        if (len > 0) {
+            let i = 0;
+            while ((i << 1) + 1 < len) {
+                let left = (i << 1) + 1;
+                let right = left + 1;
+                let smallest = (right < len && heapPriorities[right] < heapPriorities[left]) ? right : left;
+                if (lastPrio <= heapPriorities[smallest]) break;
+                heapNodes[i] = heapNodes[smallest];
+                heapPriorities[i] = heapPriorities[smallest];
+                i = smallest;
+            }
+            heapNodes[i] = lastIdx;
+            heapPriorities[i] = lastPrio;
+        }
+        return top;
+    };
+
+    const dirs = [
+        [1, 0, 1.0], [-1, 0, 1.0], [0, 1, 1.0], [0, -1, 1.0],
+        [1, 1, 1.4142], [1, -1, 1.4142], [-1, 1, 1.4142], [-1, -1, 1.4142]
+    ];
+
+    let found = false;
+    let closestIdx = startIdx;
+    let closestHeur = Math.hypot(gx - sx, gz - sz);
+    let iterations = 0;
+    const maxIterations = 2400;
+
+    while (heapNodes.length > 0 && iterations++ < maxIterations) {
+        const current = popOpen();
+        if (current === goalIdx) {
+            found = true;
+            break;
+        }
+        if (closed[current]) continue;
+        closed[current] = 1;
+
+        const cx = current % gridDim;
+        const cz = (current / gridDim) | 0;
+
+        for (let d = 0; d < 8; d++) {
+            const nx = cx + dirs[d][0];
+            const nz = cz + dirs[d][1];
+            if (nx < 0 || nx >= gridDim || nz < 0 || nz >= gridDim) continue;
+            const nIdx = nz * gridDim + nx;
+            if (closed[nIdx]) continue;
+
+            // Allow goal cell or cells belonging to ignoreStruct
+            let passable = isCellPassableOnGround(cells[nIdx]) || nIdx === goalIdx;
+            if (!passable && ignoreStruct) {
+                const wx = toWorld(nx);
+                const wz = toWorld(nz);
+                passable = isCellPassableOnGround(classifyPathfindPosition(wx, wz, ignoreStruct, 1.4));
+            }
+            if (!passable) continue;
+
+            // Prevent diagonal corner cutting across blocked orthogonal neighbors
+            if (d >= 4) {
+                const adj1 = cz * gridDim + nx;
+                const adj2 = nz * gridDim + cx;
+                if (!isCellPassableOnGround(cells[adj1]) || !isCellPassableOnGround(cells[adj2])) continue;
+            }
+
+            const tentativeG = gScore[current] + dirs[d][2];
+            if (tentativeG < gScore[nIdx]) {
+                gScore[nIdx] = tentativeG;
+                parent[nIdx] = current;
+                const h = Math.hypot(gx - nx, gz - nz);
+                if (h < closestHeur) {
+                    closestHeur = h;
+                    closestIdx = nIdx;
+                }
+                pushOpen(nIdx, tentativeG + h * 1.05);
+            }
+        }
+    }
+
+    const traceTarget = found ? goalIdx : closestIdx;
+    if (traceTarget === startIdx) {
+        return [endPos.clone()];
+    }
+
+    const rawPoints = [];
+    let curr = traceTarget;
+    while (curr !== -1 && curr !== startIdx) {
+        const cx = curr % gridDim;
+        const cz = (curr / gridDim) | 0;
+        const wx = toWorld(cx);
+        const wz = toWorld(cz);
+        const wy = (typeof getTerrainHeight === 'function') ? getTerrainHeight(wx, wz) : 0;
+        rawPoints.push(new THREE.Vector3(wx, wy, wz));
+        curr = parent[curr];
+    }
+    rawPoints.push(startPos.clone());
+    rawPoints.reverse();
+    rawPoints[rawPoints.length - 1] = endPos.clone();
+
+    const smoothed = optimizeGroundPath(rawPoints, ignoreStruct);
+    // Drop the starting point so returned array contains strictly forward waypoints ending at endPos
+    return smoothed.length > 1 ? smoothed.slice(1) : [endPos.clone()];
+}
+window.findNavigationPath = findNavigationPath;
+
+// =========================================================================
+// 2. AIDOCK.CPP & SUPPLYTRUCKAIUPDATE.CPP: MULTI-SLOT HARVESTER DOCKING
+// =========================================================================
+function getSupplyDockSlotPosition(dockObj, harvester, isCenter = false) {
+    if (!dockObj) return harvester && harvester.mesh ? harvester.mesh.position.clone() : new THREE.Vector3();
+    const basePos = dockObj.position || (dockObj.mesh && dockObj.mesh.position) || dockObj;
+    if (!dockObj._dockSlots) {
+        dockObj._dockSlots = [null, null, null, null];
+    }
+    const unitId = (harvester && (harvester.netId || harvester._dockUnitId)) ||
+        (harvester ? (harvester._dockUnitId = 'harv_' + Math.floor(Math.random() * 1000000)) : 'harv_0');
+
+    let slotIdx = dockObj._dockSlots.indexOf(unitId);
+    if (slotIdx === -1) {
+        // Reclaim dead or different-target slots first
+        for (let i = 0; i < dockObj._dockSlots.length; i++) {
+            if (!dockObj._dockSlots[i]) {
+                slotIdx = i;
+                dockObj._dockSlots[i] = unitId;
+                break;
+            }
+        }
+        if (slotIdx === -1) {
+            slotIdx = Math.abs(unitId.charCodeAt(unitId.length - 1) || 0) % 4;
+            dockObj._dockSlots[slotIdx] = unitId;
+        }
+    }
+
+    // 4 distinct radial approach bays around the Supply Dock / Supply Center (AIDock.cpp)
+    const slotAngles = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
+    const angle = slotAngles[slotIdx % 4];
+    const offsetRadius = isCenter ? 5.2 : 5.8;
+    const tx = basePos.x + Math.cos(angle) * offsetRadius;
+    const tz = basePos.z + Math.sin(angle) * offsetRadius;
+    const ty = (typeof getTerrainHeight === 'function') ? getTerrainHeight(tx, tz) : (basePos.y || 0);
+    return new THREE.Vector3(tx, ty, tz);
+}
+window.getSupplyDockSlotPosition = getSupplyDockSlotPosition;
+
+// =========================================================================
+// 3. DOZERAIUPDATE.CPP: FOOTPRINT EVACUATION, BUILD & REPAIR STATE MACHINE
+// =========================================================================
+function clearFoundationFootprint(structure) {
+    if (!structure) return 0;
+    const sPos = structure.position || (structure.mesh && structure.mesh.position);
+    if (!sPos) return 0;
+    const sRadius = structure.radius || 7.0;
+    let evacuatedCount = 0;
+
+    const allLists = [];
+    if (typeof units !== 'undefined' && Array.isArray(units)) allLists.push(units);
+    if (typeof enemyUnits !== 'undefined' && Array.isArray(enemyUnits)) allLists.push(enemyUnits);
+
+    allLists.forEach(list => {
+        list.forEach(u => {
+            if (!u || u.health <= 0 || u.isAir || !u.mesh) return;
+            if (u === structure.dozerRef) return;
+            const uRadius = u.radius || 1.5;
+            const clearanceDist = sRadius + uRadius + 1.5;
+            const dx = u.mesh.position.x - sPos.x;
+            const dz = u.mesh.position.z - sPos.z;
+            const dist = Math.hypot(dx, dz);
+            if (dist < clearanceDist) {
+                let angle = Math.atan2(dz, dx);
+                if (dist < 0.05) angle = Math.random() * Math.PI * 2;
+                const safeRadius = sRadius + uRadius + 3.5;
+                let exitX = sPos.x + Math.cos(angle) * safeRadius;
+                let exitZ = sPos.z + Math.sin(angle) * safeRadius;
+                const safeDest = adjustToPossibleDestination(new THREE.Vector3(exitX, sPos.y || 0, exitZ), structure);
+                u.targetPosition.copy(safeDest);
+                if (u.taskState === 'Idle') u.taskState = 'Moving';
+                evacuatedCount++;
+            }
+        });
+    });
+    return evacuatedCount;
+}
+window.clearFoundationFootprint = clearFoundationFootprint;
+
+// =========================================================================
+// 4. AISKIRMISHPLAYER.CPP & AIPLAYER.CPP: SKIRMISH COMMANDER ENGINE
 // =========================================================================
 let aiCommanders = {};
 window.aiCommanders = aiCommanders;
@@ -19,7 +469,6 @@ function initAICommanders() {
     const activeAISlots = (typeof spSlots !== 'undefined' ? spSlots : []).filter(s => s.active && !s.isPlayer);
 
     if (activeAISlots.length === 0) {
-        // Collect unique ownerIds from enemyStructures
         const owners = new Set();
         enemyStructures.forEach(es => { if (es.ownerId) owners.add(es.ownerId); });
         owners.forEach(ownerId => {
@@ -52,27 +501,35 @@ function initAICommanders() {
                 new THREE.Vector3(half, 0, half)
             );
         }
-        // Shuffle waypoints so each AI scout takes a unique reconnaissance path
         for (let i = candidateWaypoints.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             const tmp = candidateWaypoints[i]; candidateWaypoints[i] = candidateWaypoints[j]; candidateWaypoints[j] = tmp;
         }
 
+        const startCredits = difficulty === 'hard' ? 10000 : difficulty === 'easy' ? 5000 : 7500;
         aiCommanders[ownerId] = {
             ownerId: ownerId,
             teamId: teamId,
             faction: faction,
             difficulty: difficulty,
             basePos: basePos.clone(),
-            rallyPoint: basePos.clone().add(new THREE.Vector3(14, 0, 14)),
-            
+            rallyPoint: basePos.clone().add(new THREE.Vector3(16, 0, 16)),
+
+            // Zero Hour Economy & Base Building State (AIPlayer.cpp / AISkirmishPlayer.cpp)
+            resources: startCredits,
+            structureTimer: 0,
+            teamTimer: 0,
+            stagingTeam: [],        // Unit netIds assembling at rallyPoint before wave launch
+            activeTeams: [],        // Launched strike teams [{ id, unitNetIds, targetPos }]
+            threatProfile: { air: 0, armor: 0, infantry: 0, preferredCounter: 'balanced' },
+
             // Fog of War / Scouting State (No advance omniscience!)
             unexploredWaypoints: candidateWaypoints,
             scoutNetIds: new Set(),
             discoveredEnemyBases: [],    // Array of { position: Vector3, faction: string, teamId: number }
             discoveredEnemyTargets: [],  // Array of { netId, position: Vector3, type, teamId, isStructure }
             hasSightedEnemy: false,
-            
+
             // Production & tactical timers
             productionTimer: 0,
             attackWaveTimer: 0,
@@ -114,6 +571,233 @@ function shareTeamDiscovery(teamId, entity, isBase = false) {
     });
 }
 
+// Threat & Counter-Force Evaluation (AISkirmishPlayer.cpp::selectTeamToBuild)
+function evaluateEnemyThreatProfile(cmd, hostileUnits) {
+    let air = 0, armor = 0, infantry = 0;
+    const knownIds = new Set((cmd && cmd.discoveredEnemyTargets) ? cmd.discoveredEnemyTargets.map(t => t.netId) : []);
+    (hostileUnits || []).forEach(hu => {
+        if (!hu || hu.health <= 0) return;
+        // Count units known via recon OR all passed units in direct evaluation
+        if (knownIds.size > 0 && hu.netId && !knownIds.has(hu.netId)) return;
+        if (hu.isAir || ['raptor', 'comanche', 'aurorabomber', 'chinook'].includes(hu.type)) {
+            air++;
+        } else if (typeof getArmorCategory === 'function' ? getArmorCategory(hu) === 'infantry' : ['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'infantry', 'rocket'].includes(hu.type)) {
+            infantry++;
+        } else if (hu.type !== 'dozer' && hu.type !== 'worker' && hu.type !== 'truck') {
+            armor++;
+        }
+    });
+
+    let preferredCounter = 'balanced';
+    if (air >= 2 && air >= armor * 0.6) preferredCounter = 'anti_air';
+    else if (armor >= 3 && armor >= infantry) preferredCounter = 'anti_armor';
+    else if (infantry >= 4) preferredCounter = 'anti_infantry';
+
+    const profile = { air, armor, infantry, preferredCounter };
+    if (cmd) cmd.threatProfile = profile;
+    return profile;
+}
+window.evaluateEnemyThreatProfile = evaluateEnemyThreatProfile;
+
+// Distance-Weighted Target Attack Priority (AI.h AttackPriorityDistanceModifier)
+function scoreAITargetPriority(attacker, target, cmd = null) {
+    if (!attacker || !target || target.health <= 0) return -Infinity;
+    const aPos = attacker.position || (attacker.mesh && attacker.mesh.position) || { x: 0, z: 0 };
+    const tPos = target.position || (target.mesh && target.mesh.position) || { x: 0, z: 0 };
+    const dist = Math.hypot(tPos.x - aPos.x, tPos.z - aPos.z);
+
+    let basePriority = 100;
+    const tType = target.type || '';
+    if (['particleCannon', 'nukeSilo', 'scudStorm'].includes(tType)) basePriority = 260;
+    else if (['factory', 'airfield', 'strategyCenter', 'propagandaCenter', 'palace'].includes(tType)) basePriority = 220;
+    else if (['supplyCenter', 'supplyStash', 'truck', 'chinook', 'dozer', 'worker'].includes(tType)) basePriority = 195;
+    else if (['patriot', 'gatlingCannon', 'bunker', 'tunnel', 'stingerSite'].includes(tType)) basePriority = 180;
+    else if (['center', 'commandCenter', 'barracks', 'power', 'nuclearReactor'].includes(tType)) basePriority = 165;
+    else if (['tomahawk', 'nukecannon', 'scudlauncher', 'inferno', 'overlord', 'paladin', 'marauder'].includes(tType)) basePriority = 155;
+
+    // Bonus for low-health targets (focus fire)
+    if (target.maxHealth > 0) {
+        const hpRatio = target.health / target.maxHealth;
+        if (hpRatio < 0.35) basePriority += 25;
+    }
+
+    const distMod = ZERO_HOUR_AI_DATA.attackPriorityDistanceModifier || 100.0;
+    return basePriority - (dist / (distMod * 0.25));
+}
+window.scoreAITargetPriority = scoreAITargetPriority;
+
+// Choose optimal unit type based on faction, facility, and enemy threat profile
+function chooseAICounterUnitType(cmd, facilityType) {
+    const f = cmd.faction || 'usa';
+    const counter = (cmd.threatProfile && cmd.threatProfile.preferredCounter) || 'balanced';
+
+    if (facilityType === 'barracks') {
+        if (f === 'china') {
+            if (counter === 'anti_air' || counter === 'anti_armor') return 'tankhunter';
+            return Math.random() < 0.45 ? 'tankhunter' : 'redguard';
+        } else if (f === 'gla') {
+            if (counter === 'anti_air' || counter === 'anti_armor') return 'rpg';
+            return Math.random() < 0.45 ? 'rpg' : 'rebel';
+        } else {
+            if (counter === 'anti_air' || counter === 'anti_armor') return 'missiledefender';
+            return Math.random() < 0.45 ? 'missiledefender' : 'ranger';
+        }
+    }
+
+    // War Factory / Arms Dealer vehicles
+    if (f === 'china') {
+        if (counter === 'anti_air' || counter === 'anti_infantry') return Math.random() < 0.7 ? 'gatling' : 'battlemaster';
+        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.55) ? 'overlord' : 'battlemaster';
+        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'nukecannon';
+        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'overlord' : (Math.random() < 0.35 ? 'gatling' : 'battlemaster');
+    } else if (f === 'gla') {
+        if (counter === 'anti_air') return Math.random() < 0.75 ? 'quadcannon' : 'scorpion';
+        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'quadcannon' : 'buggy';
+        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.5) ? 'marauder' : 'scorpion';
+        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'scudlauncher';
+        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'marauder' : (Math.random() < 0.35 ? 'quadcannon' : 'scorpion');
+    } else {
+        if (counter === 'anti_air') return Math.random() < 0.75 ? 'avenger' : 'humvee';
+        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'humvee' : 'tank';
+        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.55) ? 'paladin' : 'tank';
+        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'tomahawk';
+        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'paladin' : (Math.random() < 0.35 ? 'humvee' : 'tank');
+    }
+}
+
+// Spawn AI structure for base reconstruction or base perimeter defense (AIPlayer.cpp::processBaseBuilding)
+function spawnAIStructure(cmd, type, pos) {
+    if (typeof createStructureMeshForFaction !== 'function' || typeof scene === 'undefined') return null;
+    const f = cmd.faction || 'china';
+    const group = createStructureMeshForFaction(type, f);
+    if (!group.userData || !group.userData.isW3D) {
+        group.scale.set(1.35, 1.35, 1.35);
+    }
+    const radius = (typeof getStructureFootprint === 'function') ? (getStructureFootprint(type).radius || 6.0) : 6.0;
+    const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : 0;
+    pos.y = groundY + 0.05;
+    group.position.copy(pos);
+    scene.add(group);
+
+    const maxHp = (type === 'patriot' || type === 'gatlingCannon' || type === 'stingerSite') ? 900 : 1200;
+    const esObj = {
+        type: type,
+        mesh: group,
+        position: pos.clone(),
+        radius: radius,
+        health: maxHp,
+        maxHealth: maxHp,
+        netId: 'AIS_' + (++netIdSequence),
+        teamId: cmd.teamId,
+        ownerId: cmd.ownerId,
+        faction: f,
+        isAI: true,
+        isBuilding: false,
+        buildProgress: 100
+    };
+    enemyStructures.push(esObj);
+    if (typeof clearFoundationFootprint === 'function') clearFoundationFootprint(esObj);
+    markPathfindGridDirty();
+    return esObj;
+}
+
+// AI Economy, Harvester/Dozer Replacement & Base Defense Construction (AIPlayer.cpp)
+function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnits) {
+    // 1. Supply Center income + active harvester maintenance (queueSupplyTruck / queueDozer)
+    const supplyStruct = myStructures.find(s => s.type === 'supplyCenter' || s.type === 'supplyStash');
+    const cmdCenter = myStructures.find(s => s.type === 'center' || s.type === 'commandCenter');
+    const incomeTick = cmd.difficulty === 'hard' ? 180 : cmd.difficulty === 'easy' ? 95 : 135;
+    if (supplyStruct || cmdCenter) {
+        cmd.resources = Math.min(25000, (cmd.resources || 0) + incomeTick);
+    }
+
+    const desiredGatherers = ZERO_HOUR_AI_DATA.resourceGatherers[cmd.difficulty] || 1;
+    const myGatherers = myUnits.filter(u => u.type === 'truck' || (u.type === 'worker' && u.aiState && u.aiState !== 'Idle'));
+    if (supplyStruct && myGatherers.length < desiredGatherers && cmd.resources >= 600) {
+        const hType = (cmd.faction === 'gla') ? 'worker' : 'truck';
+        const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
+        const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
+        if (harv) {
+            cmd.resources -= 600;
+            harv.teamId = cmd.teamId;
+            harv.ownerId = cmd.ownerId;
+            harv.isAI = true;
+            harv.difficulty = cmd.difficulty;
+            harv.taskState = 'Idle';
+            harv.aiState = 'MovingToDock';
+            harv.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(harv.mesh.position) : null;
+            if (harv.supplyTarget) {
+                harv.targetPosition.copy(getSupplyDockSlotPosition(harv.supplyTarget, harv, false));
+            }
+        }
+    }
+
+    // Ensure AI maintains at least 1 Construction Dozer / Builder Worker if Command Center stands
+    const myBuilders = myUnits.filter(u => u.type === 'dozer' || (u.type === 'worker' && (!u.aiState || u.aiState === 'Idle')));
+    if (cmdCenter && myBuilders.length === 0 && cmd.resources >= 1000) {
+        const bType = (cmd.faction === 'gla') ? 'worker' : 'dozer';
+        const spawnPos = adjustToPossibleDestination(cmdCenter.position.clone().add(new THREE.Vector3(-8, 0, 8)), cmdCenter);
+        const bUnit = spawnEnemyUnit(bType, spawnPos, null, cmd.faction);
+        if (bUnit) {
+            cmd.resources -= 1000;
+            bUnit.teamId = cmd.teamId;
+            bUnit.ownerId = cmd.ownerId;
+            bUnit.isAI = true;
+            bUnit.difficulty = cmd.difficulty;
+            bUnit.taskState = 'Idle';
+            bUnit.aiState = 'Idle';
+        }
+    }
+
+    // 2. Periodic Base Reconstruction & Perimeter Defense Placement (structureSeconds)
+    cmd.structureTimer = (cmd.structureTimer || 0) + 1;
+    if (cmd.structureTimer < 6) return;
+    cmd.structureTimer = 0;
+
+    // Do not build if enemies are directly inside base (underAttack check from AIPlayer.cpp)
+    const baseUnderAttack = hostileUnits.some(hu => hu.mesh && hu.mesh.position.distanceTo(cmd.basePos) < 35);
+    if (baseUnderAttack || cmd.resources < ZERO_HOUR_AI_DATA.resourcesPoor) return;
+
+    // Essential base structures to reconstruct if destroyed
+    const f = cmd.faction || 'china';
+    const essentialList = [
+        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-18, 0, -14) },
+        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(18, 0, -14) },
+        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-18, 0, 16) },
+        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(18, 0, 16) }
+    ];
+
+    for (let item of essentialList) {
+        if (f === 'gla' && (item.build === 'power' || item.build === 'nuclearReactor')) continue;
+        if (!myStructures.some(item.check) && cmd.resources >= item.cost) {
+            const candidatePos = adjustToPossibleDestination(cmd.basePos.clone().add(item.offset));
+            spawnAIStructure(cmd, item.build, candidatePos);
+            cmd.resources -= item.cost;
+            return;
+        }
+    }
+
+    // Build perimeter base defense along front approach vector (AISkirmishPlayer::buildAIBaseDefense)
+    const defType = f === 'china' ? 'gatlingCannon' : f === 'gla' ? 'stingerSite' : 'patriot';
+    const maxDefenses = cmd.difficulty === 'hard' ? 4 : cmd.difficulty === 'easy' ? 1 : 2;
+    const currentDefenses = myStructures.filter(s => s.type === 'patriot' || s.type === 'gatlingCannon' || s.type === 'stingerSite' || s.type === 'bunker' || s.type === 'tunnel');
+    if (currentDefenses.length < maxDefenses && cmd.resources >= 2800) {
+        const enemyRef = (cmd.discoveredEnemyBases.length > 0) ? cmd.discoveredEnemyBases[0].position : new THREE.Vector3(0, 0, 0);
+        const frontDir = new THREE.Vector3().subVectors(enemyRef, cmd.basePos);
+        if (frontDir.lengthSq() < 1) frontDir.set(-cmd.basePos.x, 0, -cmd.basePos.z);
+        frontDir.y = 0;
+        frontDir.normalize();
+        const sideDir = new THREE.Vector3(-frontDir.z, 0, frontDir.x);
+        const spread = (currentDefenses.length % 2 === 0 ? 1 : -1) * (8 + currentDefenses.length * 4);
+        const defPos = cmd.basePos.clone()
+            .addScaledVector(frontDir, 24)
+            .addScaledVector(sideDir, spread);
+        const clearPos = adjustToPossibleDestination(defPos);
+        spawnAIStructure(cmd, defType, clearPos);
+        cmd.resources -= 1000;
+    }
+}
+
 function processEnemyAIEngine() {
     if (isMultiplayerActive) return;
     aiDecisionTimer++;
@@ -138,51 +822,62 @@ function processEnemyAIEngine() {
 
         if (myStructures.length === 0 && myUnits.length === 0) return; // Commander eliminated
 
-        // --- 1. AI Production Engine (From Commander's Own Facilities) ---
-        cmd.productionTimer++;
-        const prodInterval = cmd.difficulty === 'hard' ? 8 : cmd.difficulty === 'easy' ? 24 : 14;
-        const maxUnits = cmd.difficulty === 'hard' ? 20 : cmd.difficulty === 'easy' ? 8 : 12;
+        const hostileUnits = allUnits.filter(u => u.health > 0 && !isFriendly(cmd, u));
+        const hostileStructures = allStructures.filter(s => s.health > 0 && !isFriendly(cmd, s));
 
-        if (cmd.productionTimer % prodInterval === 0 && myUnits.length < maxUnits) {
-            const fac = myStructures.find(es => es.type === 'factory' && es.health > 0) ||
-                        myStructures.find(es => es.type === 'barracks' && es.health > 0);
-            if (fac) {
-                const spawnPos = fac.position.clone().add(new THREE.Vector3(10 + Math.random() * 4, 0, 8 + Math.random() * 4));
+        // --- 0. Zero Hour Economy, Harvesters, Dozer Auto-Repair & Base Building ---
+        processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnits);
+        evaluateEnemyThreatProfile(cmd, hostileUnits);
+
+        // --- 1. AI Production Engine with Threat Counter Selection ---
+        cmd.productionTimer++;
+        const isWealthy = (cmd.resources || 0) >= ZERO_HOUR_AI_DATA.resourcesWealthy;
+        const baseProdInterval = cmd.difficulty === 'hard' ? 7 : cmd.difficulty === 'easy' ? 22 : 12;
+        const prodInterval = isWealthy ? Math.max(4, Math.floor(baseProdInterval * 0.65)) : baseProdInterval;
+        const maxUnits = cmd.difficulty === 'hard' ? 24 : cmd.difficulty === 'easy' ? 10 : 15;
+
+        const combatUnits = myUnits.filter(u => u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck');
+        if (cmd.productionTimer % prodInterval === 0 && combatUnits.length < maxUnits && (cmd.resources || 0) >= 500) {
+            const fac = myStructures.find(es => es.type === 'factory' && es.health > 0);
+            const bar = myStructures.find(es => es.type === 'barracks' && es.health > 0);
+            // Combined arms: mix 70% armor/vehicles + 30% counter infantry when both facilities exist
+            const chosenFacility = (fac && bar) ? (Math.random() < 0.72 ? fac : bar) : (fac || bar);
+            if (chosenFacility) {
+                const rawSpawn = chosenFacility.position.clone().add(new THREE.Vector3(10 + Math.random() * 4, 0, 8 + Math.random() * 4));
+                const spawnPos = adjustToPossibleDestination(rawSpawn, chosenFacility);
                 spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
-                let uType = 'tank';
-                if (fac.faction === 'china') {
-                    uType = (cmd.difficulty === 'hard' && Math.random() < 0.45) ? 'overlord' : (Math.random() < 0.35 ? 'gatling' : 'battlemaster');
-                } else if (fac.faction === 'gla') {
-                    uType = (cmd.difficulty === 'hard' && Math.random() < 0.45) ? 'marauder' : (Math.random() < 0.4 ? 'buggy' : 'scorpion');
-                } else {
-                    uType = (cmd.difficulty === 'hard' && Math.random() < 0.45) ? 'paladin' : (Math.random() < 0.35 ? 'humvee' : 'tank');
-                }
-                const eu = spawnEnemyUnit(uType, spawnPos);
+                const uType = chooseAICounterUnitType(cmd, chosenFacility.type);
+                const eu = spawnEnemyUnit(uType, spawnPos, null, cmd.faction);
                 if (eu) {
+                    cmd.resources = Math.max(0, (cmd.resources || 0) - 700);
                     eu.teamId = cmd.teamId;
                     eu.ownerId = cmd.ownerId;
                     eu.isAI = true;
                     eu.difficulty = cmd.difficulty;
+                    // Add newly produced combat unit to staging strike team at rally point (AISkirmishPlayer::processTeamBuilding)
+                    if (!cmd.stagingTeam) cmd.stagingTeam = [];
+                    cmd.stagingTeam.push(eu.netId);
+                    eu.targetPosition.copy(cmd.rallyPoint);
                 }
             }
         }
 
         // --- 2. Reconnaissance & Scout Allocation ---
-        // Clean up dead scouts
         for (let sId of cmd.scoutNetIds) {
             if (!myUnits.some(u => u.netId === sId)) cmd.scoutNetIds.delete(sId);
         }
 
-        // Designate up to 2 active scout units
-        if (cmd.scoutNetIds.size < (cmd.difficulty === 'easy' ? 1 : 2) && myUnits.length > 0) {
-            const candidateScout = myUnits.find(u => !u.combatTarget && !cmd.scoutNetIds.has(u.netId));
+        if (cmd.scoutNetIds.size < (cmd.difficulty === 'easy' ? 1 : 2) && combatUnits.length > 0) {
+            const candidateScout = combatUnits.find(u => !u.combatTarget && !cmd.scoutNetIds.has(u.netId));
             if (candidateScout) {
                 candidateScout.isScout = true;
                 cmd.scoutNetIds.add(candidateScout.netId);
+                if (cmd.stagingTeam) {
+                    cmd.stagingTeam = cmd.stagingTeam.filter(id => id !== candidateScout.netId);
+                }
             }
         }
 
-        // Direct scouts to explore candidate quadrants
         cmd.scoutNetIds.forEach(scoutNetId => {
             const scout = myUnits.find(u => u.netId === scoutNetId);
             if (!scout) return;
@@ -193,7 +888,6 @@ function processEnemyAIEngine() {
                     const nextWp = cmd.unexploredWaypoints.shift();
                     scout.targetPosition.copy(nextWp);
                 } else {
-                    // All initial quadrant spawns explored! Patrol perimeter or random map quadrants
                     const half = mapSize * 0.35;
                     const rx = (Math.random() * 2 - 1) * half;
                     const rz = (Math.random() * 2 - 1) * half;
@@ -203,14 +897,9 @@ function processEnemyAIEngine() {
         });
 
         // --- 3. Line-of-Sight & Recon Detection Pass (NO OMNISCIENCE!) ---
-        // Senses enemy assets ONLY when within visual range of commander's units or base
-        const hostileUnits = allUnits.filter(u => u.health > 0 && !isFriendly(cmd, u));
-        const hostileStructures = allStructures.filter(s => s.health > 0 && !isFriendly(cmd, s));
-
         myUnits.forEach(u => {
             const sightRange = (u.isScout ? 36 : 28);
-            
-            // Sighting hostile structures
+
             hostileStructures.forEach(struct => {
                 const sPos = struct.position || (struct.mesh && struct.mesh.position);
                 if (sPos && u.mesh.position.distanceTo(sPos) <= (sightRange + (struct.radius || 8))) {
@@ -227,7 +916,6 @@ function processEnemyAIEngine() {
                 }
             });
 
-            // Sighting hostile units
             hostileUnits.forEach(hu => {
                 if (hu.mesh && u.mesh.position.distanceTo(hu.mesh.position) <= sightRange) {
                     shareTeamDiscovery(cmd.teamId, hu, false);
@@ -235,8 +923,31 @@ function processEnemyAIEngine() {
             });
         });
 
-        // --- 4. Tactical AI Order Pass (Based strictly on discovered intel!) ---
-        // Clean up eradicated targets
+        // --- 4. Retaliation System (Zero Hour AI.h: MaxRetaliationDistance & RetaliationFriendsRadius) ---
+        const nowMs = Date.now();
+        const recentlyAttackedAsset = [...myStructures, ...myUnits].find(a =>
+            a._lastAttackedTime && (nowMs - a._lastAttackedTime < 6500) &&
+            a._lastAttacker && a._lastAttacker.health > 0 && !isFriendly(cmd, a._lastAttacker)
+        );
+        if (recentlyAttackedAsset && recentlyAttackedAsset._lastAttacker) {
+            const attacker = recentlyAttackedAsset._lastAttacker;
+            const attackerPos = attacker.position || (attacker.mesh && attacker.mesh.position);
+            const victimPos = recentlyAttackedAsset.position || (recentlyAttackedAsset.mesh && recentlyAttackedAsset.mesh.position);
+            if (attackerPos && victimPos) {
+                const retDist = victimPos.distanceTo(attackerPos);
+                if (retDist <= ZERO_HOUR_AI_DATA.maxRetaliateDistance) {
+                    shareTeamDiscovery(cmd.teamId, attacker, false);
+                    combatUnits.forEach(ally => {
+                        if (!ally.combatTarget && ally.mesh.position.distanceTo(victimPos) <= ZERO_HOUR_AI_DATA.retaliateFriendsRadius) {
+                            ally.combatTarget = attacker;
+                            ally.targetPosition.copy(attackerPos);
+                        }
+                    });
+                }
+            }
+        }
+
+        // --- 5. Tactical AI Order Pass & Strike Team Wave Assembly ---
         cmd.discoveredEnemyTargets = cmd.discoveredEnemyTargets.filter(t => {
             const aliveUnit = hostileUnits.find(hu => hu.netId === t.netId);
             const aliveStruct = hostileStructures.find(hs => hs.netId === t.netId);
@@ -247,10 +958,6 @@ function processEnemyAIEngine() {
             return hostileStructures.some(hs => (hs.position || hs.mesh.position).distanceTo(b.position) < 35);
         });
 
-        // AI Attack Grace Period check based on chosen difficulty:
-        // Easy AI: 5 minutes (300s)
-        // Medium AI: 3 minutes (180s)
-        // Hard AI: 2 minutes (120s)
         const elapsedSec = (Date.now() - (cmd.matchStartTime || (typeof matchStartTime !== 'undefined' ? matchStartTime : Date.now()))) / 1000;
         const attackDelays = { easy: 300, medium: 180, hard: 120 };
         const attackDelaySec = attackDelays[cmd.difficulty] || 180;
@@ -266,14 +973,26 @@ function processEnemyAIEngine() {
             }
         }
 
-        myUnits.forEach(enemy => {
-            if (enemy.isScout && !enemy.combatTarget) return; // Scouts focus on reconnaissance traversal
+        // Clean dead units from stagingTeam
+        if (!cmd.stagingTeam) cmd.stagingTeam = [];
+        cmd.stagingTeam = cmd.stagingTeam.filter(id => combatUnits.some(u => u.netId === id));
+        const targetWaveSize = ZERO_HOUR_AI_DATA.maxStrikeTeamSize[cmd.difficulty] || 4;
+        if (canLaunchOffensive && cmd.stagingTeam.length >= targetWaveSize && (cmd.discoveredEnemyTargets.length > 0 || cmd.discoveredEnemyBases.length > 0)) {
+            // Release staging team into active offensive wave!
+            cmd.stagingTeam.forEach(id => {
+                const member = combatUnits.find(u => u.netId === id);
+                if (member) member._releasedForAttack = true;
+            });
+            cmd.stagingTeam = [];
+        }
+
+        combatUnits.forEach(enemy => {
+            if (enemy.isScout && !enemy.combatTarget) return;
 
             // If unit is already engaged in active combat with valid hostile target:
             if (enemy.combatTarget && enemy.combatTarget.health > 0 && !isFriendly(enemy, enemy.combatTarget)) {
                 const targetPos = enemy.combatTarget.position || enemy.combatTarget.mesh.position;
-                // During grace period, disengage if target retreats far beyond AI base perimeter
-                if (!canLaunchOffensive && targetPos && enemy.mesh.position.distanceTo(cmd.basePos) > 40) {
+                if (!canLaunchOffensive && targetPos && enemy.mesh.position.distanceTo(cmd.basePos) > 45) {
                     enemy.combatTarget = null;
                 } else {
                     if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
@@ -285,62 +1004,78 @@ function processEnemyAIEngine() {
                 enemy.combatTarget = null;
             }
 
-            // A. If offensive NOT yet permitted OR no enemy assets discovered yet: Hold defensive base perimeter!
-            if (!canLaunchOffensive || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
-                // Defend base perimeter from close intruders
-                let localIntruder = null;
-                let minDist = 35; // Base defense perimeter radius
-                hostileUnits.forEach(hu => {
-                    if (hu.mesh) {
-                        const d = enemy.mesh.position.distanceTo(hu.mesh.position);
-                        if (d < minDist) { minDist = d; localIntruder = hu; }
-                    }
-                });
-                if (localIntruder) {
-                    enemy.combatTarget = localIntruder;
-                    enemy.targetPosition.copy(localIntruder.mesh.position);
-                } else {
-                    // Station at defensive rally zone around own Command Center
-                    if (enemy.mesh.position.distanceTo(cmd.basePos) > 32) {
-                        enemy.targetPosition.copy(cmd.rallyPoint);
-                    }
+            // Defend base perimeter against close intruders at all times (guardInnerModifierAI)
+            let localIntruder = null;
+            let minDist = 38 * ZERO_HOUR_AI_DATA.guardInnerModifierAI;
+            hostileUnits.forEach(hu => {
+                if (hu.mesh) {
+                    const d = enemy.mesh.position.distanceTo(hu.mesh.position);
+                    if (d < minDist) { minDist = d; localIntruder = hu; }
+                }
+            });
+            if (localIntruder) {
+                enemy.combatTarget = localIntruder;
+                enemy.targetPosition.copy(localIntruder.mesh.position);
+                return;
+            }
+
+            // Hold in staging rally area until wave is full or offensive grace expires
+            const isStaging = cmd.stagingTeam.includes(enemy.netId) && !enemy._releasedForAttack;
+            if (!canLaunchOffensive || isStaging || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
+                if (enemy.mesh.position.distanceTo(cmd.rallyPoint) > 14) {
+                    enemy.targetPosition.copy(cmd.rallyPoint);
                 }
                 return;
             }
 
-            // B. Attack Grace Expired AND Enemies HAVE been discovered! Launch attack waves on known coordinates!
-            let closestKnown = null;
-            let minDistance = Infinity;
+            // Select highest-priority discovered target using Zero Hour distance-weighted priority!
+            let bestTarget = null;
+            let bestScore = -Infinity;
 
-            // Target known discovered hostile units
             cmd.discoveredEnemyTargets.forEach(dt => {
                 const liveObj = hostileUnits.find(hu => hu.netId === dt.netId) || hostileStructures.find(hs => hs.netId === dt.netId);
                 if (liveObj && liveObj.health > 0) {
-                    const objPos = liveObj.position || liveObj.mesh.position;
-                    const d = enemy.mesh.position.distanceTo(objPos);
-                    if (d < minDistance) {
-                        minDistance = d;
-                        closestKnown = liveObj;
+                    const score = scoreAITargetPriority(enemy, liveObj, cmd);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestTarget = liveObj;
                     }
                 }
             });
 
-            // Target known enemy bases
-            if (!closestKnown && cmd.discoveredEnemyBases.length > 0) {
+            if (!bestTarget && cmd.discoveredEnemyBases.length > 0) {
                 const targetBase = cmd.discoveredEnemyBases[0];
                 const d = enemy.mesh.position.distanceTo(targetBase.position);
                 if (d > enemy.scanRange) {
-                    enemy.targetPosition.copy(targetBase.position);
+                    const navPath = (!enemy.isAir && typeof findNavigationPath === 'function')
+                        ? findNavigationPath(enemy.mesh.position, targetBase.position)
+                        : [targetBase.position.clone()];
+                    if (navPath.length > 1) {
+                        enemy.waypoints = navPath.slice(1);
+                        enemy.targetPosition.copy(navPath[0]);
+                    } else {
+                        enemy.targetPosition.copy(targetBase.position);
+                    }
                 }
                 return;
             }
 
-            if (closestKnown) {
-                enemy.combatTarget = closestKnown;
-                const targetPos = closestKnown.position || closestKnown.mesh.position;
-                if (minDistance > enemy.scanRange) {
+            if (bestTarget) {
+                enemy.combatTarget = bestTarget;
+                const targetPos = bestTarget.position || bestTarget.mesh.position;
+                const distToBest = enemy.mesh.position.distanceTo(targetPos);
+                if (distToBest > enemy.scanRange) {
                     const approachDir = new THREE.Vector3().subVectors(targetPos, enemy.mesh.position).normalize();
-                    enemy.targetPosition.copy(targetPos).addScaledVector(approachDir, -(enemy.scanRange - 3));
+                    const goalPos = targetPos.clone().addScaledVector(approachDir, -(enemy.scanRange - 3));
+                    const navPath = (!enemy.isAir && typeof findNavigationPath === 'function')
+                        ? findNavigationPath(enemy.mesh.position, goalPos, { ignoreStruct: bestTarget })
+                        : [goalPos];
+                    if (navPath.length > 1) {
+                        enemy.waypoints = navPath.slice(1);
+                        enemy.targetPosition.copy(navPath[0]);
+                    } else {
+                        enemy.targetPosition.copy(goalPos);
+                    }
                 } else {
                     enemy.targetPosition.copy(enemy.mesh.position);
                 }
@@ -541,6 +1276,9 @@ function processEnemyAIEngine() {
             }
         }
 
+        // Ported from DozerAIUpdate.cpp::findGoodBuildOrRepairPosition:
+        // Computes the closest perimeter point outside the structure footprint, and rotates around
+        // the perimeter if the direct angle is in water or inside another obstacle's footprint.
         function getStructureBuildPerimeterPoint(builder, structure) {
             const builderRadius = (builder && builder.radius) || 1.8;
             const structRadius = (structure && structure.radius) || 8.0;
@@ -549,10 +1287,30 @@ function processEnemyAIEngine() {
             const sPos = structure.position || (structure.mesh && structure.mesh.position) || { x: 0, y: 0, z: 0 };
             const dx = bPos.x - sPos.x;
             const dz = bPos.z - sPos.z;
-            let angle = Math.atan2(dz, dx);
-            if (Math.abs(dx) < 0.001 && Math.abs(dz) < 0.001) angle = 0;
-            const tX = sPos.x + Math.cos(angle) * workDist;
-            const tZ = sPos.z + Math.sin(angle) * workDist;
+            let baseAngle = Math.atan2(dz, dx);
+            if (Math.abs(dx) < 0.001 && Math.abs(dz) < 0.001) baseAngle = 0;
+
+            const angleOffsets = [
+                0,
+                Math.PI / 6, -Math.PI / 6,
+                Math.PI / 3, -Math.PI / 3,
+                Math.PI / 2, -Math.PI / 2,
+                (2 * Math.PI) / 3, -(2 * Math.PI) / 3,
+                (5 * Math.PI) / 6, -(5 * Math.PI) / 6,
+                Math.PI
+            ];
+            for (let i = 0; i < angleOffsets.length; i++) {
+                const a = baseAngle + angleOffsets[i];
+                const tX = sPos.x + Math.cos(a) * workDist;
+                const tZ = sPos.z + Math.sin(a) * workDist;
+                const cell = classifyPathfindPosition(tX, tZ, structure, 0.8);
+                if (isCellPassableOnGround(cell)) {
+                    const tY = typeof getTerrainHeight === 'function' ? getTerrainHeight(tX, tZ) : (sPos.y || 0);
+                    return new THREE.Vector3(tX, tY, tZ);
+                }
+            }
+            const tX = sPos.x + Math.cos(baseAngle) * workDist;
+            const tZ = sPos.z + Math.sin(baseAngle) * workDist;
             const tY = typeof getTerrainHeight === 'function' ? getTerrainHeight(tX, tZ) : (sPos.y || 0);
             return new THREE.Vector3(tX, tY, tZ);
         }
@@ -567,18 +1325,47 @@ function processEnemyAIEngine() {
             structure.dozerRef = builder;
             builder.targetStructure = structure;
             builder.taskState = 'MovingToBuild';
+            builder._boredTimer = 0;
             const perimeterPoint = getStructureBuildPerimeterPoint(builder, structure);
             builder.targetPosition.copy(perimeterPoint);
             builder.waypoints = [];
             if (typeof findBridgeCrossingsForPath === 'function' && builder.mesh) {
-                const bridges = findBridgeCrossingsForPath(builder.mesh.position, builder.targetPosition);
-                if (bridges) {
-                    builder.waypoints = [bridges[0], bridges[1], builder.targetPosition.clone()];
+                const bridges = findBridgeCrossingsForPath(builder.mesh.position, builder.targetPosition, structure);
+                if (bridges && bridges.length > 0) {
+                    builder.waypoints = [...bridges, builder.targetPosition.clone()];
                     builder.targetPosition.copy(builder.waypoints.shift());
                 }
             }
         }
         window.assignDozerToStructure = assignDozerToStructure;
+
+        // Ported from DozerAIUpdate.cpp::newTask(DOZER_TASK_REPAIR) & sole-benefactor repair lock
+        function assignDozerToRepair(builder, structure) {
+            if (!builder || !structure || structure.health <= 0 || structure.isBuilding || structure.health >= structure.maxHealth) return false;
+            // Enforce sole-benefactor repair lock (DozerAIUpdate.cpp:723 attemptHealingFromSoleBenefactor)
+            if (structure.soleRepairer && structure.soleRepairer !== builder && structure.soleRepairer.health > 0 &&
+                (structure.soleRepairer.taskState === 'Repairing' || structure.soleRepairer.taskState === 'MovingToRepair') &&
+                structure.soleRepairer.targetStructure === structure) {
+                return false;
+            }
+            structure.soleRepairer = builder;
+            builder.targetStructure = structure;
+            builder.taskState = 'MovingToRepair';
+            builder._boredTimer = 0;
+            if (builder.type === 'worker') builder.aiState = 'Idle';
+            const perimeterPoint = getStructureBuildPerimeterPoint(builder, structure);
+            builder.targetPosition.copy(perimeterPoint);
+            builder.waypoints = [];
+            if (typeof findBridgeCrossingsForPath === 'function' && builder.mesh) {
+                const bridges = findBridgeCrossingsForPath(builder.mesh.position, builder.targetPosition, structure);
+                if (bridges && bridges.length > 0) {
+                    builder.waypoints = [...bridges, builder.targetPosition.clone()];
+                    builder.targetPosition.copy(builder.waypoints.shift());
+                }
+            }
+            return true;
+        }
+        window.assignDozerToRepair = assignDozerToRepair;
 
         function onPointerUp(e) {
             if (e.button === 1) isRotatingCamera = false;
@@ -670,49 +1457,62 @@ function processEnemyAIEngine() {
             cameraRadius = Math.max(25, Math.min(450, cameraRadius)); updateCameraPosition();
         }
 
-        // River Crossing Bridge Waypoint Finder: detects if straight path hits water and routes via bridge
-        function findBridgeCrossingsForPath(startPos, endPos) {
-            if (!mapBridges || mapBridges.length === 0) return null;
+        // River Crossing Bridge & Obstacle Waypoint Finder (integrated with AIPathfind.cpp):
+        // Returns null when the straight line is clear; returns bridge entry/exit ramps when crossing water;
+        // or returns A* string-pulled intermediate waypoints when blocked by structures/obstacles.
+        function findBridgeCrossingsForPath(startPos, endPos, ignoreStruct = null) {
+            if (!startPos || !endPos) return null;
             let crossesWater = false;
+            const hasBridges = typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0;
             // Dense 20-sample scan along trajectory to detect water channels
             for (let t = 0.05; t <= 0.95; t += 0.05) {
                 const px = startPos.x + (endPos.x - startPos.x) * t;
                 const pz = startPos.z + (endPos.z - startPos.z) * t;
-                if (getTerrainHeight(px, pz) < currentWaterLevel && !mapBridges.some(b => isPointOnBridge(px, pz, b))) {
+                if (getTerrainHeight(px, pz) < currentWaterLevel && (!hasBridges || !mapBridges.some(b => isPointOnBridge(px, pz, b)))) {
                     crossesWater = true;
                     break;
                 }
             }
-            if (!crossesWater) return null; // Path is over dry land, direct movement fine!
 
-            // Find closest bridge spanning this river
-            let bestBridge = null;
-            let bestDist = Infinity;
-            mapBridges.forEach(b => {
-                const d = Math.hypot(startPos.x - b.position.x, startPos.z - b.position.z) +
-                          Math.hypot(endPos.x - b.position.x, endPos.z - b.position.z);
-                if (d < bestDist) {
-                    bestDist = d;
-                    bestBridge = b;
+            if (crossesWater && hasBridges) {
+                // Find closest bridge spanning this river
+                let bestBridge = null;
+                let bestDist = Infinity;
+                mapBridges.forEach(b => {
+                    const d = Math.hypot(startPos.x - b.position.x, startPos.z - b.position.z) +
+                              Math.hypot(endPos.x - b.position.x, endPos.z - b.position.z);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestBridge = b;
+                    }
+                });
+                if (bestBridge) {
+                    const fwdX = Math.sin(bestBridge.rotationY);
+                    const fwdZ = Math.cos(bestBridge.rotationY);
+                    const halfLen = bestBridge.length * 0.5 + 3.0;
+
+                    const ramp1 = new THREE.Vector3(bestBridge.position.x - fwdX * halfLen, bestBridge.deckY, bestBridge.position.z - fwdZ * halfLen);
+                    const ramp2 = new THREE.Vector3(bestBridge.position.x + fwdX * halfLen, bestBridge.deckY, bestBridge.position.z + fwdZ * halfLen);
+
+                    const d1 = startPos.distanceTo(ramp1);
+                    const d2 = startPos.distanceTo(ramp2);
+
+                    const entryRamp = d1 <= d2 ? ramp1 : ramp2;
+                    const exitRamp = d1 <= d2 ? ramp2 : ramp1;
+
+                    return [entryRamp, exitRamp];
                 }
-            });
-            if (!bestBridge) return null;
+            }
 
-            // Compute bridge entry and exit ramps along its longitudinal axis
-            const fwdX = Math.sin(bestBridge.rotationY);
-            const fwdZ = Math.cos(bestBridge.rotationY);
-            const halfLen = bestBridge.length * 0.5 + 3.0;
-
-            const ramp1 = new THREE.Vector3(bestBridge.position.x - fwdX * halfLen, bestBridge.deckY, bestBridge.position.z - fwdZ * halfLen);
-            const ramp2 = new THREE.Vector3(bestBridge.position.x + fwdX * halfLen, bestBridge.deckY, bestBridge.position.z + fwdZ * halfLen);
-
-            const d1 = startPos.distanceTo(ramp1);
-            const d2 = startPos.distanceTo(ramp2);
-
-            const entryRamp = d1 <= d2 ? ramp1 : ramp2;
-            const exitRamp = d1 <= d2 ? ramp2 : ramp1;
-
-            return [entryRamp, exitRamp];
+            // If straight line is blocked by intermediate structures or terrain obstacles, compute A* detour waypoints
+            if (typeof isPathfindSegmentClear === 'function' && !isPathfindSegmentClear(startPos, endPos, ignoreStruct, 1.4)) {
+                const navWaypoints = findNavigationPath(startPos, endPos, { ignoreStruct });
+                if (navWaypoints && navWaypoints.length > 1) {
+                    // Return intermediate waypoints (excluding final destination, which caller appends)
+                    return navWaypoints.slice(0, navWaypoints.length - 1);
+                }
+            }
+            return null;
         }
         window.findBridgeCrossingsForPath = findBridgeCrossingsForPath;
 
@@ -758,7 +1558,13 @@ function processEnemyAIEngine() {
                 const selectedBuilders = units.filter(u => u.selected && (u.type === 'dozer' || u.type === 'worker') && u.health > 0);
                 if (targetedStruct && selectedBuilders.length > 0) {
                     selectedBuilders.forEach(builder => {
-                        assignDozerToStructure(builder, targetedStruct);
+                        if (targetedStruct.isBuilding) {
+                            assignDozerToStructure(builder, targetedStruct);
+                        } else if (targetedStruct.health < targetedStruct.maxHealth) {
+                            assignDozerToRepair(builder, targetedStruct);
+                        } else {
+                            assignDozerToStructure(builder, targetedStruct);
+                        }
                     });
                     if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(targetedStruct.position, 'move');
                     const actionName = targetedStruct.isBuilding ? 'construction' : (targetedStruct.health < targetedStruct.maxHealth ? 'repairs' : 'assignment');
@@ -993,8 +1799,8 @@ function processEnemyAIEngine() {
                         return;
                     }
                     const bridges = !unit.isAir ? findBridgeCrossingsForPath(unit.mesh.position, groundHit) : null;
-                    if (bridges) {
-                        unit.waypoints = [bridges[0], bridges[1], groundHit.clone()];
+                    if (bridges && bridges.length > 0) {
+                        unit.waypoints = [...bridges, groundHit.clone()];
                         unit.targetPosition.copy(unit.waypoints.shift());
                     } else {
                         unit.waypoints = [];
@@ -1006,8 +1812,10 @@ function processEnemyAIEngine() {
                         unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
                         unit.patrolCenter.copy(groundHit);
                     }
-                    if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
-                        unit.targetStructure.dozerRef = null; unit.targetStructure = null;
+                    if (unit.targetStructure) {
+                        if (unit.targetStructure.dozerRef === unit) unit.targetStructure.dozerRef = null;
+                        if (unit.targetStructure.soleRepairer === unit) unit.targetStructure.soleRepairer = null;
+                        unit.targetStructure = null;
                     }
                     if (unit.type === 'truck' || unit.type === 'worker') {
                         unit.aiState = 'Idle';
@@ -1326,7 +2134,7 @@ function processEnemyAIEngine() {
                 (unit.type === 'dozer' || unit.type === 'worker') && unit.health > 0
             );
 
-            // Maintain assigned builders and automatically re-engage if interrupted
+            // 1. Maintain assigned construction & repair builders
             structures.forEach(structure => {
                 const builder = structure.dozerRef;
                 if (structure.isBuilding && builder) {
@@ -1339,18 +2147,27 @@ function processEnemyAIEngine() {
                             structure.dozerRef = null;
                         }
                     } else if (builder.taskState !== 'MovingToBuild' && builder.taskState !== 'Building') {
-                        // Resume build order if builder was stopped or bumped
                         assignDozerToStructure(builder, structure);
+                    }
+                }
+                if (structure.soleRepairer) {
+                    const rep = structure.soleRepairer;
+                    if (rep.health <= 0 || rep.targetStructure !== structure ||
+                        (rep.taskState !== 'MovingToRepair' && rep.taskState !== 'Repairing') ||
+                        structure.health >= structure.maxHealth) {
+                        structure.soleRepairer = null;
                     }
                 }
             });
 
+            // 2. Dispatch available idle builders to unfinished structures waiting for construction
             const availableBuilders = builders.filter(builder =>
-                (builder.taskState === 'Idle' && !builder.targetStructure) ||
-                (builder.targetStructure && !builder.targetStructure.isBuilding)
+                (!builder.aiState || builder.aiState === 'Idle') &&
+                ((builder.taskState === 'Idle' && !builder.targetStructure) ||
+                 (builder.targetStructure && !builder.targetStructure.isBuilding && builder.taskState !== 'MovingToRepair' && builder.taskState !== 'Repairing'))
             );
             const waitingStructures = structures.filter(structure =>
-                structure.isBuilding && !structure.dozerRef
+                structure.isBuilding && !structure.dozerRef && structure.health > 0
             );
 
             waitingStructures.forEach(structure => {
@@ -1369,6 +2186,53 @@ function processEnemyAIEngine() {
                     availableBuilders.splice(availableBuilders.indexOf(nearestBuilder), 1);
                 }
             });
+
+            // 3. Zero Hour DozerAIUpdate Boredom Auto-Repair (DozerAIUpdate.cpp: boredTime / boredRange)
+            // Idle Dozers/Workers automatically scan within boredRange for damaged friendly structures to repair.
+            availableBuilders.forEach(builder => {
+                builder._boredTimer = (builder._boredTimer || 0) + 1;
+                if (builder._boredTimer < 45) return; // Wait ~0.75s idle before seeking repair tasks
+                const boredRange = 75.0;
+                let nearestDamaged = null;
+                let minDist = boredRange;
+                structures.forEach(s => {
+                    if (!s || s.isBuilding || s.health <= 0 || s.health >= s.maxHealth || s.soleRepairer) return;
+                    const d = builder.mesh.position.distanceTo(s.position);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearestDamaged = s;
+                    }
+                });
+                if (nearestDamaged) {
+                    assignDozerToRepair(builder, nearestDamaged);
+                }
+            });
+
+            // 4. AI Dozers/Workers Auto-Repair with AIDozerBoredRadiusModifier (2.0x radius from Zero Hour AI.h)
+            if (typeof enemyUnits !== 'undefined' && typeof enemyStructures !== 'undefined') {
+                const aiBuilders = enemyUnits.filter(u =>
+                    (u.type === 'dozer' || (u.type === 'worker' && (!u.aiState || u.aiState === 'Idle'))) && u.health > 0
+                );
+                aiBuilders.forEach(aiBuilder => {
+                    if (aiBuilder.taskState === 'Repairing' || aiBuilder.taskState === 'MovingToRepair') return;
+                    aiBuilder._boredTimer = (aiBuilder._boredTimer || 0) + 1;
+                    if (aiBuilder._boredTimer < 30) return;
+                    const aiBoredRange = 75.0 * (ZERO_HOUR_AI_DATA.aiDozerBoredRadiusModifier || 2.0);
+                    let bestDamaged = null;
+                    let minDist = aiBoredRange;
+                    enemyStructures.forEach(es => {
+                        if (!es || es.ownerId !== aiBuilder.ownerId || es.isBuilding || es.health <= 0 || es.health >= es.maxHealth || es.soleRepairer) return;
+                        const d = aiBuilder.mesh.position.distanceTo(es.position);
+                        if (d < minDist) {
+                            minDist = d;
+                            bestDamaged = es;
+                        }
+                    });
+                    if (bestDamaged) {
+                        assignDozerToRepair(aiBuilder, bestDamaged);
+                    }
+                });
+            }
         }
 
         let combatDeltaScale = 1.0;
