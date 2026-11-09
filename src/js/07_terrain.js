@@ -601,9 +601,9 @@
                 miniCanvas.height = 256;
                 const mCtx = miniCanvas.getContext('2d');
                 const offImg = window._officialMapImages && window._officialMapImages[mapType];
-                if (offImg && offImg.complete && offImg.naturalWidth > 0) {
-                    mCtx.drawImage(offImg, 0, 0, 256, 256);
-                } else {
+
+                const drawProceduralRelief = () => {
+                    const step = mapSize / 256;
                     for (let py = 0; py < 256; py += 2) {
                         const wz = ((py / 255) - 0.5) * mapSize;
                         for (let px = 0; px < 256; px += 2) {
@@ -612,14 +612,44 @@
                             if (waterLevel > -100 && h < waterLevel) {
                                 mCtx.fillStyle = effectiveTheme === 'snow' ? '#54a0ff' : '#1e6b9b';
                             } else {
-                                const b = Math.max(45, Math.min(240, Math.floor(135 + h * 9)));
+                                // Directional sun hillshading so ridges, cliffs and canyons pop like the official game
+                                const hx = getRawTerrainHeight(wx + step * 2, wz) - h;
+                                const hz = getRawTerrainHeight(wx, wz + step * 2) - h;
+                                const shade = (hx * -14) + (hz * -10);
+                                const b = Math.max(40, Math.min(248, Math.floor(138 + h * 7 + shade)));
                                 if (effectiveTheme === 'jungle') mCtx.fillStyle = `rgb(${Math.floor(b * 0.42)}, ${Math.floor(b * 0.72)}, ${Math.floor(b * 0.34)})`;
                                 else if (effectiveTheme === 'snow') mCtx.fillStyle = `rgb(${b}, ${Math.min(255, b + 8)}, ${Math.min(255, b + 16)})`;
                                 else if (effectiveTheme === 'city') mCtx.fillStyle = `rgb(${Math.floor(b * 0.45)}, ${Math.floor(b * 0.48)}, ${Math.floor(b * 0.52)})`;
-                                else mCtx.fillStyle = `rgb(${b}, ${Math.floor(b * 0.84)}, ${Math.floor(b * 0.58)})`;
+                                else mCtx.fillStyle = `rgb(${b}, ${Math.floor(b * 0.82)}, ${Math.floor(b * 0.56)})`;
                             }
                             mCtx.fillRect(px, py, 2, 2);
                         }
+                    }
+                    // Bake static map obstacles (trees, rocks, urban blocks) onto the miniature map
+                    if (mapObstacles && mapObstacles.length > 0) {
+                        mapObstacles.forEach(ob => {
+                            const ox = ((ob.x / mapSize) + 0.5) * 256;
+                            const oz = ((ob.z / mapSize) + 0.5) * 256;
+                            mCtx.fillStyle = effectiveTheme === 'jungle' ? 'rgba(20, 55, 18, 0.75)' :
+                                             effectiveTheme === 'city' ? 'rgba(95, 105, 115, 0.85)' :
+                                             effectiveTheme === 'snow' ? 'rgba(90, 110, 125, 0.75)' :
+                                             'rgba(95, 72, 42, 0.75)';
+                            const r = Math.max(1.5, (ob.radius / mapSize) * 256);
+                            mCtx.fillRect(ox - r, oz - r, r * 2, r * 2);
+                        });
+                    }
+                };
+
+                if (offImg && offImg.complete && offImg.naturalWidth > 0) {
+                    mCtx.drawImage(offImg, 0, 0, 256, 256);
+                } else {
+                    drawProceduralRelief();
+                    if (offImg && typeof offImg.addEventListener === 'function') {
+                        offImg.addEventListener('load', () => {
+                            if (currentMapType === mapType) {
+                                mCtx.drawImage(offImg, 0, 0, 256, 256);
+                            }
+                        }, { once: true });
                     }
                 }
                 window._minimapTerrainCanvas = miniCanvas;

@@ -104,46 +104,15 @@ function renderRadarMinimap() {
     const mapSize = currentMapSize || 1500;
     const half = mapSize / 2;
 
-    // Check if player has active radar telemetry
     const hasRadar = (typeof isRadarOnline === 'function') ? isRadarOnline(selectedFaction) : true;
-    if (!hasRadar) {
-        // Draw Radar Offline display with animated scanlines
-        ctx.fillStyle = '#061009';
-        ctx.fillRect(0, 0, w, h);
-        
-        ctx.strokeStyle = 'rgba(0, 255, 180, 0.08)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(w/2, h/2, w * 0.44, 0, Math.PI * 2);
-        ctx.moveTo(w/2, 4); ctx.lineTo(w/2, h - 4);
-        ctx.moveTo(4, h/2); ctx.lineTo(w - 4, h/2);
-        ctx.stroke();
 
-        radarSweepAngle = (radarSweepAngle + 0.03) % (Math.PI * 2);
-        const scanY = (Math.sin(radarSweepAngle) * 0.5 + 0.5) * h;
-        ctx.strokeStyle = 'rgba(231, 76, 60, 0.45)';
-        ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(w, scanY); ctx.stroke();
-
-        ctx.fillStyle = '#e74c3c';
-        ctx.font = 'bold 11px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚡ RADAR OFFLINE', w / 2, h / 2 - 8);
-
-        ctx.fillStyle = '#95a5a6';
-        ctx.font = '9px Arial, sans-serif';
-        const reason = (selectedFaction === 'china' && (typeof researchedTechs === 'undefined' || !researchedTechs.has('radar')))
-            ? 'RESEARCH RADAR AT HQ'
-            : 'INSUFFICIENT POWER / NO HQ';
-        ctx.fillText(reason, w / 2, h / 2 + 10);
-        return;
-    }
-
-    // 1. Draw Actual Top-Down Map Terrain Base Layer (Authentic C&C Generals Radar Minimap!)
-    ctx.fillStyle = '#061009';
+    // 1. Always Draw the Miniature Version of the Map Currently Being Played (Official C&C Generals Style)
+    ctx.fillStyle = '#1b1610';
     ctx.fillRect(0, 0, w, h);
 
-    const mapKey = (typeof currentMapType !== 'undefined' && currentMapType === 'desert') ? 'tournament_desert' : (typeof currentMapType !== 'undefined' ? currentMapType : 'tournament_desert');
+    const mapKey = (typeof currentMapType !== 'undefined' && currentMapType === 'desert')
+        ? 'tournament_desert'
+        : (typeof currentMapType !== 'undefined' ? currentMapType : 'tournament_desert');
     const offImg = window._officialMapImages && window._officialMapImages[mapKey];
     if (offImg && offImg.complete && offImg.naturalWidth > 0) {
         ctx.drawImage(offImg, 0, 0, w, h);
@@ -151,29 +120,21 @@ function renderRadarMinimap() {
         ctx.drawImage(window._minimapTerrainCanvas, 0, 0, w, h);
     }
 
-    // 2. Composite Fog of War Shroud over Terrain (explored terrain visible, unexplored shrouded)
+    // 2. Subtle Fog of War tint so the full map terrain stays clearly visible while showing explored sectors
     if (typeof fogCanvas !== 'undefined' && fogCanvas) {
         ctx.save();
-        ctx.globalAlpha = 0.72;
+        ctx.globalAlpha = 0.24;
         ctx.drawImage(fogCanvas, 0, 0, w, h);
         ctx.restore();
     }
 
-    // Subtle tactical grid overlay
-    ctx.strokeStyle = 'rgba(0, 255, 180, 0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(w/2, 2); ctx.lineTo(w/2, h - 2);
-    ctx.moveTo(2, h/2); ctx.lineTo(w - 2, h/2);
-    ctx.stroke();
-
-    // Transform world coord to radar canvas coord
+    // Transform world coord to minimap canvas coord
     const toRX = (x) => ((x + half) / mapSize) * w;
     const toRZ = (z) => ((z + half) / mapSize) * h;
 
-    // Draw bridges
+    // 3. Draw Bridges
     if (mapBridges && mapBridges.length > 0) {
-        ctx.strokeStyle = '#95a5a6';
+        ctx.strokeStyle = '#d2dae2';
         ctx.lineWidth = 2.5;
         mapBridges.forEach(b => {
             if (b.position) {
@@ -189,104 +150,107 @@ function renderRadarMinimap() {
         });
     }
 
-    // Draw Supply Docks (High-visibility Gold/Green Crates)
-    if (supplyPoints && supplyPoints.length > 0) {
-        supplyPoints.forEach(sp => {
-            if (sp.stock > 0) {
-                const rx = toRX(sp.position.x);
-                const rz = toRZ(sp.position.z);
+    // 4. Draw Neutral Tech Structures (Oil Derricks, Hospitals, Refineries)
+    if (window.neutralStructures && window.neutralStructures.length > 0) {
+        window.neutralStructures.forEach(ns => {
+            if (ns.health > 0 && ns.position) {
+                const rx = toRX(ns.position.x);
+                const rz = toRZ(ns.position.z);
                 ctx.fillStyle = '#000000';
                 ctx.fillRect(rx - 3, rz - 3, 6, 6);
-                ctx.fillStyle = '#f1c40f';
+                ctx.fillStyle = ns.capturedByTeam === playerTeamId ? '#2ecc71' : (ns.capturedByTeam ? '#e74c3c' : '#ffffff');
                 ctx.fillRect(rx - 2, rz - 2, 4, 4);
             }
         });
     }
 
-    // Draw Friendly Structures (Solid Emerald Green Squares)
-    ctx.fillStyle = '#2ecc71';
+    // 5. Draw Supply Docks (Crisp Gold/Green Supply Icons)
+    if (supplyPoints && supplyPoints.length > 0) {
+        supplyPoints.forEach(sp => {
+            if (sp.stock > 0) {
+                const rx = toRX(sp.position.x);
+                const rz = toRZ(sp.position.z);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(rx - 3.5, rz - 3.5, 7, 7);
+                ctx.fillStyle = '#ffd700';
+                ctx.fillRect(rx - 2.5, rz - 2.5, 5, 5);
+            }
+        });
+    }
+
+    // 6. Draw Friendly Structures
     structures.forEach(s => {
         if (s.health > 0) {
             const rx = toRX(s.position.x);
             const rz = toRZ(s.position.z);
-            const sz = Math.max(4, (s.radius || 4) / mapSize * w * 2.2);
+            const sz = Math.max(4.5, (s.radius || 4) / mapSize * w * 2.2);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(rx - sz/2 - 0.5, rz - sz/2 - 0.5, sz + 1, sz + 1);
+            ctx.fillStyle = '#2ecc71';
             ctx.fillRect(rx - sz/2, rz - sz/2, sz, sz);
         }
     });
 
-    // Draw Enemy & Allied AI Structures
+    // 7. Draw Enemy & Allied AI Structures
     enemyStructures.forEach(es => {
         if (es.health > 0) {
             const isAlly = isFriendly({ teamId: playerTeamId }, es);
-            if (isAlly) {
-                ctx.fillStyle = '#00cec9'; // Cyan for Allied AI base
-            } else {
-                if (es.mesh && !es.mesh.visible) return; // Hidden under fog/shroud
-                ctx.fillStyle = '#e74c3c'; // Crimson for Hostile enemy
-            }
+            if (!isAlly && es.mesh && !es.mesh.visible && !hasRadar) return;
+            if (!isAlly && es.mesh && !es.mesh.visible) return;
             const rx = toRX(es.position.x);
             const rz = toRZ(es.position.z);
-            const sz = Math.max(4, (es.radius || 4) / mapSize * w * 2.2);
+            const sz = Math.max(4.5, (es.radius || 4) / mapSize * w * 2.2);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(rx - sz/2 - 0.5, rz - sz/2 - 0.5, sz + 1, sz + 1);
+            ctx.fillStyle = isAlly ? '#00cec9' : '#ff3838';
             ctx.fillRect(rx - sz/2, rz - sz/2, sz, sz);
         }
     });
 
-    // Draw Friendly Player Units (Bright Neon Green Dots, Selected = Pulsing White)
+    // 8. Draw Friendly Player Units
     units.forEach(u => {
         if (u.health > 0 && u.mesh && !u.garrisonedIn) {
             const rx = toRX(u.mesh.position.x);
             const rz = toRZ(u.mesh.position.z);
-            if (u.selected) {
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(rx - 2, rz - 2, 4, 4);
-            } else {
-                ctx.fillStyle = '#55efc4';
-                ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);
-            }
-        }
-    });
-
-    // Draw Enemy & Allied AI Units
-    enemyUnits.forEach(eu => {
-        if (eu.health > 0 && eu.mesh) {
-            const isAlly = isFriendly({ teamId: playerTeamId }, eu);
-            if (isAlly) {
-                ctx.fillStyle = '#81ecec'; // Light Cyan for Allied AI units
-            } else {
-                if (!eu.mesh.visible) return; // Hidden under fog of war
-                ctx.fillStyle = '#ff4757'; // Crimson Red for Hostile enemies
-            }
-            const rx = toRX(eu.mesh.position.x);
-            const rz = toRZ(eu.mesh.position.z);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(rx - 2.5, rz - 2.5, 5, 5);
+            ctx.fillStyle = u.selected ? '#ffffff' : '#55efc4';
             ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);
         }
     });
 
-    // Draw Camera Viewport Frustum on Radar (Cyan Outline)
+    // 9. Draw Enemy & Allied AI Units
+    enemyUnits.forEach(eu => {
+        if (eu.health > 0 && eu.mesh) {
+            const isAlly = isFriendly({ teamId: playerTeamId }, eu);
+            if (!isAlly && !eu.mesh.visible) return;
+            const rx = toRX(eu.mesh.position.x);
+            const rz = toRZ(eu.mesh.position.z);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(rx - 2.5, rz - 2.5, 5, 5);
+            ctx.fillStyle = isAlly ? '#81ecec' : '#ff4757';
+            ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);
+        }
+    });
+
+    // 10. Draw Camera Viewport Frustum Rectangle (Classic C&C Generals White/Gold View Box)
     if (camera) {
-        ctx.strokeStyle = '#00ffcc';
-        ctx.lineWidth = 1;
         const camX = toRX(cameraTarget.x);
         const camZ = toRZ(cameraTarget.z);
         const viewW = (cameraRadius / mapSize) * w * 1.4;
         const viewH = (cameraRadius / mapSize) * h * 0.9;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(camX - viewW/2, camZ - viewH/2, viewW, viewH);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
         ctx.strokeRect(camX - viewW/2, camZ - viewH/2, viewW, viewH);
     }
 
-    // Sweeping Radar Line with phosphor fade!
-    radarSweepAngle = (radarSweepAngle + 0.045) % (Math.PI * 2);
-    const sweepLen = w * 0.46;
-    const sweepX = w/2 + Math.cos(radarSweepAngle) * sweepLen;
-    const sweepY = h/2 + Math.sin(radarSweepAngle) * sweepLen;
-    const grad = ctx.createRadialGradient(w/2, h/2, 2, w/2, h/2, sweepLen);
-    grad.addColorStop(0, 'rgba(0, 255, 180, 0.4)');
-    grad.addColorStop(1, 'rgba(0, 255, 180, 0.0)');
-    ctx.strokeStyle = 'rgba(0, 255, 204, 0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(w/2, h/2);
-    ctx.lineTo(sweepX, sweepY);
-    ctx.stroke();
+    // Subtle outer border frame
+    ctx.strokeStyle = 'rgba(197, 185, 142, 0.45)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
 }
 
 function triggerTacticalBeacon() {
