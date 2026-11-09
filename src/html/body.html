@@ -43,7 +43,14 @@
 
         <div id="start-card">
             <button id="resume-game-btn" class="rts-btn resume-banner-btn" style="display: none;" onclick="resumeGame()">▶ RESUME CURRENT MATCH (ESC)</button>
-            <h1>Command Setup</h1>
+            <div class="menu-header-banner">
+                <img id="menu-skirmish-emblem" class="menu-skirmish-emblem" alt="" style="display:none;" />
+                <div class="menu-header-titles">
+                    <h1>Command &amp; Conquer: Generals — Zero Hour</h1>
+                    <img id="menu-ruler-img" class="menu-ruler-img" alt="" style="display:none;" />
+                </div>
+                <img id="menu-faction-crest" class="menu-faction-crest" alt="" style="display:none;" />
+            </div>
 
             <!-- Game Mode Switcher Tabs (Single Player, Multiplayer, Map Editor) -->
             <div class="game-mode-tabs" role="tablist">
@@ -55,9 +62,9 @@
             <!-- Faction Selection -->
             <p style="margin: 6px 0 4px 0; font-size: 12px; color: #a8b8aa;">Select your command faction:</p>
             <div class="faction-grid" role="group" aria-label="Choose faction">
-                <button class="rts-btn faction-card active" data-faction="usa" onclick="selectFaction('usa', this)"><strong>USA</strong>High-tech, drones & air power.</button>
-                <button class="rts-btn faction-card" data-faction="china" onclick="selectFaction('china', this)"><strong>China</strong>Heavy armor, mass firepower & propaganda.</button>
-                <button class="rts-btn faction-card" data-faction="gla" onclick="selectFaction('gla', this)"><strong>GLA</strong>Guerrilla, scrap salvage & toxin weapons.</button>
+                <button class="rts-btn faction-card active" data-faction="usa" onclick="selectFaction('usa', this)"><img id="fc-logo-usa" class="fc-crest-img" alt="" style="display:none;" /><div class="fc-card-text"><strong>USA</strong>High-tech, drones &amp; air power.</div></button>
+                <button class="rts-btn faction-card" data-faction="china" onclick="selectFaction('china', this)"><img id="fc-logo-china" class="fc-crest-img" alt="" style="display:none;" /><div class="fc-card-text"><strong>China</strong>Heavy armor, mass firepower &amp; propaganda.</div></button>
+                <button class="rts-btn faction-card" data-faction="gla" onclick="selectFaction('gla', this)"><img id="fc-logo-gla" class="fc-crest-img" alt="" style="display:none;" /><div class="fc-card-text"><strong>GLA</strong>Guerrilla, scrap salvage &amp; toxin weapons.</div></button>
             </div>
             <div id="faction-overview">USA forces — Infantry: Ranger, Missile Defender, Pathfinder, Colonel Burton. Vehicles & aircraft: Humvee, Ambulance, Crusader Tank, Paladin Tank, Tomahawk, Chinook, Comanche, Raptor, Stealth Fighter, Aurora Bomber. Support: Construction Dozer, Pilot (unbuildable), Scout Drone (attachment), Battle Drone (attachment).</div>
 
@@ -86,12 +93,27 @@
                     <div class="start-option" style="margin:0;">
                         <label for="map-environment" style="font-size:10px;">Theater of War</label>
                         <select id="map-environment" class="slot-select" onchange="onMapSelectionChange('single')">
-                            <option value="tournament_desert" selected>Tournament Desert (Official EA Retail Map)</option>
-                            <option value="desert">Desert Canyon (Middle East)</option>
-                            <option value="jungle">Tropical Jungle (Mekong Basin)</option>
-                            <option value="snow">Frozen Mountain (Siberian Tundra)</option>
-                            <option value="city">Small City Grid (Urban Warfare)</option>
-                            <option value="random">Procedural Warzone - Random Hills & River</option>
+                            <optgroup label="Official EA Skirmish Maps (Maps.big / MapsZH.big)">
+                                <option value="tournament_desert" selected>Tournament Desert (2-4P • Official EA Map)</option>
+                                <option value="scorched_earth">Scorched Earth (2-4P • Official EA Map)</option>
+                                <option value="desert_fury">Desert Fury (2-4P • Official EA Map)</option>
+                                <option value="golden_oasis">Golden Oasis (4P • Official EA Map)</option>
+                                <option value="barren_badlands">Barren Badlands (2-4P • Official EA Map)</option>
+                                <option value="flash_fire">Flash Fire (2-4P • Official EA Map)</option>
+                                <option value="winter_wolf">Winter Wolf (2-4P • Official EA Snow Map)</option>
+                                <option value="alpine_assault">Alpine Assault (2-4P • Official EA Snow Map)</option>
+                                <option value="final_crusade">Final Crusade (2-4P • Official EA Temperate Map)</option>
+                                <option value="heartland_shield">Heartland Shield (2-4P • Official EA Temperate Map)</option>
+                                <option value="lone_eagle">Lone Eagle (4P • Official EA Temperate Map)</option>
+                                <option value="twilight_flame">Twilight Flame (8P • Official EA Map)</option>
+                            </optgroup>
+                            <optgroup label="Procedural Theaters">
+                                <option value="desert">Desert Canyon (Middle East)</option>
+                                <option value="jungle">Tropical Jungle (Mekong Basin)</option>
+                                <option value="snow">Frozen Mountain (Siberian Tundra)</option>
+                                <option value="city">Small City Grid (Urban Warfare)</option>
+                                <option value="random">Procedural Warzone - Random Hills &amp; River</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div class="start-option" style="margin:0;">
@@ -163,12 +185,27 @@
                         <div class="start-option" style="margin:0;">
                             <label for="mp-map-env" style="font-size:10px;">Theater of War (Host)</label>
                             <select id="mp-map-env" class="slot-select" onchange="onMapSelectionChange('multiplayer')">
-                                <option value="tournament_desert" selected>Tournament Desert (Official EA Retail Map)</option>
-                                <option value="desert">Desert Canyon (Middle East)</option>
-                                <option value="jungle">Tropical Jungle (Mekong Basin)</option>
-                                <option value="snow">Frozen Mountain (Siberian Tundra)</option>
-                                <option value="city">Small City Grid (Urban Warfare)</option>
-                                <option value="random">Procedural Warzone - Random Hills & River</option>
+                                <optgroup label="Official EA Skirmish Maps (Maps.big / MapsZH.big)">
+                                    <option value="tournament_desert" selected>Tournament Desert (2-4P • Official EA Map)</option>
+                                    <option value="scorched_earth">Scorched Earth (2-4P • Official EA Map)</option>
+                                    <option value="desert_fury">Desert Fury (2-4P • Official EA Map)</option>
+                                    <option value="golden_oasis">Golden Oasis (4P • Official EA Map)</option>
+                                    <option value="barren_badlands">Barren Badlands (2-4P • Official EA Map)</option>
+                                    <option value="flash_fire">Flash Fire (2-4P • Official EA Map)</option>
+                                    <option value="winter_wolf">Winter Wolf (2-4P • Official EA Snow Map)</option>
+                                    <option value="alpine_assault">Alpine Assault (2-4P • Official EA Snow Map)</option>
+                                    <option value="final_crusade">Final Crusade (2-4P • Official EA Temperate Map)</option>
+                                    <option value="heartland_shield">Heartland Shield (2-4P • Official EA Temperate Map)</option>
+                                    <option value="lone_eagle">Lone Eagle (4P • Official EA Temperate Map)</option>
+                                    <option value="twilight_flame">Twilight Flame (8P • Official EA Map)</option>
+                                </optgroup>
+                                <optgroup label="Procedural Theaters">
+                                    <option value="desert">Desert Canyon (Middle East)</option>
+                                    <option value="jungle">Tropical Jungle (Mekong Basin)</option>
+                                    <option value="snow">Frozen Mountain (Siberian Tundra)</option>
+                                    <option value="city">Small City Grid (Urban Warfare)</option>
+                                    <option value="random">Procedural Warzone - Random Hills &amp; River</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="start-option" style="margin:0;">
@@ -347,6 +384,7 @@
     <!-- ============================================================== -->
     <div id="top-hud-bar" class="theme-usa">
         <div class="top-hud-left">
+            <img id="hud-faction-emblem" class="hud-faction-emblem" alt="" style="display:none;" />
             <span id="sidebar-faction-badge" class="hud-faction-tag">USA STRATEGIC FORCES</span>
             <span class="hud-defcon-tag">DEFCON 1</span>
         </div>
@@ -457,6 +495,7 @@
         <div id="cb-inspector-box" class="cb-panel">
             <!-- Top Generals Promotion Stars Bar -->
             <div class="cb-inspector-stars-bar">
+                <img id="cb-general-btn-img" class="cb-general-btn-img" alt="" style="display:none;" />
                 <span class="cb-stars-rank-label">RANK</span>
                 <span id="generals-rank" class="cb-stars-icons">★★★☆☆</span>
             </div>
@@ -484,6 +523,8 @@
     <!-- ============================================================== -->
     <div id="victory-modal" class="end-game-modal" style="display: none;">
         <div class="end-game-card victory-card">
+            <img id="victory-banner-img" class="end-game-official-banner" alt="VICTORY" style="display:none;" />
+            <img id="victory-rank-badge" class="end-game-rank-badge" alt="" style="display:none;" />
             <div class="end-game-laurel">★ ★ ★ ★ ★</div>
             <h1 class="victory-title">VICTORY</h1>
             <div class="end-game-subtitle">OPERATIONAL THEATER SECURED • ALL HOSTILE FORCES DESTROYED</div>
@@ -517,6 +558,7 @@
 
     <div id="defeat-modal" class="end-game-modal" style="display: none;">
         <div class="end-game-card defeat-card">
+            <img id="defeat-banner-img" class="end-game-official-banner" alt="DEFEATED" style="display:none;" />
             <div class="end-game-laurel" style="color:#ff4757;">⚠️ ★ ⚠️</div>
             <h1 class="defeat-title">DEFEATED</h1>
             <div class="end-game-subtitle">ALL STRATEGIC ASSETS LOST • COMMAND CENTER DESTROYED</div>

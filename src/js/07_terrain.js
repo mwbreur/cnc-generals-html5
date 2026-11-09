@@ -93,6 +93,9 @@
         }
 
         function getRawTerrainHeight(x, z) {
+            if (window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType] && typeof getOfficialMapHeight === 'function') {
+                return getOfficialMapHeight(currentMapType, x, z);
+            }
             if (currentMapType === 'tournament_desert' && typeof getTournamentDesertHeight === 'function') {
                 return getTournamentDesertHeight(x, z);
             }
@@ -365,6 +368,11 @@
 
         // Procedural Texture Generator per Environment
         function createTerrainTextureForMap(mapType) {
+            const officialKey = (mapType === 'desert') ? 'tournament_desert' : mapType;
+            if (window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[officialKey] && typeof createOfficialMapTexture === 'function') {
+                const retailTex = createOfficialMapTexture(officialKey);
+                if (retailTex) return retailTex;
+            }
             if ((mapType === 'tournament_desert' || mapType === 'desert') && typeof createTournamentDesertTexture === 'function') {
                 const retailTex = createTournamentDesertTexture();
                 if (retailTex) return retailTex;
@@ -480,9 +488,10 @@
             currentMapType = mapType;
             currentMapSize = mapSize;
 
+            const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType];
             const effectiveTheme = (activeCustomMap && activeCustomMap.theme)
                 ? activeCustomMap.theme
-                : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city', 'tournament_desert'].includes(mapType) ? mapType : 'desert'));
+                : (officialMap ? officialMap.theme : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city', 'tournament_desert'].includes(mapType) ? mapType : 'desert')));
 
             flattenedFootprints.length = 0;
             // Clear previous terrain, water, props, and supply points
@@ -541,9 +550,10 @@
             terrainMesh.receiveShadow = true;
             scene.add(terrainMesh);
 
-            // 3. Water Body
+            // 3. Water Body (SAGE official skirmish maps use dry passable valleys with no global water plane so AI never stalls)
             mapBridges.length = 0; // Clear previous bridges
-            let waterLevel = -1.0;
+            const isOfficialDryMap = Boolean(officialMap || effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert');
+            let waterLevel = isOfficialDryMap ? -999.0 : -1.0;
             let waterColor = 0x0984e3;
             let waterOpacity = 0.82;
 
@@ -571,6 +581,7 @@
             waterMesh = new THREE.Mesh(waterGeo, waterMat);
             waterMesh.rotation.x = -Math.PI / 2;
             waterMesh.position.y = waterLevel;
+            waterMesh.visible = (waterLevel > -100);
             waterMesh.receiveShadow = true;
             scene.add(waterMesh);
 
@@ -582,6 +593,37 @@
 
             // 6. Dynamic Fog of War (C&C Shroud)
             initFogOfWar(mapSize);
+
+            // 7. Build cached 2D Top-Down Terrain Canvas for the In-Game Radar Minimap
+            if (typeof document !== 'undefined') {
+                const miniCanvas = document.createElement('canvas');
+                miniCanvas.width = 256;
+                miniCanvas.height = 256;
+                const mCtx = miniCanvas.getContext('2d');
+                const offImg = window._officialMapImages && window._officialMapImages[mapType];
+                if (offImg && offImg.complete && offImg.naturalWidth > 0) {
+                    mCtx.drawImage(offImg, 0, 0, 256, 256);
+                } else {
+                    for (let py = 0; py < 256; py += 2) {
+                        const wz = ((py / 255) - 0.5) * mapSize;
+                        for (let px = 0; px < 256; px += 2) {
+                            const wx = ((px / 255) - 0.5) * mapSize;
+                            const h = getRawTerrainHeight(wx, wz);
+                            if (waterLevel > -100 && h < waterLevel) {
+                                mCtx.fillStyle = effectiveTheme === 'snow' ? '#54a0ff' : '#1e6b9b';
+                            } else {
+                                const b = Math.max(45, Math.min(240, Math.floor(135 + h * 9)));
+                                if (effectiveTheme === 'jungle') mCtx.fillStyle = `rgb(${Math.floor(b * 0.42)}, ${Math.floor(b * 0.72)}, ${Math.floor(b * 0.34)})`;
+                                else if (effectiveTheme === 'snow') mCtx.fillStyle = `rgb(${b}, ${Math.min(255, b + 8)}, ${Math.min(255, b + 16)})`;
+                                else if (effectiveTheme === 'city') mCtx.fillStyle = `rgb(${Math.floor(b * 0.45)}, ${Math.floor(b * 0.48)}, ${Math.floor(b * 0.52)})`;
+                                else mCtx.fillStyle = `rgb(${b}, ${Math.floor(b * 0.84)}, ${Math.floor(b * 0.58)})`;
+                            }
+                            mCtx.fillRect(px, py, 2, 2);
+                        }
+                    }
+                }
+                window._minimapTerrainCanvas = miniCanvas;
+            }
         }
 
         // --- THEMATIC 3D ENVIRONMENT PROPS ---
@@ -774,8 +816,14 @@
 
                 // Do not spawn in water
                 if (y < currentWaterLevel + 0.4 && theme !== 'city') continue;
-                // Leave base centers clear
+                // Leave base centers and spawn points clear
                 if (Math.hypot(x, z) < 45) continue;
+                if (typeof getSpawnPointsForMap === 'function') {
+                    const mapSpawns = getSpawnPointsForMap(mapSize, currentMapType, activeCustomMap);
+                    if (mapSpawns && mapSpawns.some(sp => Math.hypot(x - sp.x, z - sp.z) < 48)) continue;
+                }
+                const offMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType];
+                if (offMap && offMap.supplies && offMap.supplies.some(s => Math.hypot(x - s.nx * mapSize, z - s.nz * mapSize) < 28)) continue;
                 // Avoid blocking bridges
                 if (mapBridges.some(br => Math.hypot(x - br.position.x, z - br.position.z) < br.width + 6)) continue;
 
@@ -921,6 +969,15 @@
                 rotationY: rotationY,
                 deckY: y + 0.45
             });
+            // Flatten & elevate both bridge approaches above water so AI & player units never stall on banks
+            if (typeof registerFlattenedFootprint === 'function' && currentWaterLevel > -100) {
+                const halfL = length * 0.48;
+                const dx = Math.sin(rotationY) * halfL;
+                const dz = Math.cos(rotationY) * halfL;
+                const rampY = Math.max(y + 0.2, currentWaterLevel + 0.85);
+                registerFlattenedFootprint(x + dx, z + dz, width * 0.75, rampY);
+                registerFlattenedFootprint(x - dx, z - dz, width * 0.75, rampY);
+            }
         }
 
         function isPointOnBridge(x, z, bridge) {
@@ -1121,6 +1178,31 @@
                     const pos = new THREE.Vector3(s.x, y, s.z);
                     spawnSingleSupplyDockAt(pos, s.amount || 30000);
                 });
+                return;
+            }
+
+            const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType];
+            if (officialMap && officialMap.supplies && officialMap.supplies.length > 0) {
+                officialMap.supplies.forEach(s => {
+                    const sx = Math.round(s.nx * mapSize);
+                    const sz = Math.round(s.nz * mapSize);
+                    const y = getTerrainHeight(sx, sz);
+                    const pos = new THREE.Vector3(sx, y, sz);
+                    spawnSingleSupplyDockAt(pos, s.amount || 30000);
+                });
+                // Also ensure each spawn point has a reachable nearby supply dock within ~210 units
+                if (typeof getSpawnPointsForMap === 'function') {
+                    const spawns = getSpawnPointsForMap(mapSize, currentMapType, null);
+                    spawns.forEach(sp => {
+                        const hasNear = supplyPoints.some(d => Math.hypot(d.position.x - sp.x, d.position.z - sp.z) < 240);
+                        if (!hasNear) {
+                            const sx = Math.round(sp.x * 0.78);
+                            const sz = Math.round(sp.z * 0.78);
+                            const y = getTerrainHeight(sx, sz);
+                            spawnSingleSupplyDockAt(new THREE.Vector3(sx, y, sz), 30000);
+                        }
+                    });
+                }
                 return;
             }
 

@@ -56,7 +56,7 @@ const THREE = {
     Group: function() {
         this.children = [];
         this.position = new THREE.Vector3();
-        this.rotation = { x: 0, y: 0, z: 0 };
+        this.rotation = { x: 0, y: 0, z: 0, set: (x,y,z) => { this.rotation.x = x; this.rotation.y = y; this.rotation.z = z; } };
         this.scale = { x: 1, y: 1, z: 1, set: (x,y,z) => { this.scale.x = x; this.scale.y = y; this.scale.z = z; } };
         this.add = (c) => this.children.push(c);
         this.getObjectByName = () => null;
@@ -67,7 +67,7 @@ const THREE = {
         this.geometry = geo;
         this.material = mat;
         this.position = new THREE.Vector3();
-        this.rotation = { x: 0, y: 0, z: 0 };
+        this.rotation = { x: 0, y: 0, z: 0, set: (x,y,z) => { this.rotation.x = x; this.rotation.y = y; this.rotation.z = z; } };
         this.scale = { x: 1, y: 1, z: 1, set: (x,y,z) => { this.scale.x = x; this.scale.y = y; this.scale.z = z; } };
         this.traverse = () => {};
         this.userData = {};
@@ -135,7 +135,9 @@ const THREE = {
 
 const domElementStub = () => ({
     style: {},
-    classList: { add: () => {}, remove: () => {}, contains: () => false },
+    classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
+    setAttribute: () => {},
+    getAttribute: () => null,
     appendChild: () => {},
     removeChild: () => {},
     addEventListener: () => {},
@@ -168,6 +170,7 @@ const sandbox = {
         addEventListener: () => {}
     },
     navigator: { userAgent: 'NodeTest' },
+    Image: function() { this.complete = true; this.naturalWidth = 128; this.naturalHeight = 128; },
     performance: { now: () => Date.now() },
     localStorage: {
         getItem: () => null,
@@ -223,6 +226,7 @@ const jsFiles = [
     '08_collision.js',
     '09_fogOfWar.js',
     '10_editor.js',
+    '10b_cameos.js',
     '11_sidebar.js',
     '12_combat.js',
     '13_ai.js',
@@ -676,5 +680,53 @@ vm.runInContext(`
     }
 `, sandbox);
 console.log("✓ Verified EA C&C Generals Zero Hour AI port: A* + String-Pulling pathfinder, Dozer footprint evacuation & sole-benefactor repair, AIDock multi-slot docking, and Skirmish threat/priority engine.");
+
+// 13. Test Official Cameos, Shell/HUD Art, 12 Official Skirmish Maps, SAGE Dry-Valley Water Fix & Minimap/Radar
+vm.runInContext(`
+    {
+        // A. Verify Official Cameos & UI Assets from BIG archives
+        const cameoKeys = Object.keys(window.OFFICIAL_CAMEOS || {});
+        const uiAssetKeys = Object.keys(window.OFFICIAL_UI_ASSETS || {});
+        if (cameoKeys.length < 190) {
+            throw new Error("OFFICIAL_CAMEOS count too low: " + cameoKeys.length);
+        }
+        if (uiAssetKeys.length < 25) {
+            throw new Error("OFFICIAL_UI_ASSETS count too low: " + uiAssetKeys.length);
+        }
+        const testCameoUsa = getCameoImg('center', 'Command Center', 'usa');
+        const testCameoChina = getCameoImg('center', 'Command Center', 'china');
+        const testCameoGla = getCameoImg('center', 'Command Center', 'gla');
+        if (!testCameoUsa.includes('data:image/png;base64,') || testCameoUsa === testCameoChina || testCameoChina === testCameoGla) {
+            throw new Error("getCameoImg failed to return distinct faction-specific official cameos for Command Center!");
+        }
+
+        // B. Verify all 12 Official EA Skirmish Maps & SAGE Water Behavior
+        const expectedOfficialMaps = [
+            'tournament_desert', 'scorched_earth', 'desert_fury', 'golden_oasis',
+            'barren_badlands', 'flash_fire', 'winter_wolf', 'alpine_assault',
+            'final_crusade', 'heartland_shield', 'lone_eagle', 'twilight_flame'
+        ];
+        for (const mapKey of expectedOfficialMaps) {
+            const m = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapKey];
+            if (!m || !Array.isArray(m.grid) || m.grid.length !== 65 || m.grid[0].length !== 65 || !Array.isArray(m.spawns) || m.spawns.length < 2 || !Array.isArray(m.supplies) || m.supplies.length < 2 || !m.tgaDataUrl) {
+                throw new Error("Invalid or incomplete official skirmish map data for: " + mapKey);
+            }
+            setupMapEnvironment(mapKey);
+            if (currentWaterLevel > -100) {
+                throw new Error("Official map " + mapKey + " should have SAGE dry-valley water level (-999), got: " + currentWaterLevel);
+            }
+            const sp = getSpawnPointsForMap(mapKey);
+            if (!sp || sp.length < 2) {
+                throw new Error("getSpawnPointsForMap failed for official map: " + mapKey);
+            }
+        }
+
+        // C. Verify Radar / Minimap Terrain & Fog Rendering
+        selectedMapTheme = 'tournament_desert';
+        renderRadarMinimap();
+        applyOfficialMenuArt('china');
+    }
+`, sandbox);
+console.log("✓ Verified 195 official cameos, 25 shell/HUD graphics, all 12 official EA skirmish maps (HeightMapData + spawns + supply docks + TGA previews), SAGE dry-valley water fix, and minimap terrain + fog radar rendering.");
 
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

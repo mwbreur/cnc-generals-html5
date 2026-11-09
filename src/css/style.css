@@ -2023,3 +2023,90 @@ body {
     image-rendering: crisp-edges;
     border-radius: 2px;
 }
+
+/* Official Retail Shell, Menu, Faction Crest & HUD Art */
+.menu-header-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.menu-skirmish-emblem {
+    width: 64px;
+    height: 52px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85));
+}
+.menu-header-titles {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.menu-ruler-img {
+    width: 100%;
+    max-width: 420px;
+    height: 10px;
+    object-fit: fill;
+}
+.menu-faction-crest {
+    width: 58px;
+    height: 58px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.9));
+}
+.faction-card {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+}
+.fc-crest-img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.85));
+}
+.fc-card-text {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+.hud-faction-emblem {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+.cb-general-btn-img {
+    width: 22px;
+    height: 18px;
+    object-fit: contain;
+    margin-right: 4px;
+}
+.end-game-official-banner {
+    width: 100%;
+    max-width: 360px;
+    max-height: 120px;
+    object-fit: contain;
+    margin: 0 auto 8px auto;
+    display: block;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 215, 0, 0.35);
+}
+.end-game-rank-badge {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    margin: 0 auto 6px auto;
+    display: block;
+}
+.gp-cameo-img {
+    width: 34px;
+    height: 28px;
+    object-fit: cover;
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}

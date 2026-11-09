@@ -547,6 +547,10 @@
             const mpSelect = document.getElementById('multiplayer-slot-0-faction') || document.getElementById('mp-slot-0-faction');
             if (mpSelect) mpSelect.value = faction;
 
+            if (typeof applyOfficialMenuArt === 'function') {
+                applyOfficialMenuArt(faction);
+            }
+
             if (typeof syncMpLobbyToPeer === 'function') {
                 syncMpLobbyToPeer();
             }
@@ -990,6 +994,17 @@
                 return customMap.spawnPoints;
             }
 
+            const sz = mapSize || 1500;
+            const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType];
+            if (officialMap && officialMap.spawns && officialMap.spawns.length > 0) {
+                return officialMap.spawns.map((s, idx) => ({
+                    id: s.id || (idx + 1),
+                    name: `Spawn ${s.id || (idx + 1)} (${officialMap.name})`,
+                    x: Math.round(s.nx * sz),
+                    z: Math.round(s.nz * sz)
+                }));
+            }
+
             if (mapType === 'tournament_desert') {
                 return [
                     { id: 1, name: 'Spawn 1 (South Plateau)', x: 0, z: -580 },
@@ -1045,7 +1060,41 @@
             ctx.clearRect(0, 0, w, h);
 
             // 1. Draw Terrain Background
-            if (activeCustomMap && mapType && mapType.startsWith('custom_')) {
+            const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType];
+            if (officialMap) {
+                const offImg = window._officialMapImages && window._officialMapImages[mapType];
+                if (offImg && offImg.complete && offImg.naturalWidth > 0) {
+                    ctx.drawImage(offImg, 0, 0, w, h);
+                } else {
+                    if (offImg) {
+                        offImg.addEventListener('load', () => renderMapPreview(canvasId, mapType, mapSize, slots, interactive), { once: true });
+                    }
+                    const grid = officialMap.grid || [];
+                    const res = grid.length || 65;
+                    const cellW = w / res, cellH = h / res;
+                    for (let r = 0; r < res; r++) {
+                        for (let c = 0; c < res; c++) {
+                            const val = (grid[r] && grid[r][c] !== undefined) ? grid[r][c] : 0;
+                            const b = Math.min(245, Math.max(60, Math.floor(145 + val * 8)));
+                            ctx.fillStyle = officialMap.theme === 'snow' ? `rgb(${b}, ${Math.min(255, b + 8)}, ${Math.min(255, b + 16)})` :
+                                            officialMap.theme === 'jungle' ? `rgb(${Math.floor(b * 0.45)}, ${Math.floor(b * 0.78)}, ${Math.floor(b * 0.36)})` :
+                                            `rgb(${b}, ${Math.floor(b * 0.84)}, ${Math.floor(b * 0.58)})`;
+                            ctx.fillRect(c * cellW, r * cellH, cellW + 1, cellH + 1);
+                        }
+                    }
+                }
+                // Draw Supply Docks on Official Map Preview
+                if (officialMap.supplies) {
+                    officialMap.supplies.forEach(s => {
+                        const sx = (s.nx + 0.5) * w;
+                        const sy = (s.nz + 0.5) * h;
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                        ctx.fillRect(sx - 4, sy - 4, 8, 8);
+                        ctx.fillStyle = '#2ecc71';
+                        ctx.fillRect(sx - 3, sy - 3, 6, 6);
+                    });
+                }
+            } else if (activeCustomMap && mapType && mapType.startsWith('custom_')) {
                 const res = 32;
                 const grid = activeCustomMap.heightGrid || [];
                 const cellW = w / res;

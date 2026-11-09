@@ -139,18 +139,32 @@ function renderRadarMinimap() {
         return;
     }
 
-    // Clear radar background
+    // 1. Draw Actual Top-Down Map Terrain Base Layer (Authentic C&C Generals Radar Minimap!)
     ctx.fillStyle = '#061009';
     ctx.fillRect(0, 0, w, h);
 
-    // Radar grid rings & crosshairs
-    ctx.strokeStyle = 'rgba(0, 255, 180, 0.14)';
+    const mapKey = (typeof currentMapType !== 'undefined' && currentMapType === 'desert') ? 'tournament_desert' : (typeof currentMapType !== 'undefined' ? currentMapType : 'tournament_desert');
+    const offImg = window._officialMapImages && window._officialMapImages[mapKey];
+    if (offImg && offImg.complete && offImg.naturalWidth > 0) {
+        ctx.drawImage(offImg, 0, 0, w, h);
+    } else if (window._minimapTerrainCanvas) {
+        ctx.drawImage(window._minimapTerrainCanvas, 0, 0, w, h);
+    }
+
+    // 2. Composite Fog of War Shroud over Terrain (explored terrain visible, unexplored shrouded)
+    if (typeof fogCanvas !== 'undefined' && fogCanvas) {
+        ctx.save();
+        ctx.globalAlpha = 0.72;
+        ctx.drawImage(fogCanvas, 0, 0, w, h);
+        ctx.restore();
+    }
+
+    // Subtle tactical grid overlay
+    ctx.strokeStyle = 'rgba(0, 255, 180, 0.12)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(w/2, h/2, w * 0.44, 0, Math.PI * 2);
-    ctx.arc(w/2, h/2, w * 0.28, 0, Math.PI * 2);
-    ctx.moveTo(w/2, 4); ctx.lineTo(w/2, h - 4);
-    ctx.moveTo(4, h/2); ctx.lineTo(w - 4, h/2);
+    ctx.moveTo(w/2, 2); ctx.lineTo(w/2, h - 2);
+    ctx.moveTo(2, h/2); ctx.lineTo(w - 2, h/2);
     ctx.stroke();
 
     // Transform world coord to radar canvas coord
@@ -159,23 +173,31 @@ function renderRadarMinimap() {
 
     // Draw bridges
     if (mapBridges && mapBridges.length > 0) {
-        ctx.strokeStyle = '#636e72';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#95a5a6';
+        ctx.lineWidth = 2.5;
         mapBridges.forEach(b => {
-            ctx.beginPath();
-            ctx.moveTo(toRX(b.x1), toRZ(b.z1));
-            ctx.lineTo(toRX(b.x2), toRZ(b.z2));
-            ctx.stroke();
+            if (b.position) {
+                const bx = toRX(b.position.x);
+                const bz = toRZ(b.position.z);
+                ctx.strokeRect(bx - 3, bz - 3, 6, 6);
+            } else if (b.x1 !== undefined) {
+                ctx.beginPath();
+                ctx.moveTo(toRX(b.x1), toRZ(b.z1));
+                ctx.lineTo(toRX(b.x2), toRZ(b.z2));
+                ctx.stroke();
+            }
         });
     }
 
-    // Draw Supply Docks (Gold Diamonds)
+    // Draw Supply Docks (High-visibility Gold/Green Crates)
     if (supplyPoints && supplyPoints.length > 0) {
-        ctx.fillStyle = '#f1c40f';
         supplyPoints.forEach(sp => {
             if (sp.stock > 0) {
                 const rx = toRX(sp.position.x);
                 const rz = toRZ(sp.position.z);
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(rx - 3, rz - 3, 6, 6);
+                ctx.fillStyle = '#f1c40f';
                 ctx.fillRect(rx - 2, rz - 2, 4, 4);
             }
         });
@@ -512,8 +534,73 @@ function purchaseNukeCannonUpgrade(cost) {
 }
 
 // 2. THE UPGRADED C&C GENERALS COMMAND BAR UPDATE LOOP
+function applyOfficialMenuArt(facOverride) {
+    const ui = window.OFFICIAL_UI_ASSETS;
+    if (!ui || typeof document === 'undefined') return;
+    const fac = facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+
+    const startCard = document.getElementById('start-card');
+    if (startCard && ui.mainMenuBackdrop) {
+        startCard.style.backgroundImage = `linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%), url("${ui.mainMenuBackdrop}")`;
+        startCard.style.backgroundSize = 'cover';
+        startCard.style.backgroundPosition = 'center';
+    }
+
+    const setImg = (id, src) => {
+        const el = document.getElementById(id);
+        if (el && src) {
+            if (el.src !== src) el.src = src;
+            el.style.display = '';
+        }
+    };
+    setImg('menu-skirmish-emblem', ui.skirmishEmblem);
+    setImg('menu-ruler-img', ui.mainMenuRuler);
+    setImg('menu-faction-crest', ui['logo_' + fac] || ui.logo_usa);
+    setImg('fc-logo-usa', ui.logo_usa);
+    setImg('fc-logo-china', ui.logo_china);
+    setImg('fc-logo-gla', ui.logo_gla);
+    setImg('hud-faction-emblem', ui['hud_logo_' + fac] || ui['mini_logo_' + fac]);
+    setImg('cb-general-btn-img', ui['gen_btn_' + fac] || ui.gen_btn_usa);
+    setImg('victory-banner-img', ui.banner_victory);
+    setImg('victory-rank-badge', ui['rank_general_' + fac] || ui.rank_general_usa);
+    setImg('defeat-banner-img', ui.banner_defeat);
+
+    // Update General Powers Bar cameos according to active faction
+    const gpBar = document.getElementById('general-powers-bar');
+    if (gpBar && window.OFFICIAL_CAMEOS) {
+        const gpSpec = fac === 'china'
+            ? [
+                { id: 'gp-spy-satellite', power: 'artilleryBarrage', cameo: 'artilleryBarrage', label: 'BARRAGE', title: 'Red Army 152mm Artillery Barrage' },
+                { id: 'gp-a10-strike', power: 'a10Strike', cameo: 'carpetBomb', label: 'BOMBERS', title: 'PLA Tactical Bomber Strike' }
+              ]
+            : fac === 'gla'
+            ? [
+                { id: 'gp-spy-satellite', power: 'rebelAmbush', cameo: 'rebelAmbush', label: 'AMBUSH', title: 'GLA Rebel Ambush Cell' },
+                { id: 'gp-a10-strike', power: 'artilleryBarrage', cameo: 'anthraxBomb', label: 'BOMBARD', title: 'GLA Rocket Bombardment' }
+              ]
+            : [
+                { id: 'gp-spy-satellite', power: 'spySatellite', cameo: 'spySatellite', label: 'SATELLITE', title: 'USA Spy Satellite Scan' },
+                { id: 'gp-a10-strike', power: 'a10Strike', cameo: 'a10Strike', label: 'A-10 CAS', title: 'A-10 Thunderbolt CAS Strike' }
+              ];
+        gpSpec.forEach(g => {
+            const btn = document.getElementById(g.id);
+            const cSrc = window.OFFICIAL_CAMEOS[g.cameo];
+            if (btn && cSrc) {
+                btn.title = g.title;
+                btn.setAttribute('onclick', `activateGeneralsPower('${g.power}')`);
+                btn.innerHTML = `<img src="${cSrc}" class="gp-cameo-img" alt="${g.label}" /><span class="gp-label">${g.label}</span>`;
+            }
+        });
+    }
+}
+window.applyOfficialMenuArt = applyOfficialMenuArt;
+if (typeof window !== 'undefined') {
+    setTimeout(() => applyOfficialMenuArt(), 0);
+}
+
 function updateSidebar() {
     if (!radarCanvas) initRadarMinimap();
+    applyOfficialMenuArt(selectedFaction);
 
     // Faction Themes applied to top HUD and bottom command bar
     const topBar = document.getElementById('top-hud-bar');
@@ -648,10 +735,12 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             }
         }
 
+        const unitCameoHtml = getCameoImg(u.type, spec.name, selectedFaction) || `<div class="inspector-avatar-icon">${uIcon}</div>`;
+
         inspector.innerHTML = `
             <div class="inspector-card">
                 <div class="inspector-avatar-box">
-                    <div class="inspector-avatar-icon">${uIcon}</div>
+                    ${unitCameoHtml}
                     <div class="inspector-rank-badge ${rankClass}">${rankTitle}</div>
                 </div>
                 <div class="inspector-info-pane">
@@ -752,13 +841,16 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
         const hpPct = Math.max(0, Math.min(100, Math.round((totalHP / maxHP) * 100)));
         const totalKills = selectedUnits.reduce((a, u) => a + (u.kills || 0), 0);
 
-        // Watermark SVG based on faction
+        // Official Faction Watermark from WindowZH.big / SCLogosUserInterface512 (or fallback SVG)
+        const officialWatermarkSrc = window.OFFICIAL_UI_ASSETS && window.OFFICIAL_UI_ASSETS['watermark_' + selectedFaction];
         const watermarkSVGs = {
             usa: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><path d="M50 15 L62 38 L88 38 L68 54 L75 80 L50 64 L25 80 L32 54 L12 38 L38 38 Z" fill="rgba(0,255,204,0.14)"/></svg>`,
             china: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><polygon points="50,15 62,38 88,38 68,54 75,80 50,64 25,80 32,54 12,38 38,38" fill="rgba(255,71,87,0.14)"/></svg>`,
             gla: `<svg viewBox="0 0 100 100" class="cb-watermark-svg"><path d="M25 75 Q50 20 75 75 Z" fill="rgba(255,165,2,0.14)"/></svg>`
         };
-        const watermark = watermarkSVGs[selectedFaction] || watermarkSVGs.usa;
+        const watermark = officialWatermarkSrc
+            ? `<img src="${officialWatermarkSrc}" class="cb-watermark-svg" alt="" style="object-fit:contain;" />`
+            : (watermarkSVGs[selectedFaction] || watermarkSVGs.usa);
 
         // Render interactive unit cameo portraits (matching screenshot!)
         const unitCameosHtml = selectedUnits.slice(0, 10).map((u, idx) => {
@@ -772,7 +864,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                         <div class="cb-squad-hp-bar" style="width: ${uHpPct}%; background: ${hpColor};"></div>
                     </div>
                     <div class="cb-squad-avatar-preview">
-                        ${getCameoSVG(u.type, selectedFaction, u.type)}
+                        ${getCameoImg(u.type, u.type, selectedFaction) || getCameoSVG(u.type, selectedFaction, u.type)}
                     </div>
                     ${rankStars ? `<span class="cb-squad-rank-stars">${rankStars}</span>` : ''}
                     <span class="cb-squad-tag">${initials}</span>
@@ -881,10 +973,16 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         `;
     }
 
+    const structCameoHtml = getCameoImg(structure.type, title, selectedFaction) || getCameoSVG(structure.type, selectedFaction, title);
+
     inspector.innerHTML = `
         <div class="cb-inspector-pane">
             ${queueHtml}
             <div class="inspector-card">
+                <div class="inspector-avatar-box">
+                    ${structCameoHtml}
+                    <div class="inspector-rank-badge rank-regular">${selectedFaction.toUpperCase()}</div>
+                </div>
                 <div class="inspector-info-pane" style="width: 100%;">
                     <div class="inspector-header-row">
                         <span class="inspector-title">${title}</span>
@@ -1118,11 +1216,15 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
         gla: { icon: '⚔️', title: 'GLOBAL LIBERATION ARMY', sub: 'GUERRILLA CELL & CHEMICAL WARFARE' }
     };
     const crest = factionCrests[selectedFaction] || factionCrests.usa;
+    const officialCrestImg = window.OFFICIAL_UI_ASSETS && window.OFFICIAL_UI_ASSETS['logo_' + selectedFaction];
+    const crestVisual = officialCrestImg
+        ? `<img src="${officialCrestImg}" alt="${selectedFaction}" style="width:42px;height:42px;object-fit:contain;" />`
+        : crest.icon;
 
     inspector.innerHTML = `
         <div class="inspector-idle-box">
             <div class="inspector-idle-crest">
-                <div class="crest-icon">${crest.icon}</div>
+                <div class="crest-icon">${crestVisual}</div>
                 <div>
                     <div class="crest-heading">${crest.title}</div>
                     <div class="crest-sub">${crest.sub}</div>
@@ -1712,16 +1814,19 @@ function getCameoSVG(id, faction = 'usa', name = '') {
     `);
 }
 
-function getCameoImg(id, name) {
-    const rawKey = (id || name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function getCameoImg(id, name, faction) {
+    const fac = (faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa')).toLowerCase();
+    const rawKey = (id || name || '').toLowerCase().replace(/[^a-z0-9_]/g, '');
     const cameoMap = {
+        // USA Units & Buildings
         'crusader': 'crusader',
-        'tank': 'crusader',
+        'tank': fac === 'china' ? 'battlemaster' : fac === 'gla' ? 'scorpion' : 'crusader',
         'paladin': 'paladin',
         'humvee': 'humvee',
         'ambulance': 'ambulance',
         'tomahawk': 'tomahawk',
         'dozer': 'dozer',
+        'truck': 'truck_china',
         'chinook': 'chinook',
         'comanche': 'comanche',
         'raptor': 'raptor',
@@ -1729,26 +1834,77 @@ function getCameoImg(id, name) {
         'stealth': 'stealthFighter',
         'aurora': 'aurora',
         'ranger': 'ranger',
-        'infantry': 'ranger',
+        'infantry': fac === 'china' ? 'redguard' : fac === 'gla' ? 'rebel' : 'ranger',
         'missiledefender': 'missileDefender',
-        'rocket': 'missileDefender',
+        'rocket': fac === 'china' ? 'tankhunter' : fac === 'gla' ? 'rpg' : 'missileDefender',
         'pathfinder': 'pathfinder',
         'burton': 'burton',
         'colonelburton': 'burton',
+        // China Units & Buildings
+        'battlemaster': 'battlemaster',
+        'overlord': 'overlord',
+        'gatling': 'gatling',
+        'gatlingtank': 'gatling',
+        'dragon': 'dragon',
+        'dragontank': 'dragon',
+        'crawler': 'crawler',
+        'troopcrawler': 'crawler',
+        'inferno': 'inferno',
+        'infernocannon': 'inferno',
+        'nukecannon': 'nukecannon',
+        'nuketank': 'nukecannon',
+        'mig': 'mig',
+        'redguard': 'redguard',
+        'tankhunter': 'tankhunter',
+        'hacker': 'hacker',
+        'blacklotus': 'blacklotus',
+        // GLA Units & Buildings
+        'worker': 'worker',
+        'technical': 'technical',
+        'scorpion': 'scorpion',
+        'marauder': 'marauder',
+        'buggy': 'buggy',
+        'rocketbuggy': 'buggy',
+        'quad': 'quad',
+        'quadcannon': 'quad',
+        'toxintractor': 'toxintractor',
+        'bombtruck': 'bombtruck',
+        'scud': 'scud',
+        'scudlauncher': 'scud',
+        'radarvan': 'radarvan',
+        'rebel': 'rebel',
+        'rpg': 'rpg',
+        'rpgtrooper': 'rpg',
+        'terrorist': 'terrorist',
+        'mob': 'mob',
+        'angrymob': 'mob',
+        'hijacker': 'hijacker',
+        'jarmen': 'jarmen',
+        'jarmenkell': 'jarmen',
+        // Vehicle Drones & Overlord Towers
         'battle_drone': 'drone_battle',
         'battledrone': 'drone_battle',
         'scout_drone': 'drone_scout',
         'scoutdrone': 'drone_scout',
         'hellfire': 'drone_hellfire',
         'hellfiredrone': 'drone_hellfire',
+        'bunkertower': 'overlord_bunker',
+        'gatlingtower': 'overlord_gatling',
+        'propaganda': 'overlord_propaganda',
+        'outriggers': 'nukecannon',
+        'neutronshells': 'neutronShells',
+        // Structures
         'center': 'commandCenter',
         'commandcenter': 'commandCenter',
         'power': 'power',
+        'nuclearreactor': 'nuclearReactor',
         'barracks': 'barracks',
         'factory': 'factory',
         'warfactory': 'factory',
+        'armsdealer': 'factory_gla',
         'supplycenter': 'supplyCenter',
         'supply': 'supplyCenter',
+        'supplystash': 'supplyStash',
         'airfield': 'airfield',
         'patriot': 'patriot',
         'strategy': 'strategyCenter',
@@ -1758,6 +1914,41 @@ function getCameoImg(id, name) {
         'supplydrop': 'supplyDrop',
         'detention': 'detentionCamp',
         'detentioncamp': 'detentionCamp',
+        'propagandacenter': 'propagandaCenter',
+        'internetcenter': 'internetCenter',
+        'bunker': 'bunker',
+        'gatlingcannon': 'gatlingCannon',
+        'speakertower': 'speakerTower',
+        'nukesilo': 'nukeSilo',
+        'palace': 'palace',
+        'blackmarket': 'blackMarket',
+        'tunnel': 'tunnel',
+        'stingersite': 'stingerSite',
+        'demotrap': 'demoTrap',
+        'scudstorm': 'scudStorm',
+        'fakecommandcenter': 'fakeCommandCenter',
+        'fakebarracks': 'fakeBarracks',
+        'fakearmsdealer': 'fakeArmsDealer',
+        // Upgrades & Stances
+        'controlrods': 'controlRods',
+        'upgradepower': 'controlRods',
+        'overcharge': 'overcharge',
+        'mines': 'mines',
+        'neutronmines': 'neutronMines',
+        'camonetting': 'camoNetting',
+        'upgradetoreal': 'upgradeToReal',
+        'bombardment': 'bombardment',
+        'bombard': 'bombardment',
+        'holdtheline': 'holdTheLine',
+        'hold': 'holdTheLine',
+        'searchdestroy': 'searchAndDestroy',
+        'search': 'searchAndDestroy',
+        'spydrone': 'spyDrone',
+        'radarvanscan': 'radarVanScan',
+        'emppulse': 'empPulse',
+        'sneakattack': 'sneakAttack',
+        'superweapon': 'superweapon',
+        // Tech Buildings & Commands
         'tech_oilderrick': 'tech_oilDerrick',
         'oilderrick': 'tech_oilDerrick',
         'tech_supplydock': 'tech_supplyDock',
@@ -1765,24 +1956,32 @@ function getCameoImg(id, name) {
         'stop': 'stop',
         'guard': 'guard',
         'scatter': 'scatter',
+        'move': 'move',
+        'harvest': 'supplyCenter',
         'repair': 'repair',
         'repairmode': 'repair',
         'sell': 'sell',
         'sellmode': 'sell',
         'rally': 'rally',
+        'setrally': 'rally',
         'attack': 'attack',
         'builders': 'builders',
         'beacon': 'beacon',
         'pingmap': 'beacon',
         'recenter': 'commandCenter',
         'recenterbase': 'commandCenter',
-        'allcombat': 'crusader',
-        'harvesters': 'chinook',
-        'selecttrucks': 'chinook'
+        'allcombat': fac === 'china' ? 'battlemaster' : fac === 'gla' ? 'scorpion' : 'crusader',
+        'harvesters': fac === 'china' ? 'truck_china' : fac === 'gla' ? 'worker' : 'chinook',
+        'selecttrucks': fac === 'china' ? 'truck_china' : fac === 'gla' ? 'worker' : 'chinook',
+        'dispatchall': 'tech_supplyDock'
     };
-    const resolved = cameoMap[rawKey] || rawKey;
-    if (window.OFFICIAL_CAMEOS && window.OFFICIAL_CAMEOS[resolved]) {
-        return `<img src="${window.OFFICIAL_CAMEOS[resolved]}" class="slot-cameo-img" alt="${name || id}" />`;
+    const resolved = cameoMap[rawKey] || id || rawKey;
+    if (window.OFFICIAL_CAMEOS) {
+        const facKey = `${resolved}_${fac}`;
+        const src = window.OFFICIAL_CAMEOS[facKey] || window.OFFICIAL_CAMEOS[resolved] || window.OFFICIAL_CAMEOS[rawKey];
+        if (src) {
+            return `<img src="${src}" class="slot-cameo-img" alt="${name || id}" />`;
+        }
     }
     return null;
 }
@@ -1808,7 +2007,7 @@ function renderCommandGrid(container, slots) {
             const badgeStr = s.badge || '';
             const idStr = s.id || s.name || '';
             const disabledAttr = s.disabled ? 'disabled' : '';
-            const cameoSvg = getCameoImg(s.id, s.name) || getCameoSVG(s.id, selectedFaction, s.name);
+            const cameoSvg = getCameoImg(s.id, s.name, selectedFaction) || getCameoSVG(s.id, selectedFaction, s.name);
             const cleanBadge = isRally ? 'RALLY' : isSell ? 'SELL' : badgeStr;
 
             html += `<button class="grid-slot-btn ${specialClass}" onclick="handleGridSlotClick(${i})" onmouseenter="showTacticalTooltip(event, '${idStr}')" onmouseleave="hideTacticalTooltip()" ${disabledAttr}>
@@ -3201,6 +3400,7 @@ function executeGeneralsPowerAt(pos) {
 }
 
 function showVictoryBanner() {
+    applyOfficialMenuArt(selectedFaction);
     const vModal = document.getElementById('victory-modal');
     if (!vModal) return;
     vModal.style.display = 'flex';
@@ -3223,6 +3423,7 @@ function showVictoryBanner() {
 }
 
 function showDefeatBanner() {
+    applyOfficialMenuArt(selectedFaction);
     const dModal = document.getElementById('defeat-modal');
     if (!dModal) return;
     dModal.style.display = 'flex';
