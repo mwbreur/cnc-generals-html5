@@ -1,5 +1,7 @@
+let _combatScanTick = 0;
 function processCombatScanning() {
-			units.forEach(unit => {
+            _combatScanTick++;
+			units.forEach((unit, ui) => {
                 if (unit.garrisonedIn) return;
 				// Manage weapon assembly cooldown timers
 				if (unit.attackCooldown > 0) unit.attackCooldown = Math.max(0, unit.attackCooldown - combatDeltaScale);
@@ -15,7 +17,7 @@ function processCombatScanning() {
                         unit.combatTarget = null; // Target lost or destroyed
                     } else {
                         // Point Turret systems directly at target coordinates
-                        const turret = unit.mesh.getObjectByName("turretSystem");
+                        const turret = getCachedNode(unit.mesh, "turretSystem");
                         if (turret && turret.parent && targetPos) {
                             const localTarget = turret.parent.worldToLocal(targetPos.clone());
                             turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);
@@ -32,10 +34,12 @@ function processCombatScanning() {
                     if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
                     if (unit.overlordGatCooldown > 0) unit.overlordGatCooldown = Math.max(0, unit.overlordGatCooldown - combatDeltaScale);
                     if (unit.overlordGatCooldown === 0) {
-                        const hostiles = (typeof enemyUnits !== 'undefined' ? enemyUnits : []).filter(e => e.health > 0 && e.mesh && !isFriendly(unit, e));
+                        const hostiles = (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
                         let bestTarget = null;
                         let bestScore = -Infinity;
-                        hostiles.forEach(h => {
+                        for (let hi = 0; hi < hostiles.length; hi++) {
+                            const h = hostiles[hi];
+                            if (h.health <= 0 || !h.mesh || isFriendly(unit, h)) continue;
                             const d = unit.mesh.position.distanceTo(h.mesh.position);
                             if (d <= 28) {
                                 let score = 100 - d;
@@ -43,14 +47,14 @@ function processCombatScanning() {
                                 if (getArmorCategory(h) === 'infantry') score += 30;
                                 if (score > bestScore) { bestScore = score; bestTarget = h; }
                             }
-                        });
+                        }
                         if (bestTarget) {
                             unit.overlordGatCooldown = 18; // ~0.3s rapid fire!
-                            const upgMesh = unit.overlordUpgradeMesh || unit.mesh.getObjectByName("overlordUpgrade");
+                            const upgMesh = unit.overlordUpgradeMesh || getCachedNode(unit.mesh, "overlordUpgrade");
                             const muzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
                             const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
                             tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
-                            const barrels = unit.mesh.getObjectByName("gatlingBarrels") || (upgMesh && upgMesh.getObjectByName("gatlingBarrels"));
+                            const barrels = getCachedNode(unit.mesh, "gatlingBarrels") || (upgMesh && getCachedNode(upgMesh, "gatlingBarrels"));
                             if (barrels) barrels.rotation.z += 1.6;
                             spawnMuzzleFlash(muzzle, 0xffa502, 0.4);
                             spawnBulletTracer(muzzle, tPos, 0xf1c40f, 2.8);
@@ -66,35 +70,40 @@ function processCombatScanning() {
                 }
 
                 // Auto-Scan fallback loop if completely idle (Only engage hostile targets!)
-                if (!unit.combatTarget && unit.type !== 'chinook' && unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'dozer') {
+                // PERF: staggered every 4 frames per unit and uses squared distance to avoid Math.sqrt per enemy
+                if (!unit.combatTarget && ((_combatScanTick + ui) % 4 === 0) && unit.type !== 'chinook' && unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'dozer') {
                     if (!(unit.isAir && unit.taskState === 'Moving')) {
-                    // 1. Scan for nearest hostile units (Skip friendly allies!)
-                    if (enemyUnits.length > 0) {
-                        for (let enemy of enemyUnits) {
+                        const uPos = unit.mesh.position;
+                        const scanR2 = unit.scanRange * unit.scanRange;
+                        // 1. Scan for nearest hostile units (Skip friendly allies!)
+                        for (let ei = 0; ei < enemyUnits.length; ei++) {
+                            const enemy = enemyUnits[ei];
                             if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
-                                const dist = unit.mesh.position.distanceTo(enemy.mesh.position);
-                                if (dist <= unit.scanRange) {
+                                const ep = enemy.mesh.position;
+                                const dx = uPos.x - ep.x, dy = uPos.y - ep.y, dz = uPos.z - ep.z;
+                                if (dx * dx + dy * dy + dz * dz <= scanR2) {
                                     unit.combatTarget = enemy;
                                     if (unit.isAir) unit.airState = 'attacking';
                                     break;
                                 }
                             }
                         }
-                    }
-                    // 2. If no hostile units in range, auto-target nearest hostile structures
-                    if (!unit.combatTarget && enemyStructures.length > 0) {
-                        for (let struct of enemyStructures) {
-                            if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
-                                const sPos = struct.position || struct.mesh.position;
-                                const dist = unit.mesh.position.distanceTo(sPos);
-                                if (dist <= (unit.scanRange + (struct.radius || 6))) {
-                                    unit.combatTarget = struct;
-                                    if (unit.isAir) unit.airState = 'attacking';
-                                    break;
+                        // 2. If no hostile units in range, auto-target nearest hostile structures
+                        if (!unit.combatTarget && enemyStructures.length > 0) {
+                            for (let si = 0; si < enemyStructures.length; si++) {
+                                const struct = enemyStructures[si];
+                                if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
+                                    const sPos = struct.position || struct.mesh.position;
+                                    const effR = unit.scanRange + (struct.radius || 6);
+                                    const dx = uPos.x - sPos.x, dy = uPos.y - sPos.y, dz = uPos.z - sPos.z;
+                                    if (dx * dx + dy * dy + dz * dz <= effR * effR) {
+                                        unit.combatTarget = struct;
+                                        if (unit.isAir) unit.airState = 'attacking';
+                                        break;
+                                    }
                                 }
                             }
                         }
-                    }
                     }
                 }
             });
@@ -167,19 +176,27 @@ const ARMOR_COEFFICIENTS = {
     }
 };
 
+const _ARMOR_BLD_TYPES = new Set(['center', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'tunnel', 'demoTrap']);
+const _ARMOR_INF_TYPES = new Set(['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker']);
+const _ARMOR_LV_TYPES = new Set(['humvee', 'technical', 'buggy', 'dragon', 'toxintractor', 'truck', 'dozer', 'quad']);
+
 function getArmorCategory(target) {
     if (!target) return 'infantry';
-    if (target.radius >= 4 || target.isBuilding || target.productionQueue || ['center', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'tunnel', 'demoTrap'].includes(target.type)) {
-        return 'building';
+    if (target._armorCat) return target._armorCat;
+    let cat;
+    if (target.radius >= 4 || target.isBuilding || target.productionQueue || _ARMOR_BLD_TYPES.has(target.type)) {
+        cat = 'building';
+    } else if (target.isAir) {
+        cat = 'aircraft';
+    } else if (_ARMOR_INF_TYPES.has(target.type)) {
+        cat = 'infantry';
+    } else if (_ARMOR_LV_TYPES.has(target.type)) {
+        cat = 'light_vehicle';
+    } else {
+        cat = 'heavy_vehicle';
     }
-    if (target.isAir) return 'aircraft';
-    if (['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker'].includes(target.type)) {
-        return 'infantry';
-    }
-    if (['humvee', 'technical', 'buggy', 'dragon', 'toxintractor', 'truck', 'dozer', 'quad'].includes(target.type)) {
-        return 'light_vehicle';
-    }
-    return 'heavy_vehicle';
+    target._armorCat = cat;
+    return cat;
 }
 
 function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR_PIERCING') {
@@ -398,7 +415,7 @@ function executeWeaponFire(attacker, target) {
     const muzzlePos = getMuzzleWorldPosition(attacker);
 
     // Spin Gatling barrels when firing
-    const gatling = attacker.mesh.getObjectByName("gatlingBarrels");
+    const gatling = getCachedNode(attacker.mesh, "gatlingBarrels");
     if (gatling) gatling.rotation.z += 1.2;
 
     // Authentic Heroic Tracers (Heroic rank units fire intense red laser tracers!)
@@ -422,9 +439,9 @@ function executeWeaponFire(attacker, target) {
 
         // Overlord Gatling Cannon Upgrade Firing!
         if (attacker.overlordUpgrade === 'gatling') {
-            const upgMesh = attacker.overlordUpgradeMesh || attacker.mesh.getObjectByName("overlordUpgrade");
+            const upgMesh = attacker.overlordUpgradeMesh || getCachedNode(attacker.mesh, "overlordUpgrade");
             const gatPos = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : muzzleL;
-            const barrels = attacker.mesh.getObjectByName("gatlingBarrels") || (upgMesh && upgMesh.getObjectByName("gatlingBarrels"));
+            const barrels = getCachedNode(attacker.mesh, "gatlingBarrels") || (upgMesh && getCachedNode(upgMesh, "gatlingBarrels"));
             if (barrels) barrels.rotation.z += 1.8;
             for (let b = 0; b < 3; b++) {
                 setTimeout(() => {

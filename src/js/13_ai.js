@@ -1214,18 +1214,25 @@ function processEnemyAIEngine() {
         }
 
         // Advanced Turret System: Locks onto active combat targets or sweeps in natural idle radar scans
+        // PERF: iterates the four lists directly (no per-frame array spread) and reuses one scratch vector
+        const _turretScratch = new THREE.Vector3();
         function updateTurretSystems() {
-            const allCombatEntities = [...units, ...enemyUnits, ...structures, ...enemyStructures];
-            allCombatEntities.forEach(unit => {
+            const lists = [units, enemyUnits, structures, enemyStructures];
+            for (let li = 0; li < lists.length; li++) {
+                const list = lists[li];
+                for (let ui = 0; ui < list.length; ui++) updateTurretFor(list[ui]);
+            }
+        }
+        function updateTurretFor(unit) {
                 if (!unit.mesh) return;
-                const turret = unit.mesh.getObjectByName("turretSystem");
+                const turret = getCachedNode(unit.mesh, "turretSystem");
                 if (!turret) return;
 
                 // 1. If actively engaged in combat, lock directly onto combat target!
                 if (unit.combatTarget && unit.combatTarget.health > 0) {
                     const tPos = unit.combatTarget.position || (unit.combatTarget.mesh ? unit.combatTarget.mesh.position : null);
                     if (tPos) {
-                        const localTarget = turret.parent.worldToLocal(tPos.clone());
+                        const localTarget = turret.parent.worldToLocal(_turretScratch.copy(tPos));
                         const desiredAngle = Math.atan2(localTarget.x, localTarget.z);
                         let diff = desiredAngle - turret.rotation.y;
                         while (diff < -Math.PI) diff += Math.PI * 2;
@@ -1246,48 +1253,71 @@ function processEnemyAIEngine() {
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
                 turret.rotation.y += diff * 0.035; // Gentle, authentic military traverse
-            });
         }
 
+        // PERF: health bars no longer rebuild 4 arrays + a Set per frame, no O(S) includes() per asset,
+        // no Vector3 allocation per bar, and DOM styles are only written when their value changes.
+        // Positioning uses transform (compositor-only) instead of left/top (layout).
+        const _hbScratch = new THREE.Vector3();
+        let _hbFrame = 0;
+        let _hbContainer = null;
         function updateHealthBars() {
-            const damagedAssets = [...units, ...enemyUnits, ...structures, ...enemyStructures]
-                .filter(asset => asset.health < asset.maxHealth && asset.health > 0 && !asset.garrisonedIn);
-            const activeAssets = new Set(damagedAssets);
+            _hbFrame++;
+            if (!_hbContainer) _hbContainer = document.getElementById('health-bars');
+            const w = window.innerWidth, h = window.innerHeight;
+            const lists = [units, enemyUnits, structures, enemyStructures];
+            for (let li = 0; li < lists.length; li++) {
+                const list = lists[li];
+                const isStructure = li >= 2;
+                for (let ai = 0; ai < list.length; ai++) {
+                    const asset = list[ai];
+                    if (!(asset.health < asset.maxHealth && asset.health > 0 && !asset.garrisonedIn)) continue;
 
+                    let bar = healthBarElements.get(asset);
+                    if (!bar) {
+                        const container = document.createElement('div');
+                        container.className = 'health-bar-container';
+                        container.style.left = '0px';
+                        container.style.top = '0px';
+                        const fill = document.createElement('div');
+                        fill.className = 'health-bar-fill';
+                        container.appendChild(fill);
+                        if (_hbContainer) _hbContainer.appendChild(container);
+                        bar = { container, fill, shown: null, tf: '', pct: -1, color: '' };
+                        healthBarElements.set(asset, bar);
+                    }
+                    bar.seen = _hbFrame;
+
+                    const position = _hbScratch.copy((asset.mesh || asset).position);
+                    position.y += isStructure ? 7 : 3.5;
+                    position.project(camera);
+                    const onScreen = position.z >= -1 && position.z <= 1 &&
+                        Math.abs(position.x) <= 1.1 && Math.abs(position.y) <= 1.1;
+                    if (bar.shown !== onScreen) {
+                        bar.container.style.display = onScreen ? 'block' : 'none';
+                        bar.shown = onScreen;
+                    }
+                    if (!onScreen) continue;
+
+                    const px = Math.round((position.x * 0.5 + 0.5) * w);
+                    const py = Math.round((-position.y * 0.5 + 0.5) * h);
+                    const tf = `translate(${px}px, ${py}px) translate(-50%, -50%)`;
+                    if (bar.tf !== tf) { bar.container.style.transform = tf; bar.tf = tf; }
+
+                    const healthRatio = Math.max(0, Math.min(1, asset.health / asset.maxHealth));
+                    const pct = Math.round(healthRatio * 100);
+                    if (bar.pct !== pct) { bar.fill.style.width = pct + '%'; bar.pct = pct; }
+                    const color = healthRatio < 0.3 ? '#ff4757' : healthRatio < 0.6 ? '#ffd166' : '#42e66b';
+                    if (bar.color !== color) { bar.fill.style.backgroundColor = color; bar.color = color; }
+                }
+            }
+
+            // Remove bars for assets that are healed, dead, garrisoned or gone
             healthBarElements.forEach((bar, asset) => {
-                if (!activeAssets.has(asset)) {
+                if (bar.seen !== _hbFrame) {
                     bar.container.remove();
                     healthBarElements.delete(asset);
                 }
-            });
-
-            damagedAssets.forEach(asset => {
-                let bar = healthBarElements.get(asset);
-                if (!bar) {
-                    const container = document.createElement('div');
-                    container.className = 'health-bar-container';
-                    const fill = document.createElement('div');
-                    fill.className = 'health-bar-fill';
-                    container.appendChild(fill);
-                    document.getElementById('health-bars').appendChild(container);
-                    bar = { container, fill };
-                    healthBarElements.set(asset, bar);
-                }
-
-                const isStructure = structures.includes(asset) || enemyStructures.includes(asset);
-                const position = (asset.mesh || asset).position.clone();
-                position.y += isStructure ? 7 : 3.5;
-                position.project(camera);
-                const onScreen = position.z >= -1 && position.z <= 1 &&
-                    Math.abs(position.x) <= 1.1 && Math.abs(position.y) <= 1.1;
-                bar.container.style.display = onScreen ? 'block' : 'none';
-                if (!onScreen) return;
-
-                bar.container.style.left = `${(position.x * 0.5 + 0.5) * window.innerWidth}px`;
-                bar.container.style.top = `${(-position.y * 0.5 + 0.5) * window.innerHeight}px`;
-                const healthRatio = Math.max(0, Math.min(1, asset.health / asset.maxHealth));
-                bar.fill.style.width = `${healthRatio * 100}%`;
-                bar.fill.style.backgroundColor = healthRatio < 0.3 ? '#ff4757' : healthRatio < 0.6 ? '#ffd166' : '#42e66b';
             });
         }
 

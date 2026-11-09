@@ -601,7 +601,7 @@
 
                     if (closestEnemy) {
                         // Point turret at target
-                        const turret = def.mesh.getObjectByName("turretSystem") || def.mesh.getObjectByName("gatlingBarrels");
+                        const turret = getCachedNode(def.mesh, "turretSystem") || getCachedNode(def.mesh, "gatlingBarrels");
                         if (turret && turret.parent) {
                             const localTarget = turret.parent.worldToLocal(closestEnemy.mesh.position.clone());
                             turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);

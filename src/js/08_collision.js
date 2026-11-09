@@ -10,6 +10,10 @@ function resolveObstacleCollisions(unit) {
     let colliderCount = 0;
     var collisionCount = 0;
 
+    // PERF: compute harvester dropoff once per call (was recomputed per structure, each doing structures.filter)
+    const isDeliveringHarvester = (unit.type === 'truck' || unit.type === 'worker') && (unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing');
+    const dropoffPos = isDeliveringHarvester ? getSupplyDropoffPosition(unit.mesh.position) : null;
+
     // 1. Structure Collisions
     for (let s of structures) {
         if (s.health <= 0) continue;
@@ -17,10 +21,7 @@ function resolveObstacleCollisions(unit) {
         if (unit.targetStructure === s && (unit.taskState === 'Building' || unit.taskState === 'MovingToBuild')) continue;
 
         // CRITICAL HARVESTER FIX: Allow trucks and workers delivering supplies to reach docking bays!
-        if ((unit.type === 'truck' || unit.type === 'worker') && (unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing')) {
-            const dropoffPos = getSupplyDropoffPosition(unit.mesh.position);
-            if (Math.hypot(s.position.x - dropoffPos.x, s.position.z - dropoffPos.z) < 1.0) continue;
-        }
+        if (dropoffPos && Math.hypot(s.position.x - dropoffPos.x, s.position.z - dropoffPos.z) < 1.0) continue;
 
         const minDist = s.radius + unit.radius;
         const dx = unit.mesh.position.x - s.position.x;

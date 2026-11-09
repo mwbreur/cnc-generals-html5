@@ -70,13 +70,21 @@
         window.registerFlattenedFootprint = registerFlattenedFootprint;
 
         function getTerrainHeight(x, z) {
+            // PERF: AABB + squared-distance reject avoids Math.hypot for distant footprints
             for (let i = 0; i < flattenedFootprints.length; i++) {
                 const fp = flattenedFootprints[i];
-                const dist = Math.hypot(x - fp.cx, z - fp.cz);
-                if (dist <= fp.radius) {
+                const r = fp.radius;
+                const outerR = r * 1.35;
+                const dx = x - fp.cx;
+                if (dx > outerR || dx < -outerR) continue;
+                const dz = z - fp.cz;
+                if (dz > outerR || dz < -outerR) continue;
+                const d2 = dx * dx + dz * dz;
+                if (d2 <= r * r) {
                     return fp.targetY;
-                } else if (dist < fp.radius * 1.35) {
-                    const t = (dist - fp.radius) / (fp.radius * 0.35);
+                } else if (d2 < outerR * outerR) {
+                    const dist = Math.sqrt(d2);
+                    const t = (dist - r) / (r * 0.35);
                     const rawH = getRawTerrainHeight(x, z);
                     return fp.targetY * (1 - t) + rawH * t;
                 }
@@ -918,11 +926,18 @@
         function isPointOnBridge(x, z, bridge) {
             const dx = x - bridge.position.x;
             const dz = z - bridge.position.z;
-            const cos = Math.cos(-bridge.rotationY);
-            const sin = Math.sin(-bridge.rotationY);
-            const lx = dx * cos - dz * sin;
-            const lz = dx * sin + dz * cos;
-            return (Math.abs(lx) <= bridge.width * 0.5 + 0.8 && Math.abs(lz) <= bridge.length * 0.5 + 1.2);
+            const halfW = bridge.width * 0.5 + 0.8;
+            const halfL = bridge.length * 0.5 + 1.2;
+            const maxHalf = halfW + halfL;
+            if (dx > maxHalf || dx < -maxHalf || dz > maxHalf || dz < -maxHalf) return false;
+            if (bridge._rotCached !== bridge.rotationY) {
+                bridge._cos = Math.cos(-bridge.rotationY);
+                bridge._sin = Math.sin(-bridge.rotationY);
+                bridge._rotCached = bridge.rotationY;
+            }
+            const lx = dx * bridge._cos - dz * bridge._sin;
+            const lz = dx * bridge._sin + dz * bridge._cos;
+            return (Math.abs(lx) <= halfW && Math.abs(lz) <= halfL);
         }
 
         // --- 3D ENVIRONMENT PROPS ---

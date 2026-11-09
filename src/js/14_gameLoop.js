@@ -38,13 +38,158 @@ function getUnoccupiedRallySlot(baseRally, unitRadius, isInf, structureFacingAng
     return baseRally.clone();
 }
 
+// =========================================================================
+// PERF: Cached named-node lookup (replaces recursive getObjectByName every frame).
+// Hits are validated by walking up the parent chain (cheap, ~5 levels) so removed
+// parts are detected; misses are re-checked at most once per second so parts that
+// are attached later (e.g. Overlord upgrades) are still found.
+// =========================================================================
+function getCachedNode(root, name) {
+    if (!root || typeof root.getObjectByName !== 'function') return null;
+    const ud = root.userData || (root.userData = {});
+    const cache = ud._nodeCache || (ud._nodeCache = {});
+    const entry = cache[name];
+    if (entry !== undefined) {
+        if (entry && typeof entry === 'object') {
+            let p = entry;
+            while (p && p !== root) p = p.parent;
+            if (p === root || !entry.parent) return entry;
+        } else if (typeof entry === 'number' && (_animNodeFrame - entry) < 60) {
+            return null;
+        }
+    }
+    const found = root.getObjectByName(name) || null;
+    cache[name] = found || _animNodeFrame;
+    return found;
+}
+window.getCachedNode = getCachedNode;
+
+// =========================================================================
+// PERF: Animated-node registry (replaces per-frame scene.traverse)
+// Each top-level scene object lazily caches the sub-nodes that need animating.
+// The cache is rebuilt when the object's direct child count changes, plus a
+// staggered full refresh every ~3 seconds to catch deep hierarchy changes.
+// kind: 1 = rotor spinning +, 2 = rotor spinning -, 3 = other named animation
+// =========================================================================
+const ANIMATED_NODE_NAMES = new Set([
+    'radarDish', 'hazardBeacon', 'fusionCore', 'nukeCore', 'pumpjackArm',
+    'particleAcceleratorRing', 'particleEmitter', 'nukeTip', 'nukeBlastDoorL',
+    'nukeBlastDoorR', 'scudGantry', 'factionFlag'
+]);
+function classifyAnimatedNode(obj) {
+    const n = obj.name;
+    if (!n) return 0;
+    const pName = obj.parent ? (obj.parent.name || '') : '';
+    if (n === "comanche_rotor" || n === "chinook_rotor1" || n.includes("avcomanche_prop") || n.includes("props01") ||
+        (n === "PROPELLER01" && (pName.includes("comanche") || pName.includes("chinook"))) ||
+        n === "ductedFan" || n === "avbattledr.fan") return 1;
+    if (n === "chinook_rotor2" || n.includes("props02") || (n === "PROPELLER02" && pName.includes("chinook"))) return 2;
+    if (ANIMATED_NODE_NAMES.has(n)) return 3;
+    return 0;
+}
+let _animNodeFrame = 0;
+function forEachAnimatedNode(cb) {
+    _animNodeFrame++;
+    if (!scene || !scene.children) return;
+    const roots = scene.children;
+    for (let r = 0; r < roots.length; r++) {
+        const root = roots[r];
+        if (!root || typeof root.traverse !== 'function') continue;
+        const childLen = root.children ? root.children.length : 0;
+        const ud = root.userData || (root.userData = {});
+        let cache = ud._animNodes;
+        if (!cache || ud._animChildCount !== childLen || ((_animNodeFrame + r) % 180 === 0)) {
+            cache = [];
+            root.traverse(obj => {
+                const kind = classifyAnimatedNode(obj);
+                if (kind) cache.push(obj, kind);
+            });
+            ud._animNodes = cache;
+            ud._animChildCount = childLen;
+        }
+        for (let i = 0; i < cache.length; i += 2) cb(cache[i], cache[i + 1]);
+    }
+}
+
+// =========================================================================
+// PERF: Ground-unit separation using a uniform spatial hash grid.
+// Only units in the same or adjacent cells are compared: ~O(N) instead of O(N^2).
+// Behaviour matches the former pairwise pass: a parked unit yields only 15%,
+// the moving unit takes 85%; parked units lock their targetPosition so they
+// don't drive back into the overlap.
+// =========================================================================
+const _sepGrid = new Map();
+function _isSepMoving(u) {
+    if (u.taskState === 'Moving' || u.taskState === 'MovingToAttack') return true;
+    const tx = u.targetPosition.x - u.mesh.position.x;
+    const tz = u.targetPosition.z - u.mesh.position.z;
+    return (tx * tx + tz * tz) > 1.44; // 1.2^2
+}
+function separateGroundUnits(list) {
+    _sepGrid.clear();
+    let maxR = 0.5;
+    const ground = [];
+    for (let i = 0; i < list.length; i++) {
+        const u = list[i];
+        if (u.isAir || u.garrisonedIn || u.health <= 0 || !u.mesh) continue;
+        ground.push(u);
+        if ((u.radius || 1.2) > maxR) maxR = u.radius || 1.2;
+    }
+    const cell = maxR * 2;
+    for (let i = 0; i < ground.length; i++) {
+        const p = ground[i].mesh.position;
+        const key = (Math.floor(p.x / cell) + 32768) * 65536 + (Math.floor(p.z / cell) + 32768);
+        let bucket = _sepGrid.get(key);
+        if (!bucket) { bucket = []; _sepGrid.set(key, bucket); }
+        bucket.push(i);
+        ground[i]._sepIdx = i;
+    }
+    for (let i = 0; i < ground.length; i++) {
+        const u1 = ground[i];
+        const p1 = u1.mesh.position;
+        const cx = Math.floor(p1.x / cell), cz = Math.floor(p1.z / cell);
+        for (let ox = -1; ox <= 1; ox++) {
+            for (let oz = -1; oz <= 1; oz++) {
+                const bucket = _sepGrid.get((cx + ox + 32768) * 65536 + (cz + oz + 32768));
+                if (!bucket) continue;
+                for (let b = 0; b < bucket.length; b++) {
+                    const j = bucket[b];
+                    if (j <= i) continue; // each pair handled once
+                    const u2 = ground[j];
+                    const dx = p1.x - u2.mesh.position.x;
+                    const dz = p1.z - u2.mesh.position.z;
+                    const min = ((u1.radius || 1.2) + (u2.radius || 1.2)) * 0.95;
+                    const d2 = dx * dx + dz * dz;
+                    if (d2 >= min * min || d2 < 1e-8) continue;
+                    const d2D = Math.sqrt(d2);
+                    const pMag = (min - d2D) * 0.22; // Smooth damped spring separation
+                    const nx = dx / d2D, nz = dz / d2D;
+                    const m1 = _isSepMoving(u1), m2 = _isSepMoving(u2);
+                    let s1 = 0.5, s2 = 0.5;
+                    if (!m1 && m2) { s1 = 0.15; s2 = 0.85; }
+                    else if (m1 && !m2) { s1 = 0.85; s2 = 0.15; }
+                    p1.x += nx * pMag * s1; p1.z += nz * pMag * s1;
+                    u2.mesh.position.x -= nx * pMag * s2; u2.mesh.position.z -= nz * pMag * s2;
+                    if (!m1) u1.targetPosition.copy(p1);
+                    if (!m2) u2.targetPosition.copy(u2.mesh.position);
+                }
+            }
+        }
+    }
+}
+
+const CRUSHER_TANK_SET = new Set(['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank']);
+const INFANTRY_TYPE_SET = new Set(['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket']);
+
 function animate() {
             requestAnimationFrame(animate);
 
             const nowTime = performance.now();
-            const dt = Math.min(0.1, (nowTime - (window._lastCombatFrameTime || nowTime)) / 1000);
+            const dt = (window._lastCombatFrameTime && nowTime > window._lastCombatFrameTime)
+                ? Math.min(0.1, (nowTime - window._lastCombatFrameTime) / 1000)
+                : (1 / 60);
             window._lastCombatFrameTime = nowTime;
-            combatDeltaScale = Math.min(6.0, dt * 60);
+            combatDeltaScale = Math.max(0.25, Math.min(3.0, dt * 60));
 
             const animTime = nowTime * 0.003;
 
@@ -237,12 +382,12 @@ function animate() {
                         dMesh.rotation.z = -0.22;
                         dMesh.rotation.x = 0.08;
 
-                        // Fast spinning reconnaissance propeller
-                        dMesh.traverse(c => {
-                            if (c.name && c.name.toLowerCase().includes('prop')) {
-                                c.rotation.y += 0.65;
-                            }
-                        });
+                        // Fast spinning reconnaissance propeller (PERF: prop nodes cached once)
+                        if (!drone._propNodes) {
+                            drone._propNodes = [];
+                            dMesh.traverse(c => { if (c.name && c.name.toLowerCase().includes('prop')) drone._propNodes.push(c); });
+                        }
+                        for (let pi = 0; pi < drone._propNodes.length; pi++) drone._propNodes[pi].rotation.y += 0.65;
                     } else if (drone.type === 'hellfire') {
                         // Hellfire Drone: flies like the recon drone with horizontal flight attitude, circling the host vehicle
                         if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
@@ -280,16 +425,18 @@ function animate() {
                         dMesh.rotation.x = 0.48 + Math.sin(drone.timer * 0.06) * 0.04;
                         dMesh.rotation.z = Math.sin(drone.timer * 0.07) * 0.08;
 
-                        // Ducted lift fan spin
-                        dMesh.traverse(c => {
-                            if (c.name && (c.name.toLowerCase().includes('fan') || c.name.toLowerCase().includes('ducted'))) {
-                                c.rotation.y += 0.55;
-                            }
-                        });
+                        // Ducted lift fan spin (PERF: fan nodes cached once)
+                        if (!drone._fanNodes) {
+                            drone._fanNodes = [];
+                            dMesh.traverse(c => {
+                                if (c.name && (c.name.toLowerCase().includes('fan') || c.name.toLowerCase().includes('ducted'))) drone._fanNodes.push(c);
+                            });
+                        }
+                        for (let fi = 0; fi < drone._fanNodes.length; fi++) drone._fanNodes[fi].rotation.y += 0.55;
 
                         // Swiveling underbelly gun (TURRET01 & TURRETEL01)
-                        const dTurret = dMesh.getObjectByName('droneTurret') || dMesh.getObjectByName('turretSystem');
-                        const dElev = dMesh.getObjectByName('droneTurretElevation') || dMesh.getObjectByName('TURRETEL01');
+                        const dTurret = getCachedNode(dMesh, 'droneTurret') || getCachedNode(dMesh, 'turretSystem');
+                        const dElev = getCachedNode(dMesh, 'droneTurretElevation') || getCachedNode(dMesh, 'TURRETEL01');
                         if (dTurret) {
                             const dmX = dMesh.position.x;
                             const dmZ = dMesh.position.z;
@@ -348,7 +495,7 @@ function animate() {
                             });
                             if (enemyInf) {
                                 let muzzlePos = dMesh.position.clone();
-                                const muzzleNode = dMesh.getObjectByName('MUZZLE01');
+                                const muzzleNode = getCachedNode(dMesh, 'MUZZLE01');
                                 if (muzzleNode) muzzleNode.getWorldPosition(muzzlePos);
                                 spawnBulletTracer(muzzlePos, enemyInf.mesh.position, 0x00d2d3, 1.5);
                                 playAudio('machine_gun');
@@ -371,7 +518,7 @@ function animate() {
                             });
                             if (enemyArmor) {
                                 let launchPos = dMesh.position.clone();
-                                const pylonNode = dMesh.getObjectByName('WEAPONA');
+                                const pylonNode = getCachedNode(dMesh, 'WEAPONA');
                                 if (pylonNode) pylonNode.getWorldPosition(launchPos);
                                 spawnRocketProjectile(launchPos, enemyArmor.mesh.position, false, false);
                                 playAudio('missile_launch');
@@ -444,13 +591,13 @@ function animate() {
             }
 
             // Dynamic military & building animations (Authentic C&C Generals building movements)
-            scene.traverse(obj => {
-                if (obj.name === "comanche_rotor" || obj.name === "chinook_rotor1" || obj.name.includes("avcomanche_prop") || obj.name.includes("props01") || (obj.name === "PROPELLER01" && obj.parent && (obj.parent.name.includes("comanche") || obj.parent.name.includes("chinook")))) {
+            // PERF: instead of traversing the whole scene graph every frame, each top-level
+            // scene object caches its list of animated sub-nodes (rebuilt only if its children change).
+            forEachAnimatedNode((obj, kind) => {
+                if (kind === 1) {
                     obj.rotation.y += 0.45;
-                } else if (obj.name === "chinook_rotor2" || obj.name.includes("props02") || (obj.name === "PROPELLER02" && obj.parent && obj.parent.name.includes("chinook"))) {
+                } else if (kind === 2) {
                     obj.rotation.y -= 0.45;
-                } else if (obj.name === "ductedFan" || obj.name === "avbattledr.fan") {
-                    obj.rotation.y += 0.45;
                 } else if (obj.name === "radarDish") {
                     // Continuous radar dish / array rotation
                     obj.rotation.y += 0.025;
@@ -501,13 +648,19 @@ function animate() {
             const pulseBlue = 1.3 + Math.sin(animTime * 4.0) * 0.45;
             structures.forEach(s => {
                 if ((s.type === 'power' || s.type === 'coldFusionReactor') && s.mesh && s.health > 0) {
-                    s.mesh.traverse(c => {
-                        if (c.isMesh && c.name && c.name.toLowerCase().includes('cylinder')) {
-                            if (c.material && c.material.emissiveIntensity !== undefined) {
-                                c.material.emissiveIntensity = pulseBlue;
-                            }
+                    // PERF: cache the pulsing rod meshes once instead of traversing every frame
+                    if (!s._pulseMeshes) {
+                        s._pulseMeshes = [];
+                        s.mesh.traverse(c => {
+                            if (c.isMesh && c.name && c.name.toLowerCase().includes('cylinder')) s._pulseMeshes.push(c);
+                        });
+                    }
+                    for (let i = 0; i < s._pulseMeshes.length; i++) {
+                        const c = s._pulseMeshes[i];
+                        if (c.material && c.material.emissiveIntensity !== undefined) {
+                            c.material.emissiveIntensity = pulseBlue;
                         }
-                    });
+                    }
                 }
             });
 
@@ -532,7 +685,7 @@ function animate() {
                     const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 2.5;
                     if (dist2D <= buildThreshold) {
                         s.dozerRef.taskState = 'Building';
-                        s.buildProgress += 0.35;
+                        s.buildProgress += 0.35 * combatDeltaScale;
 
                         // Rotate builder to face the building under construction
                         const toX = s.position.x - dPos.x;
@@ -636,7 +789,7 @@ function animate() {
 
             units.forEach(unit => {
                 if ((unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'chinook') || unit.taskState !== 'Idle') return;
-                const cargoHold = unit.mesh.getObjectByName("cargoHold");
+                const cargoHold = getCachedNode(unit.mesh, "cargoHold");
                 switch (unit.aiState) {
                     case 'MovingToDock':
                         if (!unit.supplyTarget || unit.supplyTarget.stock <= 0) {
@@ -734,54 +887,9 @@ function animate() {
                 }
             });
 
-            for (let i = 0; i < units.length; i++) {
-                for (let j = i + 1; j < units.length; j++) {
-                    const u1 = units[i]; const u2 = units[j];
-                    if (u1.isAir || u2.isAir) continue; // Air units fly in air, don't collide with ground
-                    const dx = u1.mesh.position.x - u2.mesh.position.x;
-                    const dz = u1.mesh.position.z - u2.mesh.position.z;
-                    const d2D = Math.hypot(dx, dz);
-                    const min = (u1.radius + u2.radius) * 0.95;
-                    if (d2D < min && d2D > 0.0001) {
-                        const overlap = min - d2D;
-                        const pMag = overlap * 0.22; // Smooth damped spring separation
-                        const nx = dx / d2D;
-                        const nz = dz / d2D;
-
-                        const u1Moving = (u1.taskState === 'Moving' || u1.taskState === 'MovingToAttack' || Math.hypot(u1.targetPosition.x - u1.mesh.position.x, u1.targetPosition.z - u1.mesh.position.z) > 1.2);
-                        const u2Moving = (u2.taskState === 'Moving' || u2.taskState === 'MovingToAttack' || Math.hypot(u2.targetPosition.x - u2.mesh.position.x, u2.targetPosition.z - u2.mesh.position.z) > 1.2);
-
-                        if (!u1Moving && u2Moving) {
-                            // u1 is parked idle: u2 does 85% of the separation
-                            u1.mesh.position.x += nx * (pMag * 0.15);
-                            u1.mesh.position.z += nz * (pMag * 0.15);
-                            u1.targetPosition.copy(u1.mesh.position);
-
-                            u2.mesh.position.x -= nx * (pMag * 0.85);
-                            u2.mesh.position.z -= nz * (pMag * 0.85);
-                        } else if (u1Moving && !u2Moving) {
-                            // u2 is parked idle: u1 does 85% of the separation
-                            u1.mesh.position.x += nx * (pMag * 0.85);
-                            u1.mesh.position.z += nz * (pMag * 0.85);
-
-                            u2.mesh.position.x -= nx * (pMag * 0.15);
-                            u2.mesh.position.z -= nz * (pMag * 0.15);
-                            u2.targetPosition.copy(u2.mesh.position);
-                        } else {
-                            // Both moving or both idle: equal gentle separation
-                            u1.mesh.position.x += nx * (pMag * 0.5);
-                            u1.mesh.position.z += nz * (pMag * 0.5);
-                            u2.mesh.position.x -= nx * (pMag * 0.5);
-                            u2.mesh.position.z -= nz * (pMag * 0.5);
-
-                            if (!u1Moving && !u2Moving) {
-                                u1.targetPosition.copy(u1.mesh.position);
-                                u2.targetPosition.copy(u2.mesh.position);
-                            }
-                        }
-                    }
-                }
-            }
+            // PERF: single ground-unit separation pass using a spatial hash grid
+            // (was two full O(N^2) passes per frame that fought each other)
+            separateGroundUnits(units);
 
             units.forEach(unit => {
                 // Embarking into transport vehicles
@@ -917,8 +1025,8 @@ function animate() {
                                 // Close distance into effective rocket & gun range
                                 const dirX = dxA / (distToEnemy || 1);
                                 const dirZ = dzA / (distToEnemy || 1);
-                                unit.mesh.position.x += dirX * unit.speed;
-                                unit.mesh.position.z += dirZ * unit.speed;
+                                unit.mesh.position.x += dirX * unit.speed * combatDeltaScale;
+                                unit.mesh.position.z += dirZ * unit.speed * combatDeltaScale;
                                 unit.mesh.rotation.x += (0.14 - unit.mesh.rotation.x) * 0.12; // Forward tilt
                                 unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
                             } else {
@@ -932,7 +1040,7 @@ function animate() {
 
                                 const perpX = -dzA / (distToEnemy || 1);
                                 const perpZ = dxA / (distToEnemy || 1);
-                                const strafeSpeed = unit.speed * 0.60;
+                                const strafeSpeed = unit.speed * 0.60 * combatDeltaScale;
                                 unit.mesh.position.x += perpX * (strafeSpeed * unit.strafeDir);
                                 unit.mesh.position.z += perpZ * (strafeSpeed * unit.strafeDir);
 
@@ -951,7 +1059,7 @@ function animate() {
                             const dxA = tPos.x - unit.mesh.position.x;
                             const dzA = tPos.z - unit.mesh.position.z;
                             const distToEnemy = Math.hypot(dxA, dzA);
-                            const planeSpeed = (unit.type === 'aurora') ? unit.speed * 1.60 : unit.speed;
+                            const planeSpeed = ((unit.type === 'aurora') ? unit.speed * 1.60 : unit.speed) * combatDeltaScale;
 
                             if (unit.planeAttackPhase === 'inbound') {
                                 // Phase 1: High-speed approach directly at the target
@@ -1020,28 +1128,13 @@ function animate() {
                         const dx = unit.targetPosition.x - unit.mesh.position.x;
                         const dz = unit.targetPosition.z - unit.mesh.position.z;
                         const dist2D = Math.hypot(dx, dz);
-
-                // Soft Arrival: If approaching destination, check if destination area is already occupied by a resting friendly unit
-                if (!unit.isAir && dist2D <= (unit.radius * 1.6)) {
-                    const occupied = units.some(other => {
-                        if (other === unit || other.isAir || other.teamId !== unit.teamId) return false;
-                        const distToOther = Math.hypot(unit.mesh.position.x - other.mesh.position.x, unit.mesh.position.z - other.mesh.position.z);
-                        if (distToOther > (unit.radius + other.radius + 1.2)) return false;
-                        const otherAtDest = Math.hypot(unit.targetPosition.x - other.mesh.position.x, unit.targetPosition.z - other.mesh.position.z);
-                        return otherAtDest < (other.radius + 1.5) && other.taskState === 'Idle';
-                    });
-                    if (occupied) {
-                        unit.taskState = 'Idle';
-                        unit.targetPosition.copy(unit.mesh.position);
-                    }
-                }
                         const stopThreshold = isHeli ? 1.5 : 4.0;
 
                         if (dist2D > stopThreshold) {
                             const dirX = dx / dist2D;
                             const dirZ = dz / dist2D;
-                            unit.mesh.position.x += dirX * unit.speed;
-                            unit.mesh.position.z += dirZ * unit.speed;
+                            unit.mesh.position.x += dirX * unit.speed * combatDeltaScale;
+                            unit.mesh.position.z += dirZ * unit.speed * combatDeltaScale;
 
                             const targetAngle = Math.atan2(-dirZ, dirX) + Math.PI / 2;
                             let diff = targetAngle - unit.mesh.rotation.y;
@@ -1086,7 +1179,7 @@ function animate() {
                             unit.targetPosition.copy(unit.mesh.position);
                         } else {
                             const orbitR = unit.circleRadius || 16.0;
-                            const orbitSpeed = unit.speed * 0.75;
+                            const orbitSpeed = unit.speed * 0.75 * combatDeltaScale;
                             const angularSpeed = orbitSpeed / orbitR;
 
                             unit.circleAngle = (unit.circleAngle || 0) + angularSpeed;
@@ -1172,7 +1265,7 @@ function animate() {
                             targetTech.ownerId = (unit.teamId === playerTeamId) ? 'player' : (unit.ownerId || ('ai_' + unit.teamId));
 
                             // Turn flag cloth to player blue or enemy red
-                            const flagCloth = targetTech.mesh ? targetTech.mesh.getObjectByName("neutralFlagCloth") : null;
+                            const flagCloth = targetTech.mesh ? getCachedNode(targetTech.mesh, "neutralFlagCloth") : null;
                             if (flagCloth && flagCloth.material) {
                                 flagCloth.material.color.setHex((unit.teamId === playerTeamId) ? 0x3498db : 0xe74c3c);
                             }
@@ -1202,7 +1295,7 @@ function animate() {
                 }
 
                 // Smoothly return turret forward if no active combat target
-                const idleTurret = unit.mesh.getObjectByName("turretSystem");
+                const idleTurret = getCachedNode(unit.mesh, "turretSystem");
                 if (idleTurret && !unit.combatTarget) {
                     idleTurret.rotation.y += (0 - idleTurret.rotation.y) * 0.1;
                 }
@@ -1217,16 +1310,15 @@ function animate() {
                 if (dist2D > stopBuffer) {
                     const dirX = dx / dist2D;
                     const dirZ = dz / dist2D;
-                    const step = Math.min(dist2D, unit.speed);
+                    const step = Math.min(dist2D, unit.speed * combatDeltaScale);
                     unit.mesh.position.x += dirX * step;
                     unit.mesh.position.z += dirZ * step;
 
                     // Authentic Tank Crushing (SquishCollide.cpp: heavy tanks crush enemy infantry)
-                    const isCrusherTank = ['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank'].includes(unit.type);
-                    if (isCrusherTank) {
+                    if (CRUSHER_TANK_SET.has(unit.type)) {
                         const hostiles = (typeof enemyUnits !== 'undefined') ? enemyUnits : [];
                         for (let enemy of hostiles) {
-                            if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy) && (typeof getArmorCategory === 'function' ? getArmorCategory(enemy) === 'infantry' : ['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(enemy.type))) {
+                            if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy) && (typeof getArmorCategory === 'function' ? getArmorCategory(enemy) === 'infantry' : INFANTRY_TYPE_SET.has(enemy.type))) {
                                 const infDist = Math.hypot(unit.mesh.position.x - enemy.mesh.position.x, unit.mesh.position.z - enemy.mesh.position.z);
                                 if (infDist <= ((unit.radius || 1.8) + (enemy.radius || 0.6)) * 0.95) {
                                     const toX = enemy.mesh.position.x - unit.mesh.position.x;
@@ -1380,27 +1472,7 @@ function animate() {
                     unit.mesh.position.y = (onBridge ? onBridge.deckY : groundY) + (unit._strideBob || 0);
                 }
 
-                // Gentle soft repulsion for ground units to avoid overlapping and bumping
-                if (!unit.isAir) {
-                    for (let other of units) {
-                        if (other === unit || other.isAir || other.garrisonedIn) continue;
-                        const ddx = unit.mesh.position.x - other.mesh.position.x;
-                        const ddz = unit.mesh.position.z - other.mesh.position.z;
-                        const distU = Math.hypot(ddx, ddz);
-                        const minU = (unit.radius || 1.3) + (other.radius || 1.3);
-                        if (distU < minU && distU > 0.0001) {
-                            const pushU = (minU - distU) * 0.25;
-                            const px = (ddx / distU) * pushU;
-                            const pz = (ddz / distU) * pushU;
-                            unit.mesh.position.x += px;
-                            unit.mesh.position.z += pz;
-                            // If unit is idle or building, lock targetPosition to current position so it doesn't fight the separation!
-                            if (unit.taskState === 'Idle' || unit.taskState === 'Building') {
-                                unit.targetPosition.copy(unit.mesh.position);
-                            }
-                        }
-                    }
-                }
+                // (Ground-unit soft repulsion is handled once per frame by separateGroundUnits())
 
                 // Prevent driving through buildings, trees, skyscrapers or map edges
                 resolveObstacleCollisions(unit);
@@ -1411,150 +1483,190 @@ function animate() {
 
             updateHealthBars();
 
-            enemyUnits = enemyUnits.filter(enemy => {
-                if (enemy.health > 0) return true;
-                scene.remove(enemy.mesh);
-                createImpactExplosion(enemy.mesh.position);
-                // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
-                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(enemy.type))) {
-                    if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
-                }
-                units.forEach(unit => {
-                    if (unit.combatTarget === enemy) unit.combatTarget = null;
+            // PERF: only allocate/filter when at least one entity in the array actually died this frame
+            if (enemyUnits.some(e => e.health <= 0)) {
+                enemyUnits = enemyUnits.filter(enemy => {
+                    if (enemy.health > 0) return true;
+                    scene.remove(enemy.mesh);
+                    createImpactExplosion(enemy.mesh.position);
+                    // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
+                    if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
+                        if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
+                    }
+                    units.forEach(unit => {
+                        if (unit.combatTarget === enemy) unit.combatTarget = null;
+                    });
+                    return false;
                 });
-                return false;
-            });
+            }
 
-            structures = structures.filter(structure => {
-                if (structure.health > 0) return true;
-                if (structure.mesh) scene.remove(structure.mesh);
-                createImpactExplosion(structure.position || (structure.mesh && structure.mesh.position));
-                spawnExplosion(structure.position || (structure.mesh && structure.mesh.position), 0xff793f, 3.5);
-                showNotification(`Friendly ${structure.type} destroyed!`, 'error');
-                if (structure.dozerRef) {
-                    structure.dozerRef.taskState = 'Idle';
-                    structure.dozerRef.targetStructure = null;
-                    structure.dozerRef = null;
-                }
-                (structure.garrisoned || []).forEach(unit => {
-                    unit.garrisonedIn = null;
-                    unit.health = 0;
+            if (structures.some(s => s.health <= 0)) {
+                structures = structures.filter(structure => {
+                    if (structure.health > 0) return true;
+                    if (structure.mesh) scene.remove(structure.mesh);
+                    createImpactExplosion(structure.position || (structure.mesh && structure.mesh.position));
+                    spawnExplosion(structure.position || (structure.mesh && structure.mesh.position), 0xff793f, 3.5);
+                    showNotification(`Friendly ${structure.type} destroyed!`, 'error');
+                    if (structure.dozerRef) {
+                        structure.dozerRef.taskState = 'Idle';
+                        structure.dozerRef.targetStructure = null;
+                        structure.dozerRef = null;
+                    }
+                    (structure.garrisoned || []).forEach(unit => {
+                        unit.garrisonedIn = null;
+                        unit.health = 0;
+                    });
+                    if (selectedStructure === structure) {
+                        selectedStructure = null;
+                        updateSidebar();
+                    }
+                    enemyUnits.forEach(enemy => {
+                        if (enemy.combatTarget === structure) enemy.combatTarget = null;
+                    });
+                    return false;
                 });
-                if (selectedStructure === structure) {
-                    selectedStructure = null;
-                    updateSidebar();
-                }
-                enemyUnits.forEach(enemy => {
-                    if (enemy.combatTarget === structure) enemy.combatTarget = null;
-                });
-                return false;
-            });
+            }
 
             // Filter and remove neutralized enemy buildings with explosions & notifications
-            enemyStructures = enemyStructures.filter(structure => {
-                if (structure.health > 0) return true;
-                if (structure.mesh) scene.remove(structure.mesh);
-                const expPos = structure.position || (structure.mesh && structure.mesh.position);
-                createImpactExplosion(expPos);
-                spawnExplosion(expPos, 0xff4757, 4.0);
-                showNotification(`Hostile ${structure.type} eradicated!`, 'success');
-                units.forEach(unit => {
-                    if (unit.combatTarget === structure) unit.combatTarget = null;
-                });
-                return false;
-            });
-
-            const previousUnitCount = units.length;
-            units = units.filter(unit => {
-                if (unit.health > 0) return true;
-                removeSelectionCircle(unit);
-                if (unit.drone && unit.drone.mesh) {
-                    scene.remove(unit.drone.mesh);
-                    unit.drone.mesh.traverse(c => {
-                        if (c.geometry) c.geometry.dispose();
-                        if (c.material) {
-                            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-                            else c.material.dispose();
-                        }
+            if (enemyStructures.some(s => s.health <= 0)) {
+                enemyStructures = enemyStructures.filter(structure => {
+                    if (structure.health > 0) return true;
+                    if (structure.mesh) scene.remove(structure.mesh);
+                    const expPos = structure.position || (structure.mesh && structure.mesh.position);
+                    createImpactExplosion(expPos);
+                    spawnExplosion(expPos, 0xff4757, 4.0);
+                    showNotification(`Hostile ${structure.type} eradicated!`, 'success');
+                    units.forEach(unit => {
+                        if (unit.combatTarget === structure) unit.combatTarget = null;
                     });
-                    unit.drone = null;
-                }
-                scene.remove(unit.mesh);
-                // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
-                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(unit.type))) {
-                    if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);
-                }
-                enemyUnits.forEach(enemy => {
-                    if (enemy.combatTarget === unit) enemy.combatTarget = null;
+                    return false;
                 });
-                return false;
-            });
-            if (units.length !== previousUnitCount) updateHUD();
+            }
+
+            if (units.some(u => u.health <= 0)) {
+                const previousUnitCount = units.length;
+                units = units.filter(unit => {
+                    if (unit.health > 0) return true;
+                    removeSelectionCircle(unit);
+                    if (unit.drone && unit.drone.mesh) {
+                        scene.remove(unit.drone.mesh);
+                        unit.drone.mesh.traverse(c => {
+                            if (c.geometry && !c.geometry.userData?._shared) c.geometry.dispose();
+                            if (c.material && !c.material.userData?._shared) {
+                                if (Array.isArray(c.material)) c.material.forEach(m => { if (!m.userData?._shared) m.dispose(); });
+                                else c.material.dispose();
+                            }
+                        });
+                        unit.drone = null;
+                    }
+                    scene.remove(unit.mesh);
+                    // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
+                    if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(unit.type))) {
+                        if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);
+                    }
+                    enemyUnits.forEach(enemy => {
+                        if (enemy.combatTarget === unit) enemy.combatTarget = null;
+                    });
+                    return false;
+                });
+                if (units.length !== previousUnitCount) updateHUD();
+            }
 
             // Neutral Tech Buildings Periodic Effects:
             if (isMatchActive) {
                 if (window._techPassiveTimer === undefined) window._techPassiveTimer = 0;
                 window._techPassiveTimer++;
-                
-                const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
 
-                // 1. Tech Oil Derrick: +$200 every 12 seconds (~720 frames)
-                if (window._techPassiveTimer % 720 === 0) {
-                    const playerDerricks = allTechs.filter(s => s.type === 'techOilDerrick' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
-                    if (playerDerricks.length > 0) {
-                        const bonus = playerDerricks.length * 200;
-                        playerResources += bonus;
-                        const resEl = document.getElementById('resource-display');
-                        if (resEl) resEl.innerText = `$${playerResources}`;
-                        if (typeof showNotification === 'function') {
-                            showNotification(`Tech Oil Derrick: +$${bonus} passive supply revenue received.`, 'success');
+                // PERF: only build allTechs on the 1-second tick when it is actually used
+                if (window._techPassiveTimer % 60 === 0) {
+                    const allTechs = [...(typeof structures !== 'undefined' ? structures : []), ...(window.neutralStructures || [])];
+
+                    // 1. Tech Oil Derrick: +$200 every 12 seconds (~720 frames)
+                    if (window._techPassiveTimer % 720 === 0) {
+                        const playerDerricks = allTechs.filter(s => s.type === 'techOilDerrick' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
+                        if (playerDerricks.length > 0) {
+                            const bonus = playerDerricks.length * 200;
+                            playerResources += bonus;
+                            const resEl = document.getElementById('resource-display');
+                            if (resEl) resEl.innerText = `$${playerResources}`;
+                            if (typeof showNotification === 'function') {
+                                showNotification(`Tech Oil Derrick: +$${bonus} passive supply revenue received.`, 'success');
+                            }
                         }
                     }
-                }
 
-                // 2. Tech Hospital: Passive regeneration for all friendly infantry (+2 HP every 60 frames / 1.0s)
-                if (window._techPassiveTimer % 60 === 0) {
+                    // 2. Tech Hospital: Passive regeneration for all friendly infantry (+2 HP every 60 frames / 1.0s)
                     const hasHospital = allTechs.some(s => s.type === 'techHospital' && (s.capturedByTeam === playerTeamId || isFriendly({ teamId: playerTeamId }, s)) && s.health > 0);
                     if (hasHospital) {
-                        units.forEach(u => {
-                            if (u.health > 0 && u.health < u.maxHealth && !u.isAir && ['ranger','infantry','redguard','rebel','rocket','rpg','tankhunter','pathfinder','burton','jarmen','worker'].includes(u.type)) {
+                        for (let i = 0; i < units.length; i++) {
+                            const u = units[i];
+                            if (u.health > 0 && u.health < u.maxHealth && !u.isAir && INFANTRY_TYPE_SET.has(u.type)) {
                                 u.health = Math.min(u.maxHealth, u.health + 2);
                             }
-                        });
+                        }
                     }
                 }
 
-                // 3. GLA Foundation Holes Rebuilding Timer
-                const glaHoles = [...structures, ...enemyStructures].filter(s => s.type === 'glaHole' && s.health > 0);
-                glaHoles.forEach(hole => {
-                    if (hole.rebuildTimer === undefined) hole.rebuildTimer = 18 * 60; // 18 seconds
-                    hole.rebuildTimer--;
-                    if (hole.rebuildTimer <= 0) {
-                        // Reconstruct structure for free!
-                        hole.health = 0;
-                        if (hole.mesh) scene.remove(hole.mesh);
-                        const origType = hole.originalType || 'barracks';
-                        if (typeof deployBaseStructureAt === 'function') {
-                            deployBaseStructureAt(origType, hole.position, hole.ownerId, hole.teamId, 'gla');
+                // 3. GLA Foundation Holes Rebuilding Timer (PERF: iterate in-place without per-frame spread/filter)
+                const structLists = [structures, enemyStructures];
+                for (let li = 0; li < 2; li++) {
+                    const sList = structLists[li];
+                    for (let si = 0; si < sList.length; si++) {
+                        const hole = sList[si];
+                        if (hole.type !== 'glaHole' || hole.health <= 0) continue;
+                        if (hole.rebuildTimer === undefined) hole.rebuildTimer = 18 * 60; // 18 seconds
+                        hole.rebuildTimer--;
+                        if (hole.rebuildTimer <= 0) {
+                            // Reconstruct structure for free!
+                            hole.health = 0;
+                            if (hole.mesh) scene.remove(hole.mesh);
+                            const origType = hole.originalType || 'barracks';
+                            if (typeof deployBaseStructureAt === 'function') {
+                                deployBaseStructureAt(origType, hole.position, hole.ownerId, hole.teamId, 'gla');
+                            }
                         }
                     }
-                });
+                }
             }
 
             // Tactical Mission Victory / Defeat Objective Check (Total Annihilation of Hostile Forces)
-            if (isMatchActive && hasSpawnedInitialEnemyBase) {
-                const remainingHostileStructures = [...structures, ...enemyStructures].filter(s => s.health > 0 && !isFriendly({ teamId: playerTeamId }, s));
-                const remainingHostileCombatUnits = [...units, ...enemyUnits].filter(u => u.health > 0 && !isFriendly({ teamId: playerTeamId }, u) && !['truck', 'worker', 'dozer'].includes(u.type));
-                const remainingFriendlyStructures = [...structures, ...enemyStructures].filter(s => s.health > 0 && isFriendly({ teamId: playerTeamId }, s));
-                const remainingFriendlyUnits = [...units, ...enemyUnits].filter(u => u.health > 0 && isFriendly({ teamId: playerTeamId }, u));
+            // PERF: throttled to every 15 frames and uses early-exit loops instead of 4 array spreads + filters per frame
+            if (isMatchActive && hasSpawnedInitialEnemyBase && (_animNodeFrame % 15 === 0)) {
+                const pTeam = { teamId: playerTeamId };
+                let hasHostile = false, hasFriendly = false;
+                const sLists = [structures, enemyStructures];
+                for (let li = 0; li < 2 && (!hasHostile || !hasFriendly); li++) {
+                    const arr = sLists[li];
+                    for (let i = 0; i < arr.length; i++) {
+                        const s = arr[i];
+                        if (s.health <= 0) continue;
+                        if (isFriendly(pTeam, s)) hasFriendly = true;
+                        else hasHostile = true;
+                        if (hasHostile && hasFriendly) break;
+                    }
+                }
+                const uLists = [units, enemyUnits];
+                for (let li = 0; li < 2 && (!hasHostile || !hasFriendly); li++) {
+                    const arr = uLists[li];
+                    for (let i = 0; i < arr.length; i++) {
+                        const u = arr[i];
+                        if (u.health <= 0) continue;
+                        if (isFriendly(pTeam, u)) {
+                            hasFriendly = true;
+                        } else if (u.type !== 'truck' && u.type !== 'worker' && u.type !== 'dozer') {
+                            hasHostile = true;
+                        }
+                        if (hasHostile && hasFriendly) break;
+                    }
+                }
 
-                if (remainingHostileStructures.length === 0 && remainingHostileCombatUnits.length === 0) {
+                if (!hasHostile) {
                     isMatchActive = false;
                     showNotification("MISSION ACCOMPLISHED: ALL HOSTILE FORCES ELIMINATED!", "success");
                     const ticker = document.getElementById('tactical-message');
                     if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: Operational theater secured. All hostile forces destroyed!</strong>';
                     if (typeof showVictoryBanner === 'function') showVictoryBanner();
-                } else if (remainingFriendlyStructures.length === 0 && remainingFriendlyUnits.length === 0) {
+                } else if (!hasFriendly) {
                     isMatchActive = false;
                     showNotification("MISSION FAILED: ALL STRATEGIC ASSETS LOST!", "error");
                     const ticker = document.getElementById('tactical-message');
@@ -1567,6 +1679,7 @@ function animate() {
             renderer.render(scene, camera);
         }
 function processEnemyMovement() {
+    separateGroundUnits(enemyUnits);
     enemyUnits.forEach(enemy => {
         if (enemy.health <= 0) return;
 
@@ -1602,8 +1715,8 @@ function processEnemyMovement() {
                     if (distT > 20.0) {
                         const dirX = dxT / distT;
                         const dirZ = dzT / distT;
-                        enemy.mesh.position.x += dirX * enemy.speed;
-                        enemy.mesh.position.z += dirZ * enemy.speed;
+                        enemy.mesh.position.x += dirX * enemy.speed * combatDeltaScale;
+                        enemy.mesh.position.z += dirZ * enemy.speed * combatDeltaScale;
                         enemy.mesh.rotation.x = 0.14;
                     } else {
                         if (enemy.strafeDir === undefined) enemy.strafeDir = (Math.random() < 0.5 ? 1 : -1);
@@ -1614,15 +1727,15 @@ function processEnemyMovement() {
                         }
                         const perpX = -dzT / distT;
                         const perpZ = dxT / distT;
-                        enemy.mesh.position.x += perpX * (enemy.speed * 0.60 * enemy.strafeDir);
-                        enemy.mesh.position.z += perpZ * (enemy.speed * 0.60 * enemy.strafeDir);
+                        enemy.mesh.position.x += perpX * (enemy.speed * 0.60 * combatDeltaScale * enemy.strafeDir);
+                        enemy.mesh.position.z += perpZ * (enemy.speed * 0.60 * combatDeltaScale * enemy.strafeDir);
                         enemy.mesh.rotation.z = enemy.strafeDir * 0.20;
                         enemy.mesh.rotation.x = 0.15;
                     }
                 } else {
                     // AI Airplane: High-speed strafe run and overshoot
                     if (!enemy.planePhase) enemy.planePhase = 'inbound';
-                    const planeSpeed = enemy.speed * 1.30;
+                    const planeSpeed = enemy.speed * 1.30 * combatDeltaScale;
 
                     if (enemy.planePhase === 'inbound') {
                         const dirX = dxT / distT;
@@ -1666,8 +1779,8 @@ function processEnemyMovement() {
             if (distToGoal > (isHeli ? 1.5 : 3.5)) {
                 const dirX = dx / distToGoal;
                 const dirZ = dz / distToGoal;
-                enemy.mesh.position.x += dirX * enemy.speed;
-                enemy.mesh.position.z += dirZ * enemy.speed;
+                enemy.mesh.position.x += dirX * enemy.speed * combatDeltaScale;
+                enemy.mesh.position.z += dirZ * enemy.speed * combatDeltaScale;
                 enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
                 if (isHeli) enemy.mesh.rotation.x = 0.14;
                 enemy.patrolCenter.copy(enemy.targetPosition);
@@ -1678,14 +1791,14 @@ function processEnemyMovement() {
                     enemy.mesh.rotation.z = 0;
                 } else {
                     // Circling holding pattern for airplanes
-                    enemy.circleAngle += 0.022;
+                    enemy.circleAngle += 0.022 * combatDeltaScale;
                     const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * enemy.circleRadius;
                     const tZ = enemy.patrolCenter.z + Math.sin(enemy.circleAngle) * enemy.circleRadius;
                     const cDx = tX - enemy.mesh.position.x;
                     const cDz = tZ - enemy.mesh.position.z;
                     const cDist = Math.hypot(cDx, cDz);
                     if (cDist > 0.1) {
-                        const cSpeed = enemy.speed * 0.85;
+                        const cSpeed = enemy.speed * 0.85 * combatDeltaScale;
                         enemy.mesh.position.x += (cDx / cDist) * cSpeed;
                         enemy.mesh.position.z += (cDz / cDist) * cSpeed;
                         const fwdX = -Math.sin(enemy.circleAngle);
@@ -1713,15 +1826,14 @@ function processEnemyMovement() {
         if (dist2D > 0.4) {
             const dirX = dx / dist2D;
             const dirZ = dz / dist2D;
-            const step = Math.min(dist2D, enemy.speed);
+            const step = Math.min(dist2D, enemy.speed * combatDeltaScale);
             enemy.mesh.position.x += dirX * step;
             enemy.mesh.position.z += dirZ * step;
 
             // Authentic Tank Crushing by AI vehicles (SquishCollide.cpp)
-            const isEnemyCrusher = ['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank'].includes(enemy.type);
-            if (isEnemyCrusher) {
+            if (CRUSHER_TANK_SET.has(enemy.type)) {
                 for (let ally of units) {
-                    if (ally.health > 0 && ally.mesh && !isFriendly(enemy, ally) && (typeof getArmorCategory === 'function' ? getArmorCategory(ally) === 'infantry' : ['ranger','redguard','rebel','infantry','rocket','rpg','tankhunter','pathfinder','jarmen','worker'].includes(ally.type))) {
+                    if (ally.health > 0 && ally.mesh && !isFriendly(enemy, ally) && (typeof getArmorCategory === 'function' ? getArmorCategory(ally) === 'infantry' : INFANTRY_TYPE_SET.has(ally.type))) {
                         const infDist = Math.hypot(enemy.mesh.position.x - ally.mesh.position.x, enemy.mesh.position.z - ally.mesh.position.z);
                         if (infDist <= ((enemy.radius || 1.8) + (ally.radius || 0.6)) * 0.95) {
                             const toX = ally.mesh.position.x - enemy.mesh.position.x;
@@ -1811,7 +1923,7 @@ function processEnemyCombat() {
         const targetPos = target.position || target.mesh.position;
         const targetRadius = target.radius || 0;
         if (enemy.mesh.position.distanceTo(targetPos) <= (enemy.scanRange + targetRadius) && enemy.attackCooldown === 0) {
-            const turret = enemy.mesh.getObjectByName("turretSystem");
+            const turret = getCachedNode(enemy.mesh, "turretSystem");
             if (turret && turret.parent) {
                 const localTarget = turret.parent.worldToLocal(targetPos.clone());
                 turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);

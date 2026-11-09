@@ -148,6 +148,35 @@ function getW3dTexture(modelKey) {
 /**
  * Creates an authentic Westwood 3D vehicle mesh with UV texture mapping & pivot hierarchy.
  */
+// PERF: Shared caches for W3D BufferGeometries and Materials so spawning 20 tanks
+// doesn't rebuild and upload 20 identical vertex buffers or recompute normals/bounds.
+window.W3D_GEOM_CACHE = window.W3D_GEOM_CACHE || {};
+window.W3D_MAT_CACHE = window.W3D_MAT_CACHE || {};
+
+function getCachedW3DGeometry(cacheKey, mdata) {
+    let geom = window.W3D_GEOM_CACHE[cacheKey];
+    if (geom) return geom;
+    geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v, 3));
+    if (mdata.u && mdata.u.length > 0) {
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
+    }
+    geom.setIndex(mdata.i);
+    geom.computeVertexNormals();
+    geom.userData = { _shared: true };
+    window.W3D_GEOM_CACHE[cacheKey] = geom;
+    return geom;
+}
+
+function getCachedW3DMaterial(cacheKey, factoryFn) {
+    let mat = window.W3D_MAT_CACHE[cacheKey];
+    if (mat) return mat;
+    mat = factoryFn();
+    if (mat) mat.userData = Object.assign(mat.userData || {}, { _shared: true });
+    window.W3D_MAT_CACHE[cacheKey] = mat;
+    return mat;
+}
+
 function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     if (!window.W3D_VEHICLE_DATA || !window.W3D_VEHICLE_DATA[modelKey]) {
         if (typeof fallbackFn === 'function') return fallbackFn(isEnemy);
@@ -159,36 +188,37 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     const scale = data.s || 0.09;
 
     const vTex = getW3dTexture(modelKey);
+    const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? 'E' : 'F') + ':';
     let hullMat, houseMat;
     if (isEnemy) {
-        hullMat = vTex 
+        hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => vTex 
             ? new THREE.MeshStandardMaterial({ map: vTex, color: 0xaa4444, roughness: 0.6, metalness: 0.25 })
-            : new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.52, metalness: 0.35 });
-        houseMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 });
+            : new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.52, metalness: 0.35 }));
+        houseMat = getCachedW3DMaterial('veh:enemy:house', () => new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 }));
     } else {
         if (vTex) {
-            hullMat = new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 });
+            hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 }));
         } else {
             if (faction === 'usa') {
-                hullMat = (typeof matUSA !== 'undefined') ? matUSA : new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.5, metalness: 0.35 });
+                hullMat = (typeof matUSA !== 'undefined') ? matUSA : getCachedW3DMaterial('veh:usa:hull', () => new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.5, metalness: 0.35 }));
             } else if (faction === 'china') {
-                hullMat = (typeof matChina !== 'undefined') ? matChina : new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.55, metalness: 0.3 });
+                hullMat = (typeof matChina !== 'undefined') ? matChina : getCachedW3DMaterial('veh:china:hull', () => new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.55, metalness: 0.3 }));
             } else {
-                hullMat = (typeof matGLA !== 'undefined') ? matGLA : new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 });
+                hullMat = (typeof matGLA !== 'undefined') ? matGLA : getCachedW3DMaterial('veh:gla:hull', () => new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 }));
             }
         }
         if (faction === 'usa') {
-            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 });
+            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : getCachedW3DMaterial('veh:usa:house', () => new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 }));
         } else if (faction === 'china') {
-            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 });
+            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : getCachedW3DMaterial('veh:china:house', () => new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 }));
         } else {
-            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.78, metalness: 0.2 });
+            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : getCachedW3DMaterial('veh:gla:house', () => new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.78, metalness: 0.2 }));
         }
     }
 
-    const treadMat = (typeof matTread !== 'undefined') ? matTread : new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 });
-    const metalMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.7 });
-    const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 });
+    const treadMat = (typeof matTread !== 'undefined') ? matTread : getCachedW3DMaterial('veh:tread', () => new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 }));
+    const metalMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : getCachedW3DMaterial('veh:metal', () => new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.7 }));
+    const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : getCachedW3DMaterial('veh:glass', () => new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 }));
 
     const pivotGroups = [];
     data.p.forEach(p => {
@@ -221,13 +251,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
 
-        const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v, 3));
-        if (mdata.u && mdata.u.length > 0) {
-            geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
-        }
-        geom.setIndex(mdata.i);
-        geom.computeVertexNormals();
+        const geom = getCachedW3DGeometry('veh:' + modelKey + ':' + meshName, mdata);
 
         const upper = meshName.toUpperCase();
         let mat = hullMat;
@@ -277,22 +301,26 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
 
     const isAirUnit = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig', 'drone_battle', 'drone_scout', 'drone_hellfire'].includes(modelKey);
     if (!isAirUnit) {
-        let minY = 1e9;
-        root.traverse(c => {
-            if (c.isMesh && c.geometry && c.geometry.attributes.position) {
-                const pos = c.geometry.attributes.position;
-                for (let i = 0; i < pos.count; i++) {
-                    const vy = pos.getY(i);
-                    let curY = vy;
-                    let p = c.parent;
-                    while (p && p !== root) {
-                        curY += p.position.y;
-                        p = p.parent;
+        if (data._cachedMinY === undefined) {
+            let minY = 1e9;
+            root.traverse(c => {
+                if (c.isMesh && c.geometry && c.geometry.attributes && c.geometry.attributes.position) {
+                    const pos = c.geometry.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        const vy = pos.getY(i);
+                        let curY = vy;
+                        let p = c.parent;
+                        while (p && p !== root) {
+                            curY += p.position.y;
+                            p = p.parent;
+                        }
+                        if (curY < minY) minY = curY;
                     }
-                    if (curY < minY) minY = curY;
                 }
-            }
-        });
+            });
+            data._cachedMinY = minY;
+        }
+        const minY = data._cachedMinY;
         if (minY < 1e8 && minY < 0) {
             const shiftY = -minY;
             root.children.forEach(child => {
@@ -402,13 +430,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
 
-        const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v, 3));
-        if (mdata.u && mdata.u.length > 0) {
-            geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
-        }
-        geom.setIndex(mdata.i);
-        geom.computeVertexNormals();
+        const geom = getCachedW3DGeometry('bld:' + buildingKey + ':' + meshName, mdata);
 
         const upper = meshName.toUpperCase();
         let subTex = null;
@@ -480,23 +502,27 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         root.add(glow2);
     }
 
-    // Align base foundation to y = 0
-    let minBldY = 1e9;
-    root.traverse(c => {
-        if (c.isMesh && c.geometry && c.geometry.attributes.position) {
-            const pos = c.geometry.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-                const vy = pos.getY(i);
-                let curY = vy;
-                let p = c.parent;
-                while (p && p !== root) {
-                    curY += p.position.y;
-                    p = p.parent;
+    // Align base foundation to y = 0 (PERF: cache minBldY per buildingKey)
+    if (data._cachedMinBldY === undefined) {
+        let minBldY = 1e9;
+        root.traverse(c => {
+            if (c.isMesh && c.geometry && c.geometry.attributes && c.geometry.attributes.position) {
+                const pos = c.geometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const vy = pos.getY(i);
+                    let curY = vy;
+                    let p = c.parent;
+                    while (p && p !== root) {
+                        curY += p.position.y;
+                        p = p.parent;
+                    }
+                    if (curY < minBldY) minBldY = curY;
                 }
-                if (curY < minBldY) minBldY = curY;
             }
-        }
-    });
+        });
+        data._cachedMinBldY = minBldY;
+    }
+    const minBldY = data._cachedMinBldY;
     if (minBldY < 1e8 && minBldY < 0) {
         const shiftY = -minBldY + 0.35;
         root.children.forEach(child => {

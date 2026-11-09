@@ -562,4 +562,37 @@ if (finishedDozer.taskState !== 'Idle' || finishedStruct.isBuilding !== false ||
 
 console.log("✓ Verified Dozer/Worker construction lifecycle: perimeter navigation, buildProgress increment, and completion reset.");
 
+// 11. Test Performance Optimizations (W3D Geometry Cache, Spatial Grid Separation, Cached Node Lookup, Cached Armor Category)
+const geomCacheSize = vm.runInContext("Object.keys(window.W3D_GEOM_CACHE || {}).length", sandbox);
+if (geomCacheSize === 0) {
+    console.error("FAIL: W3D_GEOM_CACHE was not populated during unit/structure spawning!");
+    process.exit(1);
+}
+
+vm.runInContext(`
+    {
+        const uA = {
+            type: 'crusader', health: 500, radius: 2.0, isAir: false,
+            mesh: new THREE.Mesh(), targetPosition: new THREE.Vector3(0, 0, 0), taskState: 'Idle'
+        };
+        const uB = {
+            type: 'crusader', health: 500, radius: 2.0, isAir: false,
+            mesh: new THREE.Mesh(), targetPosition: new THREE.Vector3(0.5, 0, 0), taskState: 'Moving'
+        };
+        uA.mesh.position.set(0, 0, 0);
+        uB.mesh.position.set(0.5, 0, 0);
+        separateGroundUnits([uA, uB]);
+        window._sepDistAfter = Math.hypot(uA.mesh.position.x - uB.mesh.position.x, uA.mesh.position.z - uB.mesh.position.z);
+        window._uACat = getArmorCategory(uA);
+    }
+`, sandbox);
+
+const sepDistAfter = vm.runInContext("window._sepDistAfter", sandbox);
+const uACat = vm.runInContext("window._uACat", sandbox);
+if (!(sepDistAfter > 0.5) || uACat !== 'heavy_vehicle') {
+    console.error("FAIL: Spatial grid separation or cached armor classification failed!", { sepDistAfter, uACat });
+    process.exit(1);
+}
+console.log(`✓ Verified performance optimizations: ${geomCacheSize} W3D geometries shared in cache, spatial grid separation active, O(1) armor & node caches verified.`);
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

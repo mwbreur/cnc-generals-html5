@@ -4,11 +4,15 @@
         const activeMissiles = [];
         const activeScrapCrates = [];
 
-        // Helper: Create glowing particle materials
+        // Helper: Create glowing particle materials & shared unit-radius geometries (PERF: zero per-particle geometry alloc/dispose)
         const fxMatFire = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.95 });
         const fxMatSmoke = new THREE.MeshBasicMaterial({ color: 0x3d444d, transparent: true, opacity: 0.82 });
         const fxMatToxin = new THREE.MeshBasicMaterial({ color: 0x2ed573, transparent: true, opacity: 0.95 });
         const fxMatSpark = new THREE.MeshBasicMaterial({ color: 0xfff200, transparent: true, opacity: 1.0 });
+        const _fxSphere8 = new THREE.SphereGeometry(1, 8, 8);
+        const _fxSphere6 = new THREE.SphereGeometry(1, 6, 6);
+        const _fxSparkGeo = new THREE.SphereGeometry(0.12, 4, 4);
+        const _fxSparkMatCache = {};
 
         // =========================================================================
         
@@ -16,24 +20,25 @@
         // =========================================================================
 
         function spawnMuzzleFlash(pos, color = 0xffa502, size = 0.65) {
-            const flashGeo = new THREE.SphereGeometry(size, 8, 8);
             const flashMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1.0 });
-            const flash = new THREE.Mesh(flashGeo, flashMat);
+            const flash = new THREE.Mesh(_fxSphere8, flashMat);
+            flash.scale.set(size, size, size);
             flash.position.copy(pos);
             scene.add(flash);
 
             activeFX.push({
                 mesh: flash,
+                baseSize: size,
                 life: 4,
                 maxLife: 4,
                 update() {
                     this.life--;
                     const progress = this.life / this.maxLife;
-                    this.mesh.scale.setScalar(1 + (1 - progress) * 0.8);
+                    const s = this.baseSize * (1 + (1 - progress) * 0.8);
+                    this.mesh.scale.set(s, s, s);
                     this.mesh.material.opacity = progress;
                     if (this.life <= 0) {
                         scene.remove(this.mesh);
-                        this.mesh.geometry.dispose();
                         this.mesh.material.dispose();
                         return false;
                     }
@@ -241,29 +246,30 @@
         }
 
         function spawnSmokePuff(pos, color = 0xdcdde1, initialSize = 0.3) {
-            const geo = new THREE.SphereGeometry(initialSize, 6, 6);
             const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.75 });
-            const mesh = new THREE.Mesh(geo, mat);
+            const mesh = new THREE.Mesh(_fxSphere6, mat);
+            mesh.scale.set(initialSize, initialSize, initialSize);
             mesh.position.copy(pos);
             mesh.position.x += (Math.random() - 0.5) * 0.4;
             mesh.position.z += (Math.random() - 0.5) * 0.4;
             scene.add(mesh);
 
-            const growSpeed = 0.045 + Math.random() * 0.03;
+            const growSpeed = (0.045 + Math.random() * 0.03) * initialSize;
             const floatSpeed = 0.05 + Math.random() * 0.04;
 
             activeFX.push({
                 mesh: mesh,
+                curScale: initialSize,
                 life: 30 + Math.floor(Math.random() * 15),
                 maxLife: 45,
                 update() {
                     this.life--;
-                    this.mesh.scale.addScalar(growSpeed);
+                    this.curScale += growSpeed;
+                    this.mesh.scale.set(this.curScale, this.curScale, this.curScale);
                     this.mesh.position.y += floatSpeed;
                     this.mesh.material.opacity = (this.life / this.maxLife) * 0.7;
                     if (this.life <= 0) {
                         scene.remove(this.mesh);
-                        this.mesh.geometry.dispose();
                         this.mesh.material.dispose();
                         return false;
                     }
@@ -273,10 +279,13 @@
         }
 
         function spawnSparks(pos, color = 0xfff200, count = 12) {
+            let mat = _fxSparkMatCache[color];
+            if (!mat) {
+                mat = new THREE.MeshBasicMaterial({ color: color });
+                _fxSparkMatCache[color] = mat;
+            }
             for (let i = 0; i < count; i++) {
-                const geo = new THREE.SphereGeometry(0.12, 4, 4);
-                const mat = new THREE.MeshBasicMaterial({ color: color });
-                const mesh = new THREE.Mesh(geo, mat);
+                const mesh = new THREE.Mesh(_fxSparkGeo, mat);
                 mesh.position.copy(pos);
                 scene.add(mesh);
 
@@ -295,11 +304,10 @@
                         this.mesh.position.z += vz;
                         this.mesh.position.y += vy;
                         vy -= 0.04;
-                        this.mesh.scale.setScalar(this.life / 20);
+                        const s = this.life / 20;
+                        this.mesh.scale.set(s, s, s);
                         if (this.life <= 0 || this.mesh.position.y <= getTerrainHeight(this.mesh.position.x, this.mesh.position.z)) {
                             scene.remove(this.mesh);
-                            this.mesh.geometry.dispose();
-                            this.mesh.material.dispose();
                             return false;
                         }
                         return true;
