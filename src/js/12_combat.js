@@ -22,9 +22,10 @@ function processCombatScanning() {
                     const targetRadius = unit.combatTarget.radius || 0;
                     const distance = targetPos ? unit.mesh.position.distanceTo(targetPos) : Infinity;
                     const maxEffectiveRange = unit.scanRange + targetRadius;
+                    const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank') ? (unit.minRange || 14.0) : 0;
 
-                    if (distance > maxEffectiveRange || unit.combatTarget.health <= 0) {
-                        unit.combatTarget = null; // Target lost or destroyed
+                    if (distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
+                        unit.combatTarget = null; // Target lost, too close for siege artillery, or destroyed
                     } else {
                         // Point Turret systems directly at target coordinates
                         const turret = getCachedNode(unit.mesh, "turretSystem");
@@ -466,7 +467,7 @@ function executeWeaponFire(attacker, target) {
         spawnMuzzleFlash(muzzleR, isHeroic ? heroicFlashColor : 0xffa502, 0.9);
         spawnBulletTracer(muzzleL, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 4.2);
         spawnBulletTracer(muzzleR, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 4.2);
-        playAudio('china_cannon', {}, 'china');
+        playAudio('overlord_cannon', {}, 'china');
         const ovDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('uraniumShells')) ? 119 : 95;
         applyCalculatedDamage(attacker, target, ovDmg, 'ARMOR_PIERCING');
 
@@ -541,15 +542,69 @@ function executeWeaponFire(attacker, target) {
         setTimeout(() => spawnNapalmScorchPool(targetPos), 300);
         applyCalculatedDamage(attacker, target, 65, 'FLAME');
     } else if (attacker.type === 'nukecannon' || attacker.type === 'nuketank') {
-        // Tactical Atomic Shell with Mini-Mushroom Cloud!
+        // China Nuke Cannon: Hydraulic Outrigger Siege Deployment + Nuclear vs Neutron Shells!
         deployNukeCannonOutriggers(attacker);
-        spawnMuzzleFlash(muzzlePos, 0x10ac84, 1.5);
-        spawnBulletTracer(muzzlePos, targetPos, 0x10ac84, 6);
+        const isNeutron = !!(attacker.neutronShells && attacker.ammoMode !== 'nuclear');
+        const shellColor = isNeutron ? 0x00f2fe : 0x10ac84;
+        spawnMuzzleFlash(muzzlePos, shellColor, 1.6);
+        spawnBulletTracer(muzzlePos, targetPos, shellColor, 6.5);
         playAudio('nuke_artillery', {}, 'china');
-        setTimeout(() => {
-            spawnMiniNukeMushroom(targetPos);
-            applyCalculatedDamage(attacker, target, (attacker.neutronShells ? 180 : 140), 'EXPLOSIVE');
-        }, 750);
+
+        const impactPos = targetPos.clone();
+        const applyNukeCannonImpact = () => {
+            const allHostileUnits = (attacker.isAI ? units : enemyUnits) || [];
+            const allHostileStructs = (attacker.isAI ? structures : enemyStructures) || [];
+            if (isNeutron) {
+                if (typeof spawnNeutronBlast === 'function') spawnNeutronBlast(impactPos);
+                // Authentic Neutron Shell: Wipes out all infantry and kills drivers inside all ground vehicles in blast radius!
+                allHostileUnits.forEach(e => {
+                    if (e.health <= 0 || !e.mesh || isFriendly(attacker, e)) return;
+                    if (e.mesh.position.distanceTo(impactPos) <= 13.0) {
+                        const cat = getArmorCategory(e);
+                        if (cat === 'infantry') {
+                            applyCalculatedDamage(attacker, e, 999, 'TOXIN');
+                        } else if (!e.isAir) {
+                            e.isUnmanned = true;
+                            e.disabledUntil = 999999;
+                            e.combatTarget = null;
+                            if (e.targetPosition && e.mesh) e.targetPosition.copy(e.mesh.position);
+                        }
+                    }
+                });
+                if (target && target.health > 0 && !isFriendly(attacker, target)) {
+                    const tCat = getArmorCategory(target);
+                    if (tCat === 'infantry') {
+                        applyCalculatedDamage(attacker, target, 999, 'TOXIN');
+                    } else if (!target.isAir && tCat !== 'building') {
+                        target.isUnmanned = true;
+                        target.disabledUntil = 999999;
+                        target.combatTarget = null;
+                    }
+                }
+            } else {
+                spawnMiniNukeMushroom(impactPos);
+                if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(impactPos);
+                // AoE Tactical Nuclear Shell Splash across all units & structures within 12 units
+                const hitSet = new Set();
+                allHostileUnits.forEach(e => {
+                    if (e.health > 0 && e.mesh && !isFriendly(attacker, e) && e.mesh.position.distanceTo(impactPos) <= 12.0) {
+                        hitSet.add(e);
+                        applyCalculatedDamage(attacker, e, 160, 'EXPLOSIVE');
+                    }
+                });
+                allHostileStructs.forEach(s => {
+                    const sp = s.position || (s.mesh && s.mesh.position);
+                    if (s.health > 0 && sp && !isFriendly(attacker, s) && sp.distanceTo(impactPos) <= 13.5) {
+                        hitSet.add(s);
+                        applyCalculatedDamage(attacker, s, 180, 'EXPLOSIVE');
+                    }
+                });
+                if (target && target.health > 0 && !hitSet.has(target)) {
+                    applyCalculatedDamage(attacker, target, 160, 'EXPLOSIVE');
+                }
+            }
+        };
+        applyNukeCannonImpact();
     } else if (['battlemaster'].includes(attacker.type)) {
         // China 152mm Smoothbore Cannon
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.1);

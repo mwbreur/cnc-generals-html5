@@ -604,9 +604,9 @@ function purchaseNukeCannonUpgrade(cost) {
         return;
     }
     playerResources -= cost;
-    nukeCannons.forEach(nc => { nc.neutronShells = true; });
+    nukeCannons.forEach(nc => { nc.neutronShells = true; nc.ammoMode = 'neutron'; });
     playAudio('nuke_artillery', {}, 'china');
-    showNotification(`Neutron Shells loaded into Nuke Cannon battery!`, 'success');
+    showNotification(`Neutron Shells loaded into Nuke Cannon battery! (Eliminates infantry & vehicle drivers)`, 'success');
     updateSidebar();
 }
 
@@ -914,9 +914,31 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             );
         } else if (u.type === 'nukecannon' || u.type === 'nuketank') {
             currentGridSlots.push(
-                { name: 'OUTRIGGERS', badge: 'DEPLOY', action: () => deployNukeCannonOutriggers(u), desc: 'Deploy hydraulic stabilization legs for siege artillery' },
+                {
+                    name: u.isDeployed ? 'PACK OUTRIGGERS' : 'OUTRIGGERS',
+                    badge: u.isDeployed ? 'DEPLOYED' : 'DEPLOY',
+                    action: () => {
+                        if (u.isDeployed && typeof undeployNukeCannonOutriggers === 'function') undeployNukeCannonOutriggers(u);
+                        else deployNukeCannonOutriggers(u);
+                        updateSidebar();
+                    },
+                    desc: 'Deploy or retract hydraulic stabilization legs for siege artillery'
+                },
                 { name: 'NEUTRON SHELLS', cost: 1000, badge: u.neutronShells ? 'ACTIVE' : 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
             );
+            if (u.neutronShells) {
+                const isNeutronMode = (u.ammoMode !== 'nuclear');
+                currentGridSlots.push({
+                    name: isNeutronMode ? 'AMMO: NEUTRON' : 'AMMO: NUCLEAR',
+                    badge: isNeutronMode ? 'NEUTRON ☢' : 'NUCLEAR 💥',
+                    action: () => {
+                        u.ammoMode = isNeutronMode ? 'nuclear' : 'neutron';
+                        showNotification(`Nuke Cannon switched to ${u.ammoMode.toUpperCase()} shells!`, 'info');
+                        updateSidebar();
+                    },
+                    desc: 'Toggle between Neutron Shells (kills drivers so tanks can be captured) and Nuclear Shells (high-explosive destruction)'
+                });
+            }
         } else if (u.type === 'truck' || u.type === 'chinook') {
             currentGridSlots.push(
                 { name: 'HARVEST', badge: 'GATHER', action: () => orderSelectedHarvestersToGather(), desc: 'Dispatch to nearest supply depot' }
@@ -2978,10 +3000,80 @@ function triggerSneakAttackTunnel() {
     showNotification('Sneak Attack Network breached ground! Underground tunnel network established.', 'success');
 }
 
+function getSuperweaponMaxCooldownTicks(sType) {
+    if (sType === 'particleCannon') return 7200; // 120s (2:00)
+    if (sType === 'scudStorm') return 9000;      // 150s (2:30)
+    if (sType === 'nukeSilo') return 10800;      // 180s (3:00)
+    return 7200;
+}
+window.getSuperweaponMaxCooldownTicks = getSuperweaponMaxCooldownTicks;
+
+function activateSuperweaponTargeting(structure) {
+    if (!structure || structure.health <= 0 || structure.isBuilding) return;
+    if (buildingTick < (structure.cooldownUntil || 0)) {
+        const secsLeft = Math.ceil((structure.cooldownUntil - buildingTick) / 60);
+        showNotification(`Superweapon is recharging (${secsLeft}s remaining).`, 'error');
+        return;
+    }
+    pendingSuperweapon = structure;
+    document.body.style.cursor = 'crosshair';
+    const weaponTitle = structure.type === 'particleCannon' ? 'Orbital Particle Beam' : structure.type === 'nukeSilo' ? 'Thermonuclear Missile' : 'SCUD Storm Salvo';
+    showNotification(`⚡ TARGETING READY: Left-click target coordinates on terrain or minimap to fire ${weaponTitle}! (Right-click or Esc to cancel)`, 'warning');
+    if (typeof playUSASound === 'function') playUSASound('radio_chirp');
+}
+window.activateSuperweaponTargeting = activateSuperweaponTargeting;
+
+function updateSuperweaponTimersHUD() {
+    const hud = (typeof document !== 'undefined') ? document.getElementById('superweapon-timers-hud') : null;
+    if (!hud) return;
+
+    const allSW = [
+        ...structures.filter(s => ['particleCannon', 'nukeSilo', 'scudStorm'].includes(s.type) && !s.isBuilding && s.health > 0),
+        ...(typeof enemyStructures !== 'undefined' ? enemyStructures.filter(s => ['particleCannon', 'nukeSilo', 'scudStorm'].includes(s.type) && !s.isBuilding && s.health > 0) : [])
+    ];
+
+    if (allSW.length === 0) {
+        if (hud.innerHTML !== '') hud.innerHTML = '';
+        return;
+    }
+
+    const html = allSW.map((sw, idx) => {
+        const isEnemy = (typeof enemyStructures !== 'undefined' && enemyStructures.includes(sw)) || !!sw.isAI;
+        const maxTicks = sw.swMaxCooldown || getSuperweaponMaxCooldownTicks(sw.type);
+        const remTicks = Math.max(0, (sw.cooldownUntil || 0) - buildingTick);
+        const secsLeft = Math.ceil(remTicks / 60);
+        const mins = String(Math.floor(secsLeft / 60)).padStart(2, '0');
+        const secs = String(secsLeft % 60).padStart(2, '0');
+        const pct = Math.max(0, Math.min(100, Math.round(((maxTicks - remTicks) / Math.max(1, maxTicks)) * 100)));
+        const isReady = remTicks <= 0;
+
+        const swTitle = sw.type === 'particleCannon' ? 'PARTICLE CANNON' : sw.type === 'nukeSilo' ? 'NUCLEAR MISSILE' : 'SCUD STORM';
+        const swClass = sw.type === 'particleCannon' ? 'sw-usa' : sw.type === 'nukeSilo' ? 'sw-china' : 'sw-gla';
+        const ownerPrefix = isEnemy ? '⚠ HOSTILE ' : '';
+        const statusStr = sw._lowPowerPaused ? 'LOW POWER ⚡' : (isReady ? 'READY ⚡' : `${mins}:${secs}`);
+        const clickAttr = (!isEnemy && isReady) ? `onclick="activateSuperweaponTargeting(structures[${structures.indexOf(sw)}])" title="Click to target and launch ${swTitle}!"` : '';
+
+        return `
+            <div class="sw-timer-row ${swClass} ${(!isEnemy && isReady) ? 'sw-ready' : ''}" ${clickAttr}>
+                <div class="sw-timer-top">
+                    <span class="sw-timer-name">${ownerPrefix}${swTitle}</span>
+                    <span class="sw-timer-clock">${statusStr}</span>
+                </div>
+                <div class="sw-timer-bar-track">
+                    <div class="sw-timer-bar-fill" style="width: ${pct}%;"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    hud.innerHTML = html;
+}
+window.updateSuperweaponTimersHUD = updateSuperweaponTimersHUD;
+
 function strikeWithSuperweapon(structure, targetPosition) {
     const sType = structure.type;
     if (sType === 'particleCannon') {
-        animateParticleCannonStrike(targetPosition);
+        animateParticleCannonStrike(targetPosition, 260, structure.position);
     } else if (sType === 'nukeSilo') {
         animateNukeStrike(structure.position, targetPosition);
     } else if (sType === 'scudStorm') {
@@ -2989,11 +3081,15 @@ function strikeWithSuperweapon(structure, targetPosition) {
     } else {
         createImpactExplosion(targetPosition);
     }
+    const maxCooldown = structure.swMaxCooldown || getSuperweaponMaxCooldownTicks(sType);
+    structure.swMaxCooldown = maxCooldown;
     structure.lastFired = buildingTick;
-    structure.cooldownUntil = buildingTick + 1800; // 30s cooldown
+    structure.cooldownUntil = buildingTick + maxCooldown;
+    structure._readyAnnounced = false;
     pendingSuperweapon = null;
     document.body.style.cursor = 'default';
     showNotification('Superweapon strike confirmed on target coordinates!', 'success');
+    updateSuperweaponTimersHUD();
     updateSidebar();
 }
 
@@ -3004,14 +3100,79 @@ function renderStructureMenu(structure) {
 
 function updateHUD() {
     updateSidebar();
+    updateSuperweaponTimersHUD();
 }
 
         function processBuildingFunctions() {
             buildingTick++;
             if (intelTimer > 0) intelTimer--;
             if (buildingTick % 60 !== 0) return;
+
+            // Check player power state for superweapon buildup/cooldown pause
+            let pProduced = 0, pConsumed = 0;
+            if (typeof selectedFaction !== 'undefined' && selectedFaction !== 'gla') {
+                structures.forEach(s => {
+                    if (s.health <= 0 || s.isBuilding) return;
+                    if (s.type === 'power') pProduced += (s.powerUpgraded ? 10 : 5);
+                    if (s.type === 'nuclearReactor') pProduced += (s.overcharged ? 15 : 10);
+                    const drain = {
+                        barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
+                        strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
+                        propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
+                        particleCannon: 4, nukeSilo: 4
+                    }[s.type] || 0;
+                    pConsumed += drain;
+                });
+            }
+            const isPlayerLowPower = (typeof selectedFaction !== 'undefined' && selectedFaction !== 'gla' && pProduced < pConsumed);
+
             const activeStructures = structures.filter(structure => !structure.isBuilding && structure.health > 0);
             activeStructures.forEach(structure => {
+                // Superweapon Buildup / Cooldown Management & 3D Silo/Gantry/Lens Buildup Animation
+                if (['particleCannon', 'nukeSilo', 'scudStorm'].includes(structure.type)) {
+                    if (!structure.swMaxCooldown) {
+                        structure.swMaxCooldown = getSuperweaponMaxCooldownTicks(structure.type);
+                    }
+                    if (structure.cooldownUntil === undefined) {
+                        structure.cooldownUntil = buildingTick + structure.swMaxCooldown;
+                        structure._readyAnnounced = false;
+                    }
+                    if (isPlayerLowPower && structure.type !== 'scudStorm' && buildingTick < structure.cooldownUntil) {
+                        structure.cooldownUntil += 60; // Pause countdown while in Low Power
+                        structure._lowPowerPaused = true;
+                    } else {
+                        structure._lowPowerPaused = false;
+                    }
+                    const rem = Math.max(0, structure.cooldownUntil - buildingTick);
+                    const chargeRatio = Math.max(0, Math.min(1, 1 - (rem / Math.max(1, structure.swMaxCooldown))));
+                    structure.chargeRatio = chargeRatio;
+
+                    // Animate 3D superweapon buildup state based on chargeRatio (0.0 -> 1.0)
+                    if (structure.mesh) {
+                        if (structure.type === 'nukeSilo') {
+                            const doorL = getCachedNode(structure.mesh, 'nukeBlastDoorL');
+                            const doorR = getCachedNode(structure.mesh, 'nukeBlastDoorR');
+                            const tip = getCachedNode(structure.mesh, 'nukeTip');
+                            const openFactor = chargeRatio > 0.5 ? (chargeRatio - 0.5) * 2.0 : 0;
+                            if (doorL) doorL.position.x = -2.2 - openFactor * 1.1;
+                            if (doorR) doorR.position.x = 2.2 + openFactor * 1.1;
+                            if (tip) tip.position.y = 0.8 + chargeRatio * 1.8;
+                        } else if (structure.type === 'scudStorm') {
+                            const gantry = getCachedNode(structure.mesh, 'scudGantry');
+                            if (gantry) gantry.rotation.x = -0.15 - chargeRatio * 0.75; // Elevate 9 Scuds toward vertical launch angle
+                        }
+                    }
+
+                    if (rem === 0 && !structure._readyAnnounced) {
+                        structure._readyAnnounced = true;
+                        if (typeof playSuperweaponEvaAlert === 'function') {
+                            playSuperweaponEvaAlert(structure.type, 'ready', selectedFaction);
+                        }
+                        const swName = structure.type === 'particleCannon' ? 'Particle Cannon' : structure.type === 'nukeSilo' ? 'Nuclear Missile' : 'SCUD Storm';
+                        showNotification(`⚡ SUPERWEAPON READY: ${swName} is fully charged and ready to launch!`, 'warning');
+                    }
+                }
+
                 if (structure.type === 'supplyDrop' && buildingTick % 900 === 0) {
                     const bonus = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines')) ? 275 : 250;
                     playerResources += bonus;
@@ -3059,12 +3220,26 @@ function updateHUD() {
                     }
                 }
 
-                if (['barracks', 'speakerTower', 'propagandaCenter'].includes(structure.type)) {
-                    const healMult = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal')) ? 2 : 1;
+                if (structure.type === 'barracks') {
                     units.forEach(unit => {
-                        const infantry = ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker'].includes(unit.type);
-                        if (infantry && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < (structure.type === 'barracks' ? 12 : 26)) {
-                            unit.health = Math.min(unit.maxHealth, unit.health + (structure.type === 'barracks' ? 2 : (2 * healMult)));
+                        if (isInfantryType(unit.type) && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < 12) {
+                            unit.health = Math.min(unit.maxHealth, unit.health + 2);
+                        }
+                    });
+                }
+                // Standalone China Speaker Tower & Propaganda Center: Heals BOTH friendly infantry & vehicles (+4 HP/s, +6 HP/s with Subliminal Messaging) + grants +25% fire rate Horde buff + visual soundwave ring!
+                if (['speakerTower', 'propagandaCenter'].includes(structure.type)) {
+                    const hasSub = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
+                    const healAmt = hasSub ? 6 : 4;
+                    if (typeof spawnPropagandaPulseRing === 'function') {
+                        spawnPropagandaPulseRing(structure.position, hasSub);
+                    }
+                    units.forEach(unit => {
+                        if (unit.health > 0 && unit.mesh && unit.mesh.position.distanceTo(structure.position) < 26) {
+                            if (unit.health < unit.maxHealth) {
+                                unit.health = Math.min(unit.maxHealth, unit.health + healAmt);
+                            }
+                            unit.isHordeActive = true;
                         }
                     });
                 }
@@ -3129,6 +3304,10 @@ function updateHUD() {
                 }
             }
             document.getElementById('resource-display').textContent = `$${playerResources}`;
+            if (typeof updateSuperweaponTimersHUD === 'function') updateSuperweaponTimersHUD();
+            if (selectedStructure && ['particleCannon', 'nukeSilo', 'scudStorm'].includes(selectedStructure.type)) {
+                updateSidebar();
+            }
         }
 
         
@@ -3147,7 +3326,7 @@ function updateHUD() {
             else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; capacity = 5; garrisoned = []; }
             else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 18; capacity = 4; garrisoned = []; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 3.2; speed = 0.11; health = 220; scanRange = 38; }
-            else if (type === 'dozer') { mesh = createUSADozerMesh(); radius = 3.2; speed = 0.10; health = 300; }
+            else if (type === 'dozer') { mesh = ((typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') === 'china') ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 3.2; speed = 0.10; health = 300; }
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; }
             else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
             else if (type === 'comanche') { mesh = createComancheMesh(); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
@@ -3275,6 +3454,7 @@ function updateHUD() {
             }
             newUnitObj.teamId = playerTeamId;
             newUnitObj.ownerId = 'player';
+            newUnitObj.faction = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
             newUnitObj.isAI = false;
             units.push(newUnitObj);
             if (type === 'crawler') {
@@ -3589,8 +3769,8 @@ function applyGroupFormationMove(selectedList, groundHit) {
     if (selectedList.length === 1) {
         const unit = selectedList[0];
         const bridges = !unit.isAir && typeof findBridgeCrossingsForPath === 'function' ? findBridgeCrossingsForPath(unit.mesh.position, groundHit) : null;
-        if (bridges) {
-            unit.waypoints = [bridges[0], bridges[1], groundHit.clone()];
+        if (bridges && bridges.length > 0) {
+            unit.waypoints = [...bridges.filter(Boolean), groundHit.clone()];
             unit.targetPosition.copy(unit.waypoints.shift());
         } else {
             unit.waypoints = [];
@@ -3616,6 +3796,13 @@ function applyGroupFormationMove(selectedList, groundHit) {
     });
     const squadCenterX = sumX / selectedList.length;
     const squadCenterZ = sumZ / selectedList.length;
+
+    // Fast squad-level bridge routing computed once for the centroid instead of N times
+    const squadCenterV = new THREE.Vector3(squadCenterX, 0, squadCenterZ);
+    const hasGroundUnits = selectedList.some(u => !u.isAir);
+    const squadBridges = (hasGroundUnits && typeof findBridgeCrossingsForPath === 'function')
+        ? findBridgeCrossingsForPath(squadCenterV, groundHit)
+        : null;
 
     const moveDx = groundHit.x - squadCenterX;
     const moveDz = groundHit.z - squadCenterZ;
@@ -3675,9 +3862,8 @@ function applyGroupFormationMove(selectedList, groundHit) {
         const destY = typeof getTerrainHeight === 'function' ? getTerrainHeight(destX, destZ) : 0;
         const destV = new THREE.Vector3(destX, destY, destZ);
 
-        const bridges = !unit.isAir && typeof findBridgeCrossingsForPath === 'function' ? findBridgeCrossingsForPath(unit.mesh.position, destV) : null;
-        if (bridges) {
-            unit.waypoints = [bridges[0], bridges[1], destV];
+        if (squadBridges && squadBridges.length > 0 && !unit.isAir) {
+            unit.waypoints = [...squadBridges.filter(Boolean), destV];
             unit.targetPosition.copy(unit.waypoints.shift());
         } else {
             unit.waypoints = [];

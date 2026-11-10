@@ -319,9 +319,9 @@ function animate() {
                             newUnit.taskState = 'Moving';
                             newUnit.waypoints = [];
                             if (typeof findBridgeCrossingsForPath === 'function') {
-                                const bridges = findBridgeCrossingsForPath(newUnit.mesh.position, slotPos);
-                                if (bridges) {
-                                    newUnit.waypoints = [bridges[0], bridges[1], slotPos.clone()];
+                                const bridges = findBridgeCrossingsForPath(newUnit.mesh.position, slotPos, structure);
+                                if (bridges && bridges.length > 0) {
+                                    newUnit.waypoints = [...bridges.filter(Boolean), slotPos.clone()];
                                     newUnit.targetPosition.copy(newUnit.waypoints.shift());
                                 }
                             }
@@ -504,12 +504,18 @@ function animate() {
                         }
                     }
 
-                    // Battle Drone: Repairs host vehicle (+5 HP/s with welding arc) + fires micro-MG at hostile targets (credits kills to host!)
+                    // Battle Drone: Repairs host vehicle (+8 HP/s stationary, +5 HP/s moving, with welding arc & sparks) + fires micro-MG at hostile targets
                     if (drone.type === 'battle') {
                         if (drone.timer % 60 === 0 && unit.health < unit.maxHealth) {
-                            unit.health = Math.min(unit.maxHealth, unit.health + 5);
+                            const isMoving = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z) > 0.8;
+                            const repairAmt = isMoving ? 5 : 8;
+                            unit.health = Math.min(unit.maxHealth, unit.health + repairAmt);
+                            const hullPos = unit.mesh.position.clone().add(new THREE.Vector3(0, 1.1, 0));
                             if (typeof spawnLaserBeam === 'function') {
-                                spawnLaserBeam(dMesh.position.clone(), unit.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 0x00d2d3, 1.5);
+                                spawnLaserBeam(dMesh.position.clone(), hullPos, 0x00d2d3, 1.5);
+                            }
+                            if (typeof spawnSparks === 'function') {
+                                spawnSparks(hullPos, 0x00f2fe, 5);
                             }
                             if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
                         }
@@ -614,15 +620,21 @@ function animate() {
                         }
                     }
 
-                    // Overlord Propaganda Tower: Heals nearby allies (+4 HP/s) and grants Horde fire-rate buff (+25%)
-                    if (unit.overlordUpgrade === 'propaganda' && unit.upgTimer % 60 === 0) {
-                        const maxDistSq = 18.0 * 18.0;
-                        units.forEach(ally => {
+                    // Overlord Propaganda / Speaker Tower: Heals nearby allies (+4 HP/s, +6 HP/s with Subliminal Messaging) and grants Horde fire-rate buff (+25%)
+                    if ((unit.overlordUpgrade === 'propaganda' || unit.overlordUpgrade === 'speaker') && unit.upgTimer % 60 === 0) {
+                        const maxDistSq = 20.0 * 20.0;
+                        const hasSub = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
+                        const healAmt = hasSub ? 6 : 4;
+                        if (typeof spawnPropagandaPulseRing === 'function') {
+                            spawnPropagandaPulseRing(unit.mesh.position, hasSub);
+                        }
+                        const myTeamList = unit.isAI ? enemyUnits : units;
+                        myTeamList.forEach(ally => {
                             if (ally.health > 0 && ally.mesh) {
                                 const dx = ally.mesh.position.x - uX;
                                 const dz = ally.mesh.position.z - uZ;
                                 if ((dx * dx + dz * dz) <= maxDistSq) {
-                                    ally.health = Math.min(ally.maxHealth, ally.health + 4);
+                                    ally.health = Math.min(ally.maxHealth, ally.health + healAmt);
                                     ally.isHordeActive = true;
                                 }
                             }
@@ -860,7 +872,15 @@ function animate() {
                             }
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
                             const bFaction = s.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
-                            if (!isAiStruct && typeof playBuildingCompleteSound === 'function') {
+                            if (['particleCannon', 'nukeSilo', 'scudStorm'].includes(s.type)) {
+                                s.swMaxCooldown = (typeof getSuperweaponMaxCooldownTicks === 'function') ? getSuperweaponMaxCooldownTicks(s.type) : 7200;
+                                s.cooldownUntil = buildingTick + s.swMaxCooldown;
+                                s._readyAnnounced = false;
+                                if (typeof playSuperweaponEvaAlert === 'function') {
+                                    playSuperweaponEvaAlert(s.type, 'detected', typeof selectedFaction !== 'undefined' ? selectedFaction : bFaction);
+                                }
+                                if (typeof updateSuperweaponTimersHUD === 'function') updateSuperweaponTimersHUD();
+                            } else if (!isAiStruct && typeof playBuildingCompleteSound === 'function') {
                                 playBuildingCompleteSound(s.type, bFaction);
                             }
                             if (s.type !== 'supplyCenter' && !isAiStruct) {
@@ -1511,6 +1531,16 @@ function animate() {
                 const dist2D = Math.hypot(dx, dz);
 
                 if (dist2D > stopBuffer) {
+                    // Nuke Cannon Outrigger Siege Logic: if given a move order, automatically pack up outriggers before driving!
+                    if ((unit.type === 'nukecannon' || unit.type === 'nuketank') && unit.isDeployed) {
+                        if (unit.taskState === 'Moving' && typeof undeployNukeCannonOutriggers === 'function') {
+                            undeployNukeCannonOutriggers(unit);
+                        } else {
+                            // Halt chassis while deployed in siege mode firing at a target
+                            unit.targetPosition.copy(unit.mesh.position);
+                            return;
+                        }
+                    }
                     const dirX = dx / dist2D;
                     const dirZ = dz / dist2D;
                     const step = Math.min(dist2D, unit.speed * combatDeltaScale);
@@ -1628,7 +1658,9 @@ function animate() {
                     // Reached waypoint: advance to next waypoint if routing across bridges!
                     if (unit.waypoints && unit.waypoints.length > 0) {
                         const nextWp = unit.waypoints.shift();
-                        unit.targetPosition.copy(nextWp);
+                        if (nextWp && typeof nextWp.x === 'number') {
+                            unit.targetPosition.copy(nextWp);
+                        }
                     } else {
                         // Reached final destination! Transition to Idle so it stops driving
                         if (unit.taskState === 'Moving') {

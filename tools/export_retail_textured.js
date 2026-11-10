@@ -14,6 +14,7 @@ const VEHICLE_CONFIG = {
     'ambulance':      { file: 'AvAmbulance.W3D',  tex: 'avhummer.dds',     scale: 0.290, faction: 'usa' },
     'tomahawk':       { file: 'avtomahawk.W3D',   tex: 'avtomahawk.dds',   scale: 0.320, faction: 'usa' },
     'dozer':          { file: 'avconstdoz.W3D',   tex: 'avconstdoz.dds',   scale: 0.290, faction: 'usa' },
+    'dozer_china':    { file: 'nvconstdoz.W3D',   tex: 'nvconstdoz.dds',   scale: 0.290, faction: 'china' },
     'chinook':        { file: 'AVChinook.W3D',    tex: 'avchinook.dds',    scale: 0.300, faction: 'usa' },
     'comanche':       { file: 'AVComanche.W3D',   tex: 'avcomanche.dds',   scale: 0.280, faction: 'usa' },
     'raptor':         { file: 'avraptor.W3D',     tex: 'avraptor.dds',     scale: 0.300, faction: 'usa' },
@@ -26,6 +27,9 @@ const VEHICLE_CONFIG = {
     // China
     'battlemaster':   { file: 'NVBtMstr.W3D',     tex: 'nvbtmstr.dds',     scale: 0.320, faction: 'china' },
     'overlord':       { file: 'NVOvrlrd.W3D',     tex: 'nvovrlrd.dds',     scale: 0.360, faction: 'china' },
+    'overlord_bunker':  { file: 'NVOvrlrd_B.W3D', tex: 'nvovrlrd_u.dds',   scale: 1.0,   faction: 'china' },
+    'overlord_gatling': { file: 'NVOvrlrd_G.W3D', tex: 'nvovrlrd_u.dds',   scale: 1.0,   faction: 'china' },
+    'overlord_speaker': { file: 'NVOvrlrd_S.W3D', tex: 'nvovrlrd_u.dds',   scale: 1.0,   faction: 'china' },
     'gatling':        { file: 'NVGattTank.W3D',   tex: 'nvgatttank.dds',   scale: 0.290, faction: 'china' },
     'dragon':         { file: 'NVDragon.W3D',     tex: 'nvdragon.dds',     scale: 0.310, faction: 'china' },
     'crawler':        { file: 'NVTCrawler.W3D',   tex: 'nvtcrawler.dds',   scale: 0.320, faction: 'china' },
@@ -70,21 +74,21 @@ const BUILDING_CONFIG = {
     'china_airfield':       { file: 'NBAirfield.W3D',  tex: 'nbairfield.dds',   scale: 0.260, faction: 'china' },
     'china_gatlingCannon':  { file: 'NBGattling.W3D',  scale: 0.200, faction: 'china' },
     'china_bunker':         { file: 'NBBunker.W3D',    scale: 0.200, faction: 'china' },
-    'china_speakerTower':   { file: 'NBSpeaker.W3D',   scale: 0.200, faction: 'china' },
-    'china_propagandaCenter': { file: 'NBPropCen.W3D', scale: 0.260, faction: 'china' },
-    'china_nukeSilo':       { file: 'NBNukeSilo.W3D',  scale: 0.270, faction: 'china' },
-    'china_internetCenter': { file: 'NBIntCent.W3D',   scale: 0.270, faction: 'china' },
+    'china_speakerTower':   { file: 'NBPTower.W3D',    tex: 'nbptower.dds', scale: 0.200, faction: 'china' },
+    'china_propagandaCenter': { file: 'NBPCenter.W3D', tex: 'nbprpcntrbs.dds', scale: 0.260, faction: 'china' },
+    'china_nukeSilo':       { file: 'NBNMissle.W3D',   tex: 'ntnmissle.dds', scale: 0.270, faction: 'china' },
+    'china_internetCenter': { file: 'NBIntCnt.W3D',    tex: 'ntintrntbase.dds', scale: 0.270, faction: 'china' },
 
     // GLA
     'gla_commandCenter':    { file: 'UBCmdHQ.W3D',     scale: 0.270, faction: 'gla' },
-    'gla_supplyCenter':     { file: 'UBSupCent.W3D',   scale: 0.260, faction: 'gla' },
+    'gla_supplyCenter':     { file: 'UBSupply.W3D',    scale: 0.260, faction: 'gla' },
     'gla_barracks':         { file: 'UBBarracks.W3D',  scale: 0.260, faction: 'gla' },
-    'gla_factory':          { file: 'UBArmsDeal.W3D',  scale: 0.260, faction: 'gla' },
-    'gla_tunnel':           { file: 'UBTunnel.W3D',    scale: 0.200, faction: 'gla' },
-    'gla_stingerSite':      { file: 'UBStinger.W3D',   scale: 0.200, faction: 'gla' },
+    'gla_factory':          { file: 'UBArmDeal.W3D',   scale: 0.260, faction: 'gla' },
+    'gla_tunnel':           { file: 'UBUndTunn.W3D',   scale: 0.200, faction: 'gla' },
+    'gla_stingerSite':      { file: 'UBStingerS.W3D',  scale: 0.200, faction: 'gla' },
     'gla_palace':           { file: 'UBPalace.W3D',    scale: 0.270, faction: 'gla' },
-    'gla_blackMarket':      { file: 'UBBlkMrkt.W3D',   scale: 0.260, faction: 'gla' },
-    'gla_scudStorm':        { file: 'UBScudStm.W3D',   scale: 0.270, faction: 'gla' },
+    'gla_blackMarket':      { file: 'UBBlackMkt.W3D',  scale: 0.260, faction: 'gla' },
+    'gla_scudStorm':        { file: 'UBScudStrm.W3D',  scale: 0.270, faction: 'gla' },
     'gla_hole':             { file: 'UBHole.W3D',      scale: 0.200, faction: 'gla' },
 
     // Tech / Neutral Structures
@@ -139,7 +143,21 @@ const EXTRA_TEXTURES = {
     'ztoilpump': 'ztoilpump.dds',
     'avbattledr': 'avbattledr.dds',
     'avrepairdr': 'avrepairdr.dds',
-    'avhelldrone': 'avhelldrone.dds'
+    'avhelldrone': 'avhelldrone.dds',
+    'nbptower': 'nbptower.dds',
+    'ntnmissle': 'ntnmissle.dds',
+    'ntintrntbase': 'ntintrntbase.dds',
+    'nvconstdoz': 'nvconstdoz.dds',
+    'nvovrlrd_u': 'nvovrlrd_u.dds',
+    'nbprpcntrbs': 'nbprpcntrbs.dds',
+    'nbflag': 'nbflag.dds',
+    'nbsign01': 'nbsign01.dds',
+    'nbsign02': 'nbsign02.dds',
+    'nbsign03': 'nbsign03.dds',
+    'nbsign04': 'nbsign04.dds',
+    'nbsign05': 'nbsign05.dds',
+    'nbsign06': 'nbsign06.dds',
+    'ntbambfence01': 'ntbambfence01.dds'
 };
 
 // Clean disconnected rogue test boxes or vertex spikes from meshes
@@ -222,6 +240,10 @@ function processModels(map) {
                 }
                 c.v = newV; c.i = newI; if (c.u) c.u = newU;
             }
+        } else if (key === 'overlord') {
+            // Remove unrotated barrel trim wrap rings that float into the sky without W3D pivot quaternions
+            if (filteredMeshes['nvovrlrd.housecolor01']) delete filteredMeshes['nvovrlrd.housecolor01'];
+            if (filteredMeshes['nvovrlrd.housecolor04']) delete filteredMeshes['nvovrlrd.housecolor04'];
         }
 
         // Canonical 3D Axis Alignment for Aircraft, Helicopters, and Drones (+Z forward, +Y up, +X right):
@@ -1089,9 +1111,33 @@ function getW3dTexture(modelKey) {
     }
 }
 
-/**
- * Creates an authentic Westwood 3D vehicle mesh with UV texture mapping & pivot hierarchy.
- */
+window.W3D_GEOM_CACHE = window.W3D_GEOM_CACHE || {};
+window.W3D_MAT_CACHE = window.W3D_MAT_CACHE || {};
+
+function getCachedW3DGeometry(cacheKey, mdata) {
+    let geom = window.W3D_GEOM_CACHE[cacheKey];
+    if (geom) return geom;
+    geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v, 3));
+    if (mdata.u && mdata.u.length > 0) {
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
+    }
+    geom.setIndex(mdata.i);
+    geom.computeVertexNormals();
+    geom.userData = { _shared: true };
+    window.W3D_GEOM_CACHE[cacheKey] = geom;
+    return geom;
+}
+
+function getCachedW3DMaterial(cacheKey, factoryFn) {
+    let mat = window.W3D_MAT_CACHE[cacheKey];
+    if (mat) return mat;
+    mat = factoryFn();
+    if (mat) mat.userData = Object.assign(mat.userData || {}, { _shared: true });
+    window.W3D_MAT_CACHE[cacheKey] = mat;
+    return mat;
+}
+
 function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     if (!window.W3D_VEHICLE_DATA || !window.W3D_VEHICLE_DATA[modelKey]) {
         if (typeof fallbackFn === 'function') return fallbackFn(isEnemy);
@@ -1103,36 +1149,37 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     const scale = data.s || 0.09;
 
     const vTex = getW3dTexture(modelKey);
+    const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? 'E' : 'F') + ':';
     let hullMat, houseMat;
     if (isEnemy) {
-        hullMat = vTex 
+        hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => vTex 
             ? new THREE.MeshStandardMaterial({ map: vTex, color: 0xaa4444, roughness: 0.6, metalness: 0.25 })
-            : new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.52, metalness: 0.35 });
-        houseMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 });
+            : new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.52, metalness: 0.35 }));
+        houseMat = getCachedW3DMaterial('veh:enemy:house', () => new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 }));
     } else {
         if (vTex) {
-            hullMat = new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 });
+            hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 }));
         } else {
             if (faction === 'usa') {
-                hullMat = (typeof matUSA !== 'undefined') ? matUSA : new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.5, metalness: 0.35 });
+                hullMat = (typeof matUSA !== 'undefined') ? matUSA : getCachedW3DMaterial('veh:usa:hull', () => new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.5, metalness: 0.35 }));
             } else if (faction === 'china') {
-                hullMat = (typeof matChina !== 'undefined') ? matChina : new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.55, metalness: 0.3 });
+                hullMat = (typeof matChina !== 'undefined') ? matChina : getCachedW3DMaterial('veh:china:hull', () => new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.55, metalness: 0.3 }));
             } else {
-                hullMat = (typeof matGLA !== 'undefined') ? matGLA : new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 });
+                hullMat = (typeof matGLA !== 'undefined') ? matGLA : getCachedW3DMaterial('veh:gla:hull', () => new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 }));
             }
         }
         if (faction === 'usa') {
-            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 });
+            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : getCachedW3DMaterial('veh:usa:house', () => new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 }));
         } else if (faction === 'china') {
-            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 });
+            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : getCachedW3DMaterial('veh:china:house', () => new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 }));
         } else {
-            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.78, metalness: 0.2 });
+            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : getCachedW3DMaterial('veh:gla:house', () => new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.78, metalness: 0.2 }));
         }
     }
 
-    const treadMat = (typeof matTread !== 'undefined') ? matTread : new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 });
-    const metalMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.7 });
-    const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 });
+    const treadMat = (typeof matTread !== 'undefined') ? matTread : getCachedW3DMaterial('veh:tread', () => new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 }));
+    const metalMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : getCachedW3DMaterial('veh:metal', () => new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.7 }));
+    const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : getCachedW3DMaterial('veh:glass', () => new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 }));
 
     const pivotGroups = [];
     data.p.forEach(p => {
@@ -1144,7 +1191,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const upper = name.toUpperCase();
         if (upper === 'TURRET' || upper === 'TURRET01') {
             grp.name = 'turretSystem';
-        } else if (upper.includes('BARRELS') || upper.includes('BARREL')) {
+        } else if ((upper.includes('BARRELS') || upper.includes('BARREL')) && (modelKey === 'gatling' || modelKey === 'overlord_gatling')) {
             grp.name = 'gatlingBarrels';
         } else if (upper.includes('RADAR') || upper.includes('DISH')) {
             grp.name = 'radarDish';
@@ -1165,13 +1212,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
 
-        const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v, 3));
-        if (mdata.u && mdata.u.length > 0) {
-            geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
-        }
-        geom.setIndex(mdata.i);
-        geom.computeVertexNormals();
+        const geom = getCachedW3DGeometry('veh:' + modelKey + ':' + meshName, mdata);
 
         const upper = meshName.toUpperCase();
         let mat = hullMat;
@@ -1219,24 +1260,28 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         if (r2) r2.name = 'chinook_rotor2';
     }
 
-    const isAirUnit = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig', 'drone_battle', 'drone_scout', 'drone_hellfire'].includes(modelKey);
+    const isAirUnit = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig', 'drone_battle', 'drone_scout', 'drone_hellfire', 'overlord_bunker', 'overlord_gatling', 'overlord_speaker'].includes(modelKey);
     if (!isAirUnit) {
-        let minY = 1e9;
-        root.traverse(c => {
-            if (c.isMesh && c.geometry && c.geometry.attributes.position) {
-                const pos = c.geometry.attributes.position;
-                for (let i = 0; i < pos.count; i++) {
-                    const vy = pos.getY(i);
-                    let curY = vy;
-                    let p = c.parent;
-                    while (p && p !== root) {
-                        curY += p.position.y;
-                        p = p.parent;
+        if (data._cachedMinY === undefined) {
+            let minY = 1e9;
+            root.traverse(c => {
+                if (c.isMesh && c.geometry && c.geometry.attributes && c.geometry.attributes.position) {
+                    const pos = c.geometry.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        const vy = pos.getY(i);
+                        let curY = vy;
+                        let p = c.parent;
+                        while (p && p !== root) {
+                            curY += p.position.y;
+                            p = p.parent;
+                        }
+                        if (curY < minY) minY = curY;
                     }
-                    if (curY < minY) minY = curY;
                 }
-            }
-        });
+            });
+            data._cachedMinY = minY;
+        }
+        const minY = data._cachedMinY;
         if (minY < 1e8 && minY < 0) {
             const shiftY = -minY;
             root.children.forEach(child => {
@@ -1346,13 +1391,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
 
-        const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v, 3));
-        if (mdata.u && mdata.u.length > 0) {
-            geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
-        }
-        geom.setIndex(mdata.i);
-        geom.computeVertexNormals();
+        const geom = getCachedW3DGeometry('bld:' + buildingKey + ':' + meshName, mdata);
 
         const upper = meshName.toUpperCase();
         let subTex = null;
@@ -1376,11 +1415,11 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
             // Authentic metallic cooling tower finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
-        } else if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
-            mat = accentMat;
         } else if (subTex) {
             mat = new THREE.MeshStandardMaterial({ map: subTex, roughness: 0.65, metalness: 0.25 });
             if (isEnemy) mat.color.setHex(0xaa4444);
+        } else if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
+            mat = accentMat;
         } else if (bTex) {
             mat = bldMat;
         } else {
@@ -1424,23 +1463,27 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         root.add(glow2);
     }
 
-    // Align base foundation to y = 0
-    let minBldY = 1e9;
-    root.traverse(c => {
-        if (c.isMesh && c.geometry && c.geometry.attributes.position) {
-            const pos = c.geometry.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-                const vy = pos.getY(i);
-                let curY = vy;
-                let p = c.parent;
-                while (p && p !== root) {
-                    curY += p.position.y;
-                    p = p.parent;
+    // Align base foundation to y = 0 (PERF: cache minBldY per buildingKey)
+    if (data._cachedMinBldY === undefined) {
+        let minBldY = 1e9;
+        root.traverse(c => {
+            if (c.isMesh && c.geometry && c.geometry.attributes && c.geometry.attributes.position) {
+                const pos = c.geometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const vy = pos.getY(i);
+                    let curY = vy;
+                    let p = c.parent;
+                    while (p && p !== root) {
+                        curY += p.position.y;
+                        p = p.parent;
+                    }
+                    if (curY < minBldY) minBldY = curY;
                 }
-                if (curY < minBldY) minBldY = curY;
             }
-        }
-    });
+        });
+        data._cachedMinBldY = minBldY;
+    }
+    const minBldY = data._cachedMinBldY;
     if (minBldY < 1e8 && minBldY < 0) {
         const shiftY = -minBldY + 0.35;
         root.children.forEach(child => {

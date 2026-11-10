@@ -58,9 +58,31 @@ const THREE = {
         this.position = new THREE.Vector3();
         this.rotation = { x: 0, y: 0, z: 0, set: (x,y,z) => { this.rotation.x = x; this.rotation.y = y; this.rotation.z = z; } };
         this.scale = { x: 1, y: 1, z: 1, set: (x,y,z) => { this.scale.x = x; this.scale.y = y; this.scale.z = z; } };
-        this.add = (c) => this.children.push(c);
-        this.getObjectByName = () => null;
-        this.traverse = () => {};
+        this.add = (c) => { c.parent = this; this.children.push(c); };
+        this.remove = (c) => {
+            const idx = this.children.indexOf(c);
+            if (idx >= 0) this.children.splice(idx, 1);
+        };
+        this.getObjectByName = (n) => {
+            if (this.name === n) return this;
+            for (let c of this.children) {
+                if (c.name === n) return c;
+                if (c.getObjectByName) {
+                    const found = c.getObjectByName(n);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+        this.traverse = (cb) => {
+            cb(this);
+            for (let c of this.children) {
+                if (c.traverse) c.traverse(cb);
+                else cb(c);
+            }
+        };
+        this.getWorldPosition = (v) => { if (v && v.copy) v.copy(this.position); return v || this.position; };
+        this.getWorldQuaternion = (q) => q || new THREE.Quaternion();
         this.userData = {};
     },
     Mesh: function(geo, mat) {
@@ -69,11 +91,13 @@ const THREE = {
         this.position = new THREE.Vector3();
         this.rotation = { x: 0, y: 0, z: 0, set: (x,y,z) => { this.rotation.x = x; this.rotation.y = y; this.rotation.z = z; } };
         this.scale = { x: 1, y: 1, z: 1, set: (x,y,z) => { this.scale.x = x; this.scale.y = y; this.scale.z = z; } };
-        this.traverse = () => {};
+        this.traverse = (cb) => cb(this);
         this.userData = {};
         this.add = () => {};
         this.remove = () => {};
-        this.getObjectByName = () => null;
+        this.getObjectByName = (n) => this.name === n ? this : null;
+        this.getWorldPosition = (v) => { if (v && v.copy) v.copy(this.position); return v || this.position; };
+        this.getWorldQuaternion = (q) => q || new THREE.Quaternion();
     },
     Line: function(geo, mat) {
         this.geometry = geo || { dispose: () => {} };
@@ -178,6 +202,7 @@ const sandbox = {
         removeItem: () => {}
     },
     console: console,
+    fs: fs,
     Math: Math,
     Date: Date,
     setTimeout: (cb) => { return 1; },
@@ -816,8 +841,71 @@ vm.runInContext(`
         if (blockedStruct !== null) {
             throw new Error("spawnAIStructure allowed AI to place a structure with 0 live builders!");
         }
+
+        // --- CHINA & OVERLORD & INFANTRY VERIFICATION ---
+        // 1. Overlord Upgrades attachment & muzzle points & clean geometry
+        const testOverlord = { type: 'overlord', mesh: createW3DVehicleMesh('overlord', false) };
+        if (!testOverlord.mesh || !testOverlord.mesh.getObjectByName('FIREPOINT01')) {
+            throw new Error("Overlord mesh missing FIREPOINT01 attachment bone!");
+        }
+        if (window.W3D_VEHICLE_DATA.overlord.m['nvovrlrd.housecolor01'] || window.W3D_VEHICLE_DATA.overlord.m['nvovrlrd.housecolor04']) {
+            throw new Error("Overlord mesh contains rogue unrotated barrel trim meshes (floating U-shaped bits)!");
+        }
+        ['bunker', 'gatling', 'speaker'].forEach(upgType => {
+            attachOverlordUpgrade(testOverlord, upgType);
+            if (!testOverlord.overlordUpgradeMesh || testOverlord.overlordUpgrade !== upgType) {
+                throw new Error("Failed to attach Overlord upgrade: " + upgType);
+            }
+            if (testOverlord.overlordUpgradeMesh.position.y < 7.0) {
+                throw new Error("Overlord upgrade mounted too low (submerged inside turret): Y=" + testOverlord.overlordUpgradeMesh.position.y);
+            }
+        });
+        const muzzlePosL = getMuzzleWorldPosition(testOverlord, -0.45);
+        const muzzlePosR = getMuzzleWorldPosition(testOverlord, 0.45);
+        if (!muzzlePosL || typeof muzzlePosL.x !== 'number' || !muzzlePosR || typeof muzzlePosR.x !== 'number') {
+            throw new Error("getMuzzleWorldPosition returned invalid muzzle coordinates for Overlord!");
+        }
+        const barrelSpread = Math.abs(muzzlePosL.x - muzzlePosR.x);
+        if (barrelSpread < 1.0) {
+            throw new Error("Overlord dual cannon muzzle spread too narrow: " + barrelSpread);
+        }
+
+        // 2. China Dozer Skin & Voice Keys
+        if (!window.W3D_VEHICLE_DATA || !window.W3D_VEHICLE_DATA['dozer_china']) {
+            throw new Error("W3D_VEHICLE_DATA missing dozer_china model!");
+        }
+        const chinaDozer = createChinaDozerMesh(false);
+        if (!chinaDozer || !chinaDozer.userData || !chinaDozer.userData.isW3D) {
+            throw new Error("createChinaDozerMesh did not return valid W3D mesh!");
+        }
+        const audioSrc = fs.readFileSync('D:/C&C/src/js/05b_official_audio.js', 'utf8');
+        if (!audioSrc.includes('voice_dozer_china_select_0') || !audioSrc.includes('voice_dozer_china_move_0') || !audioSrc.includes('voice_dozer_china_build_0')) {
+            throw new Error("05b_official_audio.js missing official Chinese dozer voice lines!");
+        }
+
+        // 3. China Propaganda Center Model & Texture
+        if (!window.W3D_BUILDING_DATA || !window.W3D_BUILDING_DATA['china_propagandaCenter']) {
+            throw new Error("W3D_BUILDING_DATA missing china_propagandaCenter!");
+        }
+        const propCenter = createW3DBuildingMesh('china_propagandaCenter', false);
+        if (!propCenter || !propCenter.userData || !propCenter.userData.isW3D) {
+            throw new Error("createW3DBuildingMesh did not return valid W3D mesh for Propaganda Center!");
+        }
+
+        // 4. Group Movement Waypoint Safety (no undefined waypoints)
+        const squad = [
+            { type: 'redguard', mesh: new THREE.Mesh(), targetPosition: new THREE.Vector3(0, 0, 0), waypoints: [], taskState: 'Idle', isAir: false },
+            { type: 'redguard', mesh: new THREE.Mesh(), targetPosition: new THREE.Vector3(2, 0, 0), waypoints: [], taskState: 'Idle', isAir: false }
+        ];
+        applyGroupFormationMove(squad, new THREE.Vector3(20, 0, 20));
+        squad.forEach(u => {
+            if (u.waypoints && u.waypoints.some(wp => !wp || typeof wp.x !== 'number')) {
+                throw new Error("applyGroupFormationMove created undefined or non-vector waypoint!");
+            }
+        });
     }
 `, sandbox);
 console.log("✓ Verified Veterancy Kill Counter, Passenger Fireports, USA Vehicle Drones (Scout/Battle/Hellfire), Special Unit Mechanics, and AI Builder Requirement.");
+console.log("✓ Verified China Overlord W3D Upgrades (Bunker, Gatling, Speaker), Dual Muzzles, China Dozer Skin & Voices, Propaganda Center W3D & Textures, and Stutter-Free Group Move.");
 
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

@@ -436,6 +436,14 @@ function createTomahawkMesh(isEnemy = false) {
     return g;
 }
 
+function createChinaDozerMesh(isEnemy = false) {
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['dozer_china']) {
+        return createW3DVehicleMesh('dozer_china', isEnemy);
+    }
+    return createUSADozerMesh(isEnemy);
+}
+window.createChinaDozerMesh = createChinaDozerMesh;
+
 function createUSADozerMesh(isEnemy = false) {
     if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['dozer']) {
         return createW3DVehicleMesh('dozer', isEnemy);

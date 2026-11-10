@@ -31,11 +31,15 @@ if (typeof window !== 'undefined') {
 
 function isAudioAllowed(type, faction = null) {
     if (typeof selectedFaction === 'undefined') return true;
-    const globalSounds = ['superweapon_siren', 'orbital_beam', 'nuke_detonation', 'scud_storm_volley', 'explosion', 'construction', 'infantry_squish', 'laser_point_defense', 'scrap_pickup', 'gla_salvage'];
+    const globalSounds = [
+        'superweapon_siren', 'orbital_beam', 'nuke_detonation', 'scud_storm_volley', 'scud_detonation',
+        'explosion', 'construction', 'infantry_squish', 'laser_point_defense', 'scrap_pickup', 'gla_salvage',
+        'nuke_artillery', 'nukecannon_deploy', 'nukecannon_undeploy', 'overlord_cannon', 'speaker_pulse', 'drone_repair'
+    ];
     if (globalSounds.includes(type)) return true;
 
     const targetFaction = faction || (type.startsWith('china') || ['gatling_fire', 'flamethrower', 'propaganda_drone', 'nuke_artillery'].includes(type) ? 'china' : (type.startsWith('gla') || ['ak47', 'technical_rev', 'scud_launch', 'demo_beep', 'scrap_pickup'].includes(type)) ? 'gla' : 'usa');
-    return selectedFaction === targetFaction;
+    return true; // All combat sounds on the battlefield are audible
 }
 
 function isUSASoundAllowed() {
@@ -44,6 +48,27 @@ function isUSASoundAllowed() {
 
 function playAudio(type, options = {}, faction = null) {
     if (!isAudioAllowed(type, faction)) return;
+
+    // Trigger authentic retail WAV from 05b_official_audio.js when available
+    if (typeof playOfficialSound === 'function') {
+        const officialMap = {
+            nuke_artillery: 'sfx_nukecannon_fire',
+            nukecannon_deploy: 'sfx_nukecannon_deploy',
+            nukecannon_undeploy: 'sfx_nukecannon_undeploy',
+            overlord_cannon: 'sfx_overlord_fire',
+            speaker_pulse: 'sfx_speaker_tower',
+            orbital_beam: 'sfx_particle_beam',
+            nuke_detonation: 'sfx_nuke_blast',
+            scud_storm_volley: 'sfx_scud_alarm',
+            scud_detonation: 'sfx_scud_blast',
+            superweapon_siren: 'sfx_nuke_siren',
+            drone_repair: 'sfx_drone_fire'
+        };
+        if (officialMap[type]) {
+            playOfficialSound(officialMap[type], options.volume || 0.90);
+        }
+    }
+
     const ctx = getAudioContext();
     if (!ctx) return;
     const t = ctx.currentTime;

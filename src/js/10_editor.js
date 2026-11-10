@@ -516,6 +516,7 @@
                     u.ownerId = 'player';
                     u.isAI = false;
                     u.taskState = 'Idle';
+                    u.faction = faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
                 }
             });
             const builderName = (faction === 'gla' ? 'Worker' : 'Construction Dozer');

@@ -2109,3 +2109,79 @@ body {
     border-radius: 2px;
     border: 1px solid rgba(255, 255, 255, 0.35);
 }
+
+/* Official C&C Generals Top-Right Superweapon Countdown HUD */
+.superweapon-timers-hud {
+    position: fixed;
+    top: 44px;
+    right: 12px;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: auto;
+    min-width: 220px;
+}
+
+.sw-timer-row {
+    background: linear-gradient(90deg, rgba(10, 16, 22, 0.92) 0%, rgba(20, 30, 38, 0.95) 100%);
+    border: 1px solid #3c5261;
+    border-left: 4px solid #00f2fe;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: #ecf0f1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.65);
+    transition: all 0.2s ease;
+}
+
+.sw-timer-row.sw-usa { border-left-color: #00f2fe; }
+.sw-timer-row.sw-china { border-left-color: #ff4757; }
+.sw-timer-row.sw-gla { border-left-color: #2ecc71; }
+.sw-timer-row.sw-ready {
+    border-color: #ffd700;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.55);
+    cursor: pointer;
+}
+.sw-timer-row.sw-ready:hover {
+    transform: translateX(-2px);
+    background: linear-gradient(90deg, rgba(28, 42, 30, 0.95) 0%, rgba(40, 58, 38, 0.98) 100%);
+}
+
+.sw-timer-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.sw-timer-name {
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.sw-timer-clock {
+    font-weight: 900;
+    color: #ffd700;
+}
+
+.sw-timer-bar-track {
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.sw-timer-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00f2fe, #55efc4);
+    transition: width 0.25s linear;
+}
+.sw-timer-row.sw-china .sw-timer-bar-fill { background: linear-gradient(90deg, #ff4757, #ffa502); }
+.sw-timer-row.sw-gla .sw-timer-bar-fill { background: linear-gradient(90deg, #2ecc71, #a3cb38); }

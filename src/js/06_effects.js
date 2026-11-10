@@ -794,19 +794,60 @@
 
         // Muzzle position helper for realistic weapon firing origins
         function getMuzzleWorldPosition(attacker, xOffset = 0) {
+            if (!attacker || !attacker.mesh) return new THREE.Vector3();
+
+            // Ensure world matrix transforms are synchronously up to date
+            if (typeof attacker.mesh.updateMatrixWorld === 'function') {
+                attacker.mesh.updateMatrixWorld(true);
+            }
+
+            // Authentic Overlord dual 190mm cannons (exact world-scale offsets from turretSystem)
+            if (attacker.type === 'overlord') {
+                const turret = attacker.mesh.getObjectByName("turretSystem") || attacker.mesh;
+                const wp = new THREE.Vector3();
+                if (typeof turret.getWorldPosition === 'function') turret.getWorldPosition(wp);
+                else wp.copy(attacker.mesh.position || new THREE.Vector3());
+                const q = (typeof turret.getWorldQuaternion === 'function')
+                    ? turret.getWorldQuaternion(new THREE.Quaternion())
+                    : (attacker.mesh.quaternion ? attacker.mesh.quaternion.clone() : new THREE.Quaternion());
+                const latOffset = (xOffset < 0) ? -0.94 : (xOffset > 0 ? 0.94 : 0);
+                const forward = new THREE.Vector3(latOffset, 0.86, 11.62).applyQuaternion(q);
+                return wp.add(forward);
+            }
+
+            // 1. Direct bone query for authentic W3D muzzle points (MUZZLE01 / MUZZLE02 / MUZZLEFX)
+            if (attacker.mesh.userData && attacker.mesh.userData.isW3D) {
+                let mBone = null;
+                if (xOffset < 0) {
+                    mBone = attacker.mesh.getObjectByName("MUZZLE02") || attacker.mesh.getObjectByName("MUZZLE01") || attacker.mesh.getObjectByName("MUZZLE");
+                } else {
+                    mBone = attacker.mesh.getObjectByName("MUZZLE01") || attacker.mesh.getObjectByName("MUZZLE02") || attacker.mesh.getObjectByName("MUZZLE");
+                }
+                if (mBone && typeof mBone.getWorldPosition === 'function') {
+                    const wp = new THREE.Vector3();
+                    mBone.getWorldPosition(wp);
+                    return wp;
+                }
+            }
+
             const turret = attacker.mesh.getObjectByName("turretSystem");
             if (turret) {
                 const wp = new THREE.Vector3();
-                turret.getWorldPosition(wp);
-                const q = turret.getWorldQuaternion(new THREE.Quaternion());
-                const forward = new THREE.Vector3(xOffset, 0.15, 1.6).applyQuaternion(q);
+                if (typeof turret.getWorldPosition === 'function') turret.getWorldPosition(wp);
+                else wp.copy(attacker.mesh.position);
+                const q = (typeof turret.getWorldQuaternion === 'function')
+                    ? turret.getWorldQuaternion(new THREE.Quaternion())
+                    : (attacker.mesh.quaternion ? attacker.mesh.quaternion.clone() : new THREE.Quaternion());
+                const forwardDist = (attacker.type === 'battlemaster' || attacker.type === 'crusader') ? 2.8 : 1.6;
+                const forward = new THREE.Vector3(xOffset, 0.15, forwardDist).applyQuaternion(q);
                 wp.add(forward);
                 return wp;
             }
-            const wp = attacker.mesh.position.clone();
+            const wp = attacker.mesh.position ? attacker.mesh.position.clone() : new THREE.Vector3();
             wp.y += attacker.isAir ? -0.25 : 0.8;
             if (xOffset !== 0) {
-                const side = new THREE.Vector3(xOffset, 0, 0).applyQuaternion(attacker.mesh.quaternion);
+                const q = attacker.mesh.quaternion ? attacker.mesh.quaternion : new THREE.Quaternion();
+                const side = new THREE.Vector3(xOffset, 0, 0).applyQuaternion(q);
                 wp.add(side);
             }
             return wp;
@@ -818,32 +859,64 @@
         // CINEMATIC ANIMATED SUPERWEAPONS (PARTICLE CANNON, NUKE SILO, SCUD STORM)
         // =========================================================================
 
-        function animateParticleCannonStrike(targetPos, duration = 240) {
+        function animateParticleCannonStrike(targetPos, duration = 260, uplinkPos = null) {
+            if (typeof playSuperweaponEvaAlert === 'function') {
+                playSuperweaponEvaAlert('particleCannon', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+            }
             playAudio('orbital_beam');
+            if (typeof triggerScreenShake === 'function') triggerScreenShake(1.1);
 
             const group = new THREE.Group();
             group.position.copy(targetPos);
+            window.activeParticleCannonTarget = targetPos.clone();
 
-            // 1. Searing orbital column
-            const beamGeo = new THREE.CylinderGeometry(0.8, 1.4, 90, 16);
-            const beamMat = new THREE.MeshBasicMaterial({ color: 0x00d2d3, transparent: true, opacity: 0.95 });
+            // 1. Searing inner white-hot core + outer cyan orbital plasma column
+            const coreGeo = new THREE.CylinderGeometry(0.45, 0.75, 110, 16);
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98 });
+            const coreBeam = new THREE.Mesh(coreGeo, coreMat);
+            coreBeam.position.y = 55;
+            group.add(coreBeam);
+
+            const beamGeo = new THREE.CylinderGeometry(1.15, 2.1, 110, 20, 1, true);
+            const beamMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.72, side: THREE.DoubleSide });
             const beam = new THREE.Mesh(beamGeo, beamMat);
-            beam.position.y = 45;
+            beam.position.y = 55;
             group.add(beam);
+
+            // Ground impact plasma flare disc
+            const flareGeo = new THREE.RingGeometry(0.4, 4.2, 28);
+            flareGeo.rotateX(-Math.PI / 2);
+            const flareMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+            const flareDisc = new THREE.Mesh(flareGeo, flareMat);
+            flareDisc.position.y = 0.25;
+            group.add(flareDisc);
 
             // 2. Rotating orbital energy vortex rings
             const rings = [];
-            for (let i = 0; i < 4; i++) {
-                const rGeo = new THREE.RingGeometry(1.6 + i * 0.6, 2.0 + i * 0.6, 24);
+            for (let i = 0; i < 5; i++) {
+                const rGeo = new THREE.RingGeometry(1.8 + i * 0.65, 2.35 + i * 0.65, 24);
                 rGeo.rotateX(-Math.PI / 2);
-                const rMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+                const rMat = new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xffffff : 0x00f2fe, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
                 const r = new THREE.Mesh(rGeo, rMat);
-                r.position.y = 6 + i * 14;
+                r.position.y = 4 + i * 14;
                 group.add(r);
                 rings.push(r);
             }
 
             scene.add(group);
+
+            // Optional Uplink Beam shooting straight up from the Particle Cannon structure into orbit
+            let uplinkGroup = null;
+            if (uplinkPos) {
+                uplinkGroup = new THREE.Group();
+                uplinkGroup.position.copy(uplinkPos);
+                const upGeo = new THREE.CylinderGeometry(0.45, 0.45, 110, 12);
+                const upMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.85 });
+                const upMesh = new THREE.Mesh(upGeo, upMat);
+                upMesh.position.y = 57;
+                uplinkGroup.add(upMesh);
+                scene.add(uplinkGroup);
+            }
 
             let life = duration;
             let sweepAngle = 0;
@@ -853,46 +926,71 @@
                 life: duration,
                 update() {
                     life--;
-                    sweepAngle += 0.08;
-                    const sweepRadius = Math.sin((duration - life) * 0.02) * 12.0;
+                    sweepAngle += 0.065;
+                    // Allow player to steer the active Particle Cannon beam by clicking on the map, or sweep automatically
+                    if (window.activeParticleCannonTarget && window.activeParticleCannonTarget.distanceTo(originCenter) > 1.5) {
+                        originCenter.lerp(window.activeParticleCannonTarget, 0.08);
+                    }
+                    const sweepRadius = Math.sin((duration - life) * 0.025) * 11.0;
                     group.position.x = originCenter.x + Math.cos(sweepAngle) * sweepRadius;
                     group.position.z = originCenter.z + Math.sin(sweepAngle) * sweepRadius;
-                    group.position.y = getTerrainHeight(group.position.x, group.position.z);
+                    group.position.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(group.position.x, group.position.z) : 0;
+
+                    const pulse = 0.92 + Math.sin(life * 0.6) * 0.16;
+                    coreBeam.scale.set(pulse, 1, pulse);
+                    beam.scale.set(1.0 + Math.cos(life * 0.4) * 0.18, 1, 1.0 + Math.cos(life * 0.4) * 0.18);
+                    flareDisc.scale.setScalar(0.9 + Math.sin(life * 0.5) * 0.25);
 
                     rings.forEach((r, idx) => {
-                        r.rotation.y += 0.15 * (idx % 2 === 0 ? 1 : -1);
-                        r.scale.setScalar(1 + Math.sin(Date.now() * 0.02 + idx) * 0.2);
+                        r.rotation.z += 0.16 * (idx % 2 === 0 ? 1 : -1);
+                        r.scale.setScalar(1 + Math.sin(Date.now() * 0.02 + idx) * 0.22);
                     });
 
-                    // Ground electrical sizzle & sparks
-                    if (Math.random() < 0.8) {
-                        spawnSparks(group.position, 0x00d2d3, 8);
-                        spawnSmokePuff(group.position, 0x222f3e, 0.6);
+                    // Ground electrical sizzle, molten scorch & sparks
+                    if (Math.random() < 0.85) {
+                        spawnSparks(group.position, 0x00f2fe, 9);
+                        spawnSmokePuff(group.position, 0x222f3e, 0.65);
+                    }
+                    if (life % 20 === 0 && typeof triggerScreenShake === 'function') {
+                        triggerScreenShake(0.35);
                     }
 
                     // Continuous damage tick to hostile units & structures in beam path
                     if (life % 10 === 0) {
                         const beamPos = group.position;
                         enemyUnits.forEach(enemy => {
-                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(beamPos) <= 9.0) {
-                                enemy.health -= 35;
+                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(beamPos) <= 9.5) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(null, enemy, 45, 'LASER');
+                                } else {
+                                    enemy.health -= 45;
+                                }
                             }
                         });
                         enemyStructures.forEach(struct => {
-                            if (struct.health > 0 && struct.position && struct.position.distanceTo(beamPos) <= 12.0) {
-                                struct.health -= 50;
+                            if (struct.health > 0 && struct.position && struct.position.distanceTo(beamPos) <= 12.5) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(null, struct, 65, 'LASER');
+                                } else {
+                                    struct.health -= 65;
+                                }
                             }
                         });
-                        if (Math.random() < 0.2) {
-                            spawnCraterDecal(beamPos, 2.5, 300);
+                        if (Math.random() < 0.35) {
+                            spawnCraterDecal(beamPos, 2.6, 360);
                         }
                     }
 
                     if (life <= 0) {
+                        window.activeParticleCannonTarget = null;
                         scene.remove(group);
                         group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
-                        spawnEnhancedExplosion(group.position, 0x00d2d3, 2.8, true);
-                        spawnCraterDecal(group.position, 4.0, 480);
+                        if (uplinkGroup) {
+                            scene.remove(uplinkGroup);
+                            uplinkGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+                        }
+                        spawnEnhancedExplosion(group.position, 0x00d2d3, 3.0, true);
+                        spawnCraterDecal(group.position, 4.2, 480);
                         return false;
                     }
                     return true;
@@ -901,60 +999,108 @@
         }
 
         function animateNukeStrike(siloPos, targetPos) {
+            if (typeof playSuperweaponEvaAlert === 'function') {
+                playSuperweaponEvaAlert('nukeSilo', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'china');
+            }
             playAudio('superweapon_siren');
 
-            // 1. Ascending ICBM from Silo
+            // Target Warning Hazard Reticle on the Ground
+            const warnGroup = new THREE.Group();
+            const tGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+            warnGroup.position.set(targetPos.x, tGroundY + 0.2, targetPos.z);
+            const warnRing = new THREE.Mesh(
+                new THREE.RingGeometry(2.5, 3.2, 32),
+                new THREE.MeshBasicMaterial({ color: 0xff2222, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+            );
+            warnRing.rotation.x = -Math.PI / 2;
+            warnGroup.add(warnRing);
+            scene.add(warnGroup);
+
+            // 1. Ascending Chinese ICBM from Silo with booster fins & exhaust flame
             const missileGroup = new THREE.Group();
-            missileGroup.position.copy(siloPos || targetPos);
-            const mGeo = new THREE.CylinderGeometry(0.4, 0.45, 4.2, 8);
+            const origin = (siloPos ? siloPos.clone() : targetPos.clone());
+            missileGroup.position.copy(origin);
+            const mGeo = new THREE.CylinderGeometry(0.45, 0.52, 4.8, 12);
             const mMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, metalness: 0.8, roughness: 0.2 });
             const missileBody = new THREE.Mesh(mGeo, mMat);
             missileGroup.add(missileBody);
 
-            const noseGeo = new THREE.ConeGeometry(0.4, 1.2, 8);
-            const noseMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
+            const stripeGeo = new THREE.CylinderGeometry(0.47, 0.49, 1.1, 12);
+            const stripeMat = new THREE.MeshBasicMaterial({ color: 0xc0392b });
+            const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+            stripe.position.y = 0.8;
+            missileGroup.add(stripe);
+
+            const noseGeo = new THREE.ConeGeometry(0.45, 1.5, 12);
+            const noseMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.3 });
             const nose = new THREE.Mesh(noseGeo, noseMat);
-            nose.position.y = 2.7;
+            nose.position.y = 3.15;
             missileGroup.add(nose);
 
+            const plumeGeo = new THREE.ConeGeometry(0.55, 2.6, 10);
+            plumeGeo.rotateX(Math.PI);
+            const plumeMat = new THREE.MeshBasicMaterial({ color: 0xffa502, transparent: true, opacity: 0.95 });
+            const plume = new THREE.Mesh(plumeGeo, plumeMat);
+            plume.position.y = -3.4;
+            missileGroup.add(plume);
+
             scene.add(missileGroup);
+            if (siloPos) {
+                for (let s = 0; s < 6; s++) {
+                    spawnSmokePuff(siloPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4, 1.2, (Math.random() - 0.5) * 4)), 0xdcdde1, 1.2);
+                }
+            }
 
             let phase = 'ascent';
             let frame = 0;
 
             activeFX.push({
-                life: 200,
+                life: 220,
                 update() {
                     frame++;
+                    warnRing.scale.setScalar(1.0 + Math.sin(frame * 0.35) * 0.25);
+                    plume.scale.set(0.85 + Math.random() * 0.35, 0.85 + Math.random() * 0.45, 0.85 + Math.random() * 0.35);
+
                     if (phase === 'ascent') {
-                        missileGroup.position.y += 1.8;
-                        spawnSmokePuff(missileGroup.position, 0xff793f, 0.8);
-                        if (missileGroup.position.y > 90) {
+                        missileGroup.position.y += 1.9;
+                        spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3(0, -2.5, 0)), 0xff793f, 0.95);
+                        if (missileGroup.position.y > 95) {
                             phase = 'descent';
-                            missileGroup.position.set(targetPos.x, 100, targetPos.z);
-                            missileGroup.rotation.x = Math.PI; // point down
+                            missileGroup.position.set(targetPos.x, 105, targetPos.z);
+                            missileGroup.rotation.x = Math.PI; // point straight down
                         }
                     } else if (phase === 'descent') {
-                        missileGroup.position.y -= 3.2;
-                        spawnSmokePuff(missileGroup.position, 0xff5252, 0.9);
-                        const groundY = getTerrainHeight(targetPos.x, targetPos.z);
-                        if (missileGroup.position.y <= groundY + 1.0) {
+                        missileGroup.position.y -= 3.4;
+                        spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3(0, 2.5, 0)), 0xff5252, 1.0);
+                        const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+                        if (missileGroup.position.y <= groundY + 1.2) {
                             scene.remove(missileGroup);
                             missileGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+                            scene.remove(warnGroup);
+                            warnGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
 
-                            // Detonation!
+                            // Thermonuclear Detonation!
                             playAudio('nuke_detonation');
+                            if (typeof triggerScreenShake === 'function') triggerScreenShake(2.4);
                             spawnMushroomCloud(targetPos);
 
-                            // Apocalyptic damage: 750 to enemies within 25 units
+                            // Apocalyptic damage: 850 to enemies within 28 units
                             enemyUnits.forEach(enemy => {
-                                if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(targetPos) <= 25.0) {
-                                    enemy.health -= 750;
+                                if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(targetPos) <= 26.0) {
+                                    if (typeof applyCalculatedDamage === 'function') {
+                                        applyCalculatedDamage(null, enemy, 850, 'EXPLOSIVE');
+                                    } else {
+                                        enemy.health -= 850;
+                                    }
                                 }
                             });
                             enemyStructures.forEach(struct => {
                                 if (struct.health > 0 && struct.position && struct.position.distanceTo(targetPos) <= 28.0) {
-                                    struct.health -= 750;
+                                    if (typeof applyCalculatedDamage === 'function') {
+                                        applyCalculatedDamage(null, struct, 850, 'EXPLOSIVE');
+                                    } else {
+                                        struct.health -= 850;
+                                    }
                                 }
                             });
                             return false;
@@ -965,61 +1111,105 @@
             });
         }
 
-        function spawnMushroomCloud(pos) {
-            const groundY = getTerrainHeight(pos.x, pos.z);
+        function spawnMushroomCloud(pos, scaleMult = 1.0) {
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : 0;
 
-            // 1. Colossal expanding cap
-            const capGeo = new THREE.SphereGeometry(3.5, 16, 16);
-            const capMat = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.95 });
+            // 0. Blinding initial white-gold thermal flash dome
+            const flashGeo = new THREE.SphereGeometry(5.5 * scaleMult, 20, 20);
+            const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 });
+            const flashDome = new THREE.Mesh(flashGeo, flashMat);
+            flashDome.position.set(pos.x, groundY + 1.5, pos.z);
+            scene.add(flashDome);
+
+            // 1. Colossal expanding mushroom cap + rolling torus rim
+            const capGeo = new THREE.SphereGeometry(3.8 * scaleMult, 20, 20);
+            const capMat = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.96 });
             const cap = new THREE.Mesh(capGeo, capMat);
-            cap.position.set(pos.x, groundY + 4, pos.z);
+            cap.position.set(pos.x, groundY + 4 * scaleMult, pos.z);
             scene.add(cap);
 
-            // 2. Vertical rising stem
-            const stemGeo = new THREE.CylinderGeometry(1.2, 2.2, 14, 12);
-            const stemMat = new THREE.MeshBasicMaterial({ color: 0x2f3542, transparent: true, opacity: 0.85 });
+            const torusGeo = new THREE.TorusGeometry(3.2 * scaleMult, 1.35 * scaleMult, 12, 24);
+            torusGeo.rotateX(Math.PI / 2);
+            const torusMat = new THREE.MeshBasicMaterial({ color: 0xff9f43, transparent: true, opacity: 0.9 });
+            const torusRing = new THREE.Mesh(torusGeo, torusMat);
+            torusRing.position.set(pos.x, groundY + 3.5 * scaleMult, pos.z);
+            scene.add(torusRing);
+
+            // 2. Vertical rising fireball & dust stem
+            const stemGeo = new THREE.CylinderGeometry(1.4 * scaleMult, 2.6 * scaleMult, 14 * scaleMult, 14);
+            const stemMat = new THREE.MeshBasicMaterial({ color: 0xd35400, transparent: true, opacity: 0.88 });
             const stem = new THREE.Mesh(stemGeo, stemMat);
-            stem.position.set(pos.x, groundY + 7, pos.z);
+            stem.position.set(pos.x, groundY + 7 * scaleMult, pos.z);
             scene.add(stem);
 
-            // 3. Supersonic shockwave ring
-            const ringGeo = new THREE.RingGeometry(1.5, 4.5, 32);
+            // 3. Dual supersonic shockwave rings (ground & atmospheric Mach condensation ring)
+            const ringGeo = new THREE.RingGeometry(1.8 * scaleMult, 4.8 * scaleMult, 36);
             ringGeo.rotateX(-Math.PI / 2);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffa502, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
             const shockwave = new THREE.Mesh(ringGeo, ringMat);
-            shockwave.position.set(pos.x, groundY + 0.2, pos.z);
+            shockwave.position.set(pos.x, groundY + 0.25, pos.z);
             scene.add(shockwave);
 
-            // 4. Crater and lingering fallout
-            spawnCraterDecal(pos, 7.5, 800);
+            const machGeo = new THREE.RingGeometry(2.2 * scaleMult, 3.0 * scaleMult, 32);
+            machGeo.rotateX(-Math.PI / 2);
+            const machMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+            const machRing = new THREE.Mesh(machGeo, machMat);
+            machRing.position.set(pos.x, groundY + 9 * scaleMult, pos.z);
+            scene.add(machRing);
+
+            // 4. Crater and lingering radioactive fallout field
+            spawnCraterDecal(pos, 8.0 * scaleMult, 900);
             spawnLingeringToxinCloud(pos);
 
-            let life = 60;
+            const maxLife = Math.round(95 * Math.max(0.6, scaleMult));
+            let life = maxLife;
             activeFX.push({
-                life: 60,
+                life: maxLife,
                 update() {
                     life--;
-                    const progress = 1 - (life / 60);
+                    const progress = 1 - (life / maxLife);
 
-                    // Cap expands and billows upward
-                    cap.position.y = groundY + 4 + progress * 16;
-                    cap.scale.set(1 + progress * 3.5, 1 + progress * 2.2, 1 + progress * 3.5);
-                    cap.material.opacity = Math.max(0, 0.95 - progress * 0.85);
+                    // Thermal flash rapidly expands and fades in first 25% of lifetime
+                    if (progress < 0.28) {
+                        const fp = progress / 0.28;
+                        flashDome.scale.setScalar(1 + fp * 3.5);
+                        flashDome.material.opacity = Math.max(0, 1.0 - fp);
+                    } else {
+                        flashDome.visible = false;
+                    }
+
+                    // Cap & Torus expand and billow upward
+                    const riseY = groundY + (4 + progress * 20) * scaleMult;
+                    cap.position.y = riseY;
+                    cap.scale.set(1 + progress * 3.8, 1 + progress * 2.4, 1 + progress * 3.8);
+                    cap.material.opacity = Math.max(0, 0.96 - progress * 0.88);
+                    if (progress > 0.45) cap.material.color.setHex(0x57606f);
+
+                    torusRing.position.y = riseY - 1.2 * scaleMult;
+                    torusRing.scale.set(1 + progress * 3.6, 1 + progress * 3.6, 1 + progress * 2.2);
+                    torusRing.material.opacity = Math.max(0, 0.9 - progress * 0.85);
 
                     // Stem stretches
-                    stem.position.y = groundY + (4 + progress * 16) / 2;
-                    stem.scale.set(1 + progress * 1.5, 1 + progress * 2.0, 1 + progress * 1.5);
-                    stem.material.opacity = Math.max(0, 0.85 - progress * 0.8);
+                    stem.position.y = groundY + ((4 + progress * 20) * scaleMult) / 2;
+                    stem.scale.set(1 + progress * 1.6, 1 + progress * 2.2, 1 + progress * 1.6);
+                    stem.material.opacity = Math.max(0, 0.88 - progress * 0.82);
 
-                    // Shockwave expands to 28 units
-                    const rScale = 1 + progress * 6.5;
+                    // Shockwave expands to 28+ units
+                    const rScale = 1 + progress * 7.2;
                     shockwave.scale.set(rScale, rScale, 1);
                     shockwave.material.opacity = Math.max(0, 0.95 - progress * 1.0);
 
+                    const mScale = 1 + progress * 5.0;
+                    machRing.position.y = groundY + (8 + progress * 10) * scaleMult;
+                    machRing.scale.set(mScale, mScale, 1);
+                    machRing.material.opacity = Math.max(0, 0.85 - progress * 1.05);
+
                     if (life <= 0) {
-                        scene.remove(cap); cap.geometry.dispose(); cap.material.dispose();
-                        scene.remove(stem); stem.geometry.dispose(); stem.material.dispose();
-                        scene.remove(shockwave); shockwave.geometry.dispose(); shockwave.material.dispose();
+                        [flashDome, cap, torusRing, stem, shockwave, machRing].forEach(m => {
+                            scene.remove(m);
+                            if (m.geometry) m.geometry.dispose();
+                            if (m.material) m.material.dispose();
+                        });
                         return false;
                     }
                     return true;
@@ -1028,36 +1218,134 @@
         }
 
         function animateScudStormStrike(stormPos, targetPos) {
+            if (typeof playSuperweaponEvaAlert === 'function') {
+                playSuperweaponEvaAlert('scudStorm', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'gla');
+            }
             playAudio('superweapon_siren');
             playAudio('scud_storm_volley');
 
-            // 9-rocket ripple salvo
+            // 9-missile ballistic ripple salvo from the 9 launcher tubes
             for (let i = 0; i < 9; i++) {
                 setTimeout(() => {
-                    const offset = new THREE.Vector3((Math.random() - 0.5) * 24, 0, (Math.random() - 0.5) * 24);
+                    const angle = (i / 9) * Math.PI * 2;
+                    const dist = (i === 0) ? 0 : (6.5 + (i % 2) * 5.5);
+                    const offset = new THREE.Vector3(
+                        Math.cos(angle) * dist + (Math.random() - 0.5) * 3.0,
+                        0,
+                        Math.sin(angle) * dist + (Math.random() - 0.5) * 3.0
+                    );
                     const subTarget = targetPos.clone().add(offset);
-                    const launchOrigin = stormPos ? stormPos.clone() : targetPos.clone().add(new THREE.Vector3(-40, 0, -40));
-                    launchOrigin.y += 2.0;
+                    const tubeOffset = new THREE.Vector3(((i % 3) - 1) * 1.4, 2.4, (Math.floor(i / 3) - 1) * 1.4);
+                    const launchOrigin = (stormPos ? stormPos.clone() : targetPos.clone().add(new THREE.Vector3(-45, 0, -45))).add(tubeOffset);
 
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(launchOrigin, 0xffa502, 1.2);
+                    if (typeof spawnSmokePuff === 'function') spawnSmokePuff(launchOrigin, 0xdcdde1, 1.1);
                     spawnRocketProjectile(launchOrigin, subTarget, true, true);
 
                     setTimeout(() => {
+                        playAudio('scud_detonation');
+                        if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
+                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(subTarget, 0x2ecc71, 3.2, true);
                         enemyUnits.forEach(enemy => {
-                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(subTarget) <= 10.0) {
-                                enemy.health -= 120;
+                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(subTarget) <= 11.5) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(null, enemy, 165, 'EXPLOSIVE');
+                                } else {
+                                    enemy.health -= 165;
+                                }
                             }
                         });
                         enemyStructures.forEach(struct => {
-                            if (struct.health > 0 && struct.position && struct.position.distanceTo(subTarget) <= 12.0) {
-                                struct.health -= 140;
+                            if (struct.health > 0 && struct.position && struct.position.distanceTo(subTarget) <= 13.5) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(null, struct, 195, 'EXPLOSIVE');
+                                } else {
+                                    struct.health -= 195;
+                                }
                             }
                         });
                         spawnLingeringToxinCloud(subTarget);
-                        spawnCraterDecal(subTarget, 3.2, 450);
-                    }, 1400);
-                }, i * 160);
+                        spawnCraterDecal(subTarget, 3.6, 520);
+                    }, 1350);
+                }, i * 155);
             }
         }
+
+        // Expanding Propaganda Aura Soundwave Ring (for Overlord Speaker Tower & Standalone Speaker Tower)
+        function spawnPropagandaPulseRing(pos, isSubliminal = false) {
+            if (!pos || typeof scene === 'undefined' || !scene) return;
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : pos.y;
+            const ringColor = isSubliminal ? 0xff4757 : 0xf1c40f;
+            const ringGeo = new THREE.RingGeometry(0.8, 1.25, 28);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: ringColor,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.75
+            });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.position.set(pos.x, groundY + 0.35, pos.z);
+            scene.add(ringMesh);
+
+            let life = 36;
+            activeFX.push({
+                life: 36,
+                update() {
+                    life--;
+                    const t = 1 - (life / 36);
+                    const s = 1 + t * 14.0;
+                    ringMesh.scale.set(s, s, 1);
+                    ringMat.opacity = Math.max(0, 0.75 * (1 - t));
+                    if (life <= 0) {
+                        scene.remove(ringMesh);
+                        ringGeo.dispose();
+                        ringMat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+        window.spawnPropagandaPulseRing = spawnPropagandaPulseRing;
+
+        // Neutron Shell Radiation Pulse (Wipes out infantry & vehicle crews without destroying tank hulls)
+        function spawnNeutronBlast(pos) {
+            if (!pos || typeof scene === 'undefined' || !scene) return;
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : pos.y;
+            const sphereGeo = new THREE.SphereGeometry(2.2, 16, 16);
+            const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.92 });
+            const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+            sphere.position.set(pos.x, groundY + 1.5, pos.z);
+            scene.add(sphere);
+
+            const ringGeo = new THREE.RingGeometry(1.0, 2.2, 32);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xa29bfe, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.set(pos.x, groundY + 0.3, pos.z);
+            scene.add(ring);
+
+            let life = 35;
+            activeFX.push({
+                life: 35,
+                update() {
+                    life--;
+                    const t = 1 - (life / 35);
+                    sphere.scale.setScalar(1 + t * 4.5);
+                    sphereMat.opacity = Math.max(0, 0.92 * (1 - t));
+                    ring.scale.set(1 + t * 6.5, 1 + t * 6.5, 1);
+                    ringMat.opacity = Math.max(0, 0.95 * (1 - t));
+                    if (life <= 0) {
+                        scene.remove(sphere); sphereGeo.dispose(); sphereMat.dispose();
+                        scene.remove(ring); ringGeo.dispose(); ringMat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+        window.spawnNeutronBlast = spawnNeutronBlast;
 
         // =========================================================================
         // USA VEHICLE DRONE ATTACHMENTS (BATTLE, SCOUT, HELLFIRE)
@@ -1141,7 +1429,8 @@
                 vehicle.detectsStealth = false;
             }
 
-            playAudio('radio_chirp');
+            if (typeof playOfficialSound === 'function') playOfficialSound('sfx_drone_create', 0.90);
+            else playAudio('radio_chirp');
             showNotification(`${vehicle.type.toUpperCase()} deployed ${droneType.toUpperCase()} DRONE!`, 'success');
         }
 
@@ -1176,10 +1465,43 @@
             if (cupola) cupola.visible = false;
             const mast = tank.mesh.getObjectByName("flagMast");
             if (mast) mast.visible = false;
-            const flag = tank.mesh.getObjectByName("plaFlag");
+            const flag = tank.mesh.getObjectByName("plaFlag") || tank.mesh.getObjectByName("FLAG");
             if (flag) flag.visible = false;
             const searchlight = tank.mesh.getObjectByName("cupolaSearchlight");
             if (searchlight) searchlight.visible = false;
+            const dish = tank.mesh.getObjectByName("radardish01") || tank.mesh.getObjectByName("RADARDISH01") || tank.mesh.getObjectByName("radarDish");
+            if (dish) dish.visible = false;
+
+            tank.overlordUpgrade = upgradeType;
+
+            // Authentic Westwood 3D Overlord Upgrades (ChinaVehicle.ini):
+            // - ChinaTankOverlordBattleBunker -> NVOvrlrd_B.W3D on turretSystem roof
+            // - ChinaTankOverlordGattlingCannon -> NVOvrlrd_G.W3D on turretSystem roof
+            // - ChinaTankOverlordPropagandaTower -> NVOvrlrd_S.W3D on turretSystem roof
+            const upgKey = (upgradeType === 'bunker') ? 'overlord_bunker' :
+                           (upgradeType === 'gatling') ? 'overlord_gatling' :
+                           (upgradeType === 'speaker' || upgradeType === 'propaganda') ? 'overlord_speaker' : null;
+
+            if (upgKey && typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA[upgKey]) {
+                const upgMesh = createW3DVehicleMesh(upgKey, !!tank.isEnemy);
+                upgMesh.name = "overlordUpgrade";
+                upgMesh.scale.set(1, 1, 1);
+                // Mount flush on turret roof at Y = 7.42, Z = -1.5 in turretSystem coordinate space
+                upgMesh.position.set(0, 7.42, -1.5);
+                upgMesh.rotation.set(0, 0, 0);
+
+                if (upgradeType === 'gatling') {
+                    // Tag Gatling barrels so combat loop rotates them
+                    const b1 = upgMesh.getObjectByName('BARREL01');
+                    const b2 = upgMesh.getObjectByName('BARREL02');
+                    if (b1) b1.name = 'gatlingBarrels';
+                    if (b2) b2.name = 'gatlingBarrels2';
+                }
+
+                turretSys.add(upgMesh);
+                tank.overlordUpgradeMesh = upgMesh;
+                return;
+            }
 
             const group = new THREE.Group();
             group.name = "overlordUpgrade";
@@ -1298,30 +1620,82 @@
             turretSys.add(group);
             tank.overlordUpgradeMesh = group;
             tank.overlordUpgrade = upgradeType;
+            if (upgradeType === 'bunker') {
+                tank.capacity = 5;
+                if (!tank.garrisoned) tank.garrisoned = [];
+            } else if (upgradeType === 'gatling') {
+                tank.detectsStealth = true;
+            }
 
-            playAudio('construction', {}, 'china');
+            if (typeof playOfficialSound === 'function') {
+                playOfficialSound('sfx_overlord_upgrade', 0.90);
+                const voiceKey = upgradeType === 'bunker' ? 'voice_overlord_bunker' : upgradeType === 'gatling' ? 'voice_overlord_gatling' : 'voice_overlord_speaker';
+                playOfficialSound(voiceKey, 0.92);
+            } else {
+                playAudio('construction', {}, 'china');
+            }
             showNotification(`OVERLORD upgraded with ${upgradeType.toUpperCase()}!`, 'success');
         }
 
         // =========================================================================
-        // CHINA NUKE CANNON OUTRIGGER SIEGE DEPLOYMENT
+        // CHINA NUKE CANNON OUTRIGGER SIEGE DEPLOYMENT & RETRACTION
         // =========================================================================
 
         function deployNukeCannonOutriggers(cannon) {
-            if (cannon.isDeployed) return;
+            if (!cannon || !cannon.mesh || cannon.isDeployed) return;
             cannon.isDeployed = true;
-            playAudio('construction', {}, 'china');
+            cannon.deployTimestamp = Date.now();
+            if (cannon.targetPosition) cannon.targetPosition.copy(cannon.mesh.position);
+            playAudio('nukecannon_deploy', {}, 'china');
 
             const chassis = cannon.mesh;
-            const legMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.8 });
-            [-1.4, 1.4].forEach(x => {
-                [-1.6, 1.6].forEach(z => {
-                    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.8, 6), legMat);
-                    leg.position.set(x, 0.3, z);
-                    chassis.add(leg);
+            let legGroup = chassis.getObjectByName("outriggerLegs");
+            if (legGroup) chassis.remove(legGroup);
+
+            legGroup = new THREE.Group();
+            legGroup.name = "outriggerLegs";
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.85, roughness: 0.3 });
+            const padMat = new THREE.MeshStandardMaterial({ color: 0xc0392b, metalness: 0.6, roughness: 0.4 });
+            [-1.45, 1.45].forEach(x => {
+                [-1.65, 1.65].forEach(z => {
+                    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.16, 0.22), legMat);
+                    strut.position.set(x * 0.78, 0.45, z);
+                    legGroup.add(strut);
+
+                    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.85, 8), legMat);
+                    leg.position.set(x, 0.35, z);
+                    legGroup.add(leg);
+
+                    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.12, 8), padMat);
+                    pad.position.set(x, 0.06, z);
+                    legGroup.add(pad);
                 });
             });
+            chassis.add(legGroup);
+
+            const turret = chassis.getObjectByName("turretSystem");
+            if (turret) turret.rotation.x = -0.32; // Elevate siege barrel
         }
+
+        function undeployNukeCannonOutriggers(cannon) {
+            if (!cannon || !cannon.mesh || !cannon.isDeployed) return;
+            cannon.isDeployed = false;
+            playAudio('nukecannon_undeploy', {}, 'china');
+
+            const chassis = cannon.mesh;
+            const legGroup = chassis.getObjectByName("outriggerLegs");
+            if (legGroup) {
+                chassis.remove(legGroup);
+                legGroup.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) c.material.dispose();
+                });
+            }
+            const turret = chassis.getObjectByName("turretSystem");
+            if (turret) turret.rotation.x = 0;
+        }
+        window.deployNukeCannonOutriggers = deployNukeCannonOutriggers;
+        window.undeployNukeCannonOutriggers = undeployNukeCannonOutriggers;
 
         // Tactical Ground Waypoint Marker & Beacon (Move, Attack, Rally)
         function spawnWaypointMarker(pos, orderType = 'move') {

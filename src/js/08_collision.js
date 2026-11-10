@@ -165,8 +165,8 @@ function resolveObstacleCollisions(unit) {
                     // Automatic bridge rerouting if target is on other side of river
                     if ((!unit.waypoints || unit.waypoints.length === 0) && typeof findBridgeCrossingsForPath === 'function') {
                         const bridges = findBridgeCrossingsForPath(unit.mesh.position, unit.targetPosition);
-                        if (bridges) {
-                            unit.waypoints = [bridges[0], bridges[1], unit.targetPosition.clone()];
+                        if (bridges && bridges.length > 0) {
+                            unit.waypoints = [...bridges.filter(Boolean), unit.targetPosition.clone()];
                             unit.targetPosition.copy(unit.waypoints.shift());
                         }
                     }
@@ -358,7 +358,7 @@ function resolveObstacleCollisions(unit) {
             else if (type === 'humvee') { mesh = createHumveeMesh(true); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; }
             else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 15; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(true); radius = 3.2; speed = 0.11; health = 220; scanRange = 38; }
-            else if (type === 'dozer') { mesh = createUSADozerMesh(); radius = 3.2; speed = 0.10; health = 300; scanRange = 18; }
+            else if (type === 'dozer') { mesh = (faction === 'china' || (typeof enemyFaction !== 'undefined' && enemyFaction === 'china')) ? createChinaDozerMesh(true) : createUSADozerMesh(true); radius = 3.2; speed = 0.10; health = 300; scanRange = 18; }
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; scanRange = 16; }
             else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 550; scanRange = 22; isAir = true; }
             else if (type === 'comanche') { mesh = createComancheMesh(); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
@@ -449,6 +449,7 @@ function resolveObstacleCollisions(unit) {
                 netId: enemyNetId,
                 teamId: 2,
                 ownerId: 'ai_1',
+                faction: faction || (typeof enemyFaction !== 'undefined' ? enemyFaction : 'china'),
                 isAI: true,
                 isAir: isAir,
                 airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',

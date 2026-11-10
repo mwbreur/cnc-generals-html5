@@ -904,6 +904,8 @@ function processEnemyAIEngine() {
                     if (!cmd.stagingTeam) cmd.stagingTeam = [];
                     cmd.stagingTeam.push(eu.netId);
                     eu.targetPosition.copy(cmd.rallyPoint);
+                    eu.taskState = 'Moving';
+                    eu.waypoints = [];
                 }
             }
         }
@@ -1070,6 +1072,7 @@ function processEnemyAIEngine() {
             if (!canLaunchOffensive || isStaging || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
                 if (enemy.mesh.position.distanceTo(cmd.rallyPoint) > 14) {
                     enemy.targetPosition.copy(cmd.rallyPoint);
+                    enemy.taskState = 'Moving';
                 }
                 return;
             }
@@ -1582,7 +1585,7 @@ function processEnemyAIEngine() {
 
             if (units.some(u => u.selected)) {
                 const sel = units.find(u => u.selected);
-                if (sel && typeof playUnitVoice === 'function') playUnitVoice(sel.type, 'move');
+                if (sel && typeof playUnitVoice === 'function') playUnitVoice(sel.type, 'move', sel.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
                 else playUSASound('acknowledge');
             }
             // Ignore if clicking inside UI elements
@@ -1615,7 +1618,7 @@ function processEnemyAIEngine() {
                     if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(targetedStruct.position, 'move');
                     const actionName = targetedStruct.isBuilding ? 'construction' : (targetedStruct.health < targetedStruct.maxHealth ? 'repairs' : 'assignment');
                     showNotification(`Construction crew dispatched to resume ${actionName} on ${targetedStruct.type.toUpperCase()}.`, 'success');
-                    if (typeof playUnitVoice === 'function') playUnitVoice(selectedBuilders[0].type, 'build');
+                    if (typeof playUnitVoice === 'function') playUnitVoice(selectedBuilders[0].type, 'build', selectedBuilders[0].faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
                     updateSidebar();
                     return;
                 }
@@ -1663,7 +1666,7 @@ function processEnemyAIEngine() {
                         spawnWaypointMarker(tPos, 'attack');
                     }
                     if (firstSelected && typeof playUnitVoice === 'function') {
-                        playUnitVoice(firstSelected.type, 'attack');
+                        playUnitVoice(firstSelected.type, 'attack', firstSelected.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
                     }
 
                     const targetPos = (targetedEnemy.position || targetedEnemy.mesh.position).clone();
@@ -1913,7 +1916,7 @@ function processEnemyAIEngine() {
                         selectedSupplyPoint = null;
                         unit.selected = true;
                         addSelectionCircle(unit);
-                        if (typeof playUnitVoice === 'function') playUnitVoice(unit.type, 'select');
+                        if (typeof playUnitVoice === 'function') playUnitVoice(unit.type, 'select', unit.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
                     }
                     updateSidebar();
                     updateHUD();
@@ -1945,7 +1948,7 @@ function processEnemyAIEngine() {
                 if (closestUnit) {
                     closestUnit.selected = true;
                     addSelectionCircle(closestUnit);
-                    if (typeof playUnitVoice === 'function') playUnitVoice(closestUnit.type, 'select');
+                    if (typeof playUnitVoice === 'function') playUnitVoice(closestUnit.type, 'select', closestUnit.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
                     activeSidebarTab = 'production';
                     updateSidebar();
                     updateHUD();
