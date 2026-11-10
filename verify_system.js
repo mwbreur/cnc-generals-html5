@@ -856,8 +856,9 @@ vm.runInContext(`
             if (!testOverlord.overlordUpgradeMesh || testOverlord.overlordUpgrade !== upgType) {
                 throw new Error("Failed to attach Overlord upgrade: " + upgType);
             }
-            if (testOverlord.overlordUpgradeMesh.position.y < 7.0) {
-                throw new Error("Overlord upgrade mounted too low (submerged inside turret): Y=" + testOverlord.overlordUpgradeMesh.position.y);
+            const parentName = testOverlord.overlordUpgradeMesh.parent ? testOverlord.overlordUpgradeMesh.parent.name : '';
+            if (parentName !== 'FIREPOINT01' && testOverlord.overlordUpgradeMesh.position.z > -10) {
+                throw new Error("Overlord upgrade not mounted on rear flat deck (FIREPOINT01 / Z=-15)!");
             }
         });
         const muzzlePosL = getMuzzleWorldPosition(testOverlord, -0.45);

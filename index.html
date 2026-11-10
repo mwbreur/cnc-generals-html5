@@ -9265,34 +9265,43 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                 tank.overlordUpgradeMesh = null;
             }
 
-            // Hide the default command cupola and flag mast so they do not overlap the superstructure
+            // Hide the default command cupola and flag mast if present so they do not overlap
             const cupola = tank.mesh.getObjectByName("commandCupola");
             if (cupola) cupola.visible = false;
             const mast = tank.mesh.getObjectByName("flagMast");
             if (mast) mast.visible = false;
             const flag = tank.mesh.getObjectByName("plaFlag") || tank.mesh.getObjectByName("FLAG");
-            if (flag) flag.visible = false;
+            if (flag) flag.visible = (upgradeType !== 'bunker');
             const searchlight = tank.mesh.getObjectByName("cupolaSearchlight");
             if (searchlight) searchlight.visible = false;
             const dish = tank.mesh.getObjectByName("radardish01") || tank.mesh.getObjectByName("RADARDISH01") || tank.mesh.getObjectByName("radarDish");
-            if (dish) dish.visible = false;
+            if (dish) dish.visible = true;
 
             tank.overlordUpgrade = upgradeType;
 
-            // Authentic Westwood 3D Overlord Upgrades (ChinaVehicle.ini):
-            // - ChinaTankOverlordBattleBunker -> NVOvrlrd_B.W3D on turretSystem roof
-            // - ChinaTankOverlordGattlingCannon -> NVOvrlrd_G.W3D on turretSystem roof
-            // - ChinaTankOverlordPropagandaTower -> NVOvrlrd_S.W3D on turretSystem roof
+            // Authentic Westwood 3D Overlord Upgrades (ChinaVehicle.ini / FactionUnit.ini):
+            // Overlord upgrades attach to bone FIREPOINT01 located on the flat rear deck of the turret (Z = -15, Y = 4.81).
+            // - ChinaTankOverlordBattleBunker -> NVOvrlrd_B.W3D on FIREPOINT01
+            // - ChinaTankOverlordGattlingCannon -> NVOvrlrd_G.W3D on FIREPOINT01
+            // - ChinaTankOverlordPropagandaTower -> NVOvrlrd_S.W3D on FIREPOINT01
             const upgKey = (upgradeType === 'bunker') ? 'overlord_bunker' :
                            (upgradeType === 'gatling') ? 'overlord_gatling' :
                            (upgradeType === 'speaker' || upgradeType === 'propaganda') ? 'overlord_speaker' : null;
+
+            const firepoint = tank.mesh.getObjectByName('FIREPOINT01');
+            const mountBone = firepoint || turretSys;
 
             if (upgKey && typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA[upgKey]) {
                 const upgMesh = createW3DVehicleMesh(upgKey, !!tank.isEnemy);
                 upgMesh.name = "overlordUpgrade";
                 upgMesh.scale.set(1, 1, 1);
-                // Mount flush on turret roof at Y = 7.42, Z = -1.5 in turretSystem coordinate space
-                upgMesh.position.set(0, 7.42, -1.5);
+                // When attached to FIREPOINT01 (already located at Z = -15, Y = 4.81 on the turret rear deck), position is (0, 0, 0).
+                // If attached directly to turretSystem fallback, position is (0, 4.81, -15.0).
+                if (mountBone === firepoint) {
+                    upgMesh.position.set(0, 0, 0);
+                } else {
+                    upgMesh.position.set(0, 4.81, -15.0);
+                }
                 upgMesh.rotation.set(0, 0, 0);
 
                 if (upgradeType === 'gatling') {
@@ -9303,15 +9312,15 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                     if (b2) b2.name = 'gatlingBarrels2';
                 }
 
-                turretSys.add(upgMesh);
+                mountBone.add(upgMesh);
                 tank.overlordUpgradeMesh = upgMesh;
                 return;
             }
 
             const group = new THREE.Group();
             group.name = "overlordUpgrade";
-            // Mount directly onto the turret roof at the cupola mount position!
-            group.position.set(0, 0.88, -0.45);
+            // Mount directly onto the rear flat deck!
+            group.position.set(0, 0.45, -1.8);
 
             if (upgradeType === 'bunker') {
                 // Fortified hexagonal bunker pillbox with vision slits & firing embrasures
