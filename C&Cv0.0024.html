@@ -20199,7 +20199,16 @@ function processEnemyAIEngine() {
             const perimeterPoint = getStructureBuildPerimeterPoint(builder, structure);
             builder.targetPosition.copy(perimeterPoint);
             builder.waypoints = [];
-            if (typeof findBridgeCrossingsForPath === 'function' && builder.mesh) {
+            // Route builders around buildings, cliffs and water instead of sending
+            // them straight toward the construction site. Pathfinding is only run
+            // when a build/repair task is assigned, not every frame.
+            if (builder.mesh && typeof findNavigationPath === 'function') {
+                const route = findNavigationPath(builder.mesh.position, perimeterPoint, { ignoreStruct: structure });
+                if (route && route.length > 0) {
+                    builder.targetPosition.copy(route[0]);
+                    builder.waypoints = route.slice(1);
+                }
+            } else if (typeof findBridgeCrossingsForPath === 'function' && builder.mesh) {
                 const bridges = findBridgeCrossingsForPath(builder.mesh.position, builder.targetPosition, structure);
                 if (bridges && bridges.length > 0) {
                     builder.waypoints = [...bridges, builder.targetPosition.clone()];
@@ -20226,7 +20235,16 @@ function processEnemyAIEngine() {
             const perimeterPoint = getStructureBuildPerimeterPoint(builder, structure);
             builder.targetPosition.copy(perimeterPoint);
             builder.waypoints = [];
-            if (typeof findBridgeCrossingsForPath === 'function' && builder.mesh) {
+            // Route builders around buildings, cliffs and water instead of sending
+            // them straight toward the construction site. Pathfinding is only run
+            // when a build/repair task is assigned, not every frame.
+            if (builder.mesh && typeof findNavigationPath === 'function') {
+                const route = findNavigationPath(builder.mesh.position, perimeterPoint, { ignoreStruct: structure });
+                if (route && route.length > 0) {
+                    builder.targetPosition.copy(route[0]);
+                    builder.waypoints = route.slice(1);
+                }
+            } else if (typeof findBridgeCrossingsForPath === 'function' && builder.mesh) {
                 const bridges = findBridgeCrossingsForPath(builder.mesh.position, builder.targetPosition, structure);
                 if (bridges && bridges.length > 0) {
                     builder.waypoints = [...bridges, builder.targetPosition.clone()];
