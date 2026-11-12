@@ -1,0 +1,48 @@
+name: Build and deploy game
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "src/**"
+      - "build.js"
+      - ".github/workflows/build-and-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-and-deploy-master
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build playable HTML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build standalone game
+        run: node build.js
+
+      - name: Commit generated game files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- index.html 'C&Cv0.0024.html'
+          if git diff --cached --quiet; then
+            echo "Generated game files are already up to date."
+            exit 0
+          fi
+          git commit -m "Build playable game from latest source"
+          git push origin HEAD:master
