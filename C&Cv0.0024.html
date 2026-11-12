@@ -20102,26 +20102,31 @@ function processEnemyAIEngine() {
                     return;
                 }
             }
-            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            const intersect = new THREE.Vector3();
+            // Pointer movement is frequent. Only raycast the terrain while a blueprint
+            // actually needs a ground position; camera rotation and box selection do
+            // not need a terrain intersection.
+            const needsGroundPick = isPlacingBlueprint || !!blueprintMesh;
+            if (!needsGroundPick && !isRotatingCamera && !isDragging) return;
 
-            const groundHit = getGroundIntersectPoint();
-            if (groundHit) {
-                intersect.copy(groundHit);
-                if (isPlacingBlueprint && blueprintMesh && blueprintPlacementPos) {
-                    const dx = groundHit.x - blueprintPlacementPos.x;
-                    const dz = groundHit.z - blueprintPlacementPos.z;
-                    if (Math.hypot(dx, dz) > 1.2) {
-                        blueprintRotationY = Math.atan2(dx, dz);
-                        blueprintMesh.rotation.y = blueprintRotationY;
+            if (needsGroundPick) {
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const groundHit = getGroundIntersectPoint();
+                if (groundHit) {
+                    if (isPlacingBlueprint && blueprintMesh && blueprintPlacementPos) {
+                        const dx = groundHit.x - blueprintPlacementPos.x;
+                        const dz = groundHit.z - blueprintPlacementPos.z;
+                        if (Math.hypot(dx, dz) > 1.2) {
+                            blueprintRotationY = Math.atan2(dx, dz);
+                            blueprintMesh.rotation.y = blueprintRotationY;
+                        }
+                        return;
                     }
-                    return;
-                }
-                if (blueprintMesh) {
-                    updateBlueprintPosition(intersect);
-                    return;
+                    if (blueprintMesh) {
+                        updateBlueprintPosition(groundHit);
+                        return;
+                    }
                 }
             }
 
@@ -20737,7 +20742,8 @@ function processEnemyAIEngine() {
 
             // 1. Check Units (Direct Raycast)
             const unitMeshes = units.filter(u => !u.garrisonedIn && u.mesh).map(u => u.mesh);
-            const unitHits = raycaster.intersectObjects(unitMeshes, true);
+            // Avoid entering Three.js recursive raycasting when there is nothing selectable.
+            const unitHits = unitMeshes.length ? raycaster.intersectObjects(unitMeshes, true) : [];
             if (unitHits.length > 0) {
                 let hit = unitHits[0].object;
                 while (hit.parent && hit.parent !== scene) hit = hit.parent;
@@ -20797,7 +20803,8 @@ function processEnemyAIEngine() {
 
             // 2. Check Structures (Player & Allied)
             const allStructures = [...structures, ...enemyStructures];
-            const structureHits = raycaster.intersectObjects(allStructures.map(structure => structure.mesh).filter(Boolean), true);
+            const structureMeshes = allStructures.map(structure => structure.mesh).filter(Boolean);
+            const structureHits = structureMeshes.length ? raycaster.intersectObjects(structureMeshes, true) : [];
             if (structureHits.length > 0) {
                 let hit = structureHits[0].object;
                 while (hit.parent && hit.parent !== scene) hit = hit.parent;
@@ -20821,7 +20828,7 @@ function processEnemyAIEngine() {
 
             // 3. Check Supply Depots / Field crystals (Selectable per user request!)
             const supplyMeshes = supplyPoints.map(p => p.mesh).filter(Boolean);
-            const supplyHits = raycaster.intersectObjects(supplyMeshes, true);
+            const supplyHits = supplyMeshes.length ? raycaster.intersectObjects(supplyMeshes, true) : [];
             if (supplyHits.length > 0) {
                 let hit = supplyHits[0].object;
                 while (hit.parent && hit.parent !== scene) hit = hit.parent;
