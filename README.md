@@ -148,6 +148,22 @@ The next packaging improvement should preserve the standalone build while adding
 
 This migration should be incremental. Do not delete the current standalone output or change model/audio formats until the existing data and runtime loading paths have been inspected and tested.
 
+### Inspect project file sizes
+
+Before changing asset formats or build output, generate a repeatable inventory:
+
+```bash
+node scripts/report-project-size.js
+```
+
+For machine-readable output:
+
+```bash
+node scripts/report-project-size.js --json
+```
+
+The report lists the largest repository files, total source size, generated HTML size, and JavaScript source modules at least 1 MB. These are on-disk sizes, not compressed network transfer sizes. Use browser DevTools or a local HTTP server to measure transfer size.
+
 ## Controls
 
 - **WASD / Arrow keys:** Move the camera.
