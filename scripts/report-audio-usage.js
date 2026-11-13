@@ -73,7 +73,7 @@ for (const absolutePath of sourceFiles) {
         let match;
         while ((match = pattern.exec(source)) !== null) {
             const before = source.slice(Math.max(0, match.index - 24), match.index);
-            if (/function\\s*$/.test(before)) continue; // Skip function declarations.
+            if (/\bfunction\s*$/.test(before)) continue; // Skip function declarations.
 
             const id = readLiteral(source, pattern.lastIndex);
             const line = lineAt(source, match.index);
