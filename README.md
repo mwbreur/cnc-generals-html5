@@ -164,6 +164,22 @@ node scripts/report-project-size.js --json
 
 The report lists the largest repository files, total source size, generated HTML size, and JavaScript source modules at least 1 MB. These are on-disk sizes, not compressed network transfer sizes. Use browser DevTools or a local HTTP server to measure transfer size.
 
+### Inspect audio references
+
+Before extracting or reorganizing audio, inventory the literal sound IDs used by the gameplay code:
+
+```bash
+node scripts/report-audio-usage.js
+```
+
+For machine-readable output:
+
+```bash
+node scripts/report-audio-usage.js --json
+```
+
+This is a best-effort static scan. It reports literal calls to the audio functions, dynamic calls that need manual review, and the sizes of audio-related source modules. It does not decode or extract sounds. See [the Skirmish audio asset plan](src/audio/README.md) for the proposed groups and safe migration order.
+
 ## Controls
 
 - **WASD / Arrow keys:** Move the camera.
