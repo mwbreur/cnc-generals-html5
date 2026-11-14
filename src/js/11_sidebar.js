@@ -274,7 +274,10 @@ function resumeGame() {
         menu.classList.remove('pause-mode');
     }
     const pauseModal = document.getElementById('ingame-pause-modal');
-    if (pauseModal) pauseModal.style.display = 'none';
+    if (pauseModal) {
+        pauseModal.style.display = 'none';
+        pauseModal.classList.remove('options-mode', 'diplomacy-mode');
+    }
     const startCard = document.getElementById('start-card');
     if (startCard) {
         startCard.style.display = 'none';
@@ -286,7 +289,7 @@ function resumeGame() {
     if (pauseClock) pauseClock.style.display = 'none';
 }
 
-function showInGamePauseModal() {
+function showInGamePauseModal(view = 'options') {
     const menu = document.getElementById('start-menu');
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
@@ -300,6 +303,8 @@ function showInGamePauseModal() {
     if (startCard) startCard.style.display = 'none';
     if (pauseModal) {
         pauseModal.style.display = 'flex';
+        pauseModal.classList.toggle('diplomacy-mode', view === 'diplomacy');
+        pauseModal.classList.toggle('options-mode', view !== 'diplomacy');
         updatePauseModalPlayerList();
     }
     if (pauseWatermark) pauseWatermark.style.display = 'block';
@@ -384,11 +389,16 @@ function toggleControlBar(forceVisible = null) {
 }
 
 function openOptionsMenu() {
-    toggleInGameMenu();
+    if (typeof isMatchActive !== 'undefined' && isMatchActive) showInGamePauseModal('options');
+    else showStartSetupCard();
 }
 
 function openDiplomacyScreen() {
-    toggleInGameMenu();
+    if (typeof isMatchActive !== 'undefined' && isMatchActive) {
+        const modal = document.getElementById('ingame-pause-modal');
+        if (modal && modal.style.display !== 'none' && modal.classList.contains('diplomacy-mode')) resumeGame();
+        else showInGamePauseModal('diplomacy');
+    }
 }
 
 function updatePauseModalPlayerList() {
