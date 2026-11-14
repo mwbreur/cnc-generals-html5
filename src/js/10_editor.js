@@ -860,7 +860,7 @@
             activeSidebarTab = 'production';
             if (count > 0) {
                 const first = units.find(u => u.selected);
-                if (first && typeof playUnitVoice === 'function') playUnitVoice(first.type, 'select');
+                if (first && typeof playUnitVoice === 'function') playUnitVoice(first.type, 'select', first.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
             }
             showNotification(`Selected ${count} ${category} unit(s).`, 'info');
             updateSidebar();

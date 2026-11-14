@@ -46,6 +46,28 @@ vm.runInContext(fs.readFileSync(path.join(root, 'src/js/05b_official_audio.js'),
     if (!played.some(data => data === china.voice_china_dozer_create || data === china.eva_china_unit_ready)) {
         throw new Error('Unit-ready playback did not select an available China voice');
     }
+    const factions = {
+        usa: JSON.parse(fs.readFileSync(path.join(root, 'src/audio/usa.json'), 'utf8')),
+        china,
+        gla: JSON.parse(fs.readFileSync(path.join(root, 'src/audio/gla.json'), 'utf8'))
+    };
+    for (const faction of ['usa', 'china', 'gla']) {
+        context.window.playUnitVoice('worker', 'select', faction);
+        await new Promise(resolve => setImmediate(resolve));
+        const prefix = faction === 'usa' ? 'voice_dozer_usa_select' : faction === 'china' ? 'voice_dozer_china_select' : 'voice_worker_select';
+        const keys = Object.keys(factions[faction]).filter(key => key.startsWith(prefix));
+        if (!keys.length || !keys.some(key => played.includes(factions[faction][key]))) {
+            throw new Error(`Worker selection voice did not use the ${faction} catalog`);
+        }
+    }
+    for (const [faction, expected] of [['usa', 'voice_usa_dozer_create'], ['china', 'voice_china_dozer_create'], ['gla', 'voice_gla_worker_create']]) {
+        context.window.playUnitReadySound('worker', faction);
+        await new Promise(resolve => setImmediate(resolve));
+        const eva = factions[faction][`eva_${faction}_unit_ready`];
+        if (!played.includes(factions[faction][expected]) && (!eva || !played.includes(eva))) {
+            throw new Error(`Worker ready announcement did not use the ${faction} unit or EVA voice`);
+        }
+    }
     const playbackCount = played.length;
     context.window.playUnitVoice('unknown_unit', 'select', 'china');
     await new Promise(resolve => setImmediate(resolve));
@@ -64,7 +86,7 @@ vm.runInContext(fs.readFileSync(path.join(root, 'src/js/05b_official_audio.js'),
     if (embeddedFetches !== 0 || !embedded.window.OFFICIAL_AUDIO_DATA.voice_china_dozer_create) {
         throw new Error('Embedded audio catalog did not load without a network request');
     }
-    console.log('Audio loader checks passed: lazy startup, faction routing, valid voice selection, request caching, and offline embedded catalogs.');
+    console.log('Audio loader checks passed: lazy startup, faction-specific builder voices, valid voice selection, request caching, and offline embedded catalogs.');
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;

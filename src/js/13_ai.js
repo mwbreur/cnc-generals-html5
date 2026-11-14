@@ -118,8 +118,9 @@ window.classifyPathfindPosition = classifyPathfindPosition;
 
 function rebuildPathfindGrid() {
     const mapSize = (typeof currentMapSize !== 'undefined' && currentMapSize > 0) ? currentMapSize : 600;
-    const halfExtent = Math.min(360, mapSize * 0.46);
-    const gridDim = 100;
+    const halfExtent = mapSize * 0.5;
+    // Keep navigation coverage aligned with the actual map, with roughly 10 world units per cell.
+    const gridDim = Math.min(300, Math.max(100, Math.ceil(mapSize / 10)));
     const cellSize = (halfExtent * 2) / gridDim;
     if (!_pathfindGridState.cells || _pathfindGridState.cells.length !== gridDim * gridDim) {
         _pathfindGridState.cells = new Uint8Array(gridDim * gridDim);
@@ -298,7 +299,7 @@ function findNavigationPath(startPos, endPos, options = {}) {
     let closestIdx = startIdx;
     let closestHeur = Math.hypot(gx - sx, gz - sz);
     let iterations = 0;
-    const maxIterations = 2400;
+    const maxIterations = Math.min(totalCells, Math.max(2400, Math.floor(totalCells * 0.35)));
 
     while (heapNodes.length > 0 && iterations++ < maxIterations) {
         const current = popOpen();
@@ -349,7 +350,9 @@ function findNavigationPath(startPos, endPos, options = {}) {
         }
     }
 
-    const traceTarget = found ? goalIdx : closestIdx;
+    // An incomplete search must not be turned into an unsafe straight-line route to the goal.
+    if (!found) return [];
+    const traceTarget = goalIdx;
     if (traceTarget === startIdx) {
         return [endPos.clone()];
     }
@@ -1469,7 +1472,6 @@ function processEnemyAIEngine() {
                 placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
                 const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
                 playUSASound('construction');
-                if (typeof playUnitVoice === 'function') playUnitVoice('dozer', 'build');
                 scene.remove(blueprintMesh);
                 blueprintMesh = null;
                 activeBlueprintType = null;
@@ -1491,8 +1493,28 @@ function processEnemyAIEngine() {
                 }
                 if (assignedBuilder) {
                     assignDozerToStructure(assignedBuilder, newStruct);
+                    if (typeof playUnitVoice === 'function') playUnitVoice(assignedBuilder.type, 'build', assignedBuilder.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
                 }
                 showNotification('Construction started!', 'info');
+                return;
+            }
+            if (e.button === 0 && window.rallyPointPlacementStructure) {
+                const rallyStructure = window.rallyPointPlacementStructure;
+                window.rallyPointPlacementStructure = null;
+                isDragging = false;
+                selectionBox.style.display = 'none';
+                if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) return;
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const groundPoint = getGroundIntersectPoint();
+                if (groundPoint) {
+                    rallyStructure.rallyPoint = groundPoint.clone();
+                    if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(groundPoint, 'rally');
+                    showNotification('Rally point established for ' + rallyStructure.type.toUpperCase() + '.', 'info');
+                    playUSASound('radio_chirp');
+                    updateSidebar();
+                }
                 return;
             }
             if (e.button !== 0 || !isDragging) return;
@@ -1589,7 +1611,16 @@ function processEnemyAIEngine() {
         window.findBridgeCrossingsForPath = findBridgeCrossingsForPath;
 
         function issueMoveCommand(e) {
-            // Check if player has a building selected and right-clicks on ground to set its rally point!
+            // Ignore if clicking inside UI elements
+            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
+                return;
+            }
+
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            // Ground intersections must use the ray for this pointer event, not the previous frame.
             if (selectedStructure && !units.some(u => u.selected)) {
                 if (selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
                     showNotification('Cannot set rally points on allied structures!', 'error');
@@ -1611,14 +1642,6 @@ function processEnemyAIEngine() {
                 if (sel && typeof playUnitVoice === 'function') playUnitVoice(sel.type, 'move', sel.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
                 else playUSASound('acknowledge');
             }
-            // Ignore if clicking inside UI elements
-            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
-                return;
-            }
-
-            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
 
             // 0. Check if right-clicking on a friendly structure (unfinished foundation or damaged building) with Dozers/Workers
             const friendlyStructMeshes = structures.map(s => s.mesh).filter(Boolean);
@@ -1915,6 +1938,15 @@ function processEnemyAIEngine() {
                 return;
             }
 
+            const selectionBefore = units.filter(u => u.selected);
+            const selectedStructureBefore = selectedStructure;
+            const selectedSupplyBefore = selectedSupplyPoint;
+            const selectionChanged = () => {
+                const after = units.filter(u => u.selected);
+                return after.length !== selectionBefore.length || after.some((unit, index) => unit !== selectionBefore[index]) ||
+                    selectedStructure !== selectedStructureBefore || selectedSupplyPoint !== selectedSupplyBefore;
+            };
+
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
@@ -1928,6 +1960,7 @@ function processEnemyAIEngine() {
                 while (hit.parent && hit.parent !== scene) hit = hit.parent;
                 const unit = units.find(candidate => candidate.mesh === hit);
                 if (unit && !unit.garrisonedIn) {
+                    if (!e.shiftKey && unit.selected && selectionBefore.length === 1 && selectedStructure == null && selectedSupplyPoint == null) return;
                     if (e.shiftKey) {
                         // Shift + Click: Add or remove from current selection (Official rule)
                         unit.selected = !unit.selected;
@@ -1935,7 +1968,7 @@ function processEnemyAIEngine() {
                         else removeSelectionCircle(unit);
                     } else {
                         // Normal Click: Deselect previous and select this unit
-                        units.forEach(u => { u.selected = false; removeSelectionCircle(u); });
+                        units.forEach(u => { if (u.selected) { u.selected = false; removeSelectionCircle(u); } });
                         selectedStructure = null;
                         selectedSupplyPoint = null;
                         unit.selected = true;
@@ -1950,7 +1983,7 @@ function processEnemyAIEngine() {
 
             // If not Shift-clicking a unit, clear unit selection for structure click or ground click
             if (!e.shiftKey) {
-                units.forEach(u => { u.selected = false; removeSelectionCircle(u); });
+                units.forEach(u => { if (u.selected) { u.selected = false; removeSelectionCircle(u); } });
                 selectedStructure = null;
                 selectedSupplyPoint = null;
             }
@@ -1970,6 +2003,7 @@ function processEnemyAIEngine() {
                     }
                 }
                 if (closestUnit) {
+                    if (closestUnit.selected && selectionBefore.length === 1 && selectedStructure == null && selectedSupplyPoint == null) return;
                     closestUnit.selected = true;
                     addSelectionCircle(closestUnit);
                     if (typeof playUnitVoice === 'function') playUnitVoice(closestUnit.type, 'select', closestUnit.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
@@ -2035,8 +2069,10 @@ function processEnemyAIEngine() {
                 }
             }
 
-            updateSidebar();
-            updateHUD();
+            if (selectionChanged()) {
+                updateSidebar();
+                updateHUD();
+            }
         }
 
 

@@ -2052,6 +2052,9 @@ function getCameoImg(id, name, faction) {
         'strategycenter': 'strategyCenter',
         'particle': 'particleCannon',
         'particlecannon': 'particleCannon',
+        'ion': 'particleCannon',
+        'ioncannon': 'particleCannon',
+        'ion_cannon': 'particleCannon',
         'supplydrop': 'supplyDrop',
         'detention': 'detentionCamp',
         'detentioncamp': 'detentionCamp',
@@ -2256,7 +2259,7 @@ function cycleSelectBuilder(direction = 1) {
 
     // Audio unit voice feedback
     if (typeof playUnitVoice === 'function') {
-        playUnitVoice(chosen.type, 'select');
+        playUnitVoice(chosen.type, 'select', chosen.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
     }
 
     if (builders.length > 1) {
@@ -3593,6 +3596,7 @@ function triggerRallyPointMode() {
             showNotification('Cannot set rally points on allied structures!', 'error');
             return;
         }
+        window.rallyPointPlacementStructure = selectedStructure;
         showNotification('Click anywhere on battlefield to set Rally Point.', 'info');
     } else {
         showNotification('Select a production building first to set its Rally Point.', 'warning');

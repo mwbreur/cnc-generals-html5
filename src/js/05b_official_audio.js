@@ -73,7 +73,7 @@ function playUnitVoice(unitType, action = 'select', faction = null) {
         norm = fac === 'china' ? 'redguard' : (fac === 'gla' ? 'rebel' : 'ranger');
     } else if (t === 'rocket') {
         norm = fac === 'china' ? 'tankhunter' : (fac === 'gla' ? 'rpg' : 'rocket');
-    } else if (t.includes('dozer') || t.includes('builder')) {
+    } else if (t === 'worker' || t.includes('dozer') || t.includes('builder')) {
         norm = fac === 'china' ? 'dozer_china' : (fac === 'gla' ? 'worker' : 'dozer_usa');
     } else if (t.includes('crusader')) norm = 'crusader';
     else if (t.includes('paladin')) norm = 'paladin';
@@ -160,7 +160,7 @@ function playUnitReadySound(unitType, faction = null) {
         else if (t.includes('stealth')) unitKey = 'voice_usa_stealthfighter_create';
         else if (t.includes('aurora')) unitKey = 'voice_usa_aurora_create';
         else if (t.includes('tomahawk')) unitKey = 'voice_usa_tomahawk_create';
-        else if (t.includes('dozer') || t.includes('builder')) unitKey = 'voice_usa_dozer_create';
+        else if (t === 'worker' || t.includes('dozer') || t.includes('builder')) unitKey = 'voice_usa_dozer_create';
         else if (t.includes('burton')) unitKey = 'voice_usa_burton_create';
         else if (t.includes('pathfinder')) unitKey = 'voice_usa_pathfinder_create';
         else if (t.includes('ambulance')) unitKey = 'voice_usa_ambulance_create';
@@ -178,7 +178,7 @@ function playUnitReadySound(unitType, faction = null) {
         else if (t.includes('nuke')) unitKey = 'voice_china_nukecannon_create';
         else if (t.includes('mig') || t.includes('raptor')) unitKey = 'voice_china_mig_create';
         else if (t.includes('truck')) unitKey = 'voice_china_truck_create';
-        else if (t.includes('dozer') || t.includes('builder')) unitKey = 'voice_china_dozer_create';
+        else if (t === 'worker' || t.includes('dozer') || t.includes('builder')) unitKey = 'voice_china_dozer_create';
     } else if (fac === 'gla') {
         if (t.includes('rebel') || t.includes('infantry')) unitKey = 'voice_gla_rebel_create';
         else if (t.includes('rpg') || t.includes('rocket')) unitKey = 'voice_gla_rpg_create';

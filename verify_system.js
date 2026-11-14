@@ -648,6 +648,23 @@ vm.runInContext(`
             throw new Error("findNavigationPath did not route around blocking structure at origin! length=" + (blockedPath && blockedPath.length));
         }
 
+        // Large maps must use their full navigable area; destinations outside the old ±360 grid used to collapse onto its edge.
+        currentMapSize = 3000;
+        structures = [
+            { type: 'barracks', health: 1200, maxHealth: 1200, radius: 22.0, position: new THREE.Vector3(690, 0, 0), isBuilding: false }
+        ];
+        markPathfindGridDirty();
+        const largeMapStart = new THREE.Vector3(620, 0, 0);
+        const largeMapGoal = new THREE.Vector3(760, 0, 0);
+        const largeMapPath = findNavigationPath(largeMapStart, largeMapGoal);
+        if (!largeMapPath || largeMapPath.length < 2 || !isPathfindSegmentClear(largeMapStart, largeMapPath[0])) {
+            throw new Error("Large-map pathfinding did not route around an obstacle outside the old grid bounds!");
+        }
+        structures = [
+            { type: 'barracks', health: 1200, maxHealth: 1200, radius: 12.0, position: new THREE.Vector3(0, 0, 0), isBuilding: false }
+        ];
+        markPathfindGridDirty();
+
         // C. Verify DozerAIUpdate footprint evacuation (clearFoundationFootprint) & sole-benefactor repair (assignDozerToRepair)
         const trappedUnit = {
             type: 'ranger', health: 100, radius: 1.0, isAir: false,
@@ -727,6 +744,13 @@ vm.runInContext(`
         const testCameoGla = getCameoImg('center', 'Command Center', 'gla');
         if (!testCameoUsa.includes('data:image/png;base64,') || testCameoUsa === testCameoChina || testCameoChina === testCameoGla) {
             throw new Error("getCameoImg failed to return distinct faction-specific official cameos for Command Center!");
+        }
+        const ionCannonCameo = getCameoImg('ionCannon', 'Ion Cannon', 'usa');
+        const particleCannonCameo = getCameoImg('particleCannon', 'Particle Cannon', 'usa');
+        const ionCannonImage = ionCannonCameo && ionCannonCameo.match(/src="([^"]+)"/);
+        const particleCannonImage = particleCannonCameo && particleCannonCameo.match(/src="([^"]+)"/);
+        if (!ionCannonImage || !ionCannonImage[1].startsWith('data:image/png;base64,') || !particleCannonImage || ionCannonImage[1] !== particleCannonImage[1]) {
+            throw new Error("USA Ion Cannon menu alias did not resolve to the official Particle Cannon cameo!");
         }
 
         // B. Verify all 12 Official EA Skirmish Maps & SAGE Water Behavior
