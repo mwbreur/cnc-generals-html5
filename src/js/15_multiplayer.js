@@ -8,30 +8,35 @@
         let mpOpponentFaction = 'china';
         let netIdSequence = 100;
 
-        // --- GAME MODE & MULTIPLAYER LOBBY TABS ---
+        // --- DEDICATED SKIRMISH, MULTIPLAYER, AND EDITOR SCREENS ---
+        let currentStartMenuMode = 'single';
+
         function switchGameModeTab(mode) {
-            const spTab = document.getElementById('tab-mode-sp');
-            const mpTab = document.getElementById('tab-mode-mp');
-            const edTab = document.getElementById('tab-mode-editor');
             const spPanel = document.getElementById('sp-controls-panel');
             const mpPanel = document.getElementById('mp-controls-panel');
             const edPanel = document.getElementById('editor-controls-panel');
+            const menuTitle = document.getElementById('setup-screen-title');
+            const factionSection = document.getElementById('faction-selection');
 
-            [spTab, mpTab, edTab].forEach(t => { if (t) t.classList.remove('active'); });
+            if (!['single', 'multiplayer', 'editor'].includes(mode)) mode = 'single';
+            currentStartMenuMode = mode;
             [spPanel, mpPanel, edPanel].forEach(p => { if (p) p.style.display = 'none'; });
 
             if (mode === 'single') {
-                if (spTab) spTab.classList.add('active');
                 if (spPanel) spPanel.style.display = 'block';
+                if (menuTitle) menuTitle.textContent = 'Skirmish';
+                if (factionSection) factionSection.style.display = '';
                 onMapSelectionChange('single');
             } else if (mode === 'multiplayer') {
-                if (mpTab) mpTab.classList.add('active');
                 if (mpPanel) mpPanel.style.display = 'block';
+                if (menuTitle) menuTitle.textContent = 'Multiplayer';
+                if (factionSection) factionSection.style.display = '';
                 if (!netPeer) initHostPeer();
                 onMapSelectionChange('multiplayer');
             } else if (mode === 'editor') {
-                if (edTab) edTab.classList.add('active');
                 if (edPanel) edPanel.style.display = 'block';
+                if (menuTitle) menuTitle.textContent = 'Map Editor';
+                if (factionSection) factionSection.style.display = 'none';
                 renderEditorCanvas();
                 loadSavedMapsList();
             }

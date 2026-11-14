@@ -61,20 +61,15 @@
             <div class="menu-header-banner">
                 <img id="menu-skirmish-emblem" class="menu-skirmish-emblem" alt="" style="display:none;" />
                 <div class="menu-header-titles">
-                    <h1>Skirmish Setup</h1>
+                    <h1 id="setup-screen-title">Skirmish</h1>
                     <img id="menu-ruler-img" class="menu-ruler-img" alt="" style="display:none;" />
                 </div>
                 <img id="menu-faction-crest" class="menu-faction-crest" alt="" style="display:none;" />
             </div>
 
             <!-- Game Mode Switcher Tabs (Single Player, Multiplayer, Map Editor) -->
-            <div class="game-mode-tabs" role="tablist">
-                <button id="tab-mode-sp" class="mode-tab-btn active" onclick="switchGameModeTab('single')">🤖 SKIRMISH</button>
-                <button id="tab-mode-mp" class="mode-tab-btn" onclick="switchGameModeTab('multiplayer')">🌐 MULTIPLAYER (PEER.JS)</button>
-                <button id="tab-mode-editor" class="mode-tab-btn" onclick="switchGameModeTab('editor')">🗺️ MAP EDITOR</button>
-            </div>
-
             <!-- Faction Selection -->
+            <div id="faction-selection">
             <p style="margin: 6px 0 4px 0; font-size: 12px; color: #a8b8aa;">Select your command faction:</p>
             <div class="faction-grid" role="group" aria-label="Choose faction">
                 <button class="rts-btn faction-card active" data-faction="usa" onclick="selectFaction('usa', this)"><img id="fc-logo-usa" class="fc-crest-img" alt="" style="display:none;" /><div class="fc-card-text"><strong>USA</strong>High-tech, drones &amp; air power.</div></button>
@@ -82,6 +77,7 @@
                 <button class="rts-btn faction-card" data-faction="gla" onclick="selectFaction('gla', this)"><img id="fc-logo-gla" class="fc-crest-img" alt="" style="display:none;" /><div class="fc-card-text"><strong>GLA</strong>Guerrilla, scrap salvage &amp; toxin weapons.</div></button>
             </div>
             <div id="faction-overview">USA forces — Infantry: Ranger, Missile Defender, Pathfinder, Colonel Burton. Vehicles & aircraft: Humvee, Ambulance, Crusader Tank, Paladin Tank, Tomahawk, Chinook, Comanche, Raptor, Stealth Fighter, Aurora Bomber. Support: Construction Dozer, Pilot (unbuildable), Scout Drone (attachment), Battle Drone (attachment).</div>
+            </div>
 
             <!-- ============================================================== -->
             <!-- 1. SINGLE PLAYER SETUP PANEL                                   -->
@@ -355,11 +351,14 @@
                         </div>
 
                         <!-- Actions Bar -->
-                        <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
                             <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px;" onclick="saveCustomMap()">💾 SAVE MAP</button>
                             <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#f1c40f; color:#f1c40f;" onclick="exportCustomMapJSON()">📁 EXPORT</button>
                             <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#3498db; color:#3498db;" onclick="importCustomMapJSON()">📥 IMPORT</button>
-                            <button class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#00ffcc; color:#00ffcc;" onclick="playCustomMapNow()">🎮 PLAY NOW</button>
+                        </div>
+                        <div style="display:flex; gap:6px; margin-bottom:12px;">
+                            <button class="rts-btn" style="flex:1; padding:7px; font-size:11px; border-color:#55efc4; color:#55efc4;" onclick="saveMapAndOpenMode('single')">SAVE &amp; OPEN SKIRMISH</button>
+                            <button class="rts-btn" style="flex:1; padding:7px; font-size:11px; border-color:#3498db; color:#75c9ff;" onclick="saveMapAndOpenMode('multiplayer')">SAVE &amp; OPEN MULTIPLAYER</button>
                         </div>
 
                         <!-- Saved Maps Library -->

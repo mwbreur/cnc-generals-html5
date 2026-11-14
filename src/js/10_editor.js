@@ -252,6 +252,7 @@
             refreshMapDropdowns();
             loadSavedMapsList();
             showNotification(`Map "${name}" saved! Available in Theater of War.`, 'success');
+            return id;
         }
 
         function refreshMapDropdowns() {
@@ -261,20 +262,24 @@
             [spSelect, mpSelect].forEach(sel => {
                 if (!sel) return;
                 const prevVal = sel.value;
-                sel.innerHTML = `
-                    <option value="tournament_desert" selected>Tournament Desert (Official EA Retail Map)</option>
-                    <option value="desert">Desert Canyon (Middle East) - Dunes, mesas, oasis</option>
-                    <option value="jungle">Tropical Jungle (Mekong Basin) - River, lush hills, canopy</option>
-                    <option value="snow">Frozen Mountain (Siberian Tundra) - Icy ridges, frozen lake</option>
-                    <option value="city">Small City Grid (Urban Warfare) - Skyscrapers, canal, streets</option>
-                    <option value="random">Procedural Warzone - Random Hills, River & Bridges</option>
-                `;
+                sel.querySelectorAll('option').forEach(option => {
+                    if (option.value.startsWith('custom_')) option.remove();
+                });
+                let customGroup = sel.querySelector('optgroup[data-custom-maps]');
+                if (!customGroup) {
+                    customGroup = document.createElement('optgroup');
+                    customGroup.label = 'Saved Custom Maps';
+                    customGroup.dataset.customMaps = 'true';
+                    sel.appendChild(customGroup);
+                }
+                customGroup.replaceChildren();
                 Object.values(savedCustomMaps).forEach(map => {
                     const opt = document.createElement('option');
                     opt.value = map.id;
                     opt.innerText = `🗺️ ${map.name} (${map.theme.toUpperCase()} ${map.size}x${map.size})`;
-                    sel.appendChild(opt);
+                    customGroup.appendChild(opt);
                 });
+                if (customGroup.children.length === 0) customGroup.remove();
                 if (prevVal && sel.querySelector(`option[value="${prevVal}"]`)) {
                     sel.value = prevVal;
                 }
@@ -299,6 +304,8 @@
                     </div>
                     <div style="display:flex; gap:4px;">
                         <button class="rts-btn" style="padding:2px 8px; font-size:10px;" onclick="loadCustomMapIntoEditor('${m.id}')">EDIT</button>
+                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" onclick="openSavedCustomMapInMode('${m.id}', 'single')">SKIRMISH</button>
+                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" onclick="openSavedCustomMapInMode('${m.id}', 'multiplayer')">MULTIPLAYER</button>
                         <button class="rts-btn" style="padding:2px 8px; font-size:10px; border-color:#ff4757; color:#ff4757;" onclick="deleteCustomMap('${m.id}')">DEL</button>
                     </div>
                 </div>`;
@@ -382,13 +389,23 @@
         }
 
         function playCustomMapNow() {
-            saveCustomMap();
-            switchGameModeTab('single');
-            const spSelect = document.getElementById('map-environment');
-            const latestId = Object.keys(savedCustomMaps).pop();
-            if (latestId && spSelect) {
-                spSelect.value = latestId;
-                onMapSelectionChange('single');
+            saveMapAndOpenMode('single');
+        }
+
+        function saveMapAndOpenMode(mode) {
+            const id = saveCustomMap();
+            if (id) openSavedCustomMapInMode(id, mode);
+        }
+
+        function openSavedCustomMapInMode(id, mode) {
+            const map = savedCustomMaps[id];
+            if (!map || !['single', 'multiplayer'].includes(mode)) return;
+            showStartSetupCard();
+            switchGameModeTab(mode);
+            const select = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env');
+            if (select) {
+                select.value = id;
+                onMapSelectionChange(mode);
             }
         }
 
