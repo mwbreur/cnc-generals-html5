@@ -33,12 +33,9 @@ for (const faction of ['usa', 'china', 'gla']) {
 }
 
 const webBuild = path.join(root, 'index.html');
-const standaloneBuild = path.join(root, 'C&Cv0.0024.html');
-if (fs.existsSync(webBuild) && fs.existsSync(standaloneBuild)) {
+if (fs.existsSync(webBuild)) {
     const web = fs.readFileSync(webBuild, 'utf8');
-    const standalone = fs.readFileSync(standaloneBuild, 'utf8');
     if (web.includes('window.OFFICIAL_AUDIO_EMBEDDED =')) throw new Error('Web build should use external audio catalogs');
-    if (!standalone.includes('window.OFFICIAL_AUDIO_EMBEDDED =')) throw new Error('Standalone build must embed its audio catalogs');
 }
 
-console.log(JSON.stringify({ totalKeys: seen.size, groups: summary, runtimeBytes: Buffer.byteLength(runtime), webAndStandaloneBuildsChecked: fs.existsSync(webBuild) && fs.existsSync(standaloneBuild) }, null, 2));
+console.log(JSON.stringify({ totalKeys: seen.size, groups: summary, runtimeBytes: Buffer.byteLength(runtime), webBuildChecked: fs.existsSync(webBuild) }, null, 2));

@@ -13,7 +13,7 @@ The web build loads official audio from faction-specific catalogs. The audio run
 
 When a web Skirmish starts, the game requests shared effects and the player's faction catalog. Other catalogs are not requested for that match. The runtime caches each catalog request and only plays voice keys present in the loaded catalog. Campaign dialogue and cutscene audio are not included in these groups.
 
-The web `index.html` needs the files in `src/audio/` alongside it on the server. The versioned `C&Cv0.0024.html` embeds all four catalogs and is self-contained for offline use.
+The generated `index.html` needs the files in `src/audio/` alongside it on the server.
 
 ## What this does and does not establish
 
