@@ -17,7 +17,6 @@ function getUnitInitials(type) {
 // =========================================================================
 
 let activeGridCategory = 'commands'; // 'commands', 'units', 'structures', 'defenses'
-let isRepairMode = false;
 let isSellMode = false;
 let radarCanvas = null;
 let radarCtx = null;
@@ -261,20 +260,9 @@ function triggerTacticalBeacon() {
     spawnPingEffect(cameraTarget);
 }
 
-function toggleRepairMode() {
-    isRepairMode = !isRepairMode;
-    isSellMode = false;
-    document.getElementById('btn-repair')?.classList.toggle('active', isRepairMode);
-    document.getElementById('btn-sell')?.classList.remove('active');
-    document.body.style.cursor = isRepairMode ? 'crosshair' : 'default';
-    showNotification(isRepairMode ? '🔧 REPAIR MODE: Click any damaged building to repair ($50)' : 'Repair mode deactivated.', 'info');
-}
-
 function toggleSellMode() {
     isSellMode = !isSellMode;
-    isRepairMode = false;
     document.getElementById('btn-sell')?.classList.toggle('active', isSellMode);
-    document.getElementById('btn-repair')?.classList.remove('active');
     document.body.style.cursor = isSellMode ? 'not-allowed' : 'default';
     showNotification(isSellMode ? '💰 SELL MODE: Click any structure to demolish for 50% refund' : 'Sell mode deactivated.', 'info');
 }
@@ -374,7 +362,7 @@ function enterStartMenuMode(mode) {
 function toggleInGameMenu() {
     const menu = document.getElementById('start-menu');
     if (!menu) return;
-    const isVisible = menu.style.display !== 'none';
+    const isVisible = window.getComputedStyle(menu).display !== 'none';
     if (isVisible) {
         resumeGame();
     } else {
@@ -384,6 +372,23 @@ function toggleInGameMenu() {
             showStartSetupCard();
         }
     }
+}
+
+function toggleControlBar(forceVisible = null) {
+    const shouldShow = forceVisible === null
+        ? document.body.classList.contains('control-bar-collapsed')
+        : !!forceVisible;
+    document.body.classList.toggle('control-bar-collapsed', !shouldShow);
+    const restoreButton = document.getElementById('control-bar-restore');
+    if (restoreButton) restoreButton.hidden = shouldShow;
+}
+
+function openOptionsMenu() {
+    toggleInGameMenu();
+}
+
+function openDiplomacyScreen() {
+    toggleInGameMenu();
 }
 
 function updatePauseModalPlayerList() {
@@ -1427,7 +1432,6 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
             { name: 'HARVESTERS', badge: 'SEL', action: () => selectUnitsByType('harvesters'), desc: 'Select all supply trucks and workers' },
             { name: 'BUILDERS', badge: 'CYCLE', action: () => cycleSelectBuilder(), desc: 'Cycle through construction dozers / workers' },
             { name: 'RECENTER', badge: 'BASE', action: () => recenterBase(), desc: 'Center camera on main Command Center' },
-            { name: 'REPAIR MODE', badge: 'TOOL', action: () => toggleRepairMode(), desc: 'Click buildings to repair' },
             { name: 'SELL MODE', badge: 'TOOL', action: () => toggleSellMode(), desc: 'Click buildings to demolish for cash' },
             { name: 'PING MAP', badge: 'ALERT', action: () => triggerTacticalBeacon(), desc: 'Broadcast tactical alert beacon' },
             { name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter selected forces' }
@@ -2322,10 +2326,16 @@ window.addEventListener('keydown', e => {
     const isShift = e.shiftKey;
     const now = Date.now();
 
+    if (k === 'f9') {
+        e.preventDefault();
+        toggleControlBar();
+        return;
+    }
+
     // TAB: Toggle In-Game Diplomacy & Match Objectives Menu (Official Zero Hour shortcut)
     if (e.key === 'Tab') {
         e.preventDefault();
-        toggleInGameMenu();
+        openDiplomacyScreen();
         return;
     }
 
@@ -2348,6 +2358,16 @@ window.addEventListener('keydown', e => {
         const menu = document.getElementById('start-menu');
         if (menu && menu.style.display !== 'none') {
             resumeGame();
+            return;
+        }
+        if (window.rallyPointPlacementStructure) {
+            window.rallyPointPlacementStructure = null;
+            document.body.style.cursor = 'default';
+            showNotification('Rally point placement cancelled.', 'info');
+            return;
+        }
+        if (isSellMode) {
+            toggleSellMode();
             return;
         }
         if (blueprintMesh) {
@@ -2376,13 +2396,8 @@ window.addEventListener('keydown', e => {
             showNotification('Command cancelled.', 'info');
             return;
         }
-        const hasSelected = units.some(u => u.selected) || selectedStructure || selectedSupplyPoint;
-        if (hasSelected) {
-            deselectAll();
-            return;
-        }
-        // When completely idle: Open in-game menu!
-        toggleInGameMenu();
+        // Escape opens the in-game options menu even when units remain selected.
+        openOptionsMenu();
         return;
     }
 
@@ -3355,7 +3370,8 @@ function updateHUD() {
             return createCrusaderTankMesh(false);
         }
 
-        function spawnUnit(type, position = null) {
+        function spawnUnit(type, position = null, factionOverride = null) {
+            const spawnFaction = factionOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa';
             let mesh; let radius = 1.2; let speed = 0.14;
             let health = 400; let scanRange = 22; let isAir = false;
             let capacity = 0; let garrisoned = [];
@@ -3366,7 +3382,7 @@ function updateHUD() {
             else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; capacity = 5; garrisoned = []; }
             else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 18; capacity = 4; garrisoned = []; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 3.2; speed = 0.11; health = 220; scanRange = 38; }
-            else if (type === 'dozer') { mesh = ((typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') === 'china') ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 3.2; speed = 0.10; health = 300; }
+            else if (type === 'dozer') { mesh = spawnFaction === 'china' ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 3.2; speed = 0.10; health = 300; }
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; }
             else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
             else if (type === 'comanche') { mesh = createComancheMesh(); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
@@ -3410,7 +3426,7 @@ function updateHUD() {
             else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.8; speed = 0.11; health = 120; }
             else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.09; health = 220; scanRange = 34; }
             else {
-                mesh = selectedFaction === 'china' ? createBattlemasterTankMesh(false) : selectedFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);
+                mesh = spawnFaction === 'china' ? createBattlemasterTankMesh(false) : spawnFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);
             }
 
             // Scale calibration: vehicles/structures get 1.35x visual boost if procedural, infantry stays realistic (~0.88 units tall)
@@ -3446,7 +3462,7 @@ function updateHUD() {
                 if (researchedTechs.has('compositeArmor') && (type === 'tank' || type === 'crusader' || type === 'paladin')) {
                     health = Math.floor(health * 1.25);
                 }
-                if (researchedTechs.has('migArmor') && (type === 'raptor' || type === 'mig') && (selectedFaction === 'china')) {
+                if (researchedTechs.has('migArmor') && (type === 'raptor' || type === 'mig') && spawnFaction === 'china') {
                     health = Math.floor(health * 1.25);
                 }
                 if (researchedTechs.has('redGuardTraining') && type === 'redguard') {
@@ -3494,12 +3510,12 @@ function updateHUD() {
             }
             newUnitObj.teamId = playerTeamId;
             newUnitObj.ownerId = 'player';
-            newUnitObj.faction = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+            newUnitObj.faction = spawnFaction;
             newUnitObj.isAI = false;
             units.push(newUnitObj);
             if (type === 'crawler') {
                 for (let rg = 0; rg < 4; rg++) {
-                    const passenger = spawnUnit('redguard', position.clone());
+                    const passenger = spawnUnit('redguard', position.clone(), spawnFaction);
                     if (passenger) {
                         passenger.mesh.visible = false;
                         passenger.garrisonedIn = newUnitObj;
@@ -3514,7 +3530,7 @@ function updateHUD() {
                     position: { x: position.x, y: position.y, z: position.z },
                     netId: myNetId,
                     teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
-                    faction: selectedFaction
+                    faction: spawnFaction
                 });
             }
             updateHUD();
@@ -3634,6 +3650,7 @@ function triggerRallyPointMode() {
             return;
         }
         window.rallyPointPlacementStructure = selectedStructure;
+        document.body.style.cursor = 'crosshair';
         showNotification('Click anywhere on battlefield to set Rally Point.', 'info');
     } else {
         showNotification('Select a production building first to set its Rally Point.', 'warning');

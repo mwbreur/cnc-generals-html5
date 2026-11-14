@@ -712,6 +712,17 @@ body {
     padding: 8px 12px; gap: 12px; box-sizing: border-box;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: #e5e0ce; user-select: none;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+body.control-bar-collapsed #generals-command-bar {
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+}
+#control-bar-restore {
+    position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
+    z-index: 26; border-color: #55efc4; color: #55efc4;
+    background: rgba(8, 16, 12, 0.94); box-shadow: 0 2px 12px rgba(0,0,0,.65);
 }
 
 .cmd-bar-section {
@@ -1089,39 +1100,22 @@ body {
     margin-top: 2px;
 }
 
-/* Left 3 Utility Buttons */
 .cb-left-utilities {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 44px;
-    height: 100%;
-    justify-content: center;
+    display: flex; flex-direction: column; gap: 5px; width: 50px; height: 100%;
+    flex: 0 0 50px; justify-content: center;
 }
-
 .cb-util-btn {
-    flex: 1;
+    flex: 1; min-height: 0; padding: 2px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; cursor: pointer;
+    color: #c0d4e3; border: 1px solid #4a6373; border-radius: 3px;
     background: linear-gradient(180deg, #2b3944 0%, #161e24 100%);
-    border: 1px solid #4a6373;
-    border-radius: 3px;
-    color: #c0d4e3;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    padding: 2px;
+    transition: border-color .15s ease, color .15s ease, box-shadow .15s ease;
 }
-
-.cb-util-btn .util-icon { font-size: 13px; }
-.cb-util-btn .util-tag { font-size: 8px; font-weight: bold; letter-spacing: 0.5px; color: #8ba5b8; }
-
-.cb-util-btn:hover {
-    border-color: #00ffcc;
-    color: #fff;
-    box-shadow: 0 0 8px rgba(0,255,204,0.3);
+.cb-util-btn:hover, .cb-util-btn:focus-visible {
+    border-color: #00ffcc; color: #fff; box-shadow: 0 0 8px rgba(0,255,204,.3); outline: none;
 }
+.cb-util-btn .util-icon { font-size: 15px; line-height: 1.1; }
+.cb-util-btn .util-tag { font-size: 7px; font-weight: bold; letter-spacing: .2px; color: #8ba5b8; }
 
 /* 2-Row Production Grid (2x6) */
 .cb-production-grid {

@@ -1141,6 +1141,9 @@ function processEnemyAIEngine() {
 
             if (e.button === 0) {
                 if (typeof isSellMode !== 'undefined' && isSellMode) {
+                    isSellMode = false;
+                    document.getElementById('btn-sell')?.classList.remove('active');
+                    document.body.style.cursor = 'default';
                     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
                     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
                     raycaster.setFromCamera(mouse, camera);
@@ -1155,26 +1158,6 @@ function processEnemyAIEngine() {
                                 showNotification("Cannot demolish an allied structure!", "error");
                             } else {
                                 sellStructure(targetStruct);
-                            }
-                        }
-                    }
-                    return;
-                }
-                if (typeof isRepairMode !== 'undefined' && isRepairMode) {
-                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-                    raycaster.setFromCamera(mouse, camera);
-                    const allStructures = [...structures, ...enemyStructures];
-                    const hits = raycaster.intersectObjects(allStructures.map(s => s.mesh).filter(Boolean), true);
-                    if (hits.length > 0) {
-                        let hit = hits[0].object;
-                        while (hit.parent && hit.parent !== scene) hit = hit.parent;
-                        const targetStruct = allStructures.find(s => s.mesh === hit);
-                        if (targetStruct) {
-                            if (targetStruct.ownerId && targetStruct.ownerId !== 'player') {
-                                showNotification("Cannot command repairs on allied structures!", "error");
-                            } else {
-                                repairStructure(targetStruct);
                             }
                         }
                     }
@@ -1501,6 +1484,7 @@ function processEnemyAIEngine() {
             if (e.button === 0 && window.rallyPointPlacementStructure) {
                 const rallyStructure = window.rallyPointPlacementStructure;
                 window.rallyPointPlacementStructure = null;
+                document.body.style.cursor = 'default';
                 isDragging = false;
                 selectionBox.style.display = 'none';
                 if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) return;

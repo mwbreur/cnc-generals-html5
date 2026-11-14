@@ -562,7 +562,6 @@
             if (typeof pendingSuperweapon !== 'undefined') pendingSuperweapon = null;
             if (typeof activeGeneralPower !== 'undefined') activeGeneralPower = null;
             if (typeof isSellMode !== 'undefined') isSellMode = false;
-            if (typeof isRepairMode !== 'undefined') isRepairMode = false;
             if (document.body) document.body.style.cursor = 'default';
 
             // 2. Clear previous battle structures

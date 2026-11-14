@@ -282,15 +282,22 @@ function animate() {
                         const isInf = typeof isInfantryType === 'function' && isInfantryType(item.type);
                         const isAir = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig'].includes(item.type);
 
-                        // Clear spawn point just outside structure perimeter
-                        const exitAngle = (structure.mesh && structure.mesh.rotation) ? structure.mesh.rotation.y + Math.PI / 4 : Math.PI / 4;
-                        const spawnDist = structure.radius + (isInf ? 2.5 : 4.5);
+                        // Units exit through the building's front. Include the visual footprint
+                        // scale so infantry does not start inside the barracks corners.
+                        const exitAngle = structure.mesh?.rotation?.y ?? structure.rotationY ?? 0;
+                        const footprint = typeof getStructureFootprint === 'function'
+                            ? getStructureFootprint(structure.type)
+                            : { depth: (structure.radius || 8) * 2 };
+                        const buildingDepth = footprint.depth * ((structure.mesh && structure.mesh.scale && structure.mesh.scale.z) || 1);
+                        const exitClearance = isInf ? 2.5 : 4.5;
+                        const spawnDist = Math.max((structure.radius || 0) + exitClearance, buildingDepth / 2 + exitClearance);
                         const spawnX = structure.position.x + Math.sin(exitAngle) * spawnDist;
                         const spawnZ = structure.position.z + Math.cos(exitAngle) * spawnDist;
                         const spawnY = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnX, spawnZ) : 0;
                         const spawnPos = new THREE.Vector3(spawnX, spawnY, spawnZ);
 
-                        const newUnit = spawnUnit(item.type, spawnPos);
+                        const productionFaction = structure.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+                        const newUnit = spawnUnit(item.type, spawnPos, productionFaction);
 
                         if (newUnit.isAir) {
                             if (structure.rallyPoint) {
@@ -327,7 +334,7 @@ function animate() {
                             }
                         }
                         if (typeof playUnitReadySound === 'function') {
-                            playUnitReadySound(item.type, typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+                            playUnitReadySound(item.type, newUnit.faction || productionFaction);
                         } else {
                             playUSASound('construction');
                         }
