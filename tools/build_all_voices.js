@@ -48,7 +48,8 @@ const unitPrefixes = {
     humvee: 'vhum',
     ambulance: 'vamb',
     tomahawk: 'vtom',
-    dozer_usa: 'vdoc',
+    // Archive prefix suffix identifies the faction: C = China, U = USA.
+    dozer_usa: 'vdou',
     chinook: 'vchi',
     comanche: 'vcom',
     raptor: 'vrap',
@@ -65,7 +66,7 @@ const unitPrefixes = {
     crawler: 'vtro',
     inferno: 'vinf',
     nukecannon: 'vnuk',
-    dozer_china: 'vdou',
+    dozer_china: 'vdoc',
     mig: 'vmig',
     redguard: 'ired',
     tankhunter: 'itan',

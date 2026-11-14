@@ -20,15 +20,28 @@ function loadCatalog() {
 
 function groupFor(key) {
     if (key.startsWith('sfx_')) return 'global';
+    // A faction-qualified dozer key also starts with the generic "voice_dozer_"
+    // prefix, so resolve explicit faction names before checking unit prefixes.
     for (const faction of Object.keys(factions)) {
-        if (key.includes(`_${faction}_`) || factions[faction].some(unit => key.startsWith(`voice_${unit}_`))) return faction;
+        if (key.includes(`_${faction}_`)) return faction;
+    }
+    for (const faction of Object.keys(factions)) {
+        if (factions[faction].some(unit => key.startsWith(`voice_${unit}_`))) return faction;
     }
     throw new Error(`Cannot assign audio key to a catalog: ${key}`);
 }
 
 function writeAudioCatalog(additions) {
     const catalog = loadCatalog();
-    for (const [key, data] of Object.entries(additions)) catalog[groupFor(key)][key] = data;
+    for (const [key, data] of Object.entries(additions)) {
+        const group = groupFor(key);
+        // Remove stale copies left by earlier misclassification before moving
+        // the entry into the faction catalog selected above.
+        for (const otherGroup of Object.keys(catalog)) {
+            if (otherGroup !== group) delete catalog[otherGroup][key];
+        }
+        catalog[group][key] = data;
+    }
     fs.mkdirSync(catalogDir, { recursive: true });
     for (const [group, entries] of Object.entries(catalog)) {
         fs.writeFileSync(path.join(catalogDir, `${group}.json`), `${JSON.stringify(entries)}\n`);
