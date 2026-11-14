@@ -6,6 +6,9 @@ on:
       - master
     paths:
       - "src/**"
+      - "tools/**"
+      - "scripts/**"
+      - "verify_system.js"
       - "build.js"
       - ".github/workflows/build-and-deploy.yml"
   workflow_dispatch:
@@ -32,17 +35,29 @@ jobs:
         with:
           node-version: 20
 
-      - name: Build standalone game
-        run: node build.js
+      - name: Run project checks
+        run: |
+          node verify_system.js
+          node tools/validate_audio_catalog.js
+          node tools/test_audio_loader.js
 
-      - name: Commit generated game files
+      - name: Build and commit generated game files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- index.html 'C&Cv0.0024.html'
-          if git diff --cached --quiet; then
-            echo "Generated game files are already up to date."
-            exit 0
-          fi
-          git commit -m "Build playable game from latest source"
-          git push origin HEAD:master
+          for attempt in 1 2 3; do
+            git fetch origin master
+            git reset --hard origin/master
+            node build.js
+            git add -- index.html 'C&Cv0.0024.html'
+            if git diff --cached --quiet; then
+              echo "Generated game files are already up to date."
+              exit 0
+            fi
+            git commit -m "Build playable game from latest source"
+            if git push origin HEAD:master; then
+              exit 0
+            fi
+            echo "master advanced during the build; retrying against the latest commit ($attempt/3)."
+          done
+          exit 1
