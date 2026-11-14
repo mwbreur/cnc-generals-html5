@@ -109,7 +109,7 @@
                 const dune2 = Math.cos(x * 0.035 - z * 0.02) * 1.8;
                 let h = 3.8 + dune1 + dune2;
 
-                // Canyon mesa in the northwest
+                // Canyon mesa in the northwes
                 const dxMesa = x + size * 0.22;
                 const dzMesa = z + size * 0.22;
                 const dMesa = Math.hypot(dxMesa, dzMesa);
@@ -117,7 +117,7 @@
                     h += (1 - dMesa / (size * 0.14)) * 7.5;
                 }
 
-                // Localized oasis pond depression in the southeast
+                // Localized oasis pond depression in the southeas
                 const dxOasis = x - size * 0.20;
                 const dzOasis = z - size * 0.20;
                 const dOasis = Math.hypot(dxOasis, dzOasis);
@@ -268,7 +268,7 @@
                         }
                     } else if (theme === 'jungle') {
                         if (h <= waterLevel + 0.35) {
-                            // Muddy riverbed & wetland silt
+                            // Muddy riverbed & wetland sil
                             r = 75 + noise * 0.6;
                             g = 65 + noise * 0.5;
                             b = 48 + noise * 0.4;
@@ -292,7 +292,7 @@
                         }
                     } else if (theme === 'snow') {
                         if (h <= waterLevel + 0.35) {
-                            // Icy slush & permafrost
+                            // Icy slush & permafros
                             r = 140 + noise;
                             g = 158 + noise;
                             b = 180 + noise;
@@ -366,7 +366,7 @@
             return texture;
         }
 
-        // Procedural Texture Generator per Environment
+        // Procedural Texture Generator per Environmen
         function createTerrainTextureForMap(mapType) {
             const officialKey = (mapType === 'desert') ? 'tournament_desert' : mapType;
             if (window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[officialKey] && typeof createOfficialMapTexture === 'function') {
@@ -415,7 +415,7 @@
                     ctx.fill();
                 }
             } else if (mapType === 'city') {
-                ctx.fillStyle = '#34383c'; // Dark asphalt
+                ctx.fillStyle = '#34383c'; // Dark asphal
                 ctx.fillRect(0, 0, 512, 512);
 
                 // Grid street pattern
@@ -600,8 +600,6 @@
                 miniCanvas.width = 256;
                 miniCanvas.height = 256;
                 const mCtx = miniCanvas.getContext('2d');
-                const offImg = window._officialMapImages && window._officialMapImages[mapType];
-
                 const drawProceduralRelief = () => {
                     const step = mapSize / 256;
                     for (let py = 0; py < 256; py += 2) {
@@ -640,18 +638,7 @@
                     }
                 };
 
-                if (offImg && offImg.complete && offImg.naturalWidth > 0) {
-                    mCtx.drawImage(offImg, 0, 0, 256, 256);
-                } else {
-                    drawProceduralRelief();
-                    if (offImg && typeof offImg.addEventListener === 'function') {
-                        offImg.addEventListener('load', () => {
-                            if (currentMapType === mapType) {
-                                mCtx.drawImage(offImg, 0, 0, 256, 256);
-                            }
-                        }, { once: true });
-                    }
-                }
+                drawProceduralRelief();
                 window._minimapTerrainCanvas = miniCanvas;
             }
         }
@@ -682,7 +669,7 @@
             return g;
         }
 
-        // 8. Desert Oil Pipeline Segment
+        // 8. Desert Oil Pipeline Segmen
         function createPipelineMesh(length = 18) {
             const g = new THREE.Group();
             const pipeMat = new THREE.MeshStandardMaterial({ color: 0x636e72, roughness: 0.6, metalness: 0.65 });
@@ -757,7 +744,7 @@
             return g;
         }
 
-        // 12. City Arched Steel Streetlight
+        // 12. City Arched Steel Streetligh
         function createStreetLightMesh() {
             const g = new THREE.Group();
             const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7.5, 8), matDarkMetal);
@@ -1250,4 +1237,4 @@
             }
         }
 
-        
+

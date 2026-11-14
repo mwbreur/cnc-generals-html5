@@ -96,9 +96,7 @@
                 return hasCC && hasRadarUpgrade;
             } else if (faction === 'gla') {
                 const hasRadarVan = (typeof units !== 'undefined') && units.some(u => u.type === 'radarvan' && u.health > 0);
-                const hasBlackMarket = structures.some(s => s.type === 'blackMarket' && s.health > 0 && !s.isBuilding);
-                const hasCC = structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
-                return hasRadarVan || hasBlackMarket || hasCC;
+                return hasRadarVan;
             }
             return true;
         }
@@ -891,7 +889,7 @@
                 function refreshFactionRoster() {
             const faction = factionCatalog[selectedFaction];
             unitRoster = {};
-            
+
             // 1. Barracks Infantry
             if (faction.barracks) {
                 Object.entries(faction.barracks).forEach(([type, data]) => {
@@ -1395,4 +1393,4 @@
             if (mode === 'multiplayer') syncMpLobbyToPeer();
         }
 
-        
+

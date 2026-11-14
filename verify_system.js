@@ -378,10 +378,37 @@ const isRadarOnline = vm.runInContext("isRadarOnline", sandbox);
 if (typeof isRadarOnline === 'function') {
     const radarResult = isRadarOnline('usa');
     console.log("✓ isRadarOnline function verified (returns boolean: " + radarResult + ").");
+    const factionRadar = vm.runInContext(`(() => {
+        const oldStructures = structures, oldUnits = units, oldTechs = researchedTechs;
+        structures = [
+            { type: 'center', health: 100, isBuilding: false },
+            { type: 'blackMarket', health: 100, isBuilding: false }
+        ];
+        units = [];
+        researchedTechs = new Set();
+        const glaWithoutRadar = isRadarOnline('gla');
+        units = [{ type: 'radarvan', health: 100 }];
+        const glaWithRadarVan = isRadarOnline('gla');
+        structures = [{ type: 'center', health: 100, isBuilding: false }];
+        units = [];
+        const chinaWithoutUpgrade = isRadarOnline('china');
+        researchedTechs.add('radar');
+        const chinaWithUpgrade = isRadarOnline('china');
+        structures = oldStructures; units = oldUnits; researchedTechs = oldTechs;
+        return { glaWithoutRadar, glaWithRadarVan, chinaWithoutUpgrade, chinaWithUpgrade };
+    })()`, sandbox);
+    if (factionRadar.glaWithoutRadar || !factionRadar.glaWithRadarVan || factionRadar.chinaWithoutUpgrade || !factionRadar.chinaWithUpgrade) {
+        throw new Error("Faction radar availability did not require the proper radar tech/provider: " + JSON.stringify(factionRadar));
+    }
 }
 
 // 8. Test Builder Palette Removal & Builder Cycling Selection
 const bodyHtml = fs.readFileSync(path.join(projectRoot, 'src/html/body.html'), 'utf8');
+const mainMenuMarkup = bodyHtml.match(/<div id="main-menu-screen"[\s\S]*?(?=<div id="start-setup-screen")/)?.[0] || '';
+if (!mainMenuMarkup.includes("enterStartMenuMode('single')") || !mainMenuMarkup.includes("enterStartMenuMode('multiplayer')") ||
+    !mainMenuMarkup.includes("enterStartMenuMode('editor')") || /SOLO PLAY|CREDITS/i.test(mainMenuMarkup)) {
+    throw new Error("Zero Hour title menu is missing a required playable entry or includes a removed menu option!");
+}
 if (bodyHtml.includes('id="builder-palette"') || bodyHtml.includes('class="builder-floating-palette"')) {
     console.error("FAIL: #builder-palette is still present in src/html/body.html!");
     process.exit(1);
@@ -776,6 +803,29 @@ vm.runInContext(`
 
         // C. Verify Radar / Minimap Terrain & Fog Rendering
         selectedMapTheme = 'tournament_desert';
+        const oldRadarCanvas = radarCanvas, oldRadarCtx = radarCtx, oldIsRadarOnline = isRadarOnline;
+        const radarImages = [], radarFills = [];
+        const radarMockCtx = new Proxy({
+            fillStyle: '', globalAlpha: 1,
+            fillRect: function () { radarFills.push(this.fillStyle); },
+            drawImage: function (image) { radarImages.push(image); },
+            createRadialGradient: function () { return { addColorStop: function () {} }; },
+            createLinearGradient: function () { return { addColorStop: function () {} }; }
+        }, { get: (target, key) => key in target ? target[key] : function () {}, set: (target, key, value) => { target[key] = value; return true; } });
+        radarCanvas = { width: 185, height: 185, getContext: () => radarMockCtx };
+        radarCtx = radarMockCtx;
+        isRadarOnline = () => false;
+        renderRadarMinimap();
+        if (radarFills.length !== 1 || radarFills[0] !== '#000000' || radarImages.length !== 0) {
+            throw new Error("Radar screen did not stay black when radar technology is offline!");
+        }
+        radarFills.length = 0;
+        isRadarOnline = () => true;
+        renderRadarMinimap();
+        if (!window._minimapTerrainCanvas || radarImages[0] !== window._minimapTerrainCanvas) {
+            throw new Error("Radar did not render the active terrain snapshot!");
+        }
+        radarCanvas = oldRadarCanvas; radarCtx = oldRadarCtx; isRadarOnline = oldIsRadarOnline;
         renderRadarMinimap();
         applyOfficialMenuArt('china');
     }

@@ -41,12 +41,27 @@
             </div>
         </div>
 
-        <div id="start-card">
+        <div id="start-card" class="main-menu-active">
+            <div id="main-menu-screen" class="zh-main-menu-screen">
+                <div class="zh-main-menu-brand">
+                    <img id="main-menu-emblem" class="zh-main-menu-emblem" alt="" />
+                    <div class="zh-main-menu-title">COMMAND &amp; CONQUER</div>
+                    <div class="zh-main-menu-subtitle">GENERALS <span>ZERO:HOUR</span></div>
+                </div>
+                <nav class="zh-main-menu-actions" aria-label="Main menu">
+                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('single')"><span>SKIRMISH</span><small>Configure a battle against AI</small></button>
+                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('multiplayer')"><span>MULTIPLAYER</span><small>Host or join a battle</small></button>
+                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('editor')"><span>MAP EDITOR</span><small>Create or edit a battlefield</small></button>
+                </nav>
+                <div class="zh-main-menu-footer">TACTICAL COMMAND SYSTEM <span>·</span> ZERO HOUR</div>
+            </div>
+            <div id="start-setup-screen" hidden>
             <button id="resume-game-btn" class="rts-btn resume-banner-btn" style="display: none;" onclick="resumeGame()">▶ RESUME CURRENT MATCH (ESC)</button>
+            <button id="return-main-menu-btn" class="rts-btn return-main-menu-btn" onclick="showMainMenuScreen()">← MAIN MENU</button>
             <div class="menu-header-banner">
                 <img id="menu-skirmish-emblem" class="menu-skirmish-emblem" alt="" style="display:none;" />
                 <div class="menu-header-titles">
-                    <h1>Command &amp; Conquer: Generals — Zero Hour</h1>
+                    <h1>Skirmish Setup</h1>
                     <img id="menu-ruler-img" class="menu-ruler-img" alt="" style="display:none;" />
                 </div>
                 <img id="menu-faction-crest" class="menu-faction-crest" alt="" style="display:none;" />
@@ -54,7 +69,7 @@
 
             <!-- Game Mode Switcher Tabs (Single Player, Multiplayer, Map Editor) -->
             <div class="game-mode-tabs" role="tablist">
-                <button id="tab-mode-sp" class="mode-tab-btn active" onclick="switchGameModeTab('single')">🤖 SINGLE PLAYER</button>
+                <button id="tab-mode-sp" class="mode-tab-btn active" onclick="switchGameModeTab('single')">🤖 SKIRMISH</button>
                 <button id="tab-mode-mp" class="mode-tab-btn" onclick="switchGameModeTab('multiplayer')">🌐 MULTIPLAYER (PEER.JS)</button>
                 <button id="tab-mode-editor" class="mode-tab-btn" onclick="switchGameModeTab('editor')">🗺️ MAP EDITOR</button>
             </div>
@@ -150,7 +165,7 @@
                     </div>
                 </div>
 
-                <button id="start-game" class="rts-btn" style="margin-top: 14px; width: 100%;" onclick="startGame()">Start Single Player Skirmish</button>
+                <button id="start-game" class="rts-btn" style="margin-top: 14px; width: 100%;" onclick="startGame()">START SKIRMISH</button>
             </div>
 
             <!-- ============================================================== -->
@@ -354,6 +369,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     </div>

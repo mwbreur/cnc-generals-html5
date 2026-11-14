@@ -90,12 +90,13 @@ The repository is organized around source modules and generated browser builds:
 ├── scripts/
 │   ├── report-audio-usage.js
 │   └── report-project-size.js
-└── index.html
+├── index.html
+└── C&Cv0.0024.html
 ```
 
 The JavaScript filenames are numbered to make their concatenation order explicit. Keep shared globals and initialization dependencies in mind when changing module order.
 
-**Source files are the place to make changes.** The root `index.html` is a generated output; do not edit it by hand.
+**Source files are the place to make changes.** The root `index.html` and versioned standalone HTML are generated outputs; do not edit them by hand.
 
 ## Build and run
 
@@ -112,9 +113,10 @@ From the repository root:
 node build.js
 ```
 
-The build script reads the HTML/CSS source and JavaScript modules, validates them, and writes:
+The build script reads the HTML/CSS source and JavaScript modules, validates both outputs, and writes:
 
 - `index.html` — web build for GitHub Pages. It fetches shared audio and the selected faction's catalog from `src/audio/` when a Skirmish starts.
+- `C&Cv0.0024.html` — self-contained build with all audio catalogs embedded for offline play.
 
 The build script is intentionally simple and does not currently provide a production bundler, code splitting, minification, or asset hashing.
 
@@ -132,14 +134,14 @@ Some browser features, especially WebRTC and audio playback, require a secure co
 
 ## Build output and large files
 
-The build concatenates JavaScript source modules into `index.html`. Audio stays external so the game can lazy-load shared effects and the player's faction catalog.
+Both builds concatenate JavaScript source modules into generated HTML. The web build keeps audio external and lazy-loads the player's faction catalog; the standalone build embeds the audio catalogs so it can run offline.
 
 Two particularly large source modules identified during a repository review are:
 
 - `src/audio/*.json` — current official-audio catalogs.
 - `src/js/02b_w3d_models.js` — W3D model data.
 
-The generated `index.html` size is reported by `node scripts/report-project-size.js`. This is an on-disk size, not a compressed transfer size.
+At the current revision, the web `index.html` is about 10.6 MB and the offline `C&Cv0.0024.html` is about 45 MB. These are on-disk sizes, not compressed transfer sizes.
 
 ### Audio loading
 
@@ -186,7 +188,7 @@ node tools/validate_audio_catalog.js
 node tools/test_audio_loader.js
 ```
 
-These check catalog grouping, lazy loading, faction voice selection, and caching.
+These check catalog grouping, lazy loading, faction voice selection, caching, and the embedded standalone path.
 
 ## Controls
 

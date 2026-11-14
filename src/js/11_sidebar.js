@@ -34,6 +34,7 @@ function initRadarMinimap() {
     let isRadarDragging = false;
     function handleRadarPointer(e) {
         if (!radarCanvas) return;
+        if (typeof isRadarOnline === 'function' && !isRadarOnline(selectedFaction)) return;
         const rect = radarCanvas.getBoundingClientRect();
         const px = e.clientX - rect.left;
         const py = e.clientY - rect.top;
@@ -106,17 +107,18 @@ function renderRadarMinimap() {
 
     const hasRadar = (typeof isRadarOnline === 'function') ? isRadarOnline(selectedFaction) : true;
 
-    // 1. Always Draw the Miniature Version of the Map Currently Being Played (Official C&C Generals Style)
-    ctx.fillStyle = '#1b1610';
-    ctx.fillRect(0, 0, w, h);
+    // No live map information or command interaction without faction radar.
+    if (!hasRadar) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, w, h);
+        return;
+    }
 
-    const mapKey = (typeof currentMapType !== 'undefined' && currentMapType === 'desert')
-        ? 'tournament_desert'
-        : (typeof currentMapType !== 'undefined' ? currentMapType : 'tournament_desert');
-    const offImg = window._officialMapImages && window._officialMapImages[mapKey];
-    if (offImg && offImg.complete && offImg.naturalWidth > 0) {
-        ctx.drawImage(offImg, 0, 0, w, h);
-    } else if (window._minimapTerrainCanvas) {
+    // Draw the terrain snapshot built from the active battlefield's height data.
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, w, h);
+    if (window._minimapTerrainCanvas) {
         ctx.drawImage(window._minimapTerrainCanvas, 0, 0, w, h);
     }
 
@@ -286,7 +288,10 @@ function resumeGame() {
     const pauseModal = document.getElementById('ingame-pause-modal');
     if (pauseModal) pauseModal.style.display = 'none';
     const startCard = document.getElementById('start-card');
-    if (startCard) startCard.style.display = 'none';
+    if (startCard) {
+        startCard.style.display = 'none';
+        startCard.classList.remove('main-menu-active');
+    }
     const pauseWatermark = document.getElementById('pause-screen-watermark');
     if (pauseWatermark) pauseWatermark.style.display = 'none';
     const pauseClock = document.getElementById('pause-screen-clock');
@@ -323,6 +328,9 @@ function showStartSetupCard() {
     const resumeBtn = document.getElementById('resume-game-btn');
     const pauseWatermark = document.getElementById('pause-screen-watermark');
     const pauseClock = document.getElementById('pause-screen-clock');
+    const mainMenuScreen = document.getElementById('main-menu-screen');
+    const setupScreen = document.getElementById('start-setup-screen');
+    const returnButton = document.getElementById('return-main-menu-btn');
     if (!menu) return;
 
     menu.style.display = 'flex';
@@ -331,11 +339,36 @@ function showStartSetupCard() {
     if (pauseWatermark) pauseWatermark.style.display = 'none';
     if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
+        startCard.classList.remove('main-menu-active');
         startCard.style.display = 'block';
+        if (mainMenuScreen) mainMenuScreen.hidden = true;
+        if (setupScreen) setupScreen.hidden = false;
+        if (returnButton) returnButton.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'none' : '';
         if (resumeBtn) {
             resumeBtn.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'block' : 'none';
         }
     }
+}
+
+function showMainMenuScreen() {
+    if (typeof isMatchActive !== 'undefined' && isMatchActive) return;
+    const menu = document.getElementById('start-menu');
+    const startCard = document.getElementById('start-card');
+    const mainMenuScreen = document.getElementById('main-menu-screen');
+    const setupScreen = document.getElementById('start-setup-screen');
+    if (!menu || !startCard || !mainMenuScreen || !setupScreen) return;
+    menu.style.display = 'flex';
+    menu.classList.remove('pause-mode');
+    startCard.style.display = 'block';
+    startCard.classList.add('main-menu-active');
+    mainMenuScreen.hidden = false;
+    setupScreen.hidden = true;
+    applyOfficialMenuArt(selectedFaction);
+}
+
+function enterStartMenuMode(mode) {
+    showStartSetupCard();
+    if (typeof switchGameModeTab === 'function') switchGameModeTab(mode);
 }
 
 function toggleInGameMenu() {
@@ -618,7 +651,10 @@ function applyOfficialMenuArt(facOverride) {
 
     const startCard = document.getElementById('start-card');
     if (startCard && ui.mainMenuBackdrop) {
-        startCard.style.backgroundImage = `linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%), url("${ui.mainMenuBackdrop}")`;
+        const menuScrim = startCard.classList.contains('main-menu-active')
+            ? 'linear-gradient(90deg, rgba(2, 8, 14, 0.18) 0%, rgba(2, 8, 14, 0.04) 48%, rgba(2, 8, 14, 0.62) 100%)'
+            : 'linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%)';
+        startCard.style.backgroundImage = `${menuScrim}, url("${ui.mainMenuBackdrop}")`;
         startCard.style.backgroundSize = 'cover';
         startCard.style.backgroundPosition = 'center';
     }
@@ -631,6 +667,7 @@ function applyOfficialMenuArt(facOverride) {
         }
     };
     setImg('menu-skirmish-emblem', ui.skirmishEmblem);
+    setImg('main-menu-emblem', ui.skirmishEmblem);
     setImg('menu-ruler-img', ui.mainMenuRuler);
     setImg('menu-faction-crest', ui['logo_' + fac] || ui.logo_usa);
     setImg('fc-logo-usa', ui.logo_usa);
