@@ -14,7 +14,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const ignoredDirectories = new Set(['.git', 'node_modules']);
-const generatedNames = new Set(['index.html', 'C&Cv0.0024.html']);
+const generatedNames = new Set(['index.html']);
 const files = [];
 
 function walk(directory) {
