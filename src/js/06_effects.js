@@ -1639,7 +1639,9 @@
             if (typeof playOfficialSound === 'function') {
                 playOfficialSound('sfx_overlord_upgrade', 0.90);
                 const voiceKey = upgradeType === 'bunker' ? 'voice_overlord_bunker' : upgradeType === 'gatling' ? 'voice_overlord_gatling' : 'voice_overlord_speaker';
-                playOfficialSound(voiceKey, 0.92);
+                // These short voice keys do not encode a faction, so pass it
+                // explicitly or the loader may look in the player's catalog.
+                playOfficialSound(voiceKey, 0.92, 'china');
             } else {
                 playAudio('construction', {}, 'china');
             }
