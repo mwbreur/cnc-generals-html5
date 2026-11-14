@@ -7,6 +7,7 @@ const requested = [];
 const played = [];
 const context = {
     window: {},
+    selectedFaction: 'usa',
     URL,
     document: { baseURI: 'https://example.test/game/' },
     fetch: async url => {
@@ -26,13 +27,17 @@ vm.runInContext(fs.readFileSync(path.join(root, 'src/js/05b_official_audio.js'),
 
 (async () => {
     if (requested.length !== 0) throw new Error('Audio catalog loaded during script initialization');
+    context.window.playOfficialSound('voice_overlord_bunker', 0.9, 'china');
+    await new Promise(resolve => setImmediate(resolve));
+    if (requested.join(',') !== 'china') throw new Error(`Explicit China voice loaded the wrong catalog: ${requested.join(',')}`);
+    const initialPlaybackCount = played.length;
     await context.preloadSkirmishAudio('china');
     if (requested.slice().sort().join(',') !== 'china,global') throw new Error(`Unexpected preload groups: ${requested.join(',')}`);
     if (!context.window.OFFICIAL_AUDIO_DATA.voice_china_redguard_create) throw new Error('China voice catalog did not load');
     if (context.window.OFFICIAL_AUDIO_DATA.voice_usa_ranger_create) throw new Error('Preload downloaded another faction catalog');
     context.window.playOfficialSound('sfx_click', 0.65);
     await new Promise(resolve => setImmediate(resolve));
-    if (played.length !== 1) throw new Error(`Expected one playback, got ${played.length}`);
+    if (played.length !== initialPlaybackCount + 1) throw new Error(`Expected one additional playback, got ${played.length - initialPlaybackCount}`);
     if (requested.length !== 2) throw new Error('Cached catalog was fetched again');
 
     const china = JSON.parse(fs.readFileSync(path.join(root, 'src/audio/china.json'), 'utf8'));
