@@ -1,19 +1,17 @@
 const fs = require('fs');
 const path = require('path');
+const { loadCatalog, writeAudioCatalog } = require('./audio_catalog');
+const projectRoot = path.resolve(__dirname, '..');
 
-// 1. Load existing audio map from current 05b_official_audio.js
-const sandbox = { window: {} };
-const currentCode = fs.readFileSync('src/js/05b_official_audio.js', 'utf8');
-const fn = new Function('window', currentCode);
-fn(sandbox.window);
-const audioMap = Object.assign({}, sandbox.window.OFFICIAL_AUDIO_DATA || {});
-console.log(`Loaded ${Object.keys(audioMap).length} existing audio keys from 05b.`);
+// 1. Load existing audio entries from the faction catalogs.
+const audioMap = Object.assign({}, ...Object.values(loadCatalog()));
+console.log(`Loaded ${Object.keys(audioMap).length} existing audio keys from catalogs.`);
 
 // 2. Index big files
 const bigPaths = [
-    'generals_big_files/AudioEnglish.big',
-    'generals_big_files/SpeechEnglish.big',
-    'generals_big_files/Audio.big'
+    path.join(projectRoot, 'generals_big_files', 'AudioEnglish.big'),
+    path.join(projectRoot, 'generals_big_files', 'SpeechEnglish.big'),
+    path.join(projectRoot, 'generals_big_files', 'Audio.big')
 ];
 
 const bigIndex = {};
@@ -372,5 +370,5 @@ window.playBuildingCompleteSound = playBuildingCompleteSound;
 window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
 `;
 
-fs.writeFileSync('src/js/05b_official_audio.js', jsContent, 'utf8');
-console.log(`Successfully generated src/js/05b_official_audio.js (${(fs.statSync('src/js/05b_official_audio.js').size / (1024 * 1024)).toFixed(2)} MB)`);
+const catalogSizes = writeAudioCatalog(audioMap);
+console.log(`Merged voice variations into faction catalogs: ${JSON.stringify(catalogSizes)}`);

@@ -424,6 +424,7 @@
             const playerSlot = mySlot || activeSlots[0];
             playerTeamId = playerSlot.team;
             selectedFaction = playerSlot.faction;
+            if (typeof preloadSkirmishAudio === 'function') preloadSkirmishAudio(selectedFaction);
 
             // Refresh map & purge any previous single player skirmish remnants completely
             if (typeof resetEntireBattlefieldState === 'function') {

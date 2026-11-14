@@ -1,11 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const { writeAudioCatalog } = require('./audio_catalog');
+const projectRoot = path.resolve(__dirname, '..');
 
 const bigPaths = [
-    'D:/C&C/generals_big_files/SpeechEnglish.big',
-    'D:/C&C/generals_big_files/AudioEnglish.big',
-    'D:/C&C/generals_big_files/Audio.big',
-    'D:/C&C/generals_big_files/Speech.big'
+    path.join(projectRoot, 'generals_big_files', 'SpeechEnglish.big'),
+    path.join(projectRoot, 'generals_big_files', 'AudioEnglish.big'),
+    path.join(projectRoot, 'generals_big_files', 'Audio.big'),
+    path.join(projectRoot, 'generals_big_files', 'Speech.big')
 ];
 
 function buildBigIndices(paths) {
@@ -340,6 +342,5 @@ window.playUnitReadySound = playUnitReadySound;
 window.playBuildingCompleteSound = playBuildingCompleteSound;
 `;
 
-const destPath = 'D:/C&C/src/js/05b_official_audio.js';
-fs.writeFileSync(destPath, jsContent, 'utf8');
-console.log(`Successfully generated ${destPath}`);
+const catalogSizes = writeAudioCatalog(audioMap);
+console.log(`Merged ${Object.keys(audioMap).length} clips into faction catalogs: ${JSON.stringify(catalogSizes)}`);

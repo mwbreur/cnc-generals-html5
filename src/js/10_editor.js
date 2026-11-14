@@ -409,6 +409,8 @@
             aiDifficultyLevel = (document.getElementById('ai-difficulty') || {}).value || 'medium';
             aiFactionChosen = (document.getElementById('ai-faction') || {}).value || 'random';
 
+            if (typeof preloadSkirmishAudio === 'function') preloadSkirmishAudio(selectedFaction);
+
             setupMapEnvironment(selectedEnv, selectedSize);
 
             playerResources = Number(document.getElementById('starting-money').value);
@@ -866,4 +868,3 @@
         window.selectUnitsByType = selectUnitsByType;
 
         // =========================================================================
-        

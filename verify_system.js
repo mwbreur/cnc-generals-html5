@@ -1,5 +1,7 @@
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
+const projectRoot = __dirname;
 
 console.log("=== COMPREHENSIVE VERIFICATION SUITE ===");
 
@@ -203,6 +205,8 @@ const sandbox = {
     },
     console: console,
     fs: fs,
+    path: path,
+    projectRoot: projectRoot,
     Math: Math,
     Date: Date,
     setTimeout: (cb) => { return 1; },
@@ -260,7 +264,7 @@ const jsFiles = [
 ];
 
 for (const f of jsFiles) {
-    const code = fs.readFileSync('D:/C&C/src/js/' + f, 'utf8');
+    const code = fs.readFileSync(path.join(projectRoot, 'src', 'js', f), 'utf8');
     try {
         vm.runInContext(code, sandbox, { filename: f });
     } catch (err) {
@@ -377,7 +381,7 @@ if (typeof isRadarOnline === 'function') {
 }
 
 // 8. Test Builder Palette Removal & Builder Cycling Selection
-const bodyHtml = fs.readFileSync('src/html/body.html', 'utf8');
+const bodyHtml = fs.readFileSync(path.join(projectRoot, 'src/html/body.html'), 'utf8');
 if (bodyHtml.includes('id="builder-palette"') || bodyHtml.includes('class="builder-floating-palette"')) {
     console.error("FAIL: #builder-palette is still present in src/html/body.html!");
     process.exit(1);
@@ -879,9 +883,9 @@ vm.runInContext(`
         if (!chinaDozer || !chinaDozer.userData || !chinaDozer.userData.isW3D) {
             throw new Error("createChinaDozerMesh did not return valid W3D mesh!");
         }
-        const audioSrc = fs.readFileSync('D:/C&C/src/js/05b_official_audio.js', 'utf8');
-        if (!audioSrc.includes('voice_dozer_china_select_0') || !audioSrc.includes('voice_dozer_china_move_0') || !audioSrc.includes('voice_dozer_china_build_0')) {
-            throw new Error("05b_official_audio.js missing official Chinese dozer voice lines!");
+        const chinaAudio = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/audio/china.json'), 'utf8'));
+        if (!chinaAudio.voice_dozer_china_select_0 || !chinaAudio.voice_dozer_china_move_0 || !chinaAudio.voice_dozer_china_build_0) {
+            throw new Error("src/audio/china.json missing official Chinese dozer voice lines!");
         }
 
         // 3. China Propaganda Center Model & Texture

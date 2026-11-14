@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const { writeAudioCatalog } = require('./audio_catalog');
 
-const audioDir = 'D:/C&C/extracted_assets/audio';
+const audioDir = path.join(__dirname, '..', 'extracted_assets', 'audio');
 const soundFiles = {
     // Weapons & Combat SFX
     'sfx_cannon_crusader': 'vcruweaa.wav',
@@ -114,6 +115,5 @@ window.playOfficialSound = playOfficialSound;
 window.playUnitVoice = playUnitVoice;
 `;
 
-const destPath = 'D:/C&C/src/js/05b_official_audio.js';
-fs.writeFileSync(destPath, jsContent, 'utf8');
-console.log(`Successfully generated ${destPath}`);
+const catalogSizes = writeAudioCatalog(audioMap);
+console.log(`Merged ${Object.keys(audioMap).length} clips into faction catalogs: ${JSON.stringify(catalogSizes)}`);
