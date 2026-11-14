@@ -33,17 +33,31 @@ jsFiles.forEach(file => {
     assembledJS += `\n// --- MODULE: ${file} ---\n` + content + '\n';
 });
 
-// 3. Assemble into standalone HTML (safe replacement without $ pattern interpretation)
-const finalHtml = template
+// 3. Assemble the web build (safe replacement without $ pattern interpretation)
+const webHtml = template
     .replace('/* {{CSS_CONTENT}} */', () => css)
     .replace('<!-- {{BODY_CONTENT}} -->', () => body)
     .replace('// {{JS_CONTENT}}', () => assembledJS);
+
+// Keep the versioned file self-contained for offline use. The web build keeps
+// audio external so it can load only shared + selected-faction catalogs.
+const audioDir = path.join(srcDir, 'audio');
+const embeddedAudio = {};
+for (const group of ['global', 'usa', 'china', 'gla']) {
+    embeddedAudio[group] = JSON.parse(fs.readFileSync(path.join(audioDir, `${group}.json`), 'utf8'));
+}
+const standaloneJS = `window.OFFICIAL_AUDIO_EMBEDDED = ${JSON.stringify(embeddedAudio)};\n` + assembledJS;
+const standaloneHtml = template
+    .replace('/* {{CSS_CONTENT}} */', () => css)
+    .replace('<!-- {{BODY_CONTENT}} -->', () => body)
+    .replace('// {{JS_CONTENT}}', () => standaloneJS);
 
 // 4. Validate JavaScript syntax before saving
 console.log('Validating JavaScript syntax with Node VM...');
 try {
     new vm.Script(assembledJS);
-    console.log('✓ Syntax validation PASSED (0 errors)');
+    new vm.Script(standaloneJS);
+    console.log('✓ Syntax validation PASSED for web and standalone builds (0 errors)');
 } catch (err) {
     console.error('✗ Build FAILED due to syntax error in assembled JS:');
     console.error(err);
@@ -51,11 +65,12 @@ try {
 }
 
 // 5. Write Outputs
-fs.writeFileSync(versionedOutput, finalHtml, 'utf8');
-fs.writeFileSync(pagesOutput, finalHtml, 'utf8');
+fs.writeFileSync(versionedOutput, standaloneHtml, 'utf8');
+fs.writeFileSync(pagesOutput, webHtml, 'utf8');
 const duration = Date.now() - startTime;
-const sizeKB = (finalHtml.length / 1024).toFixed(1);
+const webSizeKB = (webHtml.length / 1024).toFixed(1);
+const standaloneSizeKB = (standaloneHtml.length / 1024).toFixed(1);
 
 console.log(`✓ SUCCESS: Built ${versionedOutput}`);
 console.log(`✓ SUCCESS: Built ${pagesOutput} (Ready for GitHub Pages!)`);
-console.log(`  Total size: ${sizeKB} KB | Build time: ${duration}ms`);
+console.log(`  Web build: ${webSizeKB} KB | Standalone: ${standaloneSizeKB} KB | Build time: ${duration}ms`);
