@@ -34,6 +34,46 @@ body {
             padding: 24px 28px; background: #101820; border: 1px solid #00a98a;
             box-shadow: 0 0 35px rgba(0,255,204,0.18); border-radius: 6px;
         }
+        #start-card.main-menu-active {
+            position: relative; width: 100vw; height: 100vh; max-width: none; max-height: none;
+            overflow: hidden; padding: 0; border: 0; border-radius: 0; box-shadow: none;
+        }
+        #start-setup-screen[hidden], .zh-main-menu-screen[hidden] { display: none !important; }
+        .zh-main-menu-screen {
+            position: absolute; inset: 0; overflow: hidden; color: #f0f2f3;
+            background: linear-gradient(90deg, rgba(2, 8, 14, .12) 0%, rgba(2, 8, 14, .02) 43%, rgba(2, 8, 14, .66) 100%);
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .zh-main-menu-brand {
+            position: absolute; top: 7.5%; right: 6.5%; width: min(47vw, 620px);
+            text-align: right; text-shadow: 0 3px 10px #000, 0 0 24px rgba(0,0,0,.85);
+        }
+        .zh-main-menu-emblem { display: block; width: min(100%, 520px); max-height: 150px; object-fit: contain; object-position: right center; margin: 0 0 8px auto; filter: drop-shadow(0 4px 10px #000); }
+        .zh-main-menu-title { color: #edf3f6; font-size: clamp(17px, 2.1vw, 28px); font-weight: 800; letter-spacing: .19em; }
+        .zh-main-menu-subtitle { color: #f1f2e9; font-size: clamp(29px, 4.6vw, 64px); font-weight: 900; line-height: .94; letter-spacing: .035em; }
+        .zh-main-menu-subtitle span { color: #d9e7f3; }
+        .zh-main-menu-actions { position: absolute; top: 49%; right: 7.5%; transform: translateY(-18%); display: grid; gap: 7px; width: min(340px, 38vw); }
+        .zh-main-menu-button {
+            min-height: 62px; padding: 9px 17px; text-align: left; color: #f0f1ee; cursor: pointer;
+            border: 1px solid rgba(175, 199, 213, .45); border-left: 4px solid #8aa0b2;
+            background: linear-gradient(90deg, rgba(15, 27, 37, .88), rgba(18, 33, 45, .64));
+            box-shadow: 0 3px 10px rgba(0, 0, 0, .45); text-shadow: 0 1px 3px #000; transition: background .14s, border-color .14s, transform .14s;
+        }
+        .zh-main-menu-button span { display: block; font-weight: 800; font-size: 15px; letter-spacing: .14em; }
+        .zh-main-menu-button small { display: block; margin-top: 3px; color: #bdc8ce; font-size: 11px; letter-spacing: .035em; }
+        .zh-main-menu-button:hover, .zh-main-menu-button:focus-visible { outline: none; border-color: #d3e2ec; border-left-color: #d3e2ec; background: linear-gradient(90deg, rgba(56, 80, 98, .96), rgba(25, 46, 61, .84)); transform: translateX(-3px); }
+        .zh-main-menu-footer { position: absolute; right: 7.5%; bottom: 5%; color: rgba(230, 237, 240, .72); font: 700 9px/1.3 Consolas, monospace; letter-spacing: .22em; }
+        .zh-main-menu-footer span { padding: 0 5px; color: #e6c86c; }
+        .return-main-menu-btn { margin: 0 0 12px; padding: 6px 10px; font-size: 10px; }
+        @media (max-width: 700px) {
+            .zh-main-menu-brand { top: 9%; right: 5%; width: 90%; }
+            .zh-main-menu-emblem { max-height: 96px; }
+            .zh-main-menu-title { font-size: 15px; }
+            .zh-main-menu-subtitle { font-size: clamp(32px, 9vw, 54px); }
+            .zh-main-menu-actions { top: 48%; right: 5%; transform: none; width: min(340px, 90vw); }
+            .zh-main-menu-button { min-height: 56px; }
+            .zh-main-menu-footer { right: 5%; bottom: 3%; font-size: 8px; }
+        }
         /* Skirmish & Multiplayer 2-Column Grid Layout */
         .setup-columns-grid {
             display: grid;
@@ -2245,12 +2285,27 @@ body {
             </div>
         </div>
 
-        <div id="start-card">
+        <div id="start-card" class="main-menu-active">
+            <div id="main-menu-screen" class="zh-main-menu-screen">
+                <div class="zh-main-menu-brand">
+                    <img id="main-menu-emblem" class="zh-main-menu-emblem" alt="" />
+                    <div class="zh-main-menu-title">COMMAND &amp; CONQUER</div>
+                    <div class="zh-main-menu-subtitle">GENERALS <span>ZERO:HOUR</span></div>
+                </div>
+                <nav class="zh-main-menu-actions" aria-label="Main menu">
+                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('single')"><span>SKIRMISH</span><small>Configure a battle against AI</small></button>
+                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('multiplayer')"><span>MULTIPLAYER</span><small>Host or join a battle</small></button>
+                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('editor')"><span>MAP EDITOR</span><small>Create or edit a battlefield</small></button>
+                </nav>
+                <div class="zh-main-menu-footer">TACTICAL COMMAND SYSTEM <span>·</span> ZERO HOUR</div>
+            </div>
+            <div id="start-setup-screen" hidden>
             <button id="resume-game-btn" class="rts-btn resume-banner-btn" style="display: none;" onclick="resumeGame()">▶ RESUME CURRENT MATCH (ESC)</button>
+            <button id="return-main-menu-btn" class="rts-btn return-main-menu-btn" onclick="showMainMenuScreen()">← MAIN MENU</button>
             <div class="menu-header-banner">
                 <img id="menu-skirmish-emblem" class="menu-skirmish-emblem" alt="" style="display:none;" />
                 <div class="menu-header-titles">
-                    <h1>Command &amp; Conquer: Generals — Zero Hour</h1>
+                    <h1>Skirmish Setup</h1>
                     <img id="menu-ruler-img" class="menu-ruler-img" alt="" style="display:none;" />
                 </div>
                 <img id="menu-faction-crest" class="menu-faction-crest" alt="" style="display:none;" />
@@ -2258,7 +2313,7 @@ body {
 
             <!-- Game Mode Switcher Tabs (Single Player, Multiplayer, Map Editor) -->
             <div class="game-mode-tabs" role="tablist">
-                <button id="tab-mode-sp" class="mode-tab-btn active" onclick="switchGameModeTab('single')">🤖 SINGLE PLAYER</button>
+                <button id="tab-mode-sp" class="mode-tab-btn active" onclick="switchGameModeTab('single')">🤖 SKIRMISH</button>
                 <button id="tab-mode-mp" class="mode-tab-btn" onclick="switchGameModeTab('multiplayer')">🌐 MULTIPLAYER (PEER.JS)</button>
                 <button id="tab-mode-editor" class="mode-tab-btn" onclick="switchGameModeTab('editor')">🗺️ MAP EDITOR</button>
             </div>
@@ -2354,7 +2409,7 @@ body {
                     </div>
                 </div>
 
-                <button id="start-game" class="rts-btn" style="margin-top: 14px; width: 100%;" onclick="startGame()">Start Single Player Skirmish</button>
+                <button id="start-game" class="rts-btn" style="margin-top: 14px; width: 100%;" onclick="startGame()">START SKIRMISH</button>
             </div>
 
             <!-- ============================================================== -->
@@ -2558,6 +2613,7 @@ body {
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     </div>
@@ -9723,7 +9779,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                 const dune2 = Math.cos(x * 0.035 - z * 0.02) * 1.8;
                 let h = 3.8 + dune1 + dune2;
 
-                // Canyon mesa in the northwest
+                // Canyon mesa in the northwes
                 const dxMesa = x + size * 0.22;
                 const dzMesa = z + size * 0.22;
                 const dMesa = Math.hypot(dxMesa, dzMesa);
@@ -9731,7 +9787,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                     h += (1 - dMesa / (size * 0.14)) * 7.5;
                 }
 
-                // Localized oasis pond depression in the southeast
+                // Localized oasis pond depression in the southeas
                 const dxOasis = x - size * 0.20;
                 const dzOasis = z - size * 0.20;
                 const dOasis = Math.hypot(dxOasis, dzOasis);
@@ -9882,7 +9938,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                         }
                     } else if (theme === 'jungle') {
                         if (h <= waterLevel + 0.35) {
-                            // Muddy riverbed & wetland silt
+                            // Muddy riverbed & wetland sil
                             r = 75 + noise * 0.6;
                             g = 65 + noise * 0.5;
                             b = 48 + noise * 0.4;
@@ -9906,7 +9962,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                         }
                     } else if (theme === 'snow') {
                         if (h <= waterLevel + 0.35) {
-                            // Icy slush & permafrost
+                            // Icy slush & permafros
                             r = 140 + noise;
                             g = 158 + noise;
                             b = 180 + noise;
@@ -9980,7 +10036,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
             return texture;
         }
 
-        // Procedural Texture Generator per Environment
+        // Procedural Texture Generator per Environmen
         function createTerrainTextureForMap(mapType) {
             const officialKey = (mapType === 'desert') ? 'tournament_desert' : mapType;
             if (window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[officialKey] && typeof createOfficialMapTexture === 'function') {
@@ -10029,7 +10085,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                     ctx.fill();
                 }
             } else if (mapType === 'city') {
-                ctx.fillStyle = '#34383c'; // Dark asphalt
+                ctx.fillStyle = '#34383c'; // Dark asphal
                 ctx.fillRect(0, 0, 512, 512);
 
                 // Grid street pattern
@@ -10214,8 +10270,6 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                 miniCanvas.width = 256;
                 miniCanvas.height = 256;
                 const mCtx = miniCanvas.getContext('2d');
-                const offImg = window._officialMapImages && window._officialMapImages[mapType];
-
                 const drawProceduralRelief = () => {
                     const step = mapSize / 256;
                     for (let py = 0; py < 256; py += 2) {
@@ -10254,18 +10308,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
                     }
                 };
 
-                if (offImg && offImg.complete && offImg.naturalWidth > 0) {
-                    mCtx.drawImage(offImg, 0, 0, 256, 256);
-                } else {
-                    drawProceduralRelief();
-                    if (offImg && typeof offImg.addEventListener === 'function') {
-                        offImg.addEventListener('load', () => {
-                            if (currentMapType === mapType) {
-                                mCtx.drawImage(offImg, 0, 0, 256, 256);
-                            }
-                        }, { once: true });
-                    }
-                }
+                drawProceduralRelief();
                 window._minimapTerrainCanvas = miniCanvas;
             }
         }
@@ -10296,7 +10339,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
             return g;
         }
 
-        // 8. Desert Oil Pipeline Segment
+        // 8. Desert Oil Pipeline Segmen
         function createPipelineMesh(length = 18) {
             const g = new THREE.Group();
             const pipeMat = new THREE.MeshStandardMaterial({ color: 0x636e72, roughness: 0.6, metalness: 0.65 });
@@ -10371,7 +10414,7 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
             return g;
         }
 
-        // 12. City Arched Steel Streetlight
+        // 12. City Arched Steel Streetligh
         function createStreetLightMesh() {
             const g = new THREE.Group();
             const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7.5, 8), matDarkMetal);
@@ -10864,7 +10907,8 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
             }
         }
 
-        
+
+
 
 // --- MODULE: 07b_tournament_desert.js ---
 /**
@@ -11573,9 +11617,7 @@ function resolveObstacleCollisions(unit) {
                 return hasCC && hasRadarUpgrade;
             } else if (faction === 'gla') {
                 const hasRadarVan = (typeof units !== 'undefined') && units.some(u => u.type === 'radarvan' && u.health > 0);
-                const hasBlackMarket = structures.some(s => s.type === 'blackMarket' && s.health > 0 && !s.isBuilding);
-                const hasCC = structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0 && !s.isBuilding);
-                return hasRadarVan || hasBlackMarket || hasCC;
+                return hasRadarVan;
             }
             return true;
         }
@@ -12368,7 +12410,7 @@ function resolveObstacleCollisions(unit) {
                 function refreshFactionRoster() {
             const faction = factionCatalog[selectedFaction];
             unitRoster = {};
-            
+
             // 1. Barracks Infantry
             if (faction.barracks) {
                 Object.entries(faction.barracks).forEach(([type, data]) => {
@@ -12872,7 +12914,8 @@ function resolveObstacleCollisions(unit) {
             if (mode === 'multiplayer') syncMpLobbyToPeer();
         }
 
-        
+
+
 
 // --- MODULE: 10_editor.js ---
 // --- MAP EDITOR ENGINE ---
@@ -14015,6 +14058,7 @@ function initRadarMinimap() {
     let isRadarDragging = false;
     function handleRadarPointer(e) {
         if (!radarCanvas) return;
+        if (typeof isRadarOnline === 'function' && !isRadarOnline(selectedFaction)) return;
         const rect = radarCanvas.getBoundingClientRect();
         const px = e.clientX - rect.left;
         const py = e.clientY - rect.top;
@@ -14087,17 +14131,18 @@ function renderRadarMinimap() {
 
     const hasRadar = (typeof isRadarOnline === 'function') ? isRadarOnline(selectedFaction) : true;
 
-    // 1. Always Draw the Miniature Version of the Map Currently Being Played (Official C&C Generals Style)
-    ctx.fillStyle = '#1b1610';
-    ctx.fillRect(0, 0, w, h);
+    // No live map information or command interaction without faction radar.
+    if (!hasRadar) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, w, h);
+        return;
+    }
 
-    const mapKey = (typeof currentMapType !== 'undefined' && currentMapType === 'desert')
-        ? 'tournament_desert'
-        : (typeof currentMapType !== 'undefined' ? currentMapType : 'tournament_desert');
-    const offImg = window._officialMapImages && window._officialMapImages[mapKey];
-    if (offImg && offImg.complete && offImg.naturalWidth > 0) {
-        ctx.drawImage(offImg, 0, 0, w, h);
-    } else if (window._minimapTerrainCanvas) {
+    // Draw the terrain snapshot built from the active battlefield's height data.
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, w, h);
+    if (window._minimapTerrainCanvas) {
         ctx.drawImage(window._minimapTerrainCanvas, 0, 0, w, h);
     }
 
@@ -14267,7 +14312,10 @@ function resumeGame() {
     const pauseModal = document.getElementById('ingame-pause-modal');
     if (pauseModal) pauseModal.style.display = 'none';
     const startCard = document.getElementById('start-card');
-    if (startCard) startCard.style.display = 'none';
+    if (startCard) {
+        startCard.style.display = 'none';
+        startCard.classList.remove('main-menu-active');
+    }
     const pauseWatermark = document.getElementById('pause-screen-watermark');
     if (pauseWatermark) pauseWatermark.style.display = 'none';
     const pauseClock = document.getElementById('pause-screen-clock');
@@ -14304,6 +14352,9 @@ function showStartSetupCard() {
     const resumeBtn = document.getElementById('resume-game-btn');
     const pauseWatermark = document.getElementById('pause-screen-watermark');
     const pauseClock = document.getElementById('pause-screen-clock');
+    const mainMenuScreen = document.getElementById('main-menu-screen');
+    const setupScreen = document.getElementById('start-setup-screen');
+    const returnButton = document.getElementById('return-main-menu-btn');
     if (!menu) return;
 
     menu.style.display = 'flex';
@@ -14312,11 +14363,36 @@ function showStartSetupCard() {
     if (pauseWatermark) pauseWatermark.style.display = 'none';
     if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
+        startCard.classList.remove('main-menu-active');
         startCard.style.display = 'block';
+        if (mainMenuScreen) mainMenuScreen.hidden = true;
+        if (setupScreen) setupScreen.hidden = false;
+        if (returnButton) returnButton.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'none' : '';
         if (resumeBtn) {
             resumeBtn.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'block' : 'none';
         }
     }
+}
+
+function showMainMenuScreen() {
+    if (typeof isMatchActive !== 'undefined' && isMatchActive) return;
+    const menu = document.getElementById('start-menu');
+    const startCard = document.getElementById('start-card');
+    const mainMenuScreen = document.getElementById('main-menu-screen');
+    const setupScreen = document.getElementById('start-setup-screen');
+    if (!menu || !startCard || !mainMenuScreen || !setupScreen) return;
+    menu.style.display = 'flex';
+    menu.classList.remove('pause-mode');
+    startCard.style.display = 'block';
+    startCard.classList.add('main-menu-active');
+    mainMenuScreen.hidden = false;
+    setupScreen.hidden = true;
+    applyOfficialMenuArt(selectedFaction);
+}
+
+function enterStartMenuMode(mode) {
+    showStartSetupCard();
+    if (typeof switchGameModeTab === 'function') switchGameModeTab(mode);
 }
 
 function toggleInGameMenu() {
@@ -14599,7 +14675,10 @@ function applyOfficialMenuArt(facOverride) {
 
     const startCard = document.getElementById('start-card');
     if (startCard && ui.mainMenuBackdrop) {
-        startCard.style.backgroundImage = `linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%), url("${ui.mainMenuBackdrop}")`;
+        const menuScrim = startCard.classList.contains('main-menu-active')
+            ? 'linear-gradient(90deg, rgba(2, 8, 14, 0.18) 0%, rgba(2, 8, 14, 0.04) 48%, rgba(2, 8, 14, 0.62) 100%)'
+            : 'linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%)';
+        startCard.style.backgroundImage = `${menuScrim}, url("${ui.mainMenuBackdrop}")`;
         startCard.style.backgroundSize = 'cover';
         startCard.style.backgroundPosition = 'center';
     }
@@ -14612,6 +14691,7 @@ function applyOfficialMenuArt(facOverride) {
         }
     };
     setImg('menu-skirmish-emblem', ui.skirmishEmblem);
+    setImg('main-menu-emblem', ui.skirmishEmblem);
     setImg('menu-ruler-img', ui.mainMenuRuler);
     setImg('menu-faction-crest', ui['logo_' + fac] || ui.logo_usa);
     setImg('fc-logo-usa', ui.logo_usa);
