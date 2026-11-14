@@ -206,6 +206,7 @@ body {
         }
         .saved-map-card {
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
             background: rgba(20, 28, 22, 0.7);
@@ -215,6 +216,7 @@ body {
             margin-bottom: 6px;
             font-size: 11px;
         }
+        .saved-map-card > div:last-child { display: flex; flex-wrap: wrap; gap: 4px; }
         .faction-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);

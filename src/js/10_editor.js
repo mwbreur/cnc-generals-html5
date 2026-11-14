@@ -9,6 +9,7 @@
         let editorSpawns = [];
         let editorProps = [];
         let editorIsMouseDown = false;
+        let editorCurrentMapId = null;
 
         function initMapEditor() {
             clearEditorCanvas();
@@ -229,7 +230,9 @@
         function saveCustomMap() {
             const nameEl = document.getElementById('me-map-name');
             const name = ((nameEl && nameEl.value) || 'Custom Map').trim();
-            const id = 'custom_' + Date.now();
+            const id = editorCurrentMapId && savedCustomMaps[editorCurrentMapId]
+                ? editorCurrentMapId
+                : 'custom_' + Date.now();
             const waterEl = document.getElementById('me-water-level');
             const mapObj = {
                 id: id,
@@ -245,6 +248,7 @@
             };
 
             savedCustomMaps[id] = mapObj;
+            editorCurrentMapId = id;
             try {
                 localStorage.setItem('cnc_custom_maps', JSON.stringify(savedCustomMaps));
             } catch (e) {}
@@ -316,6 +320,7 @@
         function loadCustomMapIntoEditor(id) {
             const m = savedCustomMaps[id];
             if (!m) return;
+            editorCurrentMapId = id;
             const nameEl = document.getElementById('me-map-name');
             const themeEl = document.getElementById('me-map-theme');
             const sizeEl = document.getElementById('me-map-size');
@@ -340,6 +345,7 @@
 
         function deleteCustomMap(id) {
             delete savedCustomMaps[id];
+            if (editorCurrentMapId === id) editorCurrentMapId = null;
             try { localStorage.setItem('cnc_custom_maps', JSON.stringify(savedCustomMaps)); } catch (e) {}
             refreshMapDropdowns();
             loadSavedMapsList();
