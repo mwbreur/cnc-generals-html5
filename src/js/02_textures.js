@@ -33,7 +33,8 @@ function createTerrainTexture() {
             texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
             texture.repeat.set(48, 48);
             texture.anisotropy = 4;
-            texture.encoding = THREE.sRGBEncoding;
+            if ('colorSpace' in texture && THREE.SRGBColorSpace) texture.colorSpace = THREE.SRGBColorSpace;
+            else if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
             return texture;
         }
 
@@ -111,6 +112,7 @@ function createTerrainTexture() {
         }
 
         function createSupplyFields() {
+            if (typeof supplyPoints !== 'undefined' && Array.isArray(supplyPoints)) supplyPoints.length = 0;
             const crystalMaterial = new THREE.MeshStandardMaterial({ color: 0xc7a85a, roughness: 0.58, metalness: 0.12 });
             const shadowCrystalMaterial = new THREE.MeshStandardMaterial({ color: 0x8d7846, roughness: 0.72 });
             const crateMaterial = new THREE.MeshStandardMaterial({ color: 0x66533a, roughness: 0.9 });
