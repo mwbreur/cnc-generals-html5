@@ -2050,16 +2050,24 @@
                 if (c.name && c.name.toUpperCase().startsWith('PROPELLER')) c130Props.push(c);
             });
 
-            const startPos = new THREE.Vector3(dropCenter.x - 105, groundY + 16, dropCenter.z - 42);
-            const endPos = new THREE.Vector3(dropCenter.x + 105, groundY + 16, dropCenter.z + 42);
+            const startPos = new THREE.Vector3(dropCenter.x - 220, groundY + 14, dropCenter.z - 90);
+            const endPos = new THREE.Vector3(dropCenter.x + 220, groundY + 14, dropCenter.z + 90);
             plane.position.copy(startPos);
             plane.lookAt(endPos);
             scene.add(plane);
 
+            if (typeof window !== 'undefined') {
+                if (!window.activeSupplyPlanes) window.activeSupplyPlanes = [];
+            }
+            const dirLen = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z) || 1;
+            const planeTracker = { mesh: plane, dirX: (endPos.x - startPos.x) / dirLen, dirZ: (endPos.z - startPos.z) / dirLen };
+            if (typeof window !== 'undefined') window.activeSupplyPlanes.push(planeTracker);
+
             if (typeof playAudio === 'function') playAudio('radio_chirp', {}, 'usa');
+            if (typeof showNotification === 'function') showNotification('✈ C-130 Supply Drop inbound!', 'info');
 
             let planeTick = 0;
-            const planeDuration = 220;
+            const planeDuration = 300;
             let crateDropped = false;
 
             // 2. Parachute Supply Crate
@@ -2150,6 +2158,10 @@
                         spawnParachuteCrate();
                     }
                     if (planeTick >= planeDuration) {
+                        if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+                            const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+                            if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+                        }
                         scene.remove(plane);
                         if (!(plane.userData && plane.userData.isW3D)) {
                             const mats = new Set();

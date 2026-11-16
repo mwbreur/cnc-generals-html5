@@ -241,6 +241,36 @@ function renderRadarMinimap() {
         }
     });
 
+    // 9b. Draw Active Supply Drop C-130 Aircraft on Minimap
+    if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes) && window.activeSupplyPlanes.length > 0) {
+        window.activeSupplyPlanes.forEach(sp => {
+            if (!sp || !sp.mesh) return;
+            const px = toRX(sp.mesh.position.x);
+            const pz = toRZ(sp.mesh.position.z);
+            const ang = Math.atan2(sp.dirZ || 0, sp.dirX || 1);
+            ctx.save();
+            ctx.translate(px, pz);
+            ctx.rotate(ang);
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(6, 0);
+            ctx.lineTo(-4, -4);
+            ctx.lineTo(-2, 0);
+            ctx.lineTo(-4, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#00f2fe';
+            ctx.beginPath();
+            ctx.moveTo(5, 0);
+            ctx.lineTo(-3, -3);
+            ctx.lineTo(-1.5, 0);
+            ctx.lineTo(-3, 3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+
     // 10. Draw Under-Attack Radar Alert Pings (Expanding Pulsing Rings)
     if (typeof window !== 'undefined' && Array.isArray(window.minimapAlertPings) && window.minimapAlertPings.length > 0) {
         for (let pi = window.minimapAlertPings.length - 1; pi >= 0; pi--) {
