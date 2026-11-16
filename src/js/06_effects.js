@@ -2105,12 +2105,7 @@
         // =========================================================================
         // USA SUPPLY DROP ZONE: C-130 HERCULES CRATE DELIVERY ($1,500 / $1,650)
         // =========================================================================
-        function triggerSupplyDropZoneDelivery(structure) {
-            if (!structure || !structure.position || structure.health <= 0 || structure.isBuilding) return;
-            const dropCenter = structure.position.clone();
-            const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
-
-            // 1. Official W3D C-130 Hercules Flyover Mesh (AvCargoPln.W3D)
+        function createC130FlyoverPlane() {
             let plane = null;
             if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['c130']) {
                 plane = createW3DVehicleMesh('c130', false);
@@ -2132,12 +2127,22 @@
             plane.traverse(c => {
                 if (c.name && c.name.toUpperCase().startsWith('PROPELLER')) c130Props.push(c);
             });
+            return { plane, c130Props };
+        }
 
-            const flightY = groundY + 26;
-            const startPos = new THREE.Vector3(dropCenter.x - 180, flightY, dropCenter.z - 80);
-            const endPos = new THREE.Vector3(dropCenter.x + 180, flightY, dropCenter.z + 80);
+        function triggerSupplyDropZoneDelivery(structure) {
+            if (!structure || !structure.position || structure.health <= 0 || structure.isBuilding) return;
+            const dropCenter = structure.position.clone();
+            const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+
+            // 1. Official W3D C-130 Hercules Flyover Mesh (AvCargoPln.W3D)
+            const { plane, c130Props } = createC130FlyoverPlane();
+
+            const flightY = groundY + 15;
+            const startPos = new THREE.Vector3(dropCenter.x - 130, flightY, dropCenter.z - 60);
+            const endPos = new THREE.Vector3(dropCenter.x + 130, flightY, dropCenter.z + 60);
             plane.position.copy(startPos);
-            plane.lookAt(endPos);
+            if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
             scene.add(plane);
 
             if (typeof window !== 'undefined') {
@@ -2265,3 +2270,79 @@
             });
         }
         window.triggerSupplyDropZoneDelivery = triggerSupplyDropZoneDelivery;
+
+        function triggerC130Paradrop(targetPos) {
+            if (!targetPos || !scene) return;
+            const dropCenter = targetPos.clone();
+            const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+
+            const { plane, c130Props } = createC130FlyoverPlane();
+            const flightY = groundY + 15;
+            const startPos = new THREE.Vector3(dropCenter.x - 130, flightY, dropCenter.z - 60);
+            const endPos = new THREE.Vector3(dropCenter.x + 130, flightY, dropCenter.z + 60);
+            plane.position.copy(startPos);
+            if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
+            scene.add(plane);
+
+            const dirLen = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z) || 1;
+            const planeTracker = {
+                mesh: plane,
+                dirX: (endPos.x - startPos.x) / dirLen,
+                dirZ: (endPos.z - startPos.z) / dirLen
+            };
+            if (typeof window !== 'undefined') {
+                if (!window.activeSupplyPlanes) window.activeSupplyPlanes = [];
+                window.activeSupplyPlanes.push(planeTracker);
+            }
+
+            let frame = 0;
+            const totalFrames = 320;
+            let dropped = false;
+            const step = () => {
+                frame++;
+                const t = frame / totalFrames;
+                plane.position.lerpVectors(startPos, endPos, t);
+                c130Props.forEach(p => { p.rotation.z += 0.9; });
+
+                if (!dropped && t >= 0.5) {
+                    dropped = true;
+                    for (let i = 0; i < 4; i++) {
+                        const rPos = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
+                        const rGround = typeof getTerrainHeight === 'function' ? getTerrainHeight(rPos.x, rPos.z) : groundY;
+                        const chuteMat = new THREE.MeshBasicMaterial({ color: 0xe8e2cf, side: THREE.DoubleSide });
+                        const chute = new THREE.Mesh(new THREE.SphereGeometry(1.1, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), chuteMat);
+                        chute.position.set(rPos.x, flightY - 2, rPos.z);
+                        scene.add(chute);
+                        let dropTick = 0;
+                        const dropStep = () => {
+                            dropTick++;
+                            const dt = Math.min(1, dropTick / 55);
+                            chute.position.y = (flightY - 2) * (1 - dt) + (rGround + 0.8) * dt;
+                            if (dt < 1) {
+                                requestAnimationFrame(dropStep);
+                            } else {
+                                scene.remove(chute);
+                                chute.geometry.dispose();
+                                chuteMat.dispose();
+                                if (typeof spawnUnit === 'function') spawnUnit('infantry', rPos);
+                            }
+                        };
+                        requestAnimationFrame(dropStep);
+                    }
+                    if (typeof spawnSmokePuff === 'function') spawnSmokePuff(dropCenter, 0xdddddd);
+                }
+
+                if (frame < totalFrames) {
+                    requestAnimationFrame(step);
+                } else {
+                    planeTracker.alive = false;
+                    if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+                        const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+                        if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+                    }
+                    scene.remove(plane);
+                }
+            };
+            requestAnimationFrame(step);
+        }
+        window.triggerC130Paradrop = triggerC130Paradrop;

@@ -3114,16 +3114,12 @@ function attachControlRodsVisual(structure) {
                 child.visible = true;
                 if (child.userData.baseY === undefined) child.userData.baseY = child.position.y;
                 child.position.y = child.userData.baseY + 11.5;
-            } else if (child.name === 'coldFusionGlowLight' && child.isPointLight) {
-                child.visible = true;
-                child.intensity = 2.8;
             } else if (child.isMesh && child.userData && child.userData.isColdFusionConduit && child.material) {
                 child.material.color.setHex(0xb8ff00);
                 if (child.material.emissive) child.material.emissive.setHex(0x88ee00);
                 child.material.emissiveIntensity = 1.4;
                 child.material.roughness = 0.25;
                 child.material.metalness = 0.4;
-                child.material.needsUpdate = true;
             }
         });
         return;
@@ -4396,12 +4392,16 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'paradrop') {
         playAudio('radio_chirp');
-        for (let i = 0; i < 4; i++) {
-            const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
-            if (typeof spawnUnit === 'function') spawnUnit('infantry', rPos);
+        if (typeof triggerC130Paradrop === 'function') {
+            triggerC130Paradrop(pos);
+        } else {
+            for (let i = 0; i < 4; i++) {
+                const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
+                if (typeof spawnUnit === 'function') spawnUnit('infantry', rPos);
+            }
+            if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xdddddd);
         }
-        if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xdddddd);
-        showNotification('★ Ranger Paradrop landed at target coordinates!', 'success');
+        showNotification('★ C-130 Paradrop inbound to target coordinates!', 'success');
         return true;
     } else if (p === 'a10Strike') {
         showNotification('★ A-10 Warthog flight inbound to target coordinates!', 'success');

@@ -726,17 +726,9 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
             root.add(upgRoot);
         }
 
-        const glow1 = new THREE.PointLight(0xb8ff00, 0, 38);
-        glow1.name = 'coldFusionGlowLight';
-        glow1.position.set(-7.5, 29.5, -7.2);
-        glow1.visible = false;
-        root.add(glow1);
-
-        const glow2 = new THREE.PointLight(0xb8ff00, 0, 32);
-        glow2.name = 'coldFusionGlowLight';
-        glow2.position.set(-17.54, 24.0, -13.16);
-        glow2.visible = false;
-        root.add(glow2);
+        // Note: Do not add toggled PointLights here — changing active NUM_POINT_LIGHTS on upgrade
+        // forces synchronous WebGL shader recompilation across the scene (~1-2s freeze).
+        // Emissive atpwrglow meshes and conduits provide the Control Rods glow at zero shader cost.
     } else if (buildingKey === 'usa_particleCannon') {
         const emitterMat = new THREE.MeshStandardMaterial({
             color: 0x00e5ff,
