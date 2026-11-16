@@ -1737,12 +1737,18 @@ function processEnemyAIEngine() {
 
             // Allow player to steer active Particle Cannon orbital beam in a straight line by right-clicking terrain
             if (window.activeParticleCannonTarget && window.activeParticleCannonPlayerOwned &&
-                (!units.some(u => u.selected) || (selectedStructure && selectedStructure.type === 'particleCannon'))) {
+                (window.activeParticleCannonControl || !units.some(u => u.selected) || (selectedStructure && selectedStructure.type === 'particleCannon'))) {
                 const beamHit = getGroundIntersectPoint();
                 if (beamHit) {
+                    const nowMs = Date.now();
+                    const isFast = (e.detail >= 2) || (window._lastParticleBeamClickMs && (nowMs - window._lastParticleBeamClickMs) < 350);
+                    window._lastParticleBeamClickMs = nowMs;
+                    window.activeParticleCannonSpeed = isFast ? 0.84 : 0.42;
+                    window.activeParticleCannonControl = true;
+                    if (typeof setParticleBeamCursor === 'function') setParticleBeamCursor(true);
                     window.activeParticleCannonTarget.copy(beamHit);
                     if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(beamHit, 'attack');
-                    showNotification('⚡ Redirecting Particle Beam!', 'info');
+                    showNotification(isFast ? '⚡ Particle Beam: Fast Sweep (2x Speed)!' : '⚡ Redirecting Particle Beam!', 'info');
                     return;
                 }
             }
@@ -2128,6 +2134,38 @@ function processEnemyAIEngine() {
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
+            // Particle Cannon active beam steering (Left-click: 1x drag, Double-click: 2x fast sweep)
+            if (window.activeParticleCannonTarget && window.activeParticleCannonPlayerOwned && window.activeParticleCannonControl) {
+                const pUnitMeshes = units.filter(u => !u.garrisonedIn && u.mesh).map(u => u.mesh);
+                const pUnitHits = pUnitMeshes.length ? raycaster.intersectObjects(pUnitMeshes, true) : [];
+                const pStructMeshes = structures.map(s => s.mesh).filter(Boolean);
+                const pStructHits = pStructMeshes.length ? raycaster.intersectObjects(pStructMeshes, true) : [];
+                let clickedOtherPlayerStruct = false;
+                if (pStructHits.length > 0) {
+                    let sRoot = pStructHits[0].object;
+                    while (sRoot.parent && sRoot.parent !== scene) sRoot = sRoot.parent;
+                    const hitStruct = structures.find(s => s.mesh === sRoot);
+                    if (hitStruct && hitStruct.type !== 'particleCannon') clickedOtherPlayerStruct = true;
+                }
+                if (pUnitHits.length > 0 || clickedOtherPlayerStruct) {
+                    // Player clicked away onto a unit or another building -> release beam steering control
+                    window.activeParticleCannonControl = false;
+                    if (typeof setParticleBeamCursor === 'function') setParticleBeamCursor(false);
+                } else {
+                    const beamGround = getGroundIntersectPoint();
+                    if (beamGround) {
+                        const nowMs = Date.now();
+                        const isFast = (e.detail >= 2) || (window._lastParticleBeamClickMs && (nowMs - window._lastParticleBeamClickMs) < 350);
+                        window._lastParticleBeamClickMs = nowMs;
+                        window.activeParticleCannonSpeed = isFast ? 0.84 : 0.42;
+                        window.activeParticleCannonTarget.copy(beamGround);
+                        if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(beamGround, 'attack');
+                        showNotification(isFast ? '⚡ Particle Beam: Fast Sweep (2x Speed)!' : '⚡ Steering Particle Beam!', 'info');
+                        return;
+                    }
+                }
+            }
+
             // 1. Check Units (Direct Raycast)
             const unitMeshes = units.filter(u => !u.garrisonedIn && u.mesh).map(u => u.mesh);
             // Avoid entering Three.js recursive raycasting when there is nothing selectable.
@@ -2210,6 +2248,11 @@ function processEnemyAIEngine() {
                     if (structures.includes(hitCandidate)) {
                         selectedStructure = hitCandidate;
                         activeSidebarTab = 'production';
+                        if (hitCandidate.type === 'particleCannon' && window.activeParticleCannonTarget && window.activeParticleCannonPlayerOwned) {
+                            window.activeParticleCannonControl = true;
+                            if (typeof setParticleBeamCursor === 'function') setParticleBeamCursor(true);
+                            showNotification('⚡ Particle Beam steering control re-acquired!', 'info');
+                        }
                         updateSidebar();
                         return;
                     }

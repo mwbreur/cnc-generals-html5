@@ -1071,6 +1071,63 @@
         // CINEMATIC ANIMATED SUPERWEAPONS (PARTICLE CANNON, NUKE SILO, SCUD STORM)
         // =========================================================================
 
+        function setParticleBeamCursor(active) {
+            if (typeof document === 'undefined' || !document.body) return;
+            if (active) {
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="%2300f2fe" stroke-width="2"/><circle cx="16" cy="16" r="3" fill="%23ffffff" stroke="%2300f2fe" stroke-width="1.5"/><line x1="16" y1="1" x2="16" y2="8" stroke="%2300f2fe" stroke-width="2"/><line x1="16" y1="24" x2="16" y2="31" stroke="%2300f2fe" stroke-width="2"/><line x1="1" y1="16" x2="8" y2="16" stroke="%2300f2fe" stroke-width="2"/><line x1="24" y1="16" x2="31" y2="16" stroke="%2300f2fe" stroke-width="2"/></svg>`;
+                document.body.style.cursor = `url("data:image/svg+xml;utf8,${svg}") 16 16, crosshair`;
+            } else if (!window.pendingSuperweapon && !window.activeBlueprintType) {
+                document.body.style.cursor = 'default';
+            }
+        }
+        window.setParticleBeamCursor = setParticleBeamCursor;
+
+        function spawnParticleFirePatch(pos) {
+            if (typeof scene === 'undefined' || !pos) return;
+            const patchGeo = new THREE.CircleGeometry(2.6, 12);
+            patchGeo.rotateX(-Math.PI / 2);
+            const patchMat = new THREE.MeshBasicMaterial({
+                color: 0xff6b00,
+                transparent: true,
+                opacity: 0.65,
+                depthWrite: false
+            });
+            const patch = new THREE.Mesh(patchGeo, patchMat);
+            const py = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+            patch.position.set(pos.x, py + 0.14, pos.z);
+            scene.add(patch);
+
+            let fireLife = 210; // ~3.5 seconds of residual fire
+            activeFX.push({
+                life: fireLife,
+                update() {
+                    fireLife--;
+                    patchMat.opacity = 0.65 * Math.min(1, fireLife / 60) * (0.8 + Math.sin(fireLife * 0.4) * 0.2);
+                    if (fireLife % 12 === 0 && typeof spawnSmokePuff === 'function') {
+                        spawnSmokePuff(patch.position, 0xff5500, 0.45);
+                    }
+                    if (fireLife % 20 === 0 && typeof applyCalculatedDamage === 'function') {
+                        const allU = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
+                        allU.forEach(u => {
+                            if (u.health > 0 && u.mesh && !u.isAir && u.mesh.position.distanceTo(patch.position) <= 5.5) {
+                                const cat = typeof getArmorCategory === 'function' ? getArmorCategory(u) : '';
+                                if (cat === 'infantry' || cat === 'light_vehicle') {
+                                    applyCalculatedDamage(null, u, 10, 'FLAME');
+                                }
+                            }
+                        });
+                    }
+                    if (fireLife <= 0) {
+                        scene.remove(patch);
+                        patchGeo.dispose();
+                        patchMat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+
         function animateParticleCannonStrike(targetPos, duration = 260, uplinkPos = null, isPlayerOwned = false) {
             if (typeof playSuperweaponEvaAlert === 'function') {
                 playSuperweaponEvaAlert('particleCannon', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
@@ -1082,6 +1139,9 @@
             group.position.copy(targetPos);
             window.activeParticleCannonTarget = targetPos.clone();
             window.activeParticleCannonPlayerOwned = !!isPlayerOwned;
+            window.activeParticleCannonControl = !!isPlayerOwned;
+            window.activeParticleCannonSpeed = 0.42;
+            if (isPlayerOwned) setParticleBeamCursor(true);
 
             // 1. Searing inner white-hot core + outer cyan orbital plasma column
             const coreGeo = new THREE.CylinderGeometry(0.45, 0.75, 110, 16);
@@ -1138,13 +1198,31 @@
                 life: duration,
                 update() {
                     life--;
+                    // Low-Power shutoff: if owner's base enters Low Power while firing, shut off beam immediately
+                    if (isPlayerOwned && typeof window !== 'undefined' && window.isPlayerLowPower) {
+                        window.activeParticleCannonTarget = null;
+                        window.activeParticleCannonPlayerOwned = false;
+                        window.activeParticleCannonControl = false;
+                        setParticleBeamCursor(false);
+                        scene.remove(group);
+                        group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+                        if (uplinkGroup) {
+                            scene.remove(uplinkGroup);
+                            uplinkGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+                        }
+                        if (typeof showNotification === 'function') {
+                            showNotification('⚡ PARTICLE CANNON OFFLINE: Low Power — beam shut off!', 'error');
+                        }
+                        return false;
+                    }
                     // Sit steadily on target when uncontrolled, or sweep in a straight line toward player's steered target
                     if (window.activeParticleCannonTarget) {
                         const dx = window.activeParticleCannonTarget.x - originCenter.x;
                         const dz = window.activeParticleCannonTarget.z - originCenter.z;
                         const dist = Math.hypot(dx, dz);
                         if (dist > 0.45) {
-                            const step = Math.min(0.42, dist);
+                            const steerSpeed = window.activeParticleCannonSpeed || 0.42;
+                            const step = Math.min(steerSpeed, dist);
                             originCenter.x += (dx / dist) * step;
                             originCenter.z += (dz / dist) * step;
                         }
@@ -1197,10 +1275,15 @@
                             spawnCraterDecal(beamPos, 2.6, 360);
                         }
                     }
+                    if (life % 14 === 0) {
+                        spawnParticleFirePatch(group.position);
+                    }
 
                     if (life <= 0) {
                         window.activeParticleCannonTarget = null;
                         window.activeParticleCannonPlayerOwned = false;
+                        window.activeParticleCannonControl = false;
+                        if (isPlayerOwned) setParticleBeamCursor(false);
                         scene.remove(group);
                         group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
                         if (uplinkGroup) {

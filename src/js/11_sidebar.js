@@ -860,7 +860,9 @@ function updateSidebar() {
                 powerText.style.color = '#e74c3c';
             }
         }
+        if (typeof window !== 'undefined') window.isPlayerLowPower = (produced < consumed);
     }
+    if (selectedFaction === 'gla' && typeof window !== 'undefined') window.isPlayerLowPower = false;
 
     // Update Cash counter
     const resDisp = document.getElementById('resource-display');
@@ -3391,6 +3393,7 @@ function updateHUD() {
                 });
             }
             const isPlayerLowPower = (typeof selectedFaction !== 'undefined' && selectedFaction !== 'gla' && pProduced < pConsumed);
+            if (typeof window !== 'undefined') window.isPlayerLowPower = isPlayerLowPower;
 
             const activeStructures = structures.filter(structure => !structure.isBuilding && structure.health > 0);
             activeStructures.forEach(structure => {
@@ -3436,6 +3439,15 @@ function updateHUD() {
                         } else if (structure.type === 'scudStorm') {
                             const gantry = getCachedNode(structure.mesh, 'scudGantry');
                             if (gantry) gantry.rotation.x = -0.15 - chargeRatio * 0.75; // Elevate 9 Scuds toward vertical launch angle
+                        } else if (structure.type === 'particleCannon') {
+                            const glowLight = getCachedNode(structure.mesh, 'particleCannonGlowLight');
+                            if (glowLight) glowLight.intensity = 0.6 + chargeRatio * 2.2;
+                            const ring = getCachedNode(structure.mesh, 'particleAcceleratorRing');
+                            if (ring && ring.material) ring.material.emissiveIntensity = 0.4 + chargeRatio * 1.4;
+                            const fan1 = getCachedNode(structure.mesh, 'FAN01');
+                            const fan4 = getCachedNode(structure.mesh, 'FAN04');
+                            if (fan1) fan1.rotation.y += 0.15 + chargeRatio * 0.45;
+                            if (fan4) fan4.rotation.y -= 0.15 + chargeRatio * 0.45;
                         }
                     }
 
