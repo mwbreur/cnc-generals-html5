@@ -7,7 +7,7 @@
         let selectedFaction = 'usa';
         let choosingBaseLocation = false;
         
-        let supplyCenterPos = new THREE.Vector3(-30, 0, -20);
+        let supplyCenterPos = typeof THREE !== 'undefined' ? new THREE.Vector3(-30, 0, -20) : { x: -30, y: 0, z: -20 };
         const supplyPoints = [];
         let activeCustomMap = null;
         let savedCustomMaps = {};
@@ -30,7 +30,7 @@
         const landmines = [];
 
 
-        let cameraTarget = new THREE.Vector3(0, 0, 0);
+        let cameraTarget = typeof THREE !== 'undefined' ? new THREE.Vector3(0, 0, 0) : { x: 0, y: 0, z: 0 };
         let cameraRadius = 115;
         let cameraAlpha = -Math.PI / 4; 
         let cameraBeta = Math.PI / 3;  
@@ -51,8 +51,8 @@
         };
         const progressContainer = document.getElementById('build-progress');
         const progressFill = document.getElementById('build-progress-fill');
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
+        const raycaster = typeof THREE !== 'undefined' ? new THREE.Raycaster() : null;
+        const mouse = typeof THREE !== 'undefined' ? new THREE.Vector2() : { x: 0, y: 0 };
 
         // Deterministic Seeded PRNG (Mulberry32) for Skirmish / Multiplayer simulation consistency
         let _simRngState = 0x6D2B79F5;
