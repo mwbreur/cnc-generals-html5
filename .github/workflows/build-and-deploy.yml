@@ -11,6 +11,16 @@ on:
       - "verify_system.js"
       - "build.js"
       - ".github/workflows/build-and-deploy.yml"
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "src/**"
+      - "tools/**"
+      - "scripts/**"
+      - "verify_system.js"
+      - "build.js"
+      - ".github/workflows/build-and-deploy.yml"
   workflow_dispatch:
 
 permissions:
@@ -47,7 +57,7 @@ jobs:
       - name: Run Playwright headless browser E2E smoke test
         run: |
           npm install --no-save playwright
-          npx playwright install chromium --with-deps
+          npx playwright install --only-shell chromium --with-deps
           node scripts/e2e_smoke.mjs
 
       - name: Package static Pages artifact
@@ -65,6 +75,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
