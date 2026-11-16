@@ -284,7 +284,7 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         if (researchedTechs.has('laserMissiles') && ['raptor', 'comanche', 'stealthfighter'].includes(attacker.type)) {
             finalDmg = Math.round(finalDmg * 1.25);
         }
-        if (researchedTechs.has('blackNapalm') && (damageType === 'FIRE' || damageType === 'FLAME' || ['dragon', 'inferno'].includes(attacker.type))) {
+        if (researchedTechs.has('blackNapalm') && (damageType === 'FIRE' || damageType === 'FLAME' || ['dragon', 'dragonTank', 'inferno', 'mig'].includes(attacker.type))) {
             finalDmg = Math.round(finalDmg * 1.30);
         }
         if (researchedTechs.has('anthraxBeta') && (damageType === 'TOXIN' || ['toxintractor', 'scud'].includes(attacker.type))) {
@@ -328,7 +328,7 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         if (researchedTechs.has('fortifiedStructures') && typeof structures !== 'undefined' && structures.includes(target)) {
             finalDmg = Math.max(1, Math.round(finalDmg * 0.75));
         }
-        if (researchedTechs.has('migArmor') && typeof units !== 'undefined' && units.includes(target) && target.type === 'raptor' && (target.faction === 'china' || target.isChina || selectedFaction === 'china')) {
+        if (researchedTechs.has('migArmor') && typeof units !== 'undefined' && units.includes(target) && target.type === 'mig' && (target.faction === 'china' || target.isChina || selectedFaction === 'china')) {
             finalDmg = Math.max(1, Math.round(finalDmg * 0.75));
         }
     }
