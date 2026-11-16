@@ -1270,10 +1270,11 @@ function animate() {
                 if (unit.taskState === 'MovingToBuild' && s) {
                     if (s.health > 0 && s.isBuilding) {
                         const distToS = Math.hypot(unit.mesh.position.x - s.position.x, unit.mesh.position.z - s.position.z);
-                        const buildThreshold = s.radius + (unit.radius || 1.8) + 3.2;
-                        if (distToS <= buildThreshold && (!unit.waypoints || unit.waypoints.length === 0 || distToS <= s.radius + (unit.radius || 1.8) + 2.0)) {
+                        const buildThreshold = s.radius + (unit.radius || 1.9) + 4.0;
+                        if (distToS <= buildThreshold) {
                             unit.taskState = 'Building';
                             unit.waypoints = [];
+                            unit.targetPosition.copy(unit.mesh.position);
                             unit._buildStuckTicks = 0;
                         } else {
                             const prevPos = unit._lastBuildMovePos;
@@ -1283,9 +1284,10 @@ function animate() {
                             unit._buildStuckTicks = (moved < 0.02) ? ((unit._buildStuckTicks || 0) + 1) : 0;
                             if (unit._buildStuckTicks > 60) {
                                 unit._buildStuckTicks = 0;
-                                if (distToS <= buildThreshold + 2.5) {
+                                if (distToS <= buildThreshold + 5.0) {
                                     unit.taskState = 'Building';
                                     unit.waypoints = [];
+                                    unit.targetPosition.copy(unit.mesh.position);
                                 } else if (typeof assignDozerToStructure === 'function') {
                                     assignDozerToStructure(unit, s);
                                 }
@@ -1652,12 +1654,17 @@ function animate() {
                                 unit.mesh.rotation.x += (-0.08 - unit.mesh.rotation.x) * 0.12; // Slight diving attack angle
                                 unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.8, -0.42, 0.42) - unit.mesh.rotation.z) * 0.15;
 
-                                // Bomb & Missile Delivery: Release ordnance as plane streaks overhead
-                                if (distToEnemy <= 16.0 && unit.attackCooldown === 0) {
-                                    executeWeaponFire(unit, unit.combatTarget);
+                                // Bomb & Missile Delivery: Release ordnance as plane streaks overhead, and always overshoot past target
+                                if ((distToEnemy <= 16.0 && unit.attackCooldown === 0) || distToEnemy <= 6.0) {
+                                    if (unit.attackCooldown === 0) executeWeaponFire(unit, unit.combatTarget);
                                     unit.planeAttackPhase = 'overshoot';
-                                    unit.overshootDirX = dirX;
-                                    unit.overshootDirZ = dirZ;
+                                    if (distToEnemy > 0.2) {
+                                        unit.overshootDirX = dirX;
+                                        unit.overshootDirZ = dirZ;
+                                    } else {
+                                        unit.overshootDirX = Math.sin(unit.mesh.rotation.y);
+                                        unit.overshootDirZ = Math.cos(unit.mesh.rotation.y);
+                                    }
                                     unit.overshootDist = 0;
                                 }
                             } else if (unit.planeAttackPhase === 'overshoot') {
@@ -2446,6 +2453,7 @@ function processEnemyMovement() {
         }
 
         // Ground vehicle and infantry movement
+        if (enemy.taskState === 'Building' || enemy.taskState === 'Repairing') return;
         const target = enemy.combatTarget;
         const targetPos = target && (target.position || target.mesh.position);
         const targetRadius = target ? (target.radius || 0) : 0;
