@@ -76,6 +76,18 @@ function playAudio(type, options = {}, faction = null) {
     try {
         switch (type) {
             // --- USA SOUNDS ---
+            case 'radar_alert': {
+                [0, 0.14].forEach((delay, idx) => {
+                    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(idx === 0 ? 960 : 740, t + delay);
+                    gain.gain.setValueAtTime(0.22, t + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.12);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(t + delay); osc.stop(t + delay + 0.13);
+                });
+                break;
+            }
             case 'radio_chirp': {
                 const osc = ctx.createOscillator(); const gain = ctx.createGain();
                 osc.type = 'sine'; osc.frequency.setValueAtTime(1400, t); osc.frequency.exponentialRampToValueAtTime(2200, t + 0.04);

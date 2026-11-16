@@ -241,7 +241,33 @@ function renderRadarMinimap() {
         }
     });
 
-    // 10. Draw Camera Viewport Frustum Rectangle (Classic C&C Generals White/Gold View Box)
+    // 10. Draw Under-Attack Radar Alert Pings (Expanding Pulsing Rings)
+    if (typeof window !== 'undefined' && Array.isArray(window.minimapAlertPings) && window.minimapAlertPings.length > 0) {
+        for (let pi = window.minimapAlertPings.length - 1; pi >= 0; pi--) {
+            const p = window.minimapAlertPings[pi];
+            p.life--;
+            if (p.life <= 0) {
+                window.minimapAlertPings.splice(pi, 1);
+                continue;
+            }
+            const px = toRX(p.x);
+            const pz = toRZ(p.z);
+            const prog = 1 - (p.life / (p.maxLife || 120));
+            const pulseR = 4 + ((prog * 3) % 1) * 14;
+            const alpha = Math.max(0.2, (p.life / (p.maxLife || 120)) * 0.95);
+            ctx.save();
+            ctx.strokeStyle = p.isBase ? `rgba(255, 71, 87, ${alpha})` : `rgba(255, 195, 18, ${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(px, pz, pulseR, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.fillRect(px - 2, pz - 2, 4, 4);
+            ctx.restore();
+        }
+    }
+
+    // 11. Draw Camera Viewport Frustum Rectangle (Classic C&C Generals White/Gold View Box)
     if (camera) {
         const camX = toRX(cameraTarget.x);
         const camZ = toRZ(cameraTarget.z);

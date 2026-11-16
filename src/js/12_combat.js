@@ -354,6 +354,29 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     target.health = Math.max(0, target.health - finalDmg);
     target._lastAttackedTime = Date.now();
     target._lastAttacker = attacker || null;
+
+    // Player "Unit Under Attack" / "Base Under Attack" EVA alert + Minimap radar signal
+    const isPlayerUnit = (typeof units !== 'undefined' && units.includes(target));
+    const isPlayerStruct = (typeof structures !== 'undefined' && structures.includes(target));
+    if ((isPlayerUnit || isPlayerStruct) && (!attacker || !isFriendly(target, attacker))) {
+        const nowMs = Date.now();
+        const tPos = target.position || (target.mesh && target.mesh.position);
+        if (tPos && typeof window !== 'undefined') {
+            window.lastRadarAlertPos = tPos.clone ? tPos.clone() : { x: tPos.x, y: tPos.y || 0, z: tPos.z };
+            if (!window.minimapAlertPings) window.minimapAlertPings = [];
+            const hasNearbyPing = window.minimapAlertPings.some(p => Math.hypot(p.x - tPos.x, p.z - tPos.z) < 25 && p.life > 75);
+            if (!hasNearbyPing) {
+                window.minimapAlertPings.push({ x: tPos.x, z: tPos.z, life: 120, maxLife: 120, isBase: isPlayerStruct });
+            }
+            if (!window._lastUnderAttackAlertMs || (nowMs - window._lastUnderAttackAlertMs) > 8000) {
+                window._lastUnderAttackAlertMs = nowMs;
+                if (typeof showNotification === 'function') {
+                    showNotification(isPlayerStruct ? '⚠ BASE UNDER ATTACK!' : '⚠ UNIT UNDER ATTACK!', 'error');
+                }
+                if (typeof playAudio === 'function') playAudio('radar_alert');
+            }
+        }
+    }
     if (target.health > 0 && target.scanRange > 0 && !target.combatTarget && target.taskState !== 'Moving' && attacker && attacker.health > 0 && !isFriendly(target, attacker)) {
         target.combatTarget = attacker;
     }
