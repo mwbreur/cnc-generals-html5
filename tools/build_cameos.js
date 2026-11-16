@@ -47,17 +47,19 @@ for (const bigFile of BIG_FILES) {
 function getAssetBuffer(nameOrPath) {
     const clean = nameOrPath.replace(/\\/g, '/').toLowerCase();
     const base = path.basename(clean);
+    const entry = bigCatalog[clean] || bigCatalog[base];
+    if (entry) {
+        const buf = Buffer.alloc(entry.size);
+        const fd = fs.openSync(entry.bigPath, 'r');
+        fs.readSync(fd, buf, 0, entry.size, entry.offset);
+        fs.closeSync(fd);
+        return buf;
+    }
     const localPath = path.join('D:/C&C/extracted_assets/textures', base);
     if (fs.existsSync(localPath)) {
         return fs.readFileSync(localPath);
     }
-    const entry = bigCatalog[clean] || bigCatalog[base];
-    if (!entry) return null;
-    const buf = Buffer.alloc(entry.size);
-    const fd = fs.openSync(entry.bigPath, 'r');
-    fs.readSync(fd, buf, 0, entry.size, entry.offset);
-    fs.closeSync(fd);
-    return buf;
+    return null;
 }
 
 function decodeTga(tgaBuf) {
@@ -267,6 +269,15 @@ function cropMappedImage(imageName, opts = {}) {
         const srcRowStart = ((top + y) * tga.width + left) * 4;
         const dstRowStart = y * cropW * 4;
         tga.rgba.copy(cropRgba, dstRowStart, srcRowStart, srcRowStart + cropW * 4);
+    }
+
+    // Some retail 32-bit TGA cameo sheets (e.g. SNUserInterface512_003, SUUserInterface512_003) store 0 in the unused alpha channel
+    let hasAlpha = false;
+    for (let i = 3; i < cropRgba.length; i += 4) {
+        if (cropRgba[i] !== 0) { hasAlpha = true; break; }
+    }
+    if (!hasAlpha) {
+        for (let i = 3; i < cropRgba.length; i += 4) cropRgba[i] = 255;
     }
 
     let finalW = cropW;
