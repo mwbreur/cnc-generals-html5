@@ -3048,19 +3048,58 @@ function attachPerimeterMinesVisual(structure, isNeutron = false) {
 
 function attachCamoNettingVisual(structure) {
     if (!structure || !structure.mesh) return;
-    const r = (structure.radius || 3.5) * 1.35;
-    const netGeo = new THREE.ConeGeometry(r, 2.5, 8, 1, true);
+    if (structure.mesh.getObjectByName("camoNettingAttachment")) return;
+
+    const sx = (structure.mesh.scale && structure.mesh.scale.x) ? structure.mesh.scale.x : 1;
+    const sy = (structure.mesh.scale && structure.mesh.scale.y) ? structure.mesh.scale.y : 1;
+    const sz = (structure.mesh.scale && structure.mesh.scale.z) ? structure.mesh.scale.z : 1;
+
+    // Counter-scale so camo netting renders at true world dimensions on W3D buildings (e.g. stingerSite s=0.2)
+    const netGroup = new THREE.Group();
+    netGroup.name = "camoNettingAttachment";
+    netGroup.scale.set(1 / sx, 1 / sy, 1 / sz);
+
+    const r = (structure.radius || 5.0) * 1.15;
+    const topY = (structure.type === 'stingerSite') ? 4.8 : 4.2;
+
+    // Translucent olive-camo draped canopy
+    const tarpGeo = new THREE.ConeGeometry(r, 2.8, 8, 2, true);
+    const tarpMat = new THREE.MeshStandardMaterial({
+        color: 0x5d6b47,
+        roughness: 0.95,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.68,
+        side: THREE.DoubleSide
+    });
+    const tarp = new THREE.Mesh(tarpGeo, tarpMat);
+    tarp.position.y = topY;
+    netGroup.add(tarp);
+
+    // Camo mesh grid overlay
+    const netGeo = new THREE.ConeGeometry(r * 1.01, 2.82, 8, 3, true);
     const netMat = new THREE.MeshStandardMaterial({
-        color: 0x5a6848,
+        color: 0x3a442b,
         wireframe: true,
         roughness: 0.9,
         transparent: true,
         opacity: 0.85
     });
     const net = new THREE.Mesh(netGeo, netMat);
-    net.position.y = 1.8;
-    net.name = "camoNettingAttachment";
-    structure.mesh.add(net);
+    net.position.y = topY + 0.02;
+    netGroup.add(net);
+
+    // Four corner support poles anchoring the netting to the ground
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x4a3b2a, roughness: 0.9 });
+    const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, topY - 0.6, 6);
+    for (let i = 0; i < 4; i++) {
+        const ang = (i * Math.PI / 2) + Math.PI / 4;
+        const pole = new THREE.Mesh(poleGeo, poleMat);
+        pole.position.set(Math.cos(ang) * r * 0.88, (topY - 0.6) * 0.5, Math.sin(ang) * r * 0.88);
+        netGroup.add(pole);
+    }
+
+    structure.mesh.add(netGroup);
 }
 
 function upgradeDecoyToRealStructure(structure) {
