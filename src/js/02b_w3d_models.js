@@ -282,7 +282,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             }
         } else if (upper.includes('TREAD') || upper.includes('TRACK') || upper.includes('WHEEL') || upper.includes('TIRE')) {
             mat = treadMat;
-        } else if ((upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON') || upper.includes('EXHAUST')) && modelKey !== 'paladin') {
+        } else if ((upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON') || upper.includes('EXHAUST')) && modelKey !== 'paladin' && modelKey !== 'crusader') {
             mat = metalMat;
         } else if (upper.includes('GLASS') || upper.includes('WINDOW')) {
             mat = glassMat;
@@ -334,6 +334,13 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         if (r1) r1.name = 'chinook_rotor1';
         const r2 = root.getObjectByName('PROPELLER02') || root.getObjectByName('avchinook.props02');
         if (r2) r2.name = 'chinook_rotor2';
+    } else if (modelKey === 'crusader') {
+        const hc2 = root.getObjectByName('HOUSECOLOR02');
+        if (hc2) hc2.rotation.z = -Math.PI / 2;
+        ['TREADSL01', 'TREADSR01'].forEach(tname => {
+            const tr = root.getObjectByName(tname);
+            if (tr) tr.rotation.y = Math.PI;
+        });
     } else if (modelKey === 'paladin') {
         const chassisGrp = root.getObjectByName('CHASSIS') || root;
         const turretGrp = root.getObjectByName('turretSystem') || root;
