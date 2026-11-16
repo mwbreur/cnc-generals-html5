@@ -640,11 +640,9 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
             if (b) b.rotation.z = Math.PI / 2;
         });
     } else if (buildingKey === 'china_power') {
-        const core = new THREE.Mesh(new THREE.SphereGeometry(7.2, 14, 10), nukeMat);
-        core.position.set(0, 15, 0);
-        const coreLight = new THREE.PointLight(0x2ed573, 2.2, 32);
+        const coreLight = new THREE.PointLight(0x2ed573, 1.8, 28);
         coreLight.position.set(0, 22, 0);
-        root.add(core, coreLight);
+        root.add(coreLight);
     } else if (buildingKey === 'china_nukeSilo') {
         const l38 = root.getObjectByName('LINE38');
         if (l38) { l38.rotation.z = Math.PI / 2; l38.position.y = 14; }

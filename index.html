@@ -4378,11 +4378,9 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
             if (b) b.rotation.z = Math.PI / 2;
         });
     } else if (buildingKey === 'china_power') {
-        const core = new THREE.Mesh(new THREE.SphereGeometry(7.2, 14, 10), nukeMat);
-        core.position.set(0, 15, 0);
-        const coreLight = new THREE.PointLight(0x2ed573, 2.2, 32);
+        const coreLight = new THREE.PointLight(0x2ed573, 1.8, 28);
         coreLight.position.set(0, 22, 0);
-        root.add(core, coreLight);
+        root.add(coreLight);
     } else if (buildingKey === 'china_nukeSilo') {
         const l38 = root.getObjectByName('LINE38');
         if (l38) { l38.rotation.z = Math.PI / 2; l38.position.y = 14; }
@@ -14147,7 +14145,7 @@ function resolveObstacleCollisions(unit) {
             }
             forces.forEach((type, index) => {
                 const angle = index * 2.4;
-                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 14, 0, Math.sin(angle) * 14));
+                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 24, 0, Math.sin(angle) * 24));
                 at.y = getTerrainHeight(at.x, at.z);
                 const u = spawnUnit(type, at);
                 if (u) {
@@ -14155,6 +14153,7 @@ function resolveObstacleCollisions(unit) {
                     u.ownerId = 'player';
                     u.isAI = false;
                     u.taskState = 'Idle';
+                    if (u.targetPosition && u.mesh) u.targetPosition.copy(u.mesh.position);
                     u.faction = faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
                 }
             });

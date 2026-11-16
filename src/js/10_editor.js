@@ -557,7 +557,7 @@
             }
             forces.forEach((type, index) => {
                 const angle = index * 2.4;
-                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 14, 0, Math.sin(angle) * 14));
+                const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 24, 0, Math.sin(angle) * 24));
                 at.y = getTerrainHeight(at.x, at.z);
                 const u = spawnUnit(type, at);
                 if (u) {
@@ -565,6 +565,7 @@
                     u.ownerId = 'player';
                     u.isAI = false;
                     u.taskState = 'Idle';
+                    if (u.targetPosition && u.mesh) u.targetPosition.copy(u.mesh.position);
                     u.faction = faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
                 }
             });
