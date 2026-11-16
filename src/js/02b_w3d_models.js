@@ -647,12 +647,17 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         if (hc4) hc4.rotation.z = Math.PI / 2;
         ['BANNERB01', 'BANNERB04'].forEach(bn => {
             const b = root.getObjectByName(bn);
-            if (b) b.rotation.z = Math.PI / 2;
+            if (b) b.rotation.z = -Math.PI / 2;
         });
     } else if (buildingKey === 'china_barracks') {
         ['BANNERB01', 'BANNERB04', 'BANNERB09', 'BANNERB12'].forEach(bn => {
             const b = root.getObjectByName(bn);
-            if (b) b.rotation.z = Math.PI / 2;
+            if (b) b.rotation.z = -Math.PI / 2;
+        });
+    } else if (buildingKey === 'china_propagandaCenter') {
+        ['BANNERE01', 'BANNERE04', 'BANNERB01', 'BANNERA01'].forEach(bn => {
+            const b = root.getObjectByName(bn);
+            if (b) b.rotation.z = -Math.PI / 2;
         });
     } else if (buildingKey === 'china_power') {
         const coreLight = new THREE.PointLight(0x2ed573, 1.8, 28);
