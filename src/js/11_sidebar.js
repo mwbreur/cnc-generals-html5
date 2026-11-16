@@ -3554,7 +3554,7 @@ function updateHUD() {
                                 incoming.intercepted = true;
                                 const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
                                 spawnMuzzleFlash(mPos, 0x00d2ff, 0.8);
-                                spawnRocketProjectile(mPos, incoming.group.position.clone(), false, false);
+                                spawnRocketProjectile(mPos, incoming.group.position.clone(), false, false, { attacker: s });
                                 if (typeof playUSASound === 'function') playUSASound('missile_launch');
                             }
                         }

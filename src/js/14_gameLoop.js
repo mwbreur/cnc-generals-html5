@@ -2695,7 +2695,12 @@ function processPointDefenseLasers() {
             for (let missile of activeMissiles) {
                 if (missile.intercepted) continue;
                 const attacker = missile.metadata ? missile.metadata.attacker : null;
-                if (attacker && typeof isFriendly === 'function' && isFriendly(defender, attacker)) continue;
+                const mTarget = missile.metadata ? missile.metadata.target : null;
+                if (typeof isFriendly === 'function') {
+                    if (attacker && isFriendly(defender, attacker)) continue;
+                    if (!attacker && (!mTarget || !isFriendly(defender, mTarget))) continue;
+                    if (mTarget && !isFriendly(defender, mTarget)) continue;
+                }
 
                 const dist = myPos.distanceTo(missile.curPos);
                 if (dist <= scanRange) {
