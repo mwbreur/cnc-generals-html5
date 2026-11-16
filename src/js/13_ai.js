@@ -496,10 +496,13 @@ function initAICommanders() {
         const actualFaction = (deployedCC && deployedCC.faction)
             ? deployedCC.faction
             : (slot.faction === 'random' ? 'china' : slot.faction);
-        createCommanderState(ownerId, slot.team, actualFaction, myBasePos, slot.difficulty || 'medium', slot.spawnId);
+        const actualColorHex = (typeof window !== 'undefined' && window.aiColorMap && window.aiColorMap[ownerId])
+            ? window.aiColorMap[ownerId]
+            : ((typeof getPlayerColorHex === 'function' && slot.color) ? getPlayerColorHex(slot.color) : 0xdc2626);
+        createCommanderState(ownerId, slot.team, actualFaction, myBasePos, slot.difficulty || 'medium', slot.spawnId, actualColorHex);
     });
 
-    function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0) {
+    function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0, colorHex = 0xdc2626) {
         const candidateWaypoints = [];
         allSpawns.forEach(sp => {
             if (sp.id !== spawnId) {
@@ -527,6 +530,7 @@ function initAICommanders() {
             ownerId: ownerId,
             teamId: teamId,
             faction: faction,
+            colorHex: colorHex,
             difficulty: difficulty,
             basePos: basePos.clone(),
             rallyPoint: basePos.clone().add(new THREE.Vector3(16, 0, 16)),

@@ -189,9 +189,10 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? ('E:' + activeHouseHex.toString(16)) : 'F') + ':';
     let hullMat, houseMat;
     if (isEnemy) {
+        const enemyHullColor = faction === 'china' ? 0x556b2f : faction === 'gla' ? 0x6e6347 : 0x4a5d4e;
         hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => vTex 
             ? new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25, side: THREE.DoubleSide })
-            : new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.52, metalness: 0.35, side: THREE.DoubleSide }));
+            : new THREE.MeshStandardMaterial({ color: enemyHullColor, roughness: 0.55, metalness: 0.3, side: THREE.DoubleSide }));
         houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28, side: THREE.DoubleSide }));
     } else {
         if (vTex) {
@@ -401,10 +402,11 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         : (typeof window !== 'undefined' && window.selectedPlayerColorHex ? window.selectedPlayerColorHex : null);
     let bldMat, accentMat;
     if (isEnemy) {
+        const enemyBldColor = faction === 'china' ? 0x48583a : faction === 'gla' ? 0x5c5040 : 0x7a7d5a;
         bldMat = bTex
             ? new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide })
-            : new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.65, metalness: 0.25 });
-        accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28 });
+            : new THREE.MeshStandardMaterial({ color: enemyBldColor, roughness: 0.65, metalness: 0.25 });
+        accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28, side: THREE.DoubleSide });
     } else {
         if (bTex) {
             bldMat = new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide });
@@ -504,12 +506,11 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
             // Authentic metallic cooling tower finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
-        } else if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
+        } else if (upper.includes('HOUSECOLOR') || (upper.includes('BANNER') && !subTex)) {
             mat = accentMat;
             if (mat && mat.side !== THREE.DoubleSide) mat.side = THREE.DoubleSide;
         } else if (subTex) {
             mat = new THREE.MeshStandardMaterial({ map: subTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide });
-            if (isEnemy && mat.color && typeof mat.color.setHex === 'function') mat.color.setHex(0xaa4444);
         } else if (bTex) {
             mat = bldMat;
         } else {
@@ -607,6 +608,42 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const banner = new THREE.Mesh(new THREE.BoxGeometry(16, 2.8, 3.2), accentMat);
         banner.position.set(0, 18.5, -14);
         root.add(banner);
+    } else if (buildingKey === 'china_speakerTower') {
+        const towerPiv = root.getObjectByName('NBPTOWER');
+        if (towerPiv) towerPiv.rotation.z = -Math.PI / 2;
+        const hc1 = root.getObjectByName('HOUSECOLOR01');
+        if (hc1) hc1.rotation.z = -Math.PI / 2;
+    } else if (buildingKey === 'china_commandCenter') {
+        const hc4 = root.getObjectByName('HOUSECOLOR04');
+        if (hc4) hc4.rotation.z = Math.PI / 2;
+        ['BANNERB01', 'BANNERB04'].forEach(bn => {
+            const b = root.getObjectByName(bn);
+            if (b) b.rotation.z = Math.PI / 2;
+        });
+    } else if (buildingKey === 'china_barracks') {
+        ['BANNERB01', 'BANNERB04', 'BANNERB09', 'BANNERB12'].forEach(bn => {
+            const b = root.getObjectByName(bn);
+            if (b) b.rotation.z = Math.PI / 2;
+        });
+    } else if (buildingKey === 'china_power') {
+        const core = new THREE.Mesh(new THREE.SphereGeometry(7.2, 14, 10), nukeMat);
+        core.position.set(0, 15, 0);
+        const coreLight = new THREE.PointLight(0x2ed573, 2.2, 32);
+        coreLight.position.set(0, 22, 0);
+        root.add(core, coreLight);
+    } else if (buildingKey === 'china_nukeSilo') {
+        const l38 = root.getObjectByName('LINE38');
+        if (l38) { l38.rotation.z = Math.PI / 2; l38.position.y = 14; }
+        const rocketGrp = new THREE.Group();
+        rocketGrp.name = 'nukeTip';
+        rocketGrp.position.set(-4.38, 12, -20.47);
+        const rBody = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.8, 22, 12), gunMat);
+        const rCone = new THREE.Mesh(new THREE.ConeGeometry(3.4, 8.5, 12), accentMat);
+        rCone.position.y = 15.2;
+        const rGlow = new THREE.Mesh(new THREE.CylinderGeometry(3.55, 3.55, 2.2, 12), nukeMat);
+        rGlow.position.y = 7.5;
+        rocketGrp.add(rBody, rCone, rGlow);
+        root.add(rocketGrp);
     }
 
     // Align base foundation to y = 0 (PERF: cache minBldY per buildingKey)

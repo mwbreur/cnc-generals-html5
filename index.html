@@ -3927,9 +3927,10 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? ('E:' + activeHouseHex.toString(16)) : 'F') + ':';
     let hullMat, houseMat;
     if (isEnemy) {
+        const enemyHullColor = faction === 'china' ? 0x556b2f : faction === 'gla' ? 0x6e6347 : 0x4a5d4e;
         hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => vTex 
             ? new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25, side: THREE.DoubleSide })
-            : new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.52, metalness: 0.35, side: THREE.DoubleSide }));
+            : new THREE.MeshStandardMaterial({ color: enemyHullColor, roughness: 0.55, metalness: 0.3, side: THREE.DoubleSide }));
         houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28, side: THREE.DoubleSide }));
     } else {
         if (vTex) {
@@ -4139,10 +4140,11 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         : (typeof window !== 'undefined' && window.selectedPlayerColorHex ? window.selectedPlayerColorHex : null);
     let bldMat, accentMat;
     if (isEnemy) {
+        const enemyBldColor = faction === 'china' ? 0x48583a : faction === 'gla' ? 0x5c5040 : 0x7a7d5a;
         bldMat = bTex
             ? new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide })
-            : new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.65, metalness: 0.25 });
-        accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28 });
+            : new THREE.MeshStandardMaterial({ color: enemyBldColor, roughness: 0.65, metalness: 0.25 });
+        accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28, side: THREE.DoubleSide });
     } else {
         if (bTex) {
             bldMat = new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide });
@@ -4242,12 +4244,11 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
             // Authentic metallic cooling tower finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
-        } else if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
+        } else if (upper.includes('HOUSECOLOR') || (upper.includes('BANNER') && !subTex)) {
             mat = accentMat;
             if (mat && mat.side !== THREE.DoubleSide) mat.side = THREE.DoubleSide;
         } else if (subTex) {
             mat = new THREE.MeshStandardMaterial({ map: subTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide });
-            if (isEnemy && mat.color && typeof mat.color.setHex === 'function') mat.color.setHex(0xaa4444);
         } else if (bTex) {
             mat = bldMat;
         } else {
@@ -4345,6 +4346,42 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const banner = new THREE.Mesh(new THREE.BoxGeometry(16, 2.8, 3.2), accentMat);
         banner.position.set(0, 18.5, -14);
         root.add(banner);
+    } else if (buildingKey === 'china_speakerTower') {
+        const towerPiv = root.getObjectByName('NBPTOWER');
+        if (towerPiv) towerPiv.rotation.z = -Math.PI / 2;
+        const hc1 = root.getObjectByName('HOUSECOLOR01');
+        if (hc1) hc1.rotation.z = -Math.PI / 2;
+    } else if (buildingKey === 'china_commandCenter') {
+        const hc4 = root.getObjectByName('HOUSECOLOR04');
+        if (hc4) hc4.rotation.z = Math.PI / 2;
+        ['BANNERB01', 'BANNERB04'].forEach(bn => {
+            const b = root.getObjectByName(bn);
+            if (b) b.rotation.z = Math.PI / 2;
+        });
+    } else if (buildingKey === 'china_barracks') {
+        ['BANNERB01', 'BANNERB04', 'BANNERB09', 'BANNERB12'].forEach(bn => {
+            const b = root.getObjectByName(bn);
+            if (b) b.rotation.z = Math.PI / 2;
+        });
+    } else if (buildingKey === 'china_power') {
+        const core = new THREE.Mesh(new THREE.SphereGeometry(7.2, 14, 10), nukeMat);
+        core.position.set(0, 15, 0);
+        const coreLight = new THREE.PointLight(0x2ed573, 2.2, 32);
+        coreLight.position.set(0, 22, 0);
+        root.add(core, coreLight);
+    } else if (buildingKey === 'china_nukeSilo') {
+        const l38 = root.getObjectByName('LINE38');
+        if (l38) { l38.rotation.z = Math.PI / 2; l38.position.y = 14; }
+        const rocketGrp = new THREE.Group();
+        rocketGrp.name = 'nukeTip';
+        rocketGrp.position.set(-4.38, 12, -20.47);
+        const rBody = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.8, 22, 12), gunMat);
+        const rCone = new THREE.Mesh(new THREE.ConeGeometry(3.4, 8.5, 12), accentMat);
+        rCone.position.y = 15.2;
+        const rGlow = new THREE.Mesh(new THREE.CylinderGeometry(3.55, 3.55, 2.2, 12), nukeMat);
+        rGlow.position.y = 7.5;
+        rocketGrp.add(rBody, rCone, rGlow);
+        root.add(rocketGrp);
     }
 
     // Align base foundation to y = 0 (PERF: cache minBldY per buildingKey)
@@ -11950,16 +11987,16 @@ function resolveObstacleCollisions(unit) {
             if (type === 'tank' || type === 'crusader') { mesh = createCrusaderTankMesh(true); radius = 3.6; speed = 0.15; health = 480; scanRange = 24; }
             else if (type === 'paladin') { mesh = createPaladinTankMesh(true); radius = 3.6; speed = 0.14; health = 550; scanRange = 26; }
             else if (type === 'humvee') { mesh = createHumveeMesh(true); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; }
-            else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 15; }
+            else if (type === 'ambulance') { mesh = createAmbulanceMesh(true); radius = 2.8; speed = 0.18; health = 220; scanRange = 15; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(true); radius = 3.2; speed = 0.11; health = 180; scanRange = 60; }
             else if (type === 'dozer') { mesh = (faction === 'china' || (typeof enemyFaction !== 'undefined' && enemyFaction === 'china')) ? createChinaDozerMesh(true) : createUSADozerMesh(true); radius = 3.2; speed = 0.10; health = 300; scanRange = 18; }
-            else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; scanRange = 16; }
-            else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 550; scanRange = 22; isAir = true; }
-            else if (type === 'comanche') { mesh = createComancheMesh(); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
+            else if (type === 'truck') { mesh = createUSATruckMesh(true); radius = 3.2; speed = 0.13; health = 260; scanRange = 16; }
+            else if (type === 'chinook') { mesh = createChinookMesh(true); radius = 4.8; speed = 0.22; health = 550; scanRange = 22; isAir = true; }
+            else if (type === 'comanche') { mesh = createComancheMesh(true); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
             else if (type === 'mig') { mesh = createMigMesh(true); radius = 4.2; speed = 0.32; health = 280; scanRange = 30; isAir = true; }
             else if (type === 'raptor') { mesh = createRaptorMesh(true); radius = 4.2; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
-            else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(); radius = 4.0; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
-            else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 4.2; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
+            else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(true); radius = 4.0; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
+            else if (type === 'aurora') { mesh = createAuroraMesh(true); radius = 4.2; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
             else if (type === 'infantry' || type === 'ranger') { mesh = createRangerMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 16; }
             else if (type === 'rocket' || type === 'missiledefender') { mesh = createMissileDefenderMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 24; }
             else if (type === 'pathfinder') { mesh = createRangerMesh(); radius = 0.8; speed = 0.09; health = 120; scanRange = 32; }
@@ -11970,9 +12007,9 @@ function resolveObstacleCollisions(unit) {
             else if (type === 'overlord') { mesh = createOverlordTankMesh(true); radius = 5.2; speed = 0.09; health = 1100; scanRange = 28; }
             else if (type === 'gatling') { mesh = createGatlingTankMesh(true); radius = 3.4; speed = 0.16; health = 400; scanRange = 22; }
             else if (type === 'dragon') { mesh = createDragonTankMesh(true); radius = 3.4; speed = 0.15; health = 450; scanRange = 18; }
-            else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 3.8; speed = 0.15; health = 480; scanRange = 20; }
-            else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 3.6; speed = 0.10; health = 220; scanRange = 36; }
-            else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(); radius = 4.0; speed = 0.08; health = 260; scanRange = 42; }
+            else if (type === 'crawler') { mesh = createTroopCrawlerMesh(true); radius = 3.8; speed = 0.15; health = 480; scanRange = 20; }
+            else if (type === 'inferno') { mesh = createInfernoCannonMesh(true); radius = 3.6; speed = 0.10; health = 220; scanRange = 36; }
+            else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(true); radius = 4.0; speed = 0.08; health = 260; scanRange = 42; }
             else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 16; }
             else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 24; }
             else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.8; speed = 0.07; health = 100; scanRange = 14; }
@@ -11988,7 +12025,7 @@ function resolveObstacleCollisions(unit) {
             else if (type === 'toxintractor') { mesh = createToxinTractorMesh(true); radius = 3.0; speed = 0.14; health = 360; scanRange = 20; }
             else if (type === 'bombtruck') { mesh = createBombTruckMesh(true); radius = 3.0; speed = 0.18; health = 220; scanRange = 14; }
             else if (type === 'scud') { mesh = createScudLauncherMesh(true); radius = 3.6; speed = 0.10; health = 240; scanRange = 40; }
-            else if (type === 'radarvan') { mesh = createRadarVanMesh(); radius = 3.0; speed = 0.16; health = 220; scanRange = 20; }
+            else if (type === 'radarvan') { mesh = createRadarVanMesh(true); radius = 3.0; speed = 0.16; health = 220; scanRange = 20; }
             else if (type === 'rebel') { mesh = createRebelMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 16; }
             else if (type === 'rpg') { mesh = createRPGTrooperMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 24; }
             else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.8; speed = 0.12; health = 80; scanRange = 8; }
@@ -20741,10 +20778,13 @@ function initAICommanders() {
         const actualFaction = (deployedCC && deployedCC.faction)
             ? deployedCC.faction
             : (slot.faction === 'random' ? 'china' : slot.faction);
-        createCommanderState(ownerId, slot.team, actualFaction, myBasePos, slot.difficulty || 'medium', slot.spawnId);
+        const actualColorHex = (typeof window !== 'undefined' && window.aiColorMap && window.aiColorMap[ownerId])
+            ? window.aiColorMap[ownerId]
+            : ((typeof getPlayerColorHex === 'function' && slot.color) ? getPlayerColorHex(slot.color) : 0xdc2626);
+        createCommanderState(ownerId, slot.team, actualFaction, myBasePos, slot.difficulty || 'medium', slot.spawnId, actualColorHex);
     });
 
-    function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0) {
+    function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0, colorHex = 0xdc2626) {
         const candidateWaypoints = [];
         allSpawns.forEach(sp => {
             if (sp.id !== spawnId) {
@@ -20772,6 +20812,7 @@ function initAICommanders() {
             ownerId: ownerId,
             teamId: teamId,
             faction: faction,
+            colorHex: colorHex,
             difficulty: difficulty,
             basePos: basePos.clone(),
             rallyPoint: basePos.clone().add(new THREE.Vector3(16, 0, 16)),
@@ -23601,6 +23642,9 @@ function animate() {
                             // Automatic Harvester Deployment upon Supply Center / Stash completion (Player & AI)
                             if (!s.spawnedHarvester) {
                                 s.spawnedHarvester = true;
+                                if (isAiStruct && typeof window !== 'undefined') {
+                                    window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[s.ownerId]) || window.activeEnemyColorHex || 0xdc2626;
+                                }
                                 if (s.type === 'supplyCenter') {
                                     if (bFaction === 'usa') {
                                         const spawnPos = s.position.clone().add(new THREE.Vector3(0, 4.5, 7.5));

@@ -973,6 +973,9 @@ function animate() {
                             // Automatic Harvester Deployment upon Supply Center / Stash completion (Player & AI)
                             if (!s.spawnedHarvester) {
                                 s.spawnedHarvester = true;
+                                if (isAiStruct && typeof window !== 'undefined') {
+                                    window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[s.ownerId]) || window.activeEnemyColorHex || 0xdc2626;
+                                }
                                 if (s.type === 'supplyCenter') {
                                     if (bFaction === 'usa') {
                                         const spawnPos = s.position.clone().add(new THREE.Vector3(0, 4.5, 7.5));
