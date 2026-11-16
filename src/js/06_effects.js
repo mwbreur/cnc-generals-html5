@@ -1969,6 +1969,7 @@
                                 if (resEl) resEl.innerText = `$${playerResources}`;
                             }
                             if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(crateGrp.position, 0x2ecc71, 2.0);
+                            if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(crateGrp.position.clone().add(new THREE.Vector3(0, 1.5, 0)), bonus);
                             if (typeof showNotification === 'function') showNotification(`📦 C-130 Supply Drop collected: +$${bonus}!`, 'success');
                             scene.remove(crateGrp);
                             box.geometry.dispose(); strap.geometry.dispose(); chute.geometry.dispose();

@@ -3363,8 +3363,22 @@ function updateHUD() {
                         }
                     }
                 }
-                if (structure.type === 'blackMarket' && buildingTick % 300 === 0) playerResources += 30;
-                if (structure.type === 'internetCenter' && buildingTick % 300 === 0) playerResources += 20;
+                if (structure.type === 'blackMarket' && !structure.isBuilding && buildingTick % 300 === 0) {
+                    playerResources += 30;
+                    if (typeof spawnFloatingCashNumber === 'function' && structure.position) {
+                        spawnFloatingCashNumber(structure.position.clone().add(new THREE.Vector3(0, 3.8, 0)), 30);
+                    }
+                }
+                if (structure.type === 'internetCenter' && !structure.isBuilding) {
+                    if (!structure.capacity) structure.capacity = 8;
+                    if (!structure.garrisoned) structure.garrisoned = [];
+                    if (buildingTick % 300 === 0) {
+                        playerResources += 20;
+                        if (typeof spawnFloatingCashNumber === 'function' && structure.position) {
+                            spawnFloatingCashNumber(structure.position.clone().add(new THREE.Vector3(0, 4.2, 0)), 20);
+                        }
+                    }
+                }
                 if (structure.type === 'nuclearReactor' && structure.overcharged) structure.health -= 8;
 
                 // Perimeter landmines installed on Chinese/defensive structures

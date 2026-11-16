@@ -749,13 +749,14 @@ function animate() {
                     }
                 }
 
-                // 5. China Hacker Autonomous Internet Cash Hacking (when stationary)
+                // 5. China Hacker Autonomous Internet Cash Hacking (when stationary OR inside Internet Center)
                 if (unit.type === 'hacker' && unit.health > 0 && !unit.combatTarget) {
+                    const inInternetCenter = !!(unit.garrisonedIn && unit.garrisonedIn.type === 'internetCenter' && unit.garrisonedIn.health > 0 && !unit.garrisonedIn.isBuilding);
                     const moveDist = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
-                    if (moveDist < 0.8) {
+                    if (inInternetCenter || moveDist < 0.8) {
                         unit._isHacking = true;
-                        // Show deployed hacking terminal + glowing green uplink ring when stationary
-                        if (unit.mesh && !unit._hackVisual && typeof THREE !== 'undefined' && typeof THREE.CylinderGeometry === 'function') {
+                        // Show deployed hacking terminal + glowing green uplink ring when stationary outside
+                        if (!inInternetCenter && unit.mesh && !unit._hackVisual && typeof THREE !== 'undefined' && typeof THREE.CylinderGeometry === 'function') {
                             const hGrp = new THREE.Group();
                             const matGlow = new THREE.MeshBasicMaterial({ color: 0x2ecc71, transparent: true, opacity: 0.75, side: THREE.DoubleSide });
                             const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.45, 18), matGlow);
@@ -771,13 +772,14 @@ function animate() {
                             unit._hackVisual = hGrp;
                         }
                         if (unit._hackVisual) {
-                            unit._hackVisual.visible = true;
-                            unit._hackVisual.rotation.y += 0.04;
+                            unit._hackVisual.visible = !inInternetCenter;
+                            if (!inInternetCenter) unit._hackVisual.rotation.y += 0.04;
                         }
                         unit._hackTimer = (unit._hackTimer || 0) + 1;
-                        if (unit._hackTimer >= 60) { // $5 -> $6 -> $8 -> $10 per second (matching Generals)
+                        const hackCycle = inInternetCenter ? 40 : 60; // Internet Center accelerates hacking (+50% faster + boosted yield)
+                        if (unit._hackTimer >= hackCycle) {
                             unit._hackTimer = 0;
-                            const vetRates = [5, 6, 8, 10];
+                            const vetRates = inInternetCenter ? [8, 9, 12, 15] : [5, 6, 8, 10];
                             const vetIdx = Math.min(3, Math.max(0, unit.veterancy || 0));
                             const hackGain = vetRates[vetIdx];
                             unit._hackXp = (unit._hackXp || 0) + 1;
@@ -786,7 +788,10 @@ function animate() {
                             else if (unit._hackXp >= 60 && (unit.veterancy || 0) < 3) { unit.veterancy = 3; }
                             if (!unit.isAI) {
                                 playerResources += hackGain;
-                                if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(unit.mesh.position, hackGain);
+                                const cashOrigin = inInternetCenter
+                                    ? (unit.garrisonedIn.position || unit.garrisonedIn.mesh.position).clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.5, 4.5, (Math.random() - 0.5) * 2.5))
+                                    : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+                                if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(cashOrigin, hackGain);
                                 if (typeof updateHUD === 'function') updateHUD();
                             }
                         }
@@ -1209,6 +1214,9 @@ function animate() {
                                 playerResources += earned;
                                 const resEl = document.getElementById('resource-display');
                                 if (resEl) resEl.innerText = '$' + playerResources;
+                                if (typeof spawnFloatingCashNumber === 'function' && unit.mesh) {
+                                    spawnFloatingCashNumber(unit.mesh.position.clone().add(new THREE.Vector3(0, 2.5, 0)), earned);
+                                }
                                 showNotification('Supplies delivered: +$' + earned, 'success');
                                 updateSidebar();
                             } else if (unit.ownerId && typeof aiCommanders !== 'undefined' && aiCommanders[unit.ownerId]) {
@@ -1356,21 +1364,23 @@ function animate() {
             separateGroundUnits(units);
 
             units.forEach(unit => {
-                // Embarking into transport vehicles
+                // Embarking into transport vehicles or garrisonable structures (e.g. Internet Center)
                 if (unit.taskState === 'MovingToEmbark' && unit.embarkTarget) {
                     const transport = unit.embarkTarget;
-                    if (transport.health > 0) {
-                        unit.targetPosition.copy(transport.mesh.position);
-                        const distToT = Math.hypot(unit.mesh.position.x - transport.mesh.position.x, unit.mesh.position.z - transport.mesh.position.z);
-                        if (distToT < ((transport.radius || 1.4) + 2.5)) {
+                    const tPos = transport.position || (transport.mesh && transport.mesh.position);
+                    if (transport.health > 0 && tPos) {
+                        unit.targetPosition.copy(tPos);
+                        const cap = transport.capacity || (transport.type === 'internetCenter' ? 8 : 0);
+                        const distToT = Math.hypot(unit.mesh.position.x - tPos.x, unit.mesh.position.z - tPos.z);
+                        if (distToT < ((transport.radius || 1.4) + 2.8)) {
                             if (!transport.garrisoned) transport.garrisoned = [];
-                            if (transport.garrisoned.length < transport.capacity) {
+                            if (transport.garrisoned.length < cap) {
                                 transport.garrisoned.push(unit);
                                 unit.garrisonedIn = transport;
                                 unit.mesh.visible = false;
                                 unit.taskState = 'Idle';
                                 unit.embarkTarget = null;
-                                showNotification(`${unit.type} boarded ${transport.type} (${transport.garrisoned.length}/${transport.capacity}).`, 'success');
+                                showNotification(`${unit.type} entered ${transport.type} (${transport.garrisoned.length}/${cap}).`, 'success');
                                 updateSidebar();
                             }
                         }
@@ -2106,6 +2116,11 @@ function animate() {
                             playerResources += bonus;
                             const resEl = document.getElementById('resource-display');
                             if (resEl) resEl.innerText = `$${playerResources}`;
+                            if (typeof spawnFloatingCashNumber === 'function') {
+                                playerDerricks.forEach(d => {
+                                    if (d.position) spawnFloatingCashNumber(d.position.clone().add(new THREE.Vector3(0, 5.0, 0)), 200);
+                                });
+                            }
                             if (typeof showNotification === 'function') {
                                 showNotification(`Tech Oil Derrick: +$${bonus} passive supply revenue received.`, 'success');
                             }

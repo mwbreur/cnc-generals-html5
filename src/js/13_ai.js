@@ -1834,12 +1834,31 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // 1b. Check if right-clicking on a friendly transport vehicle to embark!
+            // 1b. Check if right-clicking on a friendly transport vehicle or Internet Center to embark!
             const friendlyMeshes = units.filter(u => u.capacity > 0 && !u.garrisonedIn).map(u => u.mesh);
-            const transportHits = raycaster.intersectObjects(friendlyMeshes, true);
+            const selectedHackers = units.filter(u => u.selected && u.type === 'hacker');
+            const icStructures = (selectedHackers.length > 0 && typeof structures !== 'undefined')
+                ? structures.filter(s => s.health > 0 && !s.isBuilding && s.type === 'internetCenter' && s.mesh)
+                : [];
+            const icMeshes = icStructures.map(s => s.mesh);
+            const transportHits = raycaster.intersectObjects([...friendlyMeshes, ...icMeshes], true);
             if (transportHits.length > 0) {
                 let hitObj = transportHits[0].object;
                 while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
+                const icTarget = icStructures.find(s => s.mesh === hitObj);
+                if (icTarget && selectedHackers.length > 0) {
+                    if (!icTarget.capacity) icTarget.capacity = 8;
+                    if (!icTarget.garrisoned) icTarget.garrisoned = [];
+                    selectedHackers.forEach(h => {
+                        h.embarkTarget = icTarget;
+                        h.taskState = 'MovingToEmbark';
+                        h.combatTarget = null;
+                        h.targetPosition.copy(icTarget.position);
+                    });
+                    showNotification(`Hackers ordered to garrison Internet Center (${icTarget.garrisoned.length}/${icTarget.capacity} slots) for accelerated hacking.`, 'info');
+                    updateSidebar();
+                    return;
+                }
                 const transport = units.find(u => u.mesh === hitObj);
                 const selectedInfantry = units.filter(u => u.selected && isInfantryType(u.type));
                 if (transport && selectedInfantry.length > 0) {
