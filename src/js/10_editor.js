@@ -632,6 +632,7 @@
                 for (const k in aiCommanders) delete aiCommanders[k];
             }
             if (typeof buildingTick !== 'undefined') buildingTick = 0;
+            if (typeof resetGeneralsPowersState === 'function') resetGeneralsPowersState();
             hasSpawnedInitialEnemyBase = false;
 
             // 9. Reset modals

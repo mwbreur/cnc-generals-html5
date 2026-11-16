@@ -507,10 +507,11 @@
         <!-- 3. BOTTOM-RIGHT: Inspector & Training Queue Console (Wide ~340px) -->
         <div id="cb-inspector-box" class="cb-panel">
             <!-- Top Generals Promotion Stars Bar -->
-            <div class="cb-inspector-stars-bar">
+            <div class="cb-inspector-stars-bar clickable" title="Open Generals' Promotions & Powers Tree (P)" onclick="toggleGeneralsPowersModal()">
                 <img id="cb-general-btn-img" class="cb-general-btn-img" alt="" style="display:none;" />
                 <span class="cb-stars-rank-label">RANK</span>
-                <span id="generals-rank" class="cb-stars-icons">★★★☆☆</span>
+                <span id="generals-rank" class="cb-stars-icons">★☆☆☆☆</span>
+                <span id="gp-points-badge" class="gp-points-badge" style="display:none;">1 PT</span>
             </div>
 
             <div class="cb-inspector-body">
@@ -596,6 +597,30 @@
                 <button class="rts-btn end-game-btn play-again-btn" onclick="leaveMultiplayerSessionToMenu()" style="border-color: #ff4757; color: #ff4757; min-width: 220px;">
                     ↩ RETURN TO MAIN LOBBY
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GENERALS' PROMOTIONS & POWERS MODAL -->
+    <div id="generals-powers-modal" class="end-game-modal" style="display: none;">
+        <div class="gp-modal-card">
+            <div class="gp-modal-header">
+                <div>
+                    <h2 id="gp-modal-title">GENERALS' PROMOTIONS</h2>
+                    <div id="gp-modal-subtitle" class="gp-modal-subtitle">Earn Battlefield Experience to unlock Rank 1, Rank 3, and Rank 5 Faction Powers</div>
+                </div>
+                <div class="gp-modal-status">
+                    <span id="gp-modal-rank-stars" class="cb-stars-icons">★☆☆☆☆</span>
+                    <span id="gp-modal-points" class="gp-modal-points">POINTS: 1</span>
+                    <button class="rts-btn" onclick="toggleGeneralsPowersModal(false)">✕ CLOSE</button>
+                </div>
+            </div>
+            <div id="gp-modal-xp-bar" class="gp-modal-xp-bar">
+                <div id="gp-modal-xp-fill" class="gp-modal-xp-fill" style="width: 0%;"></div>
+                <span id="gp-modal-xp-text" class="gp-modal-xp-text">XP: 0 / 600</span>
+            </div>
+            <div id="gp-tree-container" class="gp-tree-grid">
+                <!-- Populated dynamically by renderGeneralsPowersModal() -->
             </div>
         </div>
     </div>

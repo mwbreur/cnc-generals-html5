@@ -133,7 +133,7 @@ const THREE = {
             }
         };
     },
-    RingGeometry: function() { this.dispose = () => {}; },
+    RingGeometry: function() { this.dispose = () => {}; this.rotateX = () => this; },
     TorusGeometry: function() { this.dispose = () => {}; },
     DodecahedronGeometry: function() { this.dispose = () => {}; },
     IcosahedronGeometry: function() { this.dispose = () => {}; },
@@ -986,9 +986,43 @@ vm.runInContext(`
                 throw new Error("applyGroupFormationMove created undefined or non-vector waypoint!");
             }
         });
+
+        // 5. Generals' Promotions & Powers Tree Verification (USA, China, GLA)
+        resetGeneralsPowersState();
+        if (generalsRank !== 1 || generalsPoints !== 1) {
+            throw new Error("Generals' Powers reset state invalid!");
+        }
+        if (isUnitUnlockedByGeneralsPower('paladin')) {
+            throw new Error("Paladin should be locked until unlocked in USA Generals' Powers!");
+        }
+        awardGeneralsXP(4500);
+        if (generalsRank !== 5 || generalsPoints < 8) {
+            throw new Error("awardGeneralsXP(4500) failed to promote to Rank 5!");
+        }
+        ['usa', 'china', 'gla'].forEach(fac => {
+            selectedFaction = fac;
+            resetGeneralsPowersState();
+            awardGeneralsXP(4500);
+            generalsPoints = 20; // Allow testing every node in the tree
+            const tree = getActiveFactionPowersTree(fac);
+            tree.forEach(node => {
+                if (!unlockGeneralsPower(node.id)) {
+                    throw new Error("Failed to unlock General Power " + node.id + " for " + fac);
+                }
+                if (node.kind === 'active') {
+                    activateGeneralsPower(node.id);
+                    if (!executeGeneralsPowerAt(new THREE.Vector3(10, 0, 10))) {
+                        throw new Error("Failed to execute General Power " + node.id + " for " + fac);
+                    }
+                }
+            });
+        });
+        selectedFaction = 'usa';
+        resetGeneralsPowersState();
     }
 `, sandbox);
 console.log("✓ Verified Veterancy Kill Counter, Passenger Fireports, USA Vehicle Drones (Scout/Battle/Hellfire), Special Unit Mechanics, and AI Builder Requirement.");
 console.log("✓ Verified China Overlord W3D Upgrades (Bunker, Gatling, Speaker), Dual Muzzles, China Dozer Skin & Voices, Propaganda Center W3D & Textures, and Stutter-Free Group Move.");
+console.log("✓ Verified Generals' Promotions & Powers Tree (USA, China, GLA - Level 1 / 3 / 5 unlocks, XP rank-ups, and active strikes).");
 
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

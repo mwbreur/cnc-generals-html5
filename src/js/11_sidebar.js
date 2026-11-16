@@ -697,33 +697,9 @@ function applyOfficialMenuArt(facOverride) {
     setImg('victory-rank-badge', ui['rank_general_' + fac] || ui.rank_general_usa);
     setImg('defeat-banner-img', ui.banner_defeat);
 
-    // Update General Powers Bar cameos according to active faction
-    const gpBar = document.getElementById('general-powers-bar');
-    if (gpBar && window.OFFICIAL_CAMEOS) {
-        const gpSpec = fac === 'china'
-            ? [
-                { id: 'gp-spy-satellite', power: 'artilleryBarrage', cameo: 'artilleryBarrage', label: 'BARRAGE', title: 'Red Army 152mm Artillery Barrage' },
-                { id: 'gp-a10-strike', power: 'a10Strike', cameo: 'carpetBomb', label: 'BOMBERS', title: 'PLA Tactical Bomber Strike' }
-              ]
-            : fac === 'gla'
-            ? [
-                { id: 'gp-spy-satellite', power: 'rebelAmbush', cameo: 'rebelAmbush', label: 'AMBUSH', title: 'GLA Rebel Ambush Cell' },
-                { id: 'gp-a10-strike', power: 'artilleryBarrage', cameo: 'anthraxBomb', label: 'BOMBARD', title: 'GLA Rocket Bombardment' }
-              ]
-            : [
-                { id: 'gp-spy-satellite', power: 'spySatellite', cameo: 'spySatellite', label: 'SATELLITE', title: 'USA Spy Satellite Scan' },
-                { id: 'gp-a10-strike', power: 'a10Strike', cameo: 'a10Strike', label: 'A-10 CAS', title: 'A-10 Thunderbolt CAS Strike' }
-              ];
-        gpSpec.forEach(g => {
-            const btn = document.getElementById(g.id);
-            const cSrc = window.OFFICIAL_CAMEOS[g.cameo];
-            if (btn && cSrc) {
-                btn.title = g.title;
-                btn.setAttribute('onclick', `activateGeneralsPower('${g.power}')`);
-                btn.innerHTML = `<img src="${cSrc}" class="gp-cameo-img" alt="${g.label}" /><span class="gp-label">${g.label}</span>`;
-            }
-        });
-    }
+    // Update General Powers Bar & Rank HUD according to active faction & unlocked powers
+    if (typeof renderGeneralPowersBar === 'function') renderGeneralPowersBar(fac);
+    if (typeof updateGeneralsRankHUD === 'function') updateGeneralsRankHUD();
 }
 window.applyOfficialMenuArt = applyOfficialMenuArt;
 if (typeof window !== 'undefined') {
@@ -1223,16 +1199,17 @@ function renderStructureInspectorAndGrid(inspector, structure) {
             const [type, spec] = producers[uIdx];
             const techReq = getUnitTechPrerequisite(type);
             const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
+            const hasGenUnlock = typeof isUnitUnlockedByGeneralsPower === 'function' ? isUnitUnlockedByGeneralsPower(type) : true;
             const canAfford = playerResources >= spec.cost;
-            let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
+            let badge = !hasGenUnlock ? 'GEN LVL' : (!hasTech ? 'LOCKED' : (canAfford ? 'READY' : 'FUNDS'));
             currentGridSlots[uIdx] = {
                 id: type,
                 name: spec.name.toUpperCase(),
                 cost: spec.cost,
                 badge: badge,
-                disabled: !hasTech || !canAfford || isConstructing,
+                disabled: !hasGenUnlock || !hasTech || !canAfford || isConstructing,
                 action: () => produceUnit(type),
-                desc: spec.role || 'Combat Unit'
+                desc: !hasGenUnlock ? 'Unlock via Generals\' Promotions (Rank Bar)' : (spec.role || 'Combat Unit')
             };
         }
 
@@ -1253,16 +1230,17 @@ function renderStructureInspectorAndGrid(inspector, structure) {
             const [type, spec] = producers[uIdx];
             const techReq = getUnitTechPrerequisite(type);
             const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
+            const hasGenUnlock = typeof isUnitUnlockedByGeneralsPower === 'function' ? isUnitUnlockedByGeneralsPower(type) : true;
             const canAfford = playerResources >= spec.cost;
-            let badge = hasTech ? (canAfford ? 'READY' : 'FUNDS') : 'LOCKED';
+            let badge = !hasGenUnlock ? 'GEN LVL' : (!hasTech ? 'LOCKED' : (canAfford ? 'READY' : 'FUNDS'));
             currentGridSlots[slotPos] = {
                 id: type,
                 name: spec.name.toUpperCase(),
                 cost: spec.cost,
                 badge: badge,
-                disabled: !hasTech || !canAfford || isConstructing,
+                disabled: !hasGenUnlock || !hasTech || !canAfford || isConstructing,
                 action: () => produceUnit(type),
-                desc: spec.role || 'Combat Unit'
+                desc: !hasGenUnlock ? 'Unlock via Generals\' Promotions (Rank Bar)' : (spec.role || 'Combat Unit')
             };
         }
 
@@ -2749,6 +2727,11 @@ function produceUnit(type) {
         return;
     }
 
+    if (typeof isUnitUnlockedByGeneralsPower === 'function' && !isUnitUnlockedByGeneralsPower(type)) {
+        showNotification(`Unlock ${spec.name} in the Generals' Promotions tree (click RANK bar or press P).`, 'error');
+        return;
+    }
+
     const techReq = getUnitTechPrerequisite(type);
     if (techReq && !hasCompletedStructure(techReq.building, techReq.altBuilding)) {
         showNotification(`Production blocked: Requires operational ${techReq.name}!`, 'error');
@@ -3373,6 +3356,7 @@ function updateHUD() {
             }
             document.getElementById('resource-display').textContent = `$${playerResources}`;
             if (typeof updateSuperweaponTimersHUD === 'function') updateSuperweaponTimersHUD();
+            if (typeof renderGeneralPowersBar === 'function') renderGeneralPowersBar();
             if (selectedStructure && ['particleCannon', 'nukeSilo', 'scudStorm'].includes(selectedStructure.type)) {
                 updateSidebar();
             }
@@ -3478,9 +3462,14 @@ function updateHUD() {
                 if (researchedTechs.has('migArmor') && (type === 'raptor' || type === 'mig') && spawnFaction === 'china') {
                     health = Math.floor(health * 1.25);
                 }
-                if (researchedTechs.has('redGuardTraining') && type === 'redguard') {
+                if ((researchedTechs.has('redGuardTraining') || (typeof unlockedGeneralsPowers !== 'undefined' && unlockedGeneralsPowers.has('redGuardTraining'))) && type === 'redguard') {
                     initialVeterancy = 1;
                     health = Math.floor(health * 1.20);
+                }
+                if (typeof unlockedGeneralsPowers !== 'undefined' && unlockedGeneralsPowers.has('technicalTraining') && type === 'technical') {
+                    initialVeterancy = 1;
+                    health = Math.floor(health * 1.20);
+                    speed *= 1.15;
                 }
                 if (researchedTechs.has('nuclearTanks') && (type === 'battlemaster' || type === 'overlord')) {
                     speed *= 1.25;
@@ -3702,37 +3691,349 @@ function handleSquadCardClick(e, idx) {
     updateSidebar();
 }
 
+// =========================================================================
+// GENERALS' PROMOTIONS & POWERS TREE (USA, CHINA, GLA - RANK 1 / 3 / 5)
+// =========================================================================
 let activeGeneralPower = null;
+let generalsXP = 0;
+let generalsRank = 1; // 1..5
+let generalsPoints = 1; // Starts with 1 Rank-1 promotion point
+let unlockedGeneralsPowers = new Set();
+let generalPowerCooldowns = {}; // powerId -> readyAtBuildingTick
+const GENERALS_RANK_THRESHOLDS = [0, 0, 600, 1500, 2800, 4500];
+const GENERALS_RANK_POINTS = { 1: 1, 2: 1, 3: 2, 4: 1, 5: 3 };
+
+const GENERALS_POWERS_TREES = {
+    usa: [
+        // Level 1
+        { id: 'paladinUnlock', rank: 1, kind: 'unlock', unit: 'paladin', cameo: 'paladin', label: 'PALADIN', name: 'Paladin Tank', desc: 'Unlocks the Paladin Main Battle Tank with Point-Defense Laser at the War Factory.' },
+        { id: 'stealthFighterUnlock', rank: 1, kind: 'unlock', unit: 'stealthfighter', cameo: 'stealthFighter', label: 'STEALTH', name: 'Stealth Fighter', desc: 'Unlocks the radar-evading F-117 Stealth Fighter at the Airfield.' },
+        { id: 'spyDrone', rank: 1, kind: 'active', cooldownTicks: 2700, cameo: 'spyDrone', label: 'SPY DRONE', name: 'Spy Drone', desc: 'Deploys a permanent airborne recon drone that reveals fog and stealth at target coordinates.' },
+        // Level 3
+        { id: 'pathfinderUnlock', rank: 3, kind: 'unlock', unit: 'pathfinder', cameo: 'pathfinder', label: 'PATHFINDER', name: 'Pathfinder', desc: 'Unlocks the stealthy long-range Pathfinder anti-infantry sniper at the Barracks.' },
+        { id: 'paradrop', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'ranger', label: 'PARADROP', name: 'Ranger Paradrop', desc: 'Drops a squad of 4 Ranger infantry directly onto target coordinates anywhere on the map.' },
+        { id: 'a10Strike', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'a10Strike', label: 'A-10 STRIKE', name: 'A-10 Strike', desc: 'Orders A-10 Thunderbolt II jets to strafe target coordinates with cannons and missiles.' },
+        { id: 'emergencyRepair', rank: 3, kind: 'active', cooldownTicks: 3600, cameo: 'emergencyRepair', label: 'REPAIR', name: 'Emergency Repair', desc: 'Rapidly repairs and heals all friendly vehicles and structures in a wide target area.' },
+        // Level 5
+        { id: 'fuelAirBomb', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'fuelAirBomb', label: 'DAISY CUTTER', name: 'Fuel Air Bomb', desc: 'Drops a massive thermobaric bomb that incinerates units and flattens structures in a wide radius.' },
+        { id: 'leafletDrop', rank: 5, kind: 'active', cooldownTicks: 7200, cameo: 'spySatellite', label: 'LEAFLETS', name: 'Leaflet Drop', desc: 'Drops surrender leaflets over enemy forces, temporarily disabling enemy units & defenses for 12s.' },
+        { id: 'spectreGunship', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'spectreGunship', label: 'SPECTRE', name: 'Spectre Gunship', desc: 'Summons an AC-130 Spectre Gunship that circles and heavily bombards a target zone for 12s.' }
+    ],
+    china: [
+        // Level 1
+        { id: 'redGuardTraining', rank: 1, kind: 'passive', cameo: 'redguard', label: 'RED GUARD+', name: 'Red Guard Training', desc: 'All current and future Red Guard infantry start at Veteran Rank (+20% HP & faster training).' },
+        { id: 'nukeCannonUnlock', rank: 1, kind: 'unlock', unit: 'nukecannon', cameo: 'nukecannon', label: 'NUKE CANNON', name: 'Nuke Cannon', desc: 'Unlocks the long-range tactical Nuclear Cannon at the War Factory.' },
+        // Level 3
+        { id: 'clusterMines', rank: 3, kind: 'active', cooldownTicks: 4500, cameo: 'clusterMines', label: 'MINES', name: 'Cluster Mines', desc: 'Airdrops a field of anti-tank and anti-personnel cluster mines at target coordinates.' },
+        { id: 'carpetBomber', rank: 3, kind: 'active', cooldownTicks: 6300, cameo: 'carpetBomb', label: 'CARPET BOMB', name: 'Carpet Bomber', desc: 'Calls in a heavy bomber fleet to drop a devastating line of bombs across the target zone.' },
+        { id: 'artilleryBarrage', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'artilleryBarrage', label: 'ARTILLERY', name: 'Artillery Barrage', desc: 'Calls down a sustained off-map 152mm artillery shell rain onto target coordinates.' },
+        { id: 'cashHack', rank: 3, kind: 'active', cooldownTicks: 7200, cameo: 'hacker', label: 'CASH HACK', name: 'Cash Hack', desc: 'Siphons $1,500 directly from enemy supply/command networks into your treasury.' },
+        { id: 'frenzy', rank: 3, kind: 'active', cooldownTicks: 4500, cameo: 'frenzy', label: 'FRENZY', name: 'Frenzy', desc: 'Temporarily boosts speed, fire rate, and damage (+30%) of friendly Chinese units in an area for 15s.' },
+        // Level 5
+        { id: 'empPulse', rank: 5, kind: 'active', cooldownTicks: 8100, cameo: 'empPulse', label: 'EMP PULSE', name: 'EMP Pulse', desc: 'Detonates an electromagnetic pulse disabling enemy vehicles and defenses in radius for 12s.' }
+    ],
+    gla: [
+        // Level 1
+        { id: 'scudUnlock', rank: 1, kind: 'unlock', unit: 'scud', cameo: 'scud', label: 'SCUD LNCH', name: 'SCUD Launcher', desc: 'Unlocks the tactical ballistic SCUD Launcher at the Arms Dealer.' },
+        { id: 'marauderUnlock', rank: 1, kind: 'unlock', unit: 'marauder', cameo: 'marauder', label: 'MARAUDER', name: 'Marauder Tank', desc: 'Unlocks the salvage-upgradable Marauder Battle Tank at the Arms Dealer.' },
+        { id: 'technicalTraining', rank: 1, kind: 'passive', cameo: 'technical', label: 'TECH TRN', name: 'Technical Training', desc: 'All current and future Technicals gain Veteran Rank (+20% HP & +15% speed).' },
+        // Level 3
+        { id: 'hijackerUnlock', rank: 3, kind: 'unlock', unit: 'hijacker', cameo: 'hijacker', label: 'HIJACKER', name: 'Hijacker', desc: 'Unlocks the stealthy Hijacker operative at the Barracks to commandeer enemy vehicles.' },
+        { id: 'rebelAmbush', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'rebelAmbush', label: 'AMBUSH', name: 'Rebel Ambush', desc: 'Surfaces a hidden guerrilla squad of 5 Rebel fighters anywhere on the map.' },
+        { id: 'cashBounty', rank: 3, kind: 'passive', cameo: 'cashBounty', label: 'BOUNTY', name: 'Cash Bounty', desc: 'Grants a +20% cash bounty bonus whenever you destroy enemy units or structures.' },
+        { id: 'emergencyRepair', rank: 3, kind: 'active', cooldownTicks: 3600, cameo: 'emergencyRepair', label: 'REPAIR', name: 'Emergency Repair', desc: 'Quickly repairs damaged GLA vehicles and structures in the targeted area.' },
+        // Level 5
+        { id: 'anthraxBomb', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'anthraxBomb', label: 'ANTHRAX', name: 'Anthrax Beta Bomb', desc: 'Drops a chemical Anthrax Beta bomb that leaves a lingering toxic cloud melting enemy infantry.' },
+        { id: 'sneakAttack', rank: 5, kind: 'active', cooldownTicks: 8100, cameo: 'sneakAttack', label: 'SNEAK ATK', name: 'Sneak Attack', desc: 'Drills a surprise Sneak Attack tunnel anywhere on the map and deploys ambush forces.' },
+        { id: 'gpsScrambler', rank: 5, kind: 'active', cooldownTicks: 7200, cameo: 'gpsScrambler', label: 'SCRAMBLER', name: 'GPS Scrambler', desc: 'Cloaks all friendly units in the target area in stealth for 30 seconds.' }
+    ]
+};
+
+const GENERALS_UNIT_POWER_GATE = {
+    paladin: 'paladinUnlock',
+    stealthfighter: 'stealthFighterUnlock',
+    pathfinder: 'pathfinderUnlock',
+    nukecannon: 'nukeCannonUnlock',
+    scud: 'scudUnlock',
+    marauder: 'marauderUnlock',
+    hijacker: 'hijackerUnlock'
+};
+
+function getActiveFactionPowersTree(facOverride) {
+    const fac = (facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
+    return GENERALS_POWERS_TREES[fac] || GENERALS_POWERS_TREES.usa;
+}
+
+function getGeneralPowerDef(powerId, facOverride) {
+    const tree = getActiveFactionPowersTree(facOverride);
+    let found = tree.find(p => p.id === powerId);
+    if (found) return found;
+    for (const list of Object.values(GENERALS_POWERS_TREES)) {
+        found = list.find(p => p.id === powerId);
+        if (found) return found;
+    }
+    return null;
+}
+
+function isUnitUnlockedByGeneralsPower(unitType) {
+    const gatePowerId = GENERALS_UNIT_POWER_GATE[unitType];
+    if (!gatePowerId) return true;
+    return unlockedGeneralsPowers.has(gatePowerId);
+}
+window.isUnitUnlockedByGeneralsPower = isUnitUnlockedByGeneralsPower;
+
+function resetGeneralsPowersState() {
+    generalsXP = 0;
+    generalsRank = 1;
+    generalsPoints = 1;
+    unlockedGeneralsPowers = new Set();
+    generalPowerCooldowns = {};
+    activeGeneralPower = null;
+    updateGeneralsRankHUD();
+    renderGeneralPowersBar();
+    const modal = (typeof document !== 'undefined') ? document.getElementById('generals-powers-modal') : null;
+    if (modal) modal.style.display = 'none';
+}
+window.resetGeneralsPowersState = resetGeneralsPowersState;
+
+function awardGeneralsXP(amount) {
+    if (!amount || amount <= 0) return;
+    generalsXP += amount;
+    while (generalsRank < 5 && generalsXP >= GENERALS_RANK_THRESHOLDS[generalsRank + 1]) {
+        generalsRank++;
+        const pts = GENERALS_RANK_POINTS[generalsRank] || 1;
+        generalsPoints += pts;
+        if (typeof showNotification === 'function') {
+            showNotification(`★ PROMOTION! Reached General Rank ${generalsRank} (+${pts} Promotion Point${pts > 1 ? 's' : ''})! Click RANK or press P.`, 'success');
+        }
+        if (typeof playAudio === 'function') playAudio('radio_chirp');
+    }
+    updateGeneralsRankHUD();
+}
+window.awardGeneralsXP = awardGeneralsXP;
+
+function onPlayerKillReward(target) {
+    if (!target) return;
+    const isStruct = !!target.isBuilding || !!target.maxHealth && target.radius >= 5;
+    const xpGain = isStruct ? 240 : (target.maxHealth >= 400 ? 180 : 90);
+    awardGeneralsXP(xpGain);
+    if (unlockedGeneralsPowers.has('cashBounty')) {
+        const bounty = isStruct ? 250 : Math.max(40, Math.round((target.maxHealth || 150) * 0.25));
+        playerResources += bounty;
+        const resEl = (typeof document !== 'undefined') ? document.getElementById('resource-display') : null;
+        if (resEl) resEl.innerText = `$${playerResources}`;
+    }
+}
+window.onPlayerKillReward = onPlayerKillReward;
+
+function updateGeneralsRankHUD() {
+    if (typeof document === 'undefined') return;
+    const starsEl = document.getElementById('generals-rank');
+    if (starsEl) starsEl.textContent = '★'.repeat(generalsRank) + '☆'.repeat(5 - generalsRank);
+    const badgeEl = document.getElementById('gp-points-badge');
+    if (badgeEl) {
+        if (generalsPoints > 0) {
+            badgeEl.textContent = `${generalsPoints} PT`;
+            badgeEl.style.display = '';
+        } else {
+            badgeEl.style.display = 'none';
+        }
+    }
+}
+window.updateGeneralsRankHUD = updateGeneralsRankHUD;
+
+function toggleGeneralsPowersModal(forceState = null) {
+    const modal = (typeof document !== 'undefined') ? document.getElementById('generals-powers-modal') : null;
+    if (!modal) return;
+    const isOpen = modal.style.display !== 'none';
+    const nextOpen = (forceState !== null) ? !!forceState : !isOpen;
+    modal.style.display = nextOpen ? 'flex' : 'none';
+    if (nextOpen) renderGeneralsPowersModal();
+}
+window.toggleGeneralsPowersModal = toggleGeneralsPowersModal;
+
+function renderGeneralsPowersModal() {
+    if (typeof document === 'undefined') return;
+    const treeEl = document.getElementById('gp-tree-container');
+    if (!treeEl) return;
+    const fac = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa').toLowerCase();
+    const tree = getActiveFactionPowersTree(fac);
+
+    const titleEl = document.getElementById('gp-modal-title');
+    if (titleEl) titleEl.textContent = `${fac.toUpperCase()} GENERALS' PROMOTIONS`;
+    const starsEl = document.getElementById('gp-modal-rank-stars');
+    if (starsEl) starsEl.textContent = '★'.repeat(generalsRank) + '☆'.repeat(5 - generalsRank);
+    const ptsEl = document.getElementById('gp-modal-points');
+    if (ptsEl) ptsEl.textContent = `POINTS: ${generalsPoints}`;
+
+    const nextThresh = generalsRank < 5 ? GENERALS_RANK_THRESHOLDS[generalsRank + 1] : GENERALS_RANK_THRESHOLDS[5];
+    const prevThresh = GENERALS_RANK_THRESHOLDS[generalsRank] || 0;
+    const xpPct = generalsRank >= 5 ? 100 : Math.max(0, Math.min(100, Math.round(((generalsXP - prevThresh) / Math.max(1, nextThresh - prevThresh)) * 100)));
+    const xpFill = document.getElementById('gp-modal-xp-fill');
+    if (xpFill) xpFill.style.width = `${xpPct}%`;
+    const xpText = document.getElementById('gp-modal-xp-text');
+    if (xpText) xpText.textContent = generalsRank >= 5 ? `MAX RANK (XP: ${generalsXP})` : `XP: ${generalsXP} / ${nextThresh} (Next Rank)`;
+
+    const tiers = [1, 3, 5];
+    treeEl.innerHTML = tiers.map(rankReq => {
+        const tierLocked = generalsRank < rankReq;
+        const nodes = tree.filter(p => p.rank === rankReq);
+        const cardsHtml = nodes.map(p => {
+            const isUnlocked = unlockedGeneralsPowers.has(p.id);
+            const canBuy = !isUnlocked && !tierLocked && generalsPoints > 0;
+            const cameoSrc = (window.OFFICIAL_CAMEOS && window.OFFICIAL_CAMEOS[p.cameo]) || '';
+            const badge = isUnlocked ? 'UNLOCKED' : (tierLocked ? `RANK ${rankReq}` : (generalsPoints > 0 ? 'UNLOCK (1 PT)' : 'NO PTS'));
+            const cls = isUnlocked ? 'unlocked' : (canBuy ? 'available' : 'disabled');
+            return `
+                <button class="gp-node-card ${cls}" onclick="unlockGeneralsPower('${p.id}')" ${canBuy ? '' : (isUnlocked ? '' : 'disabled')}>
+                    ${cameoSrc ? `<img src="${cameoSrc}" class="gp-node-cameo" alt="${p.name}" />` : ''}
+                    <div class="gp-node-info">
+                        <div class="gp-node-title"><span>${p.name}</span><span class="gp-node-badge">${badge}</span></div>
+                        <div class="gp-node-desc">${p.desc}</div>
+                    </div>
+                </button>
+            `;
+        }).join('');
+        return `
+            <div class="gp-tier-col ${tierLocked ? 'locked' : ''}">
+                <div class="gp-tier-header"><span>LEVEL ${rankReq} POWERS</span><span>${'★'.repeat(rankReq)}</span></div>
+                ${cardsHtml}
+            </div>
+        `;
+    }).join('');
+}
+window.renderGeneralsPowersModal = renderGeneralsPowersModal;
+
+function unlockGeneralsPower(powerId) {
+    const def = getGeneralPowerDef(powerId);
+    if (!def) return false;
+    if (unlockedGeneralsPowers.has(powerId)) return false;
+    if (generalsRank < def.rank) {
+        if (typeof showNotification === 'function') showNotification(`Requires General Rank ${def.rank} to unlock ${def.name}.`, 'warning');
+        return false;
+    }
+    if (generalsPoints <= 0) {
+        if (typeof showNotification === 'function') showNotification('No Promotion Points available! Destroy enemy forces to earn XP.', 'warning');
+        return false;
+    }
+
+    generalsPoints--;
+    unlockedGeneralsPowers.add(powerId);
+
+    // Immediate passive effects on existing units
+    if (powerId === 'redGuardTraining' && typeof units !== 'undefined') {
+        units.forEach(u => {
+            if (u.type === 'redguard' && u.health > 0 && (!u.veterancy || u.veterancy < 1)) {
+                u.kills = Math.max(u.kills || 0, 2);
+                if (typeof checkVeterancyPromotion === 'function') checkVeterancyPromotion(u);
+            }
+        });
+    } else if (powerId === 'technicalTraining' && typeof units !== 'undefined') {
+        units.forEach(u => {
+            if (u.type === 'technical' && u.health > 0) {
+                if (!u._techTrained) {
+                    u._techTrained = true;
+                    u.speed = (u.speed || 0.22) * 1.15;
+                }
+                if (!u.veterancy || u.veterancy < 1) {
+                    u.kills = Math.max(u.kills || 0, 2);
+                    if (typeof checkVeterancyPromotion === 'function') checkVeterancyPromotion(u);
+                }
+            }
+        });
+    }
+
+    if (typeof playAudio === 'function') playAudio('radio_chirp');
+    if (typeof showNotification === 'function') showNotification(`★ Unlocked General Power: ${def.name}!`, 'success');
+    updateGeneralsRankHUD();
+    renderGeneralsPowersModal();
+    renderGeneralPowersBar();
+    updateSidebar();
+    return true;
+}
+window.unlockGeneralsPower = unlockGeneralsPower;
+
+function renderGeneralPowersBar(facOverride) {
+    if (typeof document === 'undefined') return;
+    const gpBar = document.getElementById('general-powers-bar');
+    if (!gpBar) return;
+    const fac = (facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
+    const tree = getActiveFactionPowersTree(fac);
+    const activePowers = tree.filter(p => p.kind === 'active' && unlockedGeneralsPowers.has(p.id));
+    const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+
+    let html = `
+        <button class="gp-power-btn" id="gp-open-tree" title="Open Generals' Promotions & Powers Tree (P)" onclick="toggleGeneralsPowersModal()">
+            <span class="gp-icon">★</span>
+            <span class="gp-label">${generalsPoints > 0 ? `PROMOTE (${generalsPoints})` : `RANK ${generalsRank}`}</span>
+        </button>
+    `;
+
+    activePowers.forEach(p => {
+        const readyTick = generalPowerCooldowns[p.id] || 0;
+        const remTicks = Math.max(0, readyTick - curTick);
+        const secsLeft = Math.ceil(remTicks / 60);
+        const cameoSrc = (window.OFFICIAL_CAMEOS && window.OFFICIAL_CAMEOS[p.cameo]) || '';
+        const label = secsLeft > 0 ? `${secsLeft}s` : p.label;
+        html += `
+            <button class="gp-power-btn ${secsLeft > 0 ? 'cooldown' : ''}" id="gp-btn-${p.id}" title="${p.name}: ${p.desc}" onclick="activateGeneralsPower('${p.id}')">
+                ${cameoSrc ? `<img src="${cameoSrc}" class="gp-cameo-img" alt="${p.label}" />` : `<span class="gp-icon">⚡</span>`}
+                <span class="gp-label">${label}</span>
+            </button>
+        `;
+    });
+
+    gpBar.innerHTML = html;
+}
+window.renderGeneralPowersBar = renderGeneralPowersBar;
 
 function activateGeneralsPower(powerType) {
-    activeGeneralPower = powerType;
-    document.body.style.cursor = 'crosshair';
-    if (powerType === 'spySatellite') {
-        showNotification('USA Spy Satellite: Click terrain or minimap to survey target sector (Right-click/Esc to cancel).', 'info');
-    } else if (powerType === 'a10Strike') {
-        showNotification('A-10 Thunderbolt Strike: Click ground target to order CAS air strike (Right-click/Esc to cancel).', 'info');
-    } else if (powerType === 'artilleryBarrage') {
-        showNotification('Red Army Artillery Barrage: Click ground target to order 152mm artillery strike.', 'info');
-    } else if (powerType === 'rebelAmbush') {
-        showNotification('GLA Rebel Ambush: Click ground target to deploy armed subterranean guerrilla cell.', 'info');
+    const def = getGeneralPowerDef(powerType);
+    const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+    const readyTick = generalPowerCooldowns[powerType] || 0;
+    if (curTick < readyTick) {
+        const secsLeft = Math.ceil((readyTick - curTick) / 60);
+        showNotification(`${def ? def.name : powerType} recharging (${secsLeft}s remaining).`, 'warning');
+        return;
     }
+    activeGeneralPower = powerType;
+    if (typeof document !== 'undefined' && document.body) document.body.style.cursor = 'crosshair';
+    showNotification(`${def ? def.name : powerType}: Click terrain or minimap to deploy (Right-click/Esc to cancel).`, 'info');
 }
 
 function executeGeneralsPowerAt(pos) {
     if (!activeGeneralPower) return false;
     const p = activeGeneralPower;
     activeGeneralPower = null;
-    document.body.style.cursor = 'default';
+    if (typeof document !== 'undefined' && document.body) document.body.style.cursor = 'default';
 
-    if (p === 'spySatellite') {
-        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, 42, 1800);
-        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00ffff, 4.0);
-        if (typeof spawnLaserBeam === 'function') {
-            const orbitalHigh = pos.clone().add(new THREE.Vector3(0, 50, 0));
-            spawnLaserBeam(orbitalHigh, pos, 0x00ffff, 3.5);
+    const def = getGeneralPowerDef(p);
+    const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+    if (def && def.cooldownTicks) {
+        generalPowerCooldowns[p] = curTick + def.cooldownTicks;
+    }
+    renderGeneralPowersBar();
+
+    const pseudoAttacker = (typeof units !== 'undefined' && units[0]) || { teamId: typeof playerTeamId !== 'undefined' ? playerTeamId : 1 };
+
+    if (p === 'spySatellite' || p === 'spyDrone') {
+        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, 42, p === 'spyDrone' ? 3600 : 1800);
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00ffff, 3.5);
+        if (typeof spawnUnit === 'function' && p === 'spyDrone') {
+            const drone = spawnUnit('drone_scout', pos.clone());
+            if (drone) drone.detectsStealth = true;
         }
         playAudio('radio_chirp');
-        showNotification('★ USA Spy Satellite online! Sector uncloaked for 30 seconds.', 'success');
+        showNotification(`★ ${def ? def.name : 'Recon'} deployed! Sector revealed & stealth detected.`, 'success');
+        return true;
+    } else if (p === 'paradrop') {
+        playAudio('radio_chirp');
+        for (let i = 0; i < 4; i++) {
+            const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
+            if (typeof spawnUnit === 'function') spawnUnit('ranger', rPos);
+        }
+        if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xdddddd);
+        showNotification('★ Ranger Paradrop landed at target coordinates!', 'success');
         return true;
     } else if (p === 'a10Strike') {
         showNotification('★ A-10 Warthog flight inbound to target coordinates!', 'success');
@@ -3747,18 +4048,88 @@ function executeGeneralsPowerAt(pos) {
                         const impact = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8));
                         if (typeof spawnRocketProjectile === 'function') {
                             spawnRocketProjectile(rPos, impact, true, false, {
-                                attacker: units[0] || { teamId: playerTeamId },
-                                target: null,
-                                targetPos: impact,
-                                damage: 110,
-                                damageType: 'EXPLOSIVE',
-                                splashRadius: 6.0
+                                attacker: pseudoAttacker, target: null, targetPos: impact,
+                                damage: 120, damageType: 'EXPLOSIVE', splashRadius: 6.5
                             });
                         }
                         if (typeof playUSASound === 'function') playUSASound('missile_launch');
                     }, r * 150);
                 }
             }, i * 350);
+        }
+        return true;
+    } else if (p === 'emergencyRepair') {
+        let repaired = 0;
+        if (typeof units !== 'undefined') {
+            units.forEach(u => {
+                if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(pos) <= 22) {
+                    u.health = Math.min(u.maxHealth, u.health + Math.round(u.maxHealth * 0.65));
+                    repaired++;
+                }
+            });
+        }
+        if (typeof structures !== 'undefined') {
+            structures.forEach(s => {
+                if (s.health > 0 && s.position && s.position.distanceTo(pos) <= 22) {
+                    s.health = Math.min(s.maxHealth, s.health + Math.round(s.maxHealth * 0.5));
+                    repaired++;
+                }
+            });
+        }
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.5);
+        playAudio('construction');
+        showNotification(`★ Emergency Repair restored ${repaired} friendly asset(s)!`, 'success');
+        return true;
+    } else if (p === 'fuelAirBomb') {
+        playAudio('nuke_detonation');
+        if (typeof triggerScreenShake === 'function') triggerScreenShake(1.3);
+        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0xff7f50, 6.5, true);
+        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 22.0, 650, 'EXPLOSIVE', pseudoAttacker);
+        showNotification('★ Fuel Air Bomb (Daisy Cutter) detonated!', 'warning');
+        return true;
+    } else if (p === 'leafletDrop') {
+        playAudio('radio_chirp');
+        if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xffffff);
+        let stunned = 0;
+        if (typeof enemyUnits !== 'undefined') {
+            enemyUnits.forEach(e => {
+                if (e.health > 0 && e.mesh && e.mesh.position.distanceTo(pos) <= 20) {
+                    e.empDisabledUntil = Date.now() + 12000;
+                    stunned++;
+                }
+            });
+        }
+        showNotification(`★ Leaflet Drop stunned ${stunned} hostile unit(s) for 12s!`, 'success');
+        return true;
+    } else if (p === 'spectreGunship') {
+        showNotification('★ AC-130 Spectre Gunship circling target area!', 'success');
+        playAudio('radio_chirp');
+        for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+                const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 14, 0, (Math.random() - 0.5) * 14));
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true);
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 7.5, 130, 'EXPLOSIVE', pseudoAttacker);
+            }, i * 650);
+        }
+        return true;
+    } else if (p === 'clusterMines') {
+        playAudio('construction', {}, 'china');
+        for (let i = 0; i < 6; i++) {
+            const mPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 12, 0, (Math.random() - 0.5) * 12));
+            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(mPos, 0xff4757, 1.2);
+            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(mPos, 4.5, 110, 'EXPLOSIVE', pseudoAttacker);
+        }
+        showNotification('★ Cluster Minefield deployed at target zone!', 'success');
+        return true;
+    } else if (p === 'carpetBomber') {
+        showNotification('★ PLA Carpet Bomber strike inbound!', 'warning');
+        playAudio('explosion');
+        for (let i = -3; i <= 3; i++) {
+            setTimeout(() => {
+                const dropPos = pos.clone().add(new THREE.Vector3(i * 4.5, 0, i * 2.5));
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropPos, 0xff6348, 3.8, true);
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropPos, 9.0, 210, 'EXPLOSIVE', pseudoAttacker);
+            }, (i + 3) * 200);
         }
         return true;
     } else if (p === 'artilleryBarrage') {
@@ -3768,17 +4139,94 @@ function executeGeneralsPowerAt(pos) {
             setTimeout(() => {
                 const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
                 if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff5722, 3.2, true);
-                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', units[0] || { teamId: playerTeamId });
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', pseudoAttacker);
             }, i * 250);
         }
+        return true;
+    } else if (p === 'cashHack') {
+        playerResources += 1500;
+        const resEl = (typeof document !== 'undefined') ? document.getElementById('resource-display') : null;
+        if (resEl) resEl.innerText = `$${playerResources}`;
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 3.0);
+        playAudio('radio_chirp', {}, 'china');
+        showNotification('★ Cash Hack complete! +$1,500 siphoned from hostile network.', 'success');
+        return true;
+    } else if (p === 'frenzy') {
+        let boosted = 0;
+        const until = Date.now() + 15000;
+        if (typeof units !== 'undefined') {
+            units.forEach(u => {
+                if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(pos) <= 22) {
+                    u.frenzyUntil = until;
+                    boosted++;
+                }
+            });
+        }
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0xff2222, 4.0);
+        playAudio('radio_chirp', {}, 'china');
+        showNotification(`★ Frenzy activated on ${boosted} unit(s) (+30% combat speed & damage for 15s)!`, 'success');
+        return true;
+    } else if (p === 'empPulse') {
+        playAudio('orbital_beam');
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00d2ff, 6.0);
+        let disabled = 0;
+        const until = Date.now() + 12000;
+        if (typeof enemyUnits !== 'undefined') {
+            enemyUnits.forEach(e => {
+                if (e.health > 0 && !e.isInfantry && e.mesh && e.mesh.position.distanceTo(pos) <= 22) {
+                    e.empDisabledUntil = until;
+                    disabled++;
+                }
+            });
+        }
+        showNotification(`★ EMP Pulse disabled ${disabled} enemy vehicle(s) for 12s!`, 'success');
         return true;
     } else if (p === 'rebelAmbush') {
         showNotification('★ Rebel Ambush cell surfacing from tunnels!', 'success');
         playAudio('construction', {}, 'gla');
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
             const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6));
             if (typeof spawnUnit === 'function') spawnUnit('rebel', rPos);
         }
+        return true;
+    } else if (p === 'anthraxBomb') {
+        playAudio('scud_detonation');
+        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0x2ecc71, 5.5, true);
+        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 18.0, 320, 'TOXIN', pseudoAttacker);
+        for (let t = 1; t <= 4; t++) {
+            setTimeout(() => {
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 16.0, 95, 'TOXIN', pseudoAttacker);
+            }, t * 1500);
+        }
+        showNotification('★ Anthrax Beta Bomb detonated! Toxic cloud lingering.', 'warning');
+        return true;
+    } else if (p === 'sneakAttack') {
+        playAudio('construction', {}, 'gla');
+        if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0x8b6b43);
+        if (typeof spawnUnit === 'function') {
+            spawnUnit('rpg', pos.clone().add(new THREE.Vector3(-2, 0, 2)));
+            spawnUnit('rpg', pos.clone().add(new THREE.Vector3(2, 0, 2)));
+            spawnUnit('rebel', pos.clone().add(new THREE.Vector3(-2, 0, -2)));
+            spawnUnit('scorpion', pos.clone().add(new THREE.Vector3(2, 0, -2)));
+        }
+        showNotification('★ Sneak Attack tunnel breached! Ambush squad deployed!', 'success');
+        return true;
+    } else if (p === 'gpsScrambler') {
+        let cloaked = 0;
+        const until = Date.now() + 30000;
+        if (typeof units !== 'undefined') {
+            units.forEach(u => {
+                if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(pos) <= 22) {
+                    u.isStealth = true;
+                    u.gpsCloakUntil = until;
+                    if (u.mesh) u.mesh.traverse(c => { if (c.material && c.material.transparent !== undefined) { c.material.transparent = true; c.material.opacity = 0.48; } });
+                    cloaked++;
+                }
+            });
+        }
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.0);
+        playAudio('radio_chirp', {}, 'gla');
+        showNotification(`★ GPS Scrambler cloaked ${cloaked} friendly unit(s) for 30s!`, 'success');
         return true;
     }
     return false;

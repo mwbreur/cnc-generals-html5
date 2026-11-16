@@ -287,6 +287,9 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
             finalDmg = Math.round(finalDmg * 1.25);
         }
     }
+    if (attacker && attacker.frenzyUntil && Date.now() < attacker.frenzyUntil) {
+        finalDmg = Math.round(finalDmg * 1.30);
+    }
 
     // Target defensive upgrade buffs (USA Strategy Center Hold the Line: +20% armor / -20% damage taken)
     if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(target)) {
@@ -333,6 +336,9 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         target._killCredited = true;
         attacker.kills = (attacker.kills || 0) + 1;
         checkVeterancyPromotion(attacker);
+        if (!attacker.isAI && typeof onPlayerKillReward === 'function') {
+            onPlayerKillReward(target);
+        }
         // If attacker is a passenger firing from a transport fireport (Humvee, Technical, Overlord Bunker), also credit the transport!
         if (attacker.garrisonedIn && attacker.garrisonedIn.health > 0) {
             attacker.garrisonedIn.kills = (attacker.garrisonedIn.kills || 0) + 1;

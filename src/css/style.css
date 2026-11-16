@@ -2226,3 +2226,185 @@ body.control-bar-collapsed #generals-command-bar {
 }
 .sw-timer-row.sw-china .sw-timer-bar-fill { background: linear-gradient(90deg, #ff4757, #ffa502); }
 .sw-timer-row.sw-gla .sw-timer-bar-fill { background: linear-gradient(90deg, #2ecc71, #a3cb38); }
+
+/* Generals' Promotions & Powers Tree */
+.cb-inspector-stars-bar.clickable {
+    cursor: pointer;
+    transition: filter 0.15s ease, background 0.15s ease;
+}
+.cb-inspector-stars-bar.clickable:hover {
+    filter: brightness(1.18);
+}
+.gp-points-badge {
+    margin-left: auto;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #ffd700 0%, #d49b00 100%);
+    color: #111;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.7);
+}
+.gp-power-btn.cooldown {
+    opacity: 0.55;
+    filter: grayscale(0.6);
+}
+.gp-modal-card {
+    width: min(920px, 94vw);
+    max-height: 86vh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, rgba(14, 21, 26, 0.97) 0%, rgba(8, 12, 16, 0.98) 100%);
+    border: 2px solid #b88c2a;
+    border-radius: 8px;
+    padding: 16px 18px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85), 0 0 24px rgba(212, 175, 55, 0.25);
+    color: #e6eef4;
+}
+.gp-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+.gp-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: 1.5px;
+    color: #ffd700;
+}
+.gp-modal-subtitle {
+    font-size: 11px;
+    color: #9cb2c2;
+    margin-top: 2px;
+}
+.gp-modal-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.gp-modal-points {
+    background: rgba(255, 215, 0, 0.16);
+    border: 1px solid #ffd700;
+    color: #ffd700;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 800;
+}
+.gp-modal-xp-bar {
+    position: relative;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.gp-modal-xp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c99700, #ffd700);
+    transition: width 0.25s ease;
+}
+.gp-modal-xp-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 1px 2px #000;
+}
+.gp-tree-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+@media (max-width: 780px) {
+    .gp-tree-grid { grid-template-columns: 1fr; }
+}
+.gp-tier-col {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.gp-tier-col.locked { opacity: 0.72; }
+.gp-tier-header {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #ffd700;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+}
+.gp-node-card {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(16, 24, 30, 0.85);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+    color: #e6eef4;
+}
+.gp-node-card.available:hover {
+    border-color: #ffd700;
+    transform: translateY(-1px);
+}
+.gp-node-card.unlocked {
+    border-color: #55efc4;
+    background: rgba(20, 48, 38, 0.65);
+}
+.gp-node-card.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.gp-node-cameo {
+    width: 44px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+}
+.gp-node-info { flex: 1; min-width: 0; }
+.gp-node-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+}
+.gp-node-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffd700;
+    white-space: nowrap;
+}
+.gp-node-card.unlocked .gp-node-badge {
+    background: rgba(85, 239, 196, 0.2);
+    color: #55efc4;
+}
+.gp-node-desc {
+    font-size: 10px;
+    color: #adc0ce;
+    margin-top: 3px;
+    line-height: 1.3;
+}
