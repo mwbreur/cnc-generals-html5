@@ -17183,8 +17183,8 @@ function produceUnit(type) {
     }
 
     if (!fac.productionQueue) fac.productionQueue = [];
-    if (fac.productionQueue.length >= 5) {
-        showNotification('Production queue full (max 5 units).', 'warning');
+    if (fac.productionQueue.length >= 9) {
+        showNotification('Production queue full (max 9 units).', 'warning');
         return;
     }
 
@@ -21307,13 +21307,15 @@ function processEnemyAIEngine() {
                     activeBlueprintType = null;
                     return;
                 }
+                const isShiftBuild = !!e.shiftKey;
+                const placedType = activeBlueprintType;
                 const placementPosition = blueprintPlacementPos.clone();
                 placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
-                const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
-                scene.remove(blueprintMesh);
-                blueprintMesh = null;
-                activeBlueprintType = null;
+                const newStruct = buildStructureMesh(placedType, placementPosition, false, blueprintRotationY);
                 if (!newStruct) {
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
                     showNotification('Structure not available for this faction!', 'error');
                     return;
                 }
@@ -21321,6 +21323,13 @@ function processEnemyAIEngine() {
                 const resEl = document.getElementById('resource-display');
                 if (resEl) resEl.innerText = `$${playerResources}`;
                 playUSASound('construction');
+
+                // Keep blueprint active if Shift is held and player can afford another structure
+                if (!isShiftBuild || playerResources < cost) {
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
+                }
 
                 const builderCandidates = units.filter(u => (u.type === 'dozer' || u.type === 'worker') && u.health > 0);
                 let assignedBuilder = builderCandidates.find(u => u.selected);
@@ -21338,10 +21347,20 @@ function processEnemyAIEngine() {
                     });
                 }
                 if (assignedBuilder) {
-                    assignDozerToStructure(assignedBuilder, newStruct);
-                    if (typeof playUnitVoice === 'function') playUnitVoice(assignedBuilder.type, 'build', assignedBuilder.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+                    if (isShiftBuild && (assignedBuilder.taskState === 'Building' || assignedBuilder.taskState === 'MovingToBuild') && assignedBuilder.targetStructure && assignedBuilder.targetStructure.health > 0 && assignedBuilder.targetStructure.isBuilding) {
+                        if (!assignedBuilder.buildQueue) assignedBuilder.buildQueue = [];
+                        assignedBuilder.buildQueue.push(newStruct);
+                        newStruct.dozerRef = assignedBuilder;
+                        showNotification(`Queued ${placedType.toUpperCase()} (${assignedBuilder.buildQueue.length} in builder queue).`, 'info');
+                    } else {
+                        assignedBuilder.buildQueue = [];
+                        assignDozerToStructure(assignedBuilder, newStruct);
+                        if (typeof playUnitVoice === 'function') playUnitVoice(assignedBuilder.type, 'build', assignedBuilder.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+                        showNotification('Construction started!', 'info');
+                    }
+                } else {
+                    showNotification('Construction started!', 'info');
                 }
-                showNotification('Construction started!', 'info');
                 return;
             }
             if (e.button === 0 && window.rallyPointPlacementStructure) {
@@ -23145,9 +23164,20 @@ function animate() {
                             s.isBuilding = false;
                             s.buildProgress = 100;
                             if (s.dozerRef) {
-                                s.dozerRef.taskState = 'Idle';
-                                s.dozerRef.targetStructure = null;
+                                const finishedBuilder = s.dozerRef;
+                                finishedBuilder.taskState = 'Idle';
+                                finishedBuilder.targetStructure = null;
                                 s.dozerRef = null;
+                                // Advance Shift-queued construction orders if any remain
+                                if (finishedBuilder.buildQueue && finishedBuilder.buildQueue.length > 0 && typeof assignDozerToStructure === 'function') {
+                                    while (finishedBuilder.buildQueue.length > 0) {
+                                        const nextStruct = finishedBuilder.buildQueue.shift();
+                                        if (nextStruct && nextStruct.health > 0 && nextStruct.isBuilding) {
+                                            assignDozerToStructure(finishedBuilder, nextStruct);
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
                             const bFaction = s.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');

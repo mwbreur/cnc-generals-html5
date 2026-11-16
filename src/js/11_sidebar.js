@@ -2759,8 +2759,8 @@ function produceUnit(type) {
     }
 
     if (!fac.productionQueue) fac.productionQueue = [];
-    if (fac.productionQueue.length >= 5) {
-        showNotification('Production queue full (max 5 units).', 'warning');
+    if (fac.productionQueue.length >= 9) {
+        showNotification('Production queue full (max 9 units).', 'warning');
         return;
     }
 

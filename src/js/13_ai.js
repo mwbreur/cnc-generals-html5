@@ -1447,13 +1447,15 @@ function processEnemyAIEngine() {
                     activeBlueprintType = null;
                     return;
                 }
+                const isShiftBuild = !!e.shiftKey;
+                const placedType = activeBlueprintType;
                 const placementPosition = blueprintPlacementPos.clone();
                 placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
-                const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
-                scene.remove(blueprintMesh);
-                blueprintMesh = null;
-                activeBlueprintType = null;
+                const newStruct = buildStructureMesh(placedType, placementPosition, false, blueprintRotationY);
                 if (!newStruct) {
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
                     showNotification('Structure not available for this faction!', 'error');
                     return;
                 }
@@ -1461,6 +1463,13 @@ function processEnemyAIEngine() {
                 const resEl = document.getElementById('resource-display');
                 if (resEl) resEl.innerText = `$${playerResources}`;
                 playUSASound('construction');
+
+                // Keep blueprint active if Shift is held and player can afford another structure
+                if (!isShiftBuild || playerResources < cost) {
+                    scene.remove(blueprintMesh);
+                    blueprintMesh = null;
+                    activeBlueprintType = null;
+                }
 
                 const builderCandidates = units.filter(u => (u.type === 'dozer' || u.type === 'worker') && u.health > 0);
                 let assignedBuilder = builderCandidates.find(u => u.selected);
@@ -1478,10 +1487,20 @@ function processEnemyAIEngine() {
                     });
                 }
                 if (assignedBuilder) {
-                    assignDozerToStructure(assignedBuilder, newStruct);
-                    if (typeof playUnitVoice === 'function') playUnitVoice(assignedBuilder.type, 'build', assignedBuilder.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+                    if (isShiftBuild && (assignedBuilder.taskState === 'Building' || assignedBuilder.taskState === 'MovingToBuild') && assignedBuilder.targetStructure && assignedBuilder.targetStructure.health > 0 && assignedBuilder.targetStructure.isBuilding) {
+                        if (!assignedBuilder.buildQueue) assignedBuilder.buildQueue = [];
+                        assignedBuilder.buildQueue.push(newStruct);
+                        newStruct.dozerRef = assignedBuilder;
+                        showNotification(`Queued ${placedType.toUpperCase()} (${assignedBuilder.buildQueue.length} in builder queue).`, 'info');
+                    } else {
+                        assignedBuilder.buildQueue = [];
+                        assignDozerToStructure(assignedBuilder, newStruct);
+                        if (typeof playUnitVoice === 'function') playUnitVoice(assignedBuilder.type, 'build', assignedBuilder.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+                        showNotification('Construction started!', 'info');
+                    }
+                } else {
+                    showNotification('Construction started!', 'info');
                 }
-                showNotification('Construction started!', 'info');
                 return;
             }
             if (e.button === 0 && window.rallyPointPlacementStructure) {

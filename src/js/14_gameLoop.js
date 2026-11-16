@@ -938,9 +938,20 @@ function animate() {
                             s.isBuilding = false;
                             s.buildProgress = 100;
                             if (s.dozerRef) {
-                                s.dozerRef.taskState = 'Idle';
-                                s.dozerRef.targetStructure = null;
+                                const finishedBuilder = s.dozerRef;
+                                finishedBuilder.taskState = 'Idle';
+                                finishedBuilder.targetStructure = null;
                                 s.dozerRef = null;
+                                // Advance Shift-queued construction orders if any remain
+                                if (finishedBuilder.buildQueue && finishedBuilder.buildQueue.length > 0 && typeof assignDozerToStructure === 'function') {
+                                    while (finishedBuilder.buildQueue.length > 0) {
+                                        const nextStruct = finishedBuilder.buildQueue.shift();
+                                        if (nextStruct && nextStruct.health > 0 && nextStruct.isBuilding) {
+                                            assignDozerToStructure(finishedBuilder, nextStruct);
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                             s.mesh.traverse(child => { if (child.isMesh && child.savedMaterial) child.material = child.savedMaterial; });
                             const bFaction = s.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
