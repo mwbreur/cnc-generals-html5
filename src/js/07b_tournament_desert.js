@@ -72,16 +72,17 @@ function createOfficialMapTexture(mapType) {
         tex.generateMipmaps = true;
 
         var applyDetail = function() {
-            if (mapObj.theme === 'desert' && window.RETAIL_DESERT_SAND_URI) {
+            if (window.RETAIL_DESERT_SAND_URI) {
                 var sandImg = new Image();
                 sandImg.onload = function() {
                     var pat = ctx.createPattern(sandImg, 'repeat');
                     if (pat) {
                         ctx.save();
+                        ctx.scale(0.16, 0.16);
                         ctx.globalCompositeOperation = 'overlay';
-                        ctx.globalAlpha = 0.48;
+                        ctx.globalAlpha = mapObj.theme === 'desert' ? 0.62 : 0.30;
                         ctx.fillStyle = pat;
-                        ctx.fillRect(0, 0, 1024, 1024);
+                        ctx.fillRect(0, 0, 1024 / 0.16, 1024 / 0.16);
                         ctx.restore();
                         tex.needsUpdate = true;
                     }

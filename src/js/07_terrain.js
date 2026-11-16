@@ -543,7 +543,9 @@
 
             const terrainMat = new THREE.MeshStandardMaterial({
                 map: terrainTexture,
-                roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.95,
+                bumpMap: (typeof texBumpConcrete !== 'undefined') ? texBumpConcrete : null,
+                bumpScale: 0.22,
+                roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.92,
                 metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
             });
             terrainMesh = new THREE.Mesh(geo, terrainMat);
@@ -870,18 +872,27 @@
                     });
                 }
                 if (Array.isArray(offMap.buildings)) {
-                    offMap.buildings.forEach(bld => {
+                    const civPool = ['civilian_house1', 'civilian_house2', 'civilian_warehouse', 'civilian_hangar'];
+                    offMap.buildings.forEach((bld, bIdx) => {
                         const bx = bld[0] * mapSize, bz = bld[1] * mapSize;
                         const angle = bld[2] || 0;
                         const kind = bld[3] || 'civilian';
                         const by = getTerrainHeight(bx, bz);
                         let mesh = null;
+                        let yPos = by;
                         if (kind === 'bunker' && typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['civilian_bunker']) {
                             mesh = createW3DBuildingMesh('civilian_bunker', false);
+                            yPos = by - 1.2; // Seat sloped bunker skirt into hillside
                         } else if (kind === 'bunker' && typeof createChinaBunker === 'function') {
                             mesh = createChinaBunker(false);
                             mesh.scale.set(0.95, 0.95, 0.95);
-                        } else {
+                        } else if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA) {
+                            const civKey = civPool[bIdx % civPool.length];
+                            if (window.W3D_BUILDING_DATA[civKey]) {
+                                mesh = createW3DBuildingMesh(civKey, false);
+                            }
+                        }
+                        if (!mesh) {
                             mesh = new THREE.Group();
                             const body = new THREE.Mesh(
                                 new THREE.BoxGeometry(9.0, 5.5, 7.5),
@@ -897,7 +908,7 @@
                             roof.position.y = 5.65;
                             mesh.add(body, roof);
                         }
-                        mesh.position.set(bx, by, bz);
+                        mesh.position.set(bx, yPos, bz);
                         mesh.rotation.y = angle;
                         mapPropsGroup.add(mesh);
                         mapObstacles.push({ position: new THREE.Vector3(bx, by, bz), radius: kind === 'bunker' ? 5.0 : 6.0 });
