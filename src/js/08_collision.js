@@ -278,7 +278,7 @@ function resolveObstacleCollisions(unit) {
             const hS = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z + radius * 0.7) : pos.y;
             const hE = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x + radius * 0.7, pos.z) : pos.y;
             const hW = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x - radius * 0.7, pos.z) : pos.y;
-            const deckY = Math.max(hCenter, hN, hS, hE, hW) + 0.05;
+            const deckY = (hCenter * 2 + hN + hS + hE + hW) / 6 + 0.05;
 
             pos.y = deckY;
             group.position.copy(pos);

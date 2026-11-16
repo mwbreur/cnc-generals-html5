@@ -594,7 +594,13 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         if (altTurret) altTurret.name = 'turretSystem';
     }
 
-    if (buildingKey === 'usa_power') {
+    if (buildingKey === 'usa_barracks') {
+        const plinthMat = new THREE.MeshStandardMaterial({ color: 0x5c5850, roughness: 0.92, metalness: 0.08 });
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(52, 10, 44), plinthMat);
+        plinth.position.set(0, -4.85, 0);
+        plinth.receiveShadow = true;
+        root.add(plinth);
+    } else if (buildingKey === 'usa_power') {
         const glow1 = new THREE.PointLight(0x00d2ff, 2.5, 35);
         glow1.position.set(-4.65, 18.0, -0.54);
         root.add(glow1);

@@ -496,6 +496,7 @@
             flattenedFootprints.length = 0;
             // Clear previous terrain, water, props, and supply points
             if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh = null; }
+            if (window.terrainDetailMesh) { scene.remove(window.terrainDetailMesh); if (window.terrainDetailMesh.material) window.terrainDetailMesh.material.dispose(); window.terrainDetailMesh = null; }
             if (waterMesh) { scene.remove(waterMesh); waterMesh.geometry.dispose(); waterMesh = null; }
             if (mapPropsGroup) { scene.remove(mapPropsGroup); mapPropsGroup = null; }
             mapObstacles.length = 0;
@@ -554,6 +555,65 @@
             terrainMesh = new THREE.Mesh(geo, terrainMat);
             terrainMesh.receiveShadow = true;
             scene.add(terrainMesh);
+
+            // High-frequency tiled micro-detail overlay (~22 px/world unit) for crisp close-up ground detail
+            if (typeof document !== 'undefined' && document.createElement) {
+                const detCanvas = document.createElement('canvas');
+                detCanvas.width = detCanvas.height = 512;
+                const dCtx = detCanvas.getContext && detCanvas.getContext('2d');
+                if (dCtx) {
+                    dCtx.fillStyle = '#e8e8e8';
+                    dCtx.fillRect(0, 0, 512, 512);
+                    const isDesertTheme = (effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert');
+                    const isSnowTheme = (effectiveTheme === 'snow');
+                    const isCityTheme = (effectiveTheme === 'city');
+                    // Deterministic pseudo-random crisp pebbles, ripples & grain
+                    let seed = 1337;
+                    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+                    if (isDesertTheme) {
+                        for (let y = 0; y < 512; y += 8) {
+                            dCtx.strokeStyle = (y % 16 === 0) ? 'rgba(180,165,135,0.28)' : 'rgba(255,250,238,0.22)';
+                            dCtx.lineWidth = 2;
+                            dCtx.beginPath();
+                            for (let x = 0; x <= 512; x += 16) {
+                                const yy = y + Math.sin(x * 0.049 + y * 0.08) * 2.5;
+                                if (x === 0) dCtx.moveTo(x, yy); else dCtx.lineTo(x, yy);
+                            }
+                            dCtx.stroke();
+                        }
+                    }
+                    for (let i = 0; i < 4200; i++) {
+                        const px = rand() * 512, py = rand() * 512;
+                        const r = 0.6 + rand() * (isCityTheme ? 1.4 : 2.2);
+                        dCtx.fillStyle = rand() > 0.45
+                            ? (isSnowTheme ? 'rgba(195,210,225,0.25)' : 'rgba(115,105,90,0.26)')
+                            : 'rgba(255,255,255,0.20)';
+                        dCtx.beginPath();
+                        dCtx.arc(px, py, r, 0, Math.PI * 2);
+                        dCtx.fill();
+                    }
+                    const detTex = new THREE.CanvasTexture(detCanvas);
+                    detTex.wrapS = detTex.wrapT = THREE.RepeatWrapping;
+                    detTex.repeat.set(64, 64);
+                    detTex.anisotropy = 8;
+                    const detMat = new THREE.MeshStandardMaterial({
+                        map: detTex,
+                        transparent: true,
+                        opacity: 0.55,
+                        blending: THREE.MultiplyBlending,
+                        roughness: 0.95,
+                        depthWrite: false,
+                        polygonOffset: true,
+                        polygonOffsetFactor: -1,
+                        polygonOffsetUnits: -1
+                    });
+                    const detMesh = new THREE.Mesh(geo, detMat);
+                    detMesh.position.y = 0.03;
+                    detMesh.receiveShadow = true;
+                    scene.add(detMesh);
+                    window.terrainDetailMesh = detMesh;
+                }
+            }
 
             // 3. Water Body (per-map waterLevel on official maps so river/lake maps render water while dry canyons stay passable)
             mapBridges.length = 0; // Clear previous bridges

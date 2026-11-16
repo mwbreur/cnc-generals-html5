@@ -956,7 +956,13 @@ function animate() {
             let constructionActive = false;
             const allConstructing = [...structures, ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
             allConstructing.forEach(s => {
-                if (!s || !s.isBuilding || s.health <= 0) return;
+                if (!s || !s.isBuilding || s.health <= 0) {
+                    if (s && s._progressBarEl) {
+                        if (s._progressBarEl.parentElement) s._progressBarEl.parentElement.removeChild(s._progressBarEl);
+                        s._progressBarEl = null;
+                    }
+                    return;
+                }
                 
                 if (s.dozerRef && s.dozerRef.health > 0) {
                     const dPos = s.dozerRef.mesh.position;
@@ -981,21 +987,35 @@ function animate() {
                         }
                         
                         const isAiStruct = !!s.isAI || (s.ownerId && s.ownerId !== 'player');
-                        if (!isAiStruct) {
-                            constructionActive = true;
+                        if (!isAiStruct && typeof document !== 'undefined' && progressContainer) {
+                            if (!s._progressBarEl) {
+                                const barEl = progressContainer.cloneNode(true);
+                                barEl.removeAttribute('id');
+                                barEl.style.position = 'fixed';
+                                (progressContainer.parentElement || document.body).appendChild(barEl);
+                                s._progressBarEl = barEl;
+                            }
                             const wp = s.position.clone(); wp.y += 4; wp.project(camera);
-                            const sX = (wp.x * 0.5 + 0.5) * window.innerWidth; const sY = (-(wp.y * 0.5) + 0.5) * window.innerHeight;
-                            
+                            const sX = (wp.x * 0.5 + 0.5) * window.innerWidth;
+                            const sY = (-(wp.y * 0.5) + 0.5) * window.innerHeight;
                             if (wp.z >= -1 && wp.z <= 1) {
-                                progressContainer.style.display = 'block';
-                                progressContainer.style.left = sX + 'px'; progressContainer.style.top = sY + 'px';
-                                progressFill.style.width = Math.min(100, s.buildProgress) + '%';
+                                s._progressBarEl.style.display = 'block';
+                                s._progressBarEl.style.left = sX + 'px';
+                                s._progressBarEl.style.top = sY + 'px';
+                                const fillEl = s._progressBarEl.firstElementChild;
+                                if (fillEl) fillEl.style.width = Math.min(100, s.buildProgress) + '%';
+                            } else {
+                                s._progressBarEl.style.display = 'none';
                             }
                         }
 
                         if (s.buildProgress >= 100) {
                             s.isBuilding = false;
                             s.buildProgress = 100;
+                            if (s._progressBarEl) {
+                                if (s._progressBarEl.parentElement) s._progressBarEl.parentElement.removeChild(s._progressBarEl);
+                                s._progressBarEl = null;
+                            }
                             if (s.mesh && s._baseScaleY !== undefined) s.mesh.scale.y = s._baseScaleY;
                             if (s.dozerRef) {
                                 const finishedBuilder = s.dozerRef;
