@@ -1733,6 +1733,18 @@ function processEnemyAIEngine() {
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
+            // Allow player to steer active Particle Cannon orbital beam in a straight line by right-clicking terrain
+            if (window.activeParticleCannonTarget && window.activeParticleCannonPlayerOwned &&
+                (!units.some(u => u.selected) || (selectedStructure && selectedStructure.type === 'particleCannon'))) {
+                const beamHit = getGroundIntersectPoint();
+                if (beamHit) {
+                    window.activeParticleCannonTarget.copy(beamHit);
+                    if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(beamHit, 'attack');
+                    showNotification('⚡ Redirecting Particle Beam!', 'info');
+                    return;
+                }
+            }
+
             // Ground intersections must use the ray for this pointer event, not the previous frame.
             if (selectedStructure && !units.some(u => u.selected)) {
                 if (selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {

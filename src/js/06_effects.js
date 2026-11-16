@@ -1071,7 +1071,7 @@
         // CINEMATIC ANIMATED SUPERWEAPONS (PARTICLE CANNON, NUKE SILO, SCUD STORM)
         // =========================================================================
 
-        function animateParticleCannonStrike(targetPos, duration = 260, uplinkPos = null) {
+        function animateParticleCannonStrike(targetPos, duration = 260, uplinkPos = null, isPlayerOwned = false) {
             if (typeof playSuperweaponEvaAlert === 'function') {
                 playSuperweaponEvaAlert('particleCannon', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
             }
@@ -1081,6 +1081,7 @@
             const group = new THREE.Group();
             group.position.copy(targetPos);
             window.activeParticleCannonTarget = targetPos.clone();
+            window.activeParticleCannonPlayerOwned = !!isPlayerOwned;
 
             // 1. Searing inner white-hot core + outer cyan orbital plasma column
             const coreGeo = new THREE.CylinderGeometry(0.45, 0.75, 110, 16);
@@ -1131,21 +1132,25 @@
             }
 
             let life = duration;
-            let sweepAngle = 0;
             const originCenter = targetPos.clone();
 
             activeFX.push({
                 life: duration,
                 update() {
                     life--;
-                    sweepAngle += 0.065;
-                    // Allow player to steer the active Particle Cannon beam by clicking on the map, or sweep automatically
-                    if (window.activeParticleCannonTarget && window.activeParticleCannonTarget.distanceTo(originCenter) > 1.5) {
-                        originCenter.lerp(window.activeParticleCannonTarget, 0.08);
+                    // Sit steadily on target when uncontrolled, or sweep in a straight line toward player's steered target
+                    if (window.activeParticleCannonTarget) {
+                        const dx = window.activeParticleCannonTarget.x - originCenter.x;
+                        const dz = window.activeParticleCannonTarget.z - originCenter.z;
+                        const dist = Math.hypot(dx, dz);
+                        if (dist > 0.45) {
+                            const step = Math.min(0.42, dist);
+                            originCenter.x += (dx / dist) * step;
+                            originCenter.z += (dz / dist) * step;
+                        }
                     }
-                    const sweepRadius = Math.sin((duration - life) * 0.025) * 11.0;
-                    group.position.x = originCenter.x + Math.cos(sweepAngle) * sweepRadius;
-                    group.position.z = originCenter.z + Math.sin(sweepAngle) * sweepRadius;
+                    group.position.x = originCenter.x;
+                    group.position.z = originCenter.z;
                     group.position.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(group.position.x, group.position.z) : 0;
 
                     const pulse = 0.92 + Math.sin(life * 0.6) * 0.16;
@@ -1195,6 +1200,7 @@
 
                     if (life <= 0) {
                         window.activeParticleCannonTarget = null;
+                        window.activeParticleCannonPlayerOwned = false;
                         scene.remove(group);
                         group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
                         if (uplinkGroup) {

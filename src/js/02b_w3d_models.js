@@ -615,6 +615,38 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         glow2.position.set(-17.54, 18.0, -13.16);
         glow2.visible = false;
         root.add(glow2);
+    } else if (buildingKey === 'usa_particleCannon') {
+        const emitterMat = new THREE.MeshStandardMaterial({
+            color: 0x00e5ff,
+            emissive: 0x00b8ff,
+            emissiveIntensity: 1.25,
+            roughness: 0.2,
+            metalness: 0.3
+        });
+        const orbGeo = new THREE.SphereGeometry(1.35, 10, 8);
+        ['FX01', 'FX02', 'FX03', 'FX04', 'FX05'].forEach(fxName => {
+            const fxPivot = root.getObjectByName(fxName);
+            if (fxPivot) {
+                const orb = new THREE.Mesh(orbGeo, emitterMat);
+                orb.name = 'particleEmitter';
+                fxPivot.add(orb);
+            }
+        });
+        const ringWrapper = new THREE.Group();
+        ringWrapper.position.set(0, 6.2, 24.6);
+        ringWrapper.rotation.x = Math.PI / 2;
+        const accelRing = new THREE.Mesh(
+            new THREE.TorusGeometry(9.6, 0.55, 8, 28),
+            new THREE.MeshStandardMaterial({ color: 0x00d2ff, emissive: 0x0088ff, emissiveIntensity: 1.1, roughness: 0.25, metalness: 0.5 })
+        );
+        accelRing.name = 'particleAcceleratorRing';
+        ringWrapper.add(accelRing);
+        root.add(ringWrapper);
+
+        const pitGlow = new THREE.PointLight(0x00e5ff, 1.8, 32);
+        pitGlow.name = 'particleCannonGlowLight';
+        pitGlow.position.set(0, 11.5, 24.6);
+        root.add(pitGlow);
     } else if (buildingKey === 'usa_commandCenter') {
         // Fix sideways W3D flag orientation (flat in X-Z) -> hang vertically from flagpole
         const hc4 = root.getObjectByName('HOUSECOLOR04');

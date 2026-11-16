@@ -3248,7 +3248,13 @@ window.updateSuperweaponTimersHUD = updateSuperweaponTimersHUD;
 function strikeWithSuperweapon(structure, targetPosition) {
     const sType = structure.type;
     if (sType === 'particleCannon') {
-        animateParticleCannonStrike(targetPosition, 260, structure.position);
+        let uplinkPos = structure.position;
+        if (structure.mesh && structure.mesh.userData && structure.mesh.userData.isW3D) {
+            const pitOffset = new THREE.Vector3(0, 6.2 * 0.27, 24.6 * 0.27);
+            pitOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), structure.rotationY || 0);
+            uplinkPos = structure.position.clone().add(pitOffset);
+        }
+        animateParticleCannonStrike(targetPosition, 260, uplinkPos, !structure.isAI);
     } else if (sType === 'nukeSilo') {
         animateNukeStrike(structure.position, targetPosition);
     } else if (sType === 'scudStorm') {
