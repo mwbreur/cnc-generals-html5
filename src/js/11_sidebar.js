@@ -3740,7 +3740,7 @@ function updateHUD() {
             else if (type === 'raptor') { mesh = createRaptorMesh(false); radius = 4.2; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
             else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(); radius = 4.0; speed = 0.28; health = 240; scanRange = 32; isAir = true; }
             else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 4.2; speed = 0.38; health = 180; scanRange = 35; isAir = true; }
-            else if (type === 'infantry') { mesh = createRangerMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 16; }
+            else if (type === 'infantry' || type === 'ranger') { mesh = createRangerMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 16; }
             else if (type === 'rocket') { mesh = createMissileDefenderMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 24; }
             else if (type === 'pathfinder') { mesh = createPathfinderMesh(); radius = 0.8; speed = 0.09; health = 120; scanRange = 32; }
             else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.9; speed = 0.10; health = 350; scanRange = 24; }
@@ -4398,7 +4398,7 @@ function executeGeneralsPowerAt(pos) {
         playAudio('radio_chirp');
         for (let i = 0; i < 4; i++) {
             const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
-            if (typeof spawnUnit === 'function') spawnUnit('ranger', rPos);
+            if (typeof spawnUnit === 'function') spawnUnit('infantry', rPos);
         }
         if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xdddddd);
         showNotification('★ Ranger Paradrop landed at target coordinates!', 'success');
