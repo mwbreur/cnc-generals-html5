@@ -637,6 +637,8 @@
             geo.rotateX(-Math.PI / 2);
 
             const posAttr = geo.attributes.position;
+            const colorArr = new Float32Array(posAttr.count * 3);
+            const gridSize = segments + 1;
             for (let i = 0; i < posAttr.count; i++) {
                 const vx = posAttr.getX(i);
                 const vz = posAttr.getZ(i);
@@ -644,83 +646,174 @@
             }
             geo.computeVertexNormals();
 
+            // Compute rich macro vertex colors from height & slope (avoids stretching 128x128 minimap TGA across the 3D terrain)
+            const normAttr = geo.attributes.normal;
+            for (let i = 0; i < posAttr.count; i++) {
+                const h = posAttr.getY(i);
+                const ny = normAttr ? normAttr.getY(i) : 1.0;
+                const slope = 1.0 - Math.max(0, Math.min(1, ny));
+                let cr = 0.84, cg = 0.63, cb = 0.35;
+                if (effectiveTheme === 'jungle') {
+                    cr = 0.34; cg = 0.48; cb = 0.24;
+                    if (slope > 0.10) {
+                        const t = Math.min(1, (slope - 0.10) * 4.0);
+                        cr = cr * (1 - t) + 0.32 * t;
+                        cg = cg * (1 - t) + 0.30 * t;
+                        cb = cb * (1 - t) + 0.24 * t;
+                    } else if (h > 6.0) {
+                        cr = 0.42; cg = 0.54; cb = 0.28;
+                    }
+                } else if (effectiveTheme === 'snow') {
+                    cr = 0.86; cg = 0.90; cb = 0.95;
+                    if (slope > 0.10) {
+                        const t = Math.min(1, (slope - 0.10) * 4.0);
+                        cr = cr * (1 - t) + 0.38 * t;
+                        cg = cg * (1 - t) + 0.43 * t;
+                        cb = cb * (1 - t) + 0.50 * t;
+                    }
+                } else if (effectiveTheme === 'city') {
+                    cr = 0.38; cg = 0.40; cb = 0.43;
+                    if (slope > 0.10) { cr = 0.30; cg = 0.32; cb = 0.35; }
+                } else {
+                    // Desert / Tournament Desert: warm ochre-gold sand + stratified canyon cliffs
+                    const strata = Math.sin(h * 1.6) * 0.05;
+                    if (slope > 0.08) {
+                        const t = Math.min(1, (slope - 0.08) * 4.5);
+                        cr = cr * (1 - t) + (0.50 + strata) * t;
+                        cg = cg * (1 - t) + (0.35 + strata * 0.7) * t;
+                        cb = cb * (1 - t) + (0.21 + strata * 0.5) * t;
+                    } else if (h > 6.5) {
+                        cr = 0.88; cg = 0.70; cb = 0.43;
+                    } else if (h < -0.5) {
+                        cr = 0.70; cg = 0.50; cb = 0.28;
+                    }
+                }
+                colorArr[i * 3] = cr;
+                colorArr[i * 3 + 1] = cg;
+                colorArr[i * 3 + 2] = cb;
+            }
+            if (typeof geo.setAttribute === 'function' && typeof THREE.BufferAttribute === 'function') {
+                geo.setAttribute('color', new THREE.BufferAttribute(colorArr, 3));
+            }
+
+            // High-resolution tiled ground texture (54x54 across map) for crisp close-up pebbles, ripples & grain
             const isCustom = Boolean(activeCustomMap || (mapType && mapType.startsWith('custom_')));
-            const terrainTexture = isCustom
-                ? createCustomTerrainTexture(activeCustomMap)
-                : createTerrainTextureForMap(mapType);
+            let terrainTexture = null;
+            if (isCustom) {
+                terrainTexture = createCustomTerrainTexture(activeCustomMap);
+            } else if (typeof document !== 'undefined' && document.createElement) {
+                const tileCanvas = document.createElement('canvas');
+                tileCanvas.width = tileCanvas.height = 512;
+                const tCtx = tileCanvas.getContext && tileCanvas.getContext('2d');
+                if (tCtx) {
+                    const isSnow = (effectiveTheme === 'snow');
+                    const isJungle = (effectiveTheme === 'jungle');
+                    const isCity = (effectiveTheme === 'city');
+                    // Bright neutral base so vertexColors drive macro hues without washing out contrast
+                    tCtx.fillStyle = isCity ? '#c8ccd2' : isSnow ? '#f2f6fa' : isJungle ? '#d8e4cf' : '#ede0c8';
+                    tCtx.fillRect(0, 0, 512, 512);
+
+                    let seed = 4242;
+                    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+
+                    // Soft organic dirt/grass/sand patches
+                    for (let i = 0; i < 450; i++) {
+                        tCtx.fillStyle = rand() > 0.5
+                            ? (isCity ? 'rgba(90,95,102,0.14)' : isSnow ? 'rgba(185,202,220,0.18)' : isJungle ? 'rgba(72,96,52,0.18)' : 'rgba(155,112,62,0.16)')
+                            : 'rgba(255,250,240,0.16)';
+                        tCtx.beginPath();
+                        tCtx.ellipse(rand() * 512, rand() * 512, 8 + rand() * 28, 5 + rand() * 20, rand() * Math.PI, 0, Math.PI * 2);
+                        tCtx.fill();
+                    }
+
+                    // Wind-swept sand ripples for desert/snow
+                    if (!isCity && !isJungle) {
+                        for (let y = 0; y < 512; y += 8) {
+                            tCtx.strokeStyle = (y % 16 === 0) ? 'rgba(140,104,58,0.20)' : 'rgba(255,252,244,0.20)';
+                            tCtx.lineWidth = 1.6;
+                            tCtx.beginPath();
+                            for (let x = 0; x <= 512; x += 16) {
+                                const yy = y + Math.sin(x * 0.049 + y * 0.08) * 2.4;
+                                if (x === 0) tCtx.moveTo(x, yy); else tCtx.lineTo(x, yy);
+                            }
+                            tCtx.stroke();
+                        }
+                    }
+
+                    // Crisp high-frequency pebbles, gravel & mineral speckles
+                    for (let i = 0; i < 6500; i++) {
+                        const px = rand() * 512, py = rand() * 512;
+                        const r = 0.5 + rand() * 1.9;
+                        tCtx.fillStyle = rand() > 0.45
+                            ? (isSnow ? 'rgba(150,170,190,0.28)' : 'rgba(78,58,36,0.28)')
+                            : 'rgba(255,255,255,0.24)';
+                        tCtx.beginPath();
+                        tCtx.arc(px, py, r, 0, Math.PI * 2);
+                        tCtx.fill();
+                    }
+
+                    terrainTexture = new THREE.CanvasTexture(tileCanvas);
+                    terrainTexture.wrapS = terrainTexture.wrapT = THREE.RepeatWrapping;
+                    terrainTexture.repeat.set(54, 54);
+                    terrainTexture.minFilter = THREE.LinearMipmapLinearFilter;
+                    terrainTexture.magFilter = THREE.LinearFilter;
+                    terrainTexture.generateMipmaps = true;
+                }
+            } else {
+                terrainTexture = createTerrainTextureForMap(mapType);
+            }
+
+            // Sample official aerial TGA layout (roads, oases, cliff rims) smoothly into vertexColors + minimap
+            if (officialMap && !isCustom && officialMap.tgaDataUrl && typeof document !== 'undefined') {
+                const aerialImg = new Image();
+                aerialImg.onload = function() {
+                    const aSize = 256;
+                    const aCan = document.createElement('canvas');
+                    aCan.width = aCan.height = aSize;
+                    const aCtx = aCan.getContext('2d');
+                    aCtx.drawImage(aerialImg, 0, 0, aSize, aSize);
+                    const aData = aCtx.getImageData(0, 0, aSize, aSize).data;
+                    const cAttr = geo.attributes.color;
+                    if (cAttr) {
+                        for (let i = 0; i < posAttr.count; i++) {
+                            const vx = posAttr.getX(i);
+                            const vz = posAttr.getZ(i);
+                            const u = Math.max(0, Math.min(1, (vx / mapSize) + 0.5));
+                            const v = Math.max(0, Math.min(1, (vz / mapSize) + 0.5));
+                            const ax = Math.min(aSize - 1, Math.floor(u * (aSize - 1)));
+                            const ay = Math.min(aSize - 1, Math.floor(v * (aSize - 1)));
+                            const aIdx = (ay * aSize + ax) << 2;
+                            // Boost aerial macro contrast slightly so roads/oases pop without washing out
+                            const ar = Math.max(0, Math.min(1, (112 + (aData[aIdx] - 122) * 1.22) / 255));
+                            const ag = Math.max(0, Math.min(1, (110 + (aData[aIdx + 1] - 122) * 1.22) / 255));
+                            const ab = Math.max(0, Math.min(1, (105 + (aData[aIdx + 2] - 122) * 1.20) / 255));
+                            const br = cAttr.getX(i), bg = cAttr.getY(i), bb = cAttr.getZ(i);
+                            cAttr.setXYZ(i, br * 0.30 + ar * 0.70, bg * 0.30 + ag * 0.70, bb * 0.30 + ab * 0.70);
+                        }
+                        cAttr.needsUpdate = true;
+                    }
+                    if (window._minimapTerrainCanvas && typeof currentMapType !== 'undefined' && currentMapType === mapType) {
+                        const mCtx = window._minimapTerrainCanvas.getContext('2d');
+                        mCtx.drawImage(aerialImg, 0, 0, window._minimapTerrainCanvas.width, window._minimapTerrainCanvas.height);
+                    }
+                };
+                aerialImg.src = officialMap.tgaDataUrl;
+            }
 
             if (terrainTexture && 'anisotropy' in terrainTexture) {
                 terrainTexture.anisotropy = 8;
             }
             const terrainMat = new THREE.MeshStandardMaterial({
                 map: terrainTexture,
+                vertexColors: !isCustom,
                 bumpMap: (typeof texBumpConcrete !== 'undefined') ? texBumpConcrete : null,
-                bumpScale: 0.55,
+                bumpScale: 0.45,
                 roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.92,
                 metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
             });
             terrainMesh = new THREE.Mesh(geo, terrainMat);
             terrainMesh.receiveShadow = true;
             scene.add(terrainMesh);
-
-            // High-frequency tiled micro-detail overlay (~22 px/world unit) for crisp close-up ground detail
-            if (typeof document !== 'undefined' && document.createElement) {
-                const detCanvas = document.createElement('canvas');
-                detCanvas.width = detCanvas.height = 512;
-                const dCtx = detCanvas.getContext && detCanvas.getContext('2d');
-                if (dCtx) {
-                    dCtx.fillStyle = '#e8e8e8';
-                    dCtx.fillRect(0, 0, 512, 512);
-                    const isDesertTheme = (effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert');
-                    const isSnowTheme = (effectiveTheme === 'snow');
-                    const isCityTheme = (effectiveTheme === 'city');
-                    // Deterministic pseudo-random crisp pebbles, ripples & grain
-                    let seed = 1337;
-                    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-                    if (isDesertTheme) {
-                        for (let y = 0; y < 512; y += 8) {
-                            dCtx.strokeStyle = (y % 16 === 0) ? 'rgba(180,165,135,0.28)' : 'rgba(255,250,238,0.22)';
-                            dCtx.lineWidth = 2;
-                            dCtx.beginPath();
-                            for (let x = 0; x <= 512; x += 16) {
-                                const yy = y + Math.sin(x * 0.049 + y * 0.08) * 2.5;
-                                if (x === 0) dCtx.moveTo(x, yy); else dCtx.lineTo(x, yy);
-                            }
-                            dCtx.stroke();
-                        }
-                    }
-                    for (let i = 0; i < 4200; i++) {
-                        const px = rand() * 512, py = rand() * 512;
-                        const r = 0.6 + rand() * (isCityTheme ? 1.4 : 2.2);
-                        dCtx.fillStyle = rand() > 0.45
-                            ? (isSnowTheme ? 'rgba(195,210,225,0.25)' : 'rgba(115,105,90,0.26)')
-                            : 'rgba(255,255,255,0.20)';
-                        dCtx.beginPath();
-                        dCtx.arc(px, py, r, 0, Math.PI * 2);
-                        dCtx.fill();
-                    }
-                    const detTex = new THREE.CanvasTexture(detCanvas);
-                    detTex.wrapS = detTex.wrapT = THREE.RepeatWrapping;
-                    detTex.repeat.set(64, 64);
-                    detTex.anisotropy = 8;
-                    const detMat = new THREE.MeshStandardMaterial({
-                        map: detTex,
-                        transparent: true,
-                        opacity: 0.55,
-                        blending: THREE.MultiplyBlending,
-                        roughness: 0.95,
-                        depthWrite: false,
-                        polygonOffset: true,
-                        polygonOffsetFactor: -1,
-                        polygonOffsetUnits: -1
-                    });
-                    const detMesh = new THREE.Mesh(geo, detMat);
-                    detMesh.position.y = 0.03;
-                    detMesh.receiveShadow = true;
-                    scene.add(detMesh);
-                    window.terrainDetailMesh = detMesh;
-                }
-            }
 
             // 3. Water Body (per-map waterLevel on official maps so river/lake maps render water while dry canyons stay passable)
             mapBridges.length = 0; // Clear previous bridges
