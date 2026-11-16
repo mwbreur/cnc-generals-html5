@@ -280,7 +280,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             }
         } else if (upper.includes('TREAD') || upper.includes('TRACK') || upper.includes('WHEEL') || upper.includes('TIRE')) {
             mat = treadMat;
-        } else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON') || upper.includes('EXHAUST')) {
+        } else if ((upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON') || upper.includes('EXHAUST')) && modelKey !== 'paladin') {
             mat = metalMat;
         } else if (upper.includes('GLASS') || upper.includes('WINDOW')) {
             mat = glassMat;
@@ -333,10 +333,74 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const r2 = root.getObjectByName('PROPELLER02') || root.getObjectByName('avchinook.props02');
         if (r2) r2.name = 'chinook_rotor2';
     } else if (modelKey === 'paladin') {
+        const chassisGrp = root.getObjectByName('CHASSIS') || root;
         const turretGrp = root.getObjectByName('turretSystem') || root;
-        const hatch = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.9, 3.6), houseMat);
-        hatch.position.set(0, 2.3, -2.5);
-        turretGrp.add(hatch);
+        const barrelGrp = root.getObjectByName('BARREL01') || turretGrp;
+
+        // Blue/team-color tapered muzzle brake at cannon tip
+        const muzzleBrake = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.32, 4.6, 12), houseMat);
+        muzzleBrake.rotation.x = Math.PI / 2;
+        muzzleBrake.position.set(-0.08, -0.02, 11.4);
+        muzzleBrake.castShadow = true;
+        barrelGrp.add(muzzleBrake);
+
+        const muzzleBore = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.72, 0.7, 10), metalMat);
+        muzzleBore.rotation.x = Math.PI / 2;
+        muzzleBore.position.set(-0.08, -0.02, 13.75);
+        barrelGrp.add(muzzleBore);
+
+        // Side-skirt team-color armor trim bars along both hull sides
+        [-10.25, 10.25].forEach(sx => {
+            const skirtTrim = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.95, 22.0), houseMat);
+            skirtTrim.position.set(sx, -0.15, -1.2);
+            skirtTrim.castShadow = true;
+            chassisGrp.add(skirtTrim);
+        });
+
+        // Turret side smoke-grenade launchers / team-color pods
+        [-7.85, 7.85].forEach(tx => {
+            for (let si = 0; si < 3; si++) {
+                const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 1.6, 8), houseMat);
+                pod.rotation.z = Math.PI / 2;
+                pod.position.set(tx, 0.55, -5.2 - si * 1.55);
+                turretGrp.add(pod);
+            }
+        });
+
+        // Commander cupola with team-color collar on forward turret roof
+        const cupolaBase = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.3, 0.9, 12), houseMat);
+        cupolaBase.position.set(-2.6, 2.75, 2.4);
+        turretGrp.add(cupolaBase);
+        const cupolaCap = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.1, 0.35, 12), metalMat);
+        cupolaCap.position.set(-2.6, 3.3, 2.4);
+        turretGrp.add(cupolaCap);
+
+        // Point Defense Laser (PDL) turret pod on rear turret roof
+        const pdlCollar = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.65, 0.95, 12), houseMat);
+        pdlCollar.position.set(-0.1, 2.85, -9.1);
+        turretGrp.add(pdlCollar);
+
+        const pdlHousing = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.7, 3.2), metalMat);
+        pdlHousing.position.set(-0.1, 4.15, -9.2);
+        pdlHousing.rotation.x = -0.22;
+        pdlHousing.castShadow = true;
+        turretGrp.add(pdlHousing);
+
+        const pdlLens = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.42, 0.42, 0.4, 10),
+            typeof matIonBlue !== 'undefined' ? matIonBlue : glassMat
+        );
+        pdlLens.rotation.x = Math.PI / 2 - 0.22;
+        pdlLens.position.set(-0.1, 4.35, -7.55);
+        turretGrp.add(pdlLens);
+
+        // Dual rear radio antennas angled backward
+        [-6.6, 6.6].forEach(ax => {
+            const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 9.5, 6), metalMat);
+            ant.position.set(ax, 6.2, -13.8);
+            ant.rotation.x = -0.32;
+            turretGrp.add(ant);
+        });
     } else if (modelKey === 'raptor' || modelKey === 'aurora') {
         const stripeL = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.35, 3.2), houseMat);
         stripeL.position.set(-10.5, 0.6, -4.0);
