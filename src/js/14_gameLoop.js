@@ -961,8 +961,8 @@ function animate() {
                 if (s.dozerRef && s.dozerRef.health > 0) {
                     const dPos = s.dozerRef.mesh.position;
                     const dist2D = Math.hypot(dPos.x - s.position.x, dPos.z - s.position.z);
-                    const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 2.5;
-                    if (dist2D <= buildThreshold) {
+                    const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 3.5;
+                    if (s.dozerRef.taskState === 'Building' || dist2D <= buildThreshold) {
                         s.dozerRef.taskState = 'Building';
                         const buildRate = (s.type === 'supplyDrop') ? (100 / 2700) : 0.35; // 45s build time for Supply Drop Zone
                         s.buildProgress += buildRate * combatDeltaScale;
