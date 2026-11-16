@@ -3221,7 +3221,7 @@ function upgradeDecoyToRealStructure(structure) {
 
 function triggerReconnaissanceScan(abilityId) {
     const targetPos = (typeof camera !== 'undefined' && camera.position) ? new THREE.Vector3(camera.position.x, 0, camera.position.z) : new THREE.Vector3(0, 0, 0);
-    if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(targetPos, 45, 900);
+    if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(targetPos, 110, 900);
     playUSASound('radio_chirp');
     showNotification(`${abilityId === 'spyDrone' ? 'Spy Drone' : 'Radar Van'} recon scan active over operational theater!`, 'info');
 }
@@ -4083,14 +4083,28 @@ const GENERALS_UNIT_POWER_GATE = {
     hijacker: 'hijackerUnlock'
 };
 
+const STARTING_GENERALS_POWERS = {
+    usa: [
+        { id: 'spySatellite', rank: 0, kind: 'active', cooldownTicks: 1800, cameo: 'spySatellite', label: 'RADAR SCAN', name: 'Spy Satellite Scan', desc: 'Orbital radar scan that reveals a large sector of the battlefield and detects stealth units.' }
+    ]
+};
+
 function getActiveFactionPowersTree(facOverride) {
     const fac = (facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
     return GENERALS_POWERS_TREES[fac] || GENERALS_POWERS_TREES.usa;
 }
 
 function getGeneralPowerDef(powerId, facOverride) {
+    const fac = (facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
+    const startList = STARTING_GENERALS_POWERS[fac] || [];
+    let found = startList.find(p => p.id === powerId);
+    if (found) return found;
+    for (const sList of Object.values(STARTING_GENERALS_POWERS)) {
+        found = sList.find(p => p.id === powerId);
+        if (found) return found;
+    }
     const tree = getActiveFactionPowersTree(facOverride);
-    let found = tree.find(p => p.id === powerId);
+    found = tree.find(p => p.id === powerId);
     if (found) return found;
     for (const list of Object.values(GENERALS_POWERS_TREES)) {
         found = list.find(p => p.id === powerId);
@@ -4283,7 +4297,8 @@ function renderGeneralPowersBar(facOverride) {
     if (!gpBar) return;
     const fac = (facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
     const tree = getActiveFactionPowersTree(fac);
-    const activePowers = tree.filter(p => p.kind === 'active' && unlockedGeneralsPowers.has(p.id));
+    const startingPowers = STARTING_GENERALS_POWERS[fac] || [];
+    const activePowers = [...startingPowers, ...tree.filter(p => p.kind === 'active' && unlockedGeneralsPowers.has(p.id))];
     const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
 
     let html = `
@@ -4341,7 +4356,8 @@ function executeGeneralsPowerAt(pos) {
     const pseudoAttacker = (typeof units !== 'undefined' && units[0]) || { teamId: typeof playerTeamId !== 'undefined' ? playerTeamId : 1 };
 
     if (p === 'spySatellite' || p === 'spyDrone') {
-        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, 42, p === 'spyDrone' ? 3600 : 1800);
+        const scanRadius = p === 'spySatellite' ? 125 : 85;
+        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, scanRadius, p === 'spyDrone' ? 3600 : 1800);
         if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00ffff, 3.5);
         if (typeof spawnUnit === 'function' && p === 'spyDrone') {
             const drone = spawnUnit('drone_scout', pos.clone());
