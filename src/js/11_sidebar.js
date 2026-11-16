@@ -2100,9 +2100,27 @@ function getCameoImg(id, name, faction) {
         'hellfiredrone': 'drone_hellfire',
         'bunkertower': 'overlord_bunker',
         'gatlingtower': 'overlord_gatling',
-        'propaganda': 'overlord_propaganda',
-        'outriggers': 'nukecannon',
+        'propaganda': 'overlord_speaker',
+        'propagandatower': 'overlord_speaker',
+        'outriggers': 'outriggers',
+        'packoutriggers': 'outriggers',
         'neutronshells': 'neutronShells',
+        'ammoneutron': 'neutronShells',
+        'ammonuclear': 'nukeWarhead',
+        'timedc4': 'timedC4',
+        'c4': 'timedC4',
+        'remotedemo': 'remoteC4',
+        'remotec4': 'remoteC4',
+        'detonatecharges': 'detonateCharges',
+        'snipedriver': 'snipeDriver',
+        'cyberhack': 'captureHack',
+        'lotushack': 'captureHack',
+        'hackinternet': 'satHack1',
+        'hacking': 'satHack1',
+        'detonate': 'detonate',
+        'highexplosive': 'highExplosive',
+        'biobomb': 'bioBomb',
+        'flamewall': 'flameWall',
         // Structures
         'center': 'commandCenter',
         'commandcenter': 'commandCenter',
@@ -2169,7 +2187,8 @@ function getCameoImg(id, name, faction) {
         'stop': 'stop',
         'guard': 'guard',
         'scatter': 'scatter',
-        'move': 'move',
+        'move': 'attack',
+        'evacuate': 'ungarrison',
         'harvest': 'supplyCenter',
         'repair': 'repair',
         'repairmode': 'repair',
@@ -2188,7 +2207,8 @@ function getCameoImg(id, name, faction) {
         'selecttrucks': fac === 'china' ? 'truck_china' : fac === 'gla' ? 'worker' : 'chinook',
         'dispatchall': 'tech_supplyDock'
     };
-    const resolved = cameoMap[rawKey] || id || rawKey;
+    const normKey = rawKey.replace(/^evacuate\d*$/, 'evacuate');
+    const resolved = cameoMap[normKey] || cameoMap[rawKey] || id || rawKey;
     if (window.OFFICIAL_CAMEOS) {
         const facKey = `${resolved}_${fac}`;
         const src = window.OFFICIAL_CAMEOS[facKey] || window.OFFICIAL_CAMEOS[resolved] || window.OFFICIAL_CAMEOS[rawKey];
@@ -3443,7 +3463,7 @@ function updateHUD() {
 
             // Overlord Propaganda Tower healing
             units.forEach(u => {
-                if (u.type === 'overlord' && u.overlordUpgrade === 'speaker' && u.health > 0 && u.mesh) {
+                if (u.type === 'overlord' && (u.overlordUpgrade === 'speaker' || u.overlordUpgrade === 'propaganda') && u.health > 0 && u.mesh) {
                     const ovHeal = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal')) ? 4 : 2;
                     units.forEach(nearby => {
                         if (nearby.health > 0 && nearby.health < nearby.maxHealth && nearby.mesh && nearby.mesh.position.distanceTo(u.mesh.position) < 24) {
@@ -3850,23 +3870,23 @@ const GENERALS_POWERS_TREES = {
         { id: 'spyDrone', rank: 1, kind: 'active', cooldownTicks: 2700, cameo: 'spyDrone', label: 'SPY DRONE', name: 'Spy Drone', desc: 'Deploys a permanent airborne recon drone that reveals fog and stealth at target coordinates.' },
         // Level 3
         { id: 'pathfinderUnlock', rank: 3, kind: 'unlock', unit: 'pathfinder', cameo: 'pathfinder', label: 'PATHFINDER', name: 'Pathfinder', desc: 'Unlocks the stealthy long-range Pathfinder anti-infantry sniper at the Barracks.' },
-        { id: 'paradrop', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'ranger', label: 'PARADROP', name: 'Ranger Paradrop', desc: 'Drops a squad of 4 Ranger infantry directly onto target coordinates anywhere on the map.' },
+        { id: 'paradrop', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'paratroopers', label: 'PARADROP', name: 'Ranger Paradrop', desc: 'Drops a squad of 4 Ranger infantry directly onto target coordinates anywhere on the map.' },
         { id: 'a10Strike', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'a10Strike', label: 'A-10 STRIKE', name: 'A-10 Strike', desc: 'Orders A-10 Thunderbolt II jets to strafe target coordinates with cannons and missiles.' },
         { id: 'emergencyRepair', rank: 3, kind: 'active', cooldownTicks: 3600, cameo: 'emergencyRepair', label: 'REPAIR', name: 'Emergency Repair', desc: 'Rapidly repairs and heals all friendly vehicles and structures in a wide target area.' },
         // Level 5
         { id: 'fuelAirBomb', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'fuelAirBomb', label: 'DAISY CUTTER', name: 'Fuel Air Bomb', desc: 'Drops a massive thermobaric bomb that incinerates units and flattens structures in a wide radius.' },
-        { id: 'leafletDrop', rank: 5, kind: 'active', cooldownTicks: 7200, cameo: 'spySatellite', label: 'LEAFLETS', name: 'Leaflet Drop', desc: 'Drops surrender leaflets over enemy forces, temporarily disabling enemy units & defenses for 12s.' },
+        { id: 'leafletDrop', rank: 5, kind: 'active', cooldownTicks: 7200, cameo: 'leafletDrop', label: 'LEAFLETS', name: 'Leaflet Drop', desc: 'Drops surrender leaflets over enemy forces, temporarily disabling enemy units & defenses for 12s.' },
         { id: 'spectreGunship', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'spectreGunship', label: 'SPECTRE', name: 'Spectre Gunship', desc: 'Summons an AC-130 Spectre Gunship that circles and heavily bombards a target zone for 12s.' }
     ],
     china: [
         // Level 1
-        { id: 'redGuardTraining', rank: 1, kind: 'passive', cameo: 'redguard', label: 'RED GUARD+', name: 'Red Guard Training', desc: 'All current and future Red Guard infantry start at Veteran Rank (+20% HP & faster training).' },
+        { id: 'redGuardTraining', rank: 1, kind: 'passive', cameo: 'redGuardTraining', label: 'RED GUARD+', name: 'Red Guard Training', desc: 'All current and future Red Guard infantry start at Veteran Rank (+20% HP & faster training).' },
         { id: 'nukeCannonUnlock', rank: 1, kind: 'unlock', unit: 'nukecannon', cameo: 'nukecannon', label: 'NUKE CANNON', name: 'Nuke Cannon', desc: 'Unlocks the long-range tactical Nuclear Cannon at the War Factory.' },
         // Level 3
         { id: 'clusterMines', rank: 3, kind: 'active', cooldownTicks: 4500, cameo: 'clusterMines', label: 'MINES', name: 'Cluster Mines', desc: 'Airdrops a field of anti-tank and anti-personnel cluster mines at target coordinates.' },
         { id: 'carpetBomber', rank: 3, kind: 'active', cooldownTicks: 6300, cameo: 'carpetBomb', label: 'CARPET BOMB', name: 'Carpet Bomber', desc: 'Calls in a heavy bomber fleet to drop a devastating line of bombs across the target zone.' },
         { id: 'artilleryBarrage', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'artilleryBarrage', label: 'ARTILLERY', name: 'Artillery Barrage', desc: 'Calls down a sustained off-map 152mm artillery shell rain onto target coordinates.' },
-        { id: 'cashHack', rank: 3, kind: 'active', cooldownTicks: 7200, cameo: 'hacker', label: 'CASH HACK', name: 'Cash Hack', desc: 'Siphons $1,500 directly from enemy supply/command networks into your treasury.' },
+        { id: 'cashHack', rank: 3, kind: 'active', cooldownTicks: 7200, cameo: 'networkHack', label: 'CASH HACK', name: 'Cash Hack', desc: 'Siphons $1,500 directly from enemy supply/command networks into your treasury.' },
         { id: 'frenzy', rank: 3, kind: 'active', cooldownTicks: 4500, cameo: 'frenzy', label: 'FRENZY', name: 'Frenzy', desc: 'Temporarily boosts speed, fire rate, and damage (+30%) of friendly Chinese units in an area for 15s.' },
         // Level 5
         { id: 'empPulse', rank: 5, kind: 'active', cooldownTicks: 8100, cameo: 'empPulse', label: 'EMP PULSE', name: 'EMP Pulse', desc: 'Detonates an electromagnetic pulse disabling enemy vehicles and defenses in radius for 12s.' }
@@ -3875,7 +3895,7 @@ const GENERALS_POWERS_TREES = {
         // Level 1
         { id: 'scudUnlock', rank: 1, kind: 'unlock', unit: 'scud', cameo: 'scud', label: 'SCUD LNCH', name: 'SCUD Launcher', desc: 'Unlocks the tactical ballistic SCUD Launcher at the Arms Dealer.' },
         { id: 'marauderUnlock', rank: 1, kind: 'unlock', unit: 'marauder', cameo: 'marauder', label: 'MARAUDER', name: 'Marauder Tank', desc: 'Unlocks the salvage-upgradable Marauder Battle Tank at the Arms Dealer.' },
-        { id: 'technicalTraining', rank: 1, kind: 'passive', cameo: 'technical', label: 'TECH TRN', name: 'Technical Training', desc: 'All current and future Technicals gain Veteran Rank (+20% HP & +15% speed).' },
+        { id: 'technicalTraining', rank: 1, kind: 'passive', cameo: 'technicalTraining', label: 'TECH TRN', name: 'Technical Training', desc: 'All current and future Technicals gain Veteran Rank (+20% HP & +15% speed).' },
         // Level 3
         { id: 'hijackerUnlock', rank: 3, kind: 'unlock', unit: 'hijacker', cameo: 'hijacker', label: 'HIJACKER', name: 'Hijacker', desc: 'Unlocks the stealthy Hijacker operative at the Barracks to commandeer enemy vehicles.' },
         { id: 'rebelAmbush', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'rebelAmbush', label: 'AMBUSH', name: 'Rebel Ambush', desc: 'Surfaces a hidden guerrilla squad of 5 Rebel fighters anywhere on the map.' },

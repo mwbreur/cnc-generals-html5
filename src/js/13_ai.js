@@ -72,12 +72,14 @@ function classifyPathfindPosition(wx, wz, ignoreStruct = null, extraClearance = 
     const h = (typeof getTerrainHeight === 'function') ? getTerrainHeight(wx, wz) : 0;
     if (h < waterLvl + 0.15) return PATHFIND_CELL_TYPES.WATER;
 
-    // Check slope/cliff passability
+    // Check slope/cliff passability (symmetric +d / -d on X and Z)
     if (typeof getTerrainHeight === 'function') {
         const d = 2.5;
-        const hX = getTerrainHeight(wx + d, wz);
-        const hZ = getTerrainHeight(wx, wz + d);
-        if (Math.abs(hX - h) / d > 1.35 || Math.abs(hZ - h) / d > 1.35) {
+        const hXp = getTerrainHeight(wx + d, wz);
+        const hXm = getTerrainHeight(wx - d, wz);
+        const hZp = getTerrainHeight(wx, wz + d);
+        const hZm = getTerrainHeight(wx, wz - d);
+        if (Math.abs(hXp - h) / d > 1.35 || Math.abs(hXm - h) / d > 1.35 || Math.abs(hZp - h) / d > 1.35 || Math.abs(hZm - h) / d > 1.35) {
             return PATHFIND_CELL_TYPES.CLIFF;
         }
     }
@@ -620,8 +622,12 @@ function evaluateEnemyThreatProfile(cmd, hostileUnits) {
 window.evaluateEnemyThreatProfile = evaluateEnemyThreatProfile;
 
 // Distance-Weighted Target Attack Priority (AI.h AttackPriorityDistanceModifier)
+const AI_AA_CAPABLE_TYPES = new Set(['gatling', 'quad', 'patriot', 'stingerSite', 'avenger', 'missiledefender', 'tankhunter', 'rpg', 'raptor', 'mig', 'comanche', 'stealthfighter', 'humvee']);
 function scoreAITargetPriority(attacker, target, cmd = null) {
     if (!attacker || !target || target.health <= 0) return -Infinity;
+    if (target.isAir && !AI_AA_CAPABLE_TYPES.has(attacker.type) && !(attacker.type === 'overlord' && attacker.overlordUpgrade === 'gatling')) {
+        return -Infinity;
+    }
     const aPos = attacker.position || (attacker.mesh && attacker.mesh.position) || { x: 0, z: 0 };
     const tPos = target.position || (target.mesh && target.mesh.position) || { x: 0, z: 0 };
     const dist = Math.hypot(tPos.x - aPos.x, tPos.z - aPos.z);
@@ -829,8 +835,14 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-22, 0, -18) },
         { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(22, 0, -18) },
         { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-22, 0, 20) },
-        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(24, 0, 20) }
+        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(24, 0, 20) },
+        { check: s => s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace', build: f === 'china' ? 'propagandaCenter' : f === 'gla' ? 'palace' : 'strategyCenter', cost: 1500, offset: new THREE.Vector3(-28, 0, 0) }
     ];
+    if (cmd.difficulty !== 'easy') {
+        essentialList.push(
+            { check: s => s.type === 'particleCannon' || s.type === 'nukeSilo' || s.type === 'scudStorm', build: f === 'china' ? 'nukeSilo' : f === 'gla' ? 'scudStorm' : 'particleCannon', cost: 2500, offset: new THREE.Vector3(28, 0, 0) }
+        );
+    }
 
     for (let item of essentialList) {
         if (f === 'gla' && (item.build === 'power' || item.build === 'nuclearReactor')) continue;
@@ -1094,8 +1106,12 @@ function processEnemyAIEngine() {
             // Hold in staging rally area until wave is full or offensive grace expires
             const isStaging = cmd.stagingTeam.includes(enemy.netId) && !enemy._releasedForAttack;
             if (!canLaunchOffensive || isStaging || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
-                if (enemy.mesh.position.distanceTo(cmd.rallyPoint) > 14) {
-                    enemy.targetPosition.copy(cmd.rallyPoint);
+                const slotIdx = (enemy.netId || 1);
+                const slotAng = (slotIdx % 12) * (Math.PI * 2 / 12);
+                const slotR = 5.5 + ((slotIdx >> 2) % 3) * 4.5;
+                const stagedSpot = new THREE.Vector3(cmd.rallyPoint.x + Math.cos(slotAng) * slotR, cmd.rallyPoint.y || 0, cmd.rallyPoint.z + Math.sin(slotAng) * slotR);
+                if (enemy.mesh.position.distanceTo(stagedSpot) > 5) {
+                    enemy.targetPosition.copy(stagedSpot);
                     enemy.taskState = 'Moving';
                 }
                 return;
@@ -1119,7 +1135,7 @@ function processEnemyAIEngine() {
             if (!bestTarget && cmd.discoveredEnemyBases.length > 0) {
                 const targetBase = cmd.discoveredEnemyBases[0];
                 const d = enemy.mesh.position.distanceTo(targetBase.position);
-                if (d > enemy.scanRange) {
+                if (d > enemy.scanRange && (!enemy.waypoints || enemy.waypoints.length === 0)) {
                     const navPath = (!enemy.isAir && typeof findNavigationPath === 'function')
                         ? findNavigationPath(enemy.mesh.position, targetBase.position)
                         : [targetBase.position.clone()];
@@ -1138,18 +1154,21 @@ function processEnemyAIEngine() {
                 const targetPos = bestTarget.position || bestTarget.mesh.position;
                 const distToBest = enemy.mesh.position.distanceTo(targetPos);
                 if (distToBest > enemy.scanRange) {
-                    const approachDir = new THREE.Vector3().subVectors(targetPos, enemy.mesh.position).normalize();
-                    const goalPos = targetPos.clone().addScaledVector(approachDir, -(enemy.scanRange - 3));
-                    const navPath = (!enemy.isAir && typeof findNavigationPath === 'function')
-                        ? findNavigationPath(enemy.mesh.position, goalPos, { ignoreStruct: bestTarget })
-                        : [goalPos];
-                    if (navPath.length > 1) {
-                        enemy.waypoints = navPath.slice(1);
-                        enemy.targetPosition.copy(navPath[0]);
-                    } else {
-                        enemy.targetPosition.copy(goalPos);
+                    if (!enemy.waypoints || enemy.waypoints.length === 0) {
+                        const approachDir = new THREE.Vector3().subVectors(targetPos, enemy.mesh.position).normalize();
+                        const goalPos = targetPos.clone().addScaledVector(approachDir, -(enemy.scanRange - 3));
+                        const navPath = (!enemy.isAir && typeof findNavigationPath === 'function')
+                            ? findNavigationPath(enemy.mesh.position, goalPos, { ignoreStruct: bestTarget })
+                            : [goalPos];
+                        if (navPath.length > 1) {
+                            enemy.waypoints = navPath.slice(1);
+                            enemy.targetPosition.copy(navPath[0]);
+                        } else {
+                            enemy.targetPosition.copy(goalPos);
+                        }
                     }
                 } else {
+                    enemy.waypoints = [];
                     enemy.targetPosition.copy(enemy.mesh.position);
                 }
             }
@@ -1386,6 +1405,7 @@ function processEnemyAIEngine() {
             structure.dozerRef = builder;
             builder.targetStructure = structure;
             builder.taskState = 'MovingToBuild';
+            if (builder.aiState) builder.aiState = 'Idle';
             builder._boredTimer = 0;
             const perimeterPoint = getStructureBuildPerimeterPoint(builder, structure);
             builder.targetPosition.copy(perimeterPoint);
@@ -1398,6 +1418,20 @@ function processEnemyAIEngine() {
                 if (route && route.length > 0) {
                     builder.targetPosition.copy(route[0]);
                     builder.waypoints = route.slice(1);
+                } else {
+                    const dx = perimeterPoint.x - builder.mesh.position.x;
+                    const dz = perimeterPoint.z - builder.mesh.position.z;
+                    const d = Math.hypot(dx, dz) || 1;
+                    const sideSign = ((builder.netId || 1) % 2 === 0 ? 1 : -1);
+                    const detour = new THREE.Vector3(
+                        builder.mesh.position.x + (dx * 0.5 - dz * 0.4 * sideSign),
+                        perimeterPoint.y || 0,
+                        builder.mesh.position.z + (dz * 0.5 + dx * 0.4 * sideSign)
+                    );
+                    if (d > 12) {
+                        builder.targetPosition.copy(detour);
+                        builder.waypoints = [perimeterPoint.clone()];
+                    }
                 }
             } else if (typeof findBridgeCrossingsForPath === 'function' && builder.mesh) {
                 const bridges = findBridgeCrossingsForPath(builder.mesh.position, builder.targetPosition, structure);

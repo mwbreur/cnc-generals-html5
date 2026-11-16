@@ -482,6 +482,9 @@
                 demoTrap: [
                     { id: 'camoNetting', name: 'CAMO NETTING', cost: 400, isAddon: true, desc: 'Conceals the Demo Trap with stealth netting until detonation.' }
                 ],
+                fakeCommandCenter: [
+                    { id: 'upgradeToReal', name: 'UPGRADE TO REAL COMMAND CENTER', cost: 1500, isAddon: true, desc: 'Converts this decoy fake command center into a real functional Command Center.' }
+                ],
                 fakeBarracks: [
                     { id: 'upgradeToReal', name: 'UPGRADE TO REAL BARRACKS', cost: 200, isAddon: true, desc: 'Converts this decoy fake barracks into a real functional Barracks.' }
                 ],
@@ -506,7 +509,7 @@
             gla: [
                 ['barracks', 'Barracks', 400], ['factory', 'Arms Dealer', 700], ['supplyStash', 'Supply Stash', 500],
                 ['blackMarket', 'Black Market', 1200], ['tunnel', 'Tunnel Network', 700], ['stingerSite', 'Stinger Site', 700],
-                ['demoTrap', 'Demo Trap', 300], ['palace', 'Palace', 1500], ['fakeBarracks', 'Fake Barracks', 200],
+                ['demoTrap', 'Demo Trap', 300], ['palace', 'Palace', 1500], ['fakeCommandCenter', 'Fake Command Center', 500], ['fakeBarracks', 'Fake Barracks', 200],
                 ['fakeArmsDealer', 'Fake Arms Dealer', 350], ['scudStorm', 'SCUD Storm', 2500]
             ]
         };
@@ -576,7 +579,10 @@
                 internetCenter: [20, 9, 18], propagandaCenter: [22, 10, 20], bunker: [14, 8, 14], gatlingCannon: [12, 9, 12],
                 speakerTower: [10, 12, 10], nukeSilo: [24, 14, 24], supplyStash: [18, 9, 18], blackMarket: [20, 9, 18],
                 tunnel: [16, 8, 16], stingerSite: [12, 9, 12], demoTrap: [6, 2, 6], palace: [26, 12, 22],
-                fakeBarracks: [18, 9, 18], fakeArmsDealer: [26, 10, 22], scudStorm: [26, 14, 26]
+                fakeCommandCenter: [
+                    { id: 'upgradeToReal', name: 'UPGRADE TO REAL COMMAND CENTER', cost: 1500, isAddon: true, desc: 'Converts this decoy fake command center into a real functional Command Center.' }
+                ],
+                fakeCommandCenter: [26, 12, 24], fakeBarracks: [18, 9, 18], fakeArmsDealer: [26, 10, 22], scudStorm: [26, 14, 26]
             };
             const [baseW, baseH, baseD] = sizes[type] || [16, 8, 16];
             const width = baseW;

@@ -14,8 +14,10 @@ function resolveObstacleCollisions(unit) {
     const isDeliveringHarvester = (unit.type === 'truck' || unit.type === 'worker') && (unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing');
     const dropoffPos = isDeliveringHarvester ? getSupplyDropoffPosition(unit.mesh.position) : null;
 
-    // 1. Structure Collisions
-    for (let s of structures) {
+    // 1. Structure Collisions (check both player and AI structures)
+    const structLists = (typeof enemyStructures !== 'undefined' && enemyStructures.length > 0) ? [structures, enemyStructures] : [structures];
+    for (let sList of structLists) {
+    for (let s of sList) {
         if (s.health <= 0) continue;
         // Allow assigned builder to reach foundation or repair perimeter
         if (unit.targetStructure === s && (unit.taskState === 'Building' || unit.taskState === 'MovingToBuild' || unit.taskState === 'Repairing' || unit.taskState === 'MovingToRepair')) continue;
@@ -61,6 +63,7 @@ function resolveObstacleCollisions(unit) {
                         }
                     }
                 }
+            }
             }
 
             // Pinch Resolution: If squeezed between multiple structures, pop out into open clearance

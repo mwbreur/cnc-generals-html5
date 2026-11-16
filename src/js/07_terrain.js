@@ -820,7 +820,39 @@
                 });
             }
 
-            // 3. Ambient thematic props
+            // 3. Map props: use authentic EA ObjectsList props on official maps (no random procedural clutter!)
+            const offMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType];
+            if (offMap && !activeCustomMap && Array.isArray(offMap.props) && offMap.props.length > 0) {
+                offMap.props.forEach(p => {
+                    const x = p[0] * mapSize;
+                    const z = p[1] * mapSize;
+                    const kind = p[2];
+                    const y = getTerrainHeight(x, z);
+                    if (y < currentWaterLevel + 0.3) return;
+                    if (kind === 'palm') {
+                        const palm = createPalmTreeMesh();
+                        palm.position.set(x, y, z);
+                        mapPropsGroup.add(palm);
+                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.6 });
+                    } else if (kind === 'tree') {
+                        const tree = (theme === 'snow') ? createSnowPineMesh() : createJungleTreeMesh();
+                        tree.position.set(x, y, z);
+                        mapPropsGroup.add(tree);
+                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
+                    } else if (kind === 'bush') {
+                        const bush = createJungleTreeMesh();
+                        bush.scale.set(0.5, 0.45, 0.5);
+                        bush.position.set(x, y, z);
+                        mapPropsGroup.add(bush);
+                    } else if (kind === 'rock') {
+                        const rockCol = theme === 'snow' ? 0xbdc3c7 : theme === 'jungle' ? 0x5d6d5a : 0x8a775b;
+                        const rock = createRockMesh(rockCol);
+                        rock.position.set(x, y + 0.4, z);
+                        mapPropsGroup.add(rock);
+                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
+                    }
+                });
+            } else {
             const count = activeCustomMap
                 ? Math.min(32, Math.floor(mapSize * 0.035))
                 : (mapSize > 1000 ? 110 : mapSize > 600 ? 75 : 45);
@@ -929,9 +961,10 @@
                     }
                 }
             }
+            }
 
-            // 4. Default Bridges for Preset Maps (only if not a custom map)
-            if (!activeCustomMap) {
+            // 4. Default Bridges for Preset Maps (only if not a custom map and not an official EA dry-valley map)
+            if (!activeCustomMap && !offMap) {
                 if (currentMapType === 'jungle') {
                     const x1 = -mapSize * 0.24;
                     const z1 = Math.sin(x1 * 0.012) * (mapSize * 0.09);

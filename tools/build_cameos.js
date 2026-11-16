@@ -403,6 +403,7 @@ const CAMEO_MAP = {
     'scudStorm': 'SUScudStorm',
     'fakeBarracks': 'SUBarracks_F',
     'fakeArmsDealer': 'SUArmsDealer_F',
+    'fakeCommandCenter': 'SUHeadquarters_F',
 
     // Neutral / Tech Buildings
     'tech_oilDerrick': 'SSTechOilDerrick_L',
@@ -455,11 +456,25 @@ const CAMEO_MAP = {
     'overlord_bunker': 'SSOLBunker',
     'overlord_gatling': 'SSOLGattling',
     'overlord_speaker': 'SSOLSpeaker',
+    'overlord_propaganda': 'SSOLSpeaker',
+    'timedC4': 'SSTimedDemo',
+    'remoteC4': 'SSRemoteDemo',
+    'detonateCharges': 'SSDetonate',
+    'knifeAttack': 'SSKnifeAttack',
+    'snipeDriver': 'SSSniperAttack',
+    'captureHack': 'SSBLCapture',
+    'vehicleHack': 'SSVehicleHack',
+    'flameWall': 'SSFireStorm',
+    'nukeWarhead': 'SSExplosiveScud',
 
     // GLA Upgrades & Abilities
     'radarVanScan': 'SSRadarVanScan',
     'sneakAttack': 'SUSneakAttack',
-    'boobyTrap': 'SUBBTrap',
+    'boobyTrap': 'SNBoobyTrap',
+    'detonate': 'SSTerroristCarBomb',
+    'highExplosive': 'SSExplosiveBombTruck',
+    'bioBomb': 'SSBioBombTruck',
+    'bombDisguise': 'SSBombDisguise',
     'scorpionRocket': 'SSScorpionRocketBuild',
     'fortifiedStructures': 'SUFakeUpgrade',
     'armTheMob': 'SSArmMob',
@@ -491,6 +506,8 @@ const CAMEO_MAP = {
     'anthraxBomb': 'SSAnthraxBomb',
     'emergencyRepair': 'SSRepair',
     'gpsScrambler': 'SUGPS01',
+    'leafletDrop': 'SALeaflet',
+    'technicalTraining': 'SSTechTraining',
 
     // Superweapon Launch Icons
     'superweapon_usa': 'SSParticleFire',
@@ -511,7 +528,10 @@ const CAMEO_MAP = {
     'builders_gla': 'SUWorkerE',
     'beacon': 'SABeacon',
     'garrison': 'SUEnterbldg',
-    'ungarrison': 'SSEvacButton'
+    'ungarrison': 'SSEvacButton',
+    'move': 'SSAttackMove2',
+    'evacuate': 'SSEvacButton',
+    'chinookUnload': 'SSChinookUnload'
 };
 
 const outputCameos = {};

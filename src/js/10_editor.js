@@ -740,16 +740,20 @@
             });
             window.neutralStructures = [];
 
-            const contested = (selectedEnv === 'tournament_desert') ? [
-                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: -360, z: 0, maxHealth: 1500 },
-                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: 360, z: 0, maxHealth: 1500 },
-                { type: 'techHospital', name: 'Tech Hospital', x: 0, z: 0, maxHealth: 1800 }
-            ] : [
-                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: -selectedSize * 0.22, z: selectedSize * 0.18, maxHealth: 1500 },
-                { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: selectedSize * 0.22, z: -selectedSize * 0.18, maxHealth: 1500 },
-                { type: 'techHospital', name: 'Tech Hospital', x: selectedSize * 0.20, z: selectedSize * 0.20, maxHealth: 1800 },
-                { type: 'techRefinery', name: 'Tech Oil Refinery', x: -selectedSize * 0.20, z: -selectedSize * 0.20, maxHealth: 2000 }
-            ];
+            const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[selectedEnv];
+            let contested = [];
+            if (officialMap) {
+                (officialMap.derricks || []).forEach(d => contested.push({ type: 'techOilDerrick', name: 'Tech Oil Derrick', x: d.nx * selectedSize, z: d.nz * selectedSize, maxHealth: 1500 }));
+                (officialMap.hospitals || []).forEach(h => contested.push({ type: 'techHospital', name: 'Tech Hospital', x: h.nx * selectedSize, z: h.nz * selectedSize, maxHealth: 1800 }));
+                (officialMap.refineries || []).forEach(r => contested.push({ type: 'techRefinery', name: 'Tech Oil Refinery', x: r.nx * selectedSize, z: r.nz * selectedSize, maxHealth: 2000 }));
+            } else {
+                contested = [
+                    { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: -selectedSize * 0.22, z: selectedSize * 0.18, maxHealth: 1500 },
+                    { type: 'techOilDerrick', name: 'Tech Oil Derrick', x: selectedSize * 0.22, z: -selectedSize * 0.18, maxHealth: 1500 },
+                    { type: 'techHospital', name: 'Tech Hospital', x: selectedSize * 0.20, z: selectedSize * 0.20, maxHealth: 1800 },
+                    { type: 'techRefinery', name: 'Tech Oil Refinery', x: -selectedSize * 0.20, z: -selectedSize * 0.20, maxHealth: 2000 }
+                ];
+            }
 
             contested.forEach(item => {
                 const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(item.x, item.z) : 0;

@@ -392,8 +392,8 @@ function animate() {
                             if (structure.rallyPoint && newUnit.waypoints.length === 0 && typeof findNavigationPath === 'function') {
                                 const navPath = findNavigationPath(newUnit.mesh.position, slotPos);
                                 if (navPath && navPath.length > 1) {
+                                    newUnit.targetPosition.copy(navPath[0]);
                                     newUnit.waypoints = navPath.slice(1);
-                                    newUnit.targetPosition.copy(newUnit.waypoints.shift());
                                 }
                             }
                         }
@@ -1054,12 +1054,28 @@ function animate() {
                             const dockSlotPos = (typeof getSupplyDockSlotPosition === 'function' && unit.type !== 'chinook')
                                 ? getSupplyDockSlotPosition(unit.supplyTarget, unit, false)
                                 : unit.supplyTarget.position;
-                            unit.targetPosition.copy(dockSlotPos);
+                            if (!unit.waypoints || unit.waypoints.length === 0) {
+                                const dSlot = Math.hypot(unit.mesh.position.x - dockSlotPos.x, unit.mesh.position.z - dockSlotPos.z);
+                                if (dSlot > 26 && !unit._harvNavDock && unit.type !== 'chinook' && typeof findNavigationPath === 'function') {
+                                    unit._harvNavDock = true;
+                                    const nav = findNavigationPath(unit.mesh.position, dockSlotPos);
+                                    if (nav && nav.length > 0) {
+                                        unit.targetPosition.copy(nav[0]);
+                                        unit.waypoints = nav.slice(1);
+                                    } else {
+                                        unit.targetPosition.copy(dockSlotPos);
+                                    }
+                                } else if (!unit._harvNavDock || dSlot <= 26) {
+                                    unit.targetPosition.copy(dockSlotPos);
+                                }
+                            }
                             const distToDock = Math.hypot(unit.mesh.position.x - unit.supplyTarget.position.x, unit.mesh.position.z - unit.supplyTarget.position.z);
                             const dockDistThreshold = (unit.type === 'chinook') ? 14.0 : 11.5;
                             if (distToDock < dockDistThreshold) {
                                 unit.aiState = 'Harvesting';
                                 unit.timerState = 0;
+                                unit._harvNavDock = false;
+                                unit.waypoints = [];
                                 unit.targetPosition.copy(unit.mesh.position);
                                 if (unit.type === 'chinook') unit.airState = 'hovering';
                             }
@@ -1108,13 +1124,29 @@ function animate() {
                         } else {
                             dropoffPosition = getSupplyDropoffPosition(unit.mesh.position);
                         }
-                        unit.targetPosition.copy(dropoffPosition);
+                        if (!unit.waypoints || unit.waypoints.length === 0) {
+                            const dDrop = Math.hypot(unit.mesh.position.x - dropoffPosition.x, unit.mesh.position.z - dropoffPosition.z);
+                            if (dDrop > 26 && !unit._harvNavCenter && unit.type !== 'chinook' && typeof findNavigationPath === 'function') {
+                                unit._harvNavCenter = true;
+                                const nav = findNavigationPath(unit.mesh.position, dropoffPosition);
+                                if (nav && nav.length > 0) {
+                                    unit.targetPosition.copy(nav[0]);
+                                    unit.waypoints = nav.slice(1);
+                                } else {
+                                    unit.targetPosition.copy(dropoffPosition);
+                                }
+                            } else if (!unit._harvNavCenter || dDrop <= 26) {
+                                unit.targetPosition.copy(dropoffPosition);
+                            }
+                        }
                         if (cargoHold && cargoHold.scale.y < 1.0) cargoHold.scale.y += 0.015;
                         const distToDropoff = Math.hypot(unit.mesh.position.x - dropoffPosition.x, unit.mesh.position.z - dropoffPosition.z);
                         const centerDistThreshold = (unit.type === 'chinook') ? 14.0 : 9.5;
                         if (distToDropoff < centerDistThreshold) {
                             unit.aiState = 'Depositing';
                             unit.timerState = 0;
+                            unit._harvNavCenter = false;
+                            unit.waypoints = [];
                             unit.targetPosition.copy(unit.mesh.position);
                             if (unit.type === 'chinook') unit.airState = 'hovering';
                         }
@@ -2186,6 +2218,26 @@ function processEnemyMovement() {
             enemy.mesh.position.x += dirX * step;
             enemy.mesh.position.z += dirZ * step;
 
+            // AI Anti-Stuck Watchdog: prevent dozers/units from vibrating forever against obstacles
+            if (!enemy.isAir) {
+                enemy._aiStuckTick = (enemy._aiStuckTick || 0) + 1;
+                if (!enemy._aiLastPos) enemy._aiLastPos = enemy.mesh.position.clone();
+                if (enemy._aiStuckTick >= 40) {
+                    const moved = Math.hypot(enemy.mesh.position.x - enemy._aiLastPos.x, enemy.mesh.position.z - enemy._aiLastPos.z);
+                    enemy._aiLastPos.copy(enemy.mesh.position);
+                    enemy._aiStuckTick = 0;
+                    if (moved < 0.25) {
+                        const sideAngle = ((enemy.netId || 1) % 2 === 0 ? 1 : -1) * (Math.PI / 2);
+                        const perpX = Math.cos(sideAngle) * dirX - Math.sin(sideAngle) * dirZ;
+                        const perpZ = Math.sin(sideAngle) * dirX + Math.cos(sideAngle) * dirZ;
+                        const detour = new THREE.Vector3(enemy.mesh.position.x + perpX * 14, 0, enemy.mesh.position.z + perpZ * 14);
+                        if (!enemy.waypoints) enemy.waypoints = [];
+                        enemy.waypoints.unshift(enemy.targetPosition.clone());
+                        enemy.targetPosition.copy(detour);
+                    }
+                }
+            }
+
             // Authentic Tank Crushing by AI vehicles (SquishCollide.cpp)
             if (CRUSHER_TANK_SET.has(enemy.type)) {
                 for (let ally of units) {
@@ -2208,7 +2260,7 @@ function processEnemyMovement() {
                 }
             }
             enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
-            if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(enemy.type)) {
+            if (INFANTRY_TYPE_SET.has(enemy.type)) {
                 enemy.mesh.rotation.x = 0;
                 enemy.mesh.rotation.z = 0;
                 enemy._strideBob = 0;
@@ -2236,7 +2288,7 @@ function processEnemyMovement() {
                 const nextWp = enemy.waypoints.shift();
                 enemy.targetPosition.copy(nextWp);
             }
-            if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(enemy.type)) {
+            if (INFANTRY_TYPE_SET.has(enemy.type)) {
                 enemy.mesh.rotation.x = 0;
                 enemy.mesh.rotation.z = 0;
                 enemy._strideBob = 0;

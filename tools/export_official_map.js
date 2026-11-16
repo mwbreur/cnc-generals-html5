@@ -224,6 +224,11 @@ function parseOfficialMap(mapKey, meta) {
     // 4. Parse ObjectsList for Player_*_Start, SupplyDock, and Tech buildings
     const rawSpawns = [];
     const rawSupplies = [];
+    const rawDerricks = [];
+    const rawHospitals = [];
+    const rawRefineries = [];
+    const rawBunkers = [];
+    const rawProps = [];
     let p = objListPos;
     while (p > 0 && p + 10 <= objListEnd) {
         const cid = decomp.readUInt32LE(p);
@@ -291,6 +296,22 @@ function parseOfficialMap(mapKey, meta) {
                         amount: 30000
                     });
                 }
+            } else if (/TechOilDerrick/i.test(templateName)) {
+                rawDerricks.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)) });
+            } else if (/TechHospital/i.test(templateName)) {
+                rawHospitals.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)) });
+            } else if (/TechOilRefinery/i.test(templateName)) {
+                rawRefineries.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)) });
+            } else if (/CivilianBunker/i.test(templateName)) {
+                rawBunkers.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)), angle: parseFloat(angle.toFixed(2)) });
+            } else if (/TreePalm/i.test(templateName)) {
+                rawProps.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), 'palm']);
+            } else if (/Tree/i.test(templateName)) {
+                rawProps.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), 'tree']);
+            } else if (/Bush/i.test(templateName)) {
+                rawProps.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), 'bush']);
+            } else if (/Rock|Boulder|CementChunk/i.test(templateName)) {
+                rawProps.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), 'rock']);
             }
         }
         p = dStart + csz;
@@ -356,6 +377,11 @@ function parseOfficialMap(mapKey, meta) {
         grid,
         spawns: rawSpawns,
         supplies: rawSupplies,
+        derricks: rawDerricks,
+        hospitals: rawHospitals,
+        refineries: rawRefineries,
+        bunkers: rawBunkers,
+        props: rawProps,
         tgaDataUrl
     };
 }
