@@ -377,7 +377,13 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
             }
         }
     }
-    if (target.health > 0 && target.scanRange > 0 && !target.combatTarget && target.taskState !== 'Moving' && attacker && attacker.health > 0 && !isFriendly(target, attacker)) {
+    const isFlyingAirUnit = !!(target.isAir && (
+        target.type === 'chinook' ||
+        target.airState === 'flying' ||
+        target.taskState === 'Moving' ||
+        (target.targetPosition && target.mesh && Math.hypot(target.targetPosition.x - target.mesh.position.x, target.targetPosition.z - target.mesh.position.z) > 4.0)
+    ));
+    if (target.health > 0 && target.scanRange > 0 && !target.combatTarget && target.taskState !== 'Moving' && !isFlyingAirUnit && attacker && attacker.health > 0 && !isFriendly(target, attacker)) {
         target.combatTarget = attacker;
     }
 

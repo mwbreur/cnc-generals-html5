@@ -1521,7 +1521,7 @@ function animate() {
                     }
 
                     // Dynamic State Transition: Automatically react to player/AI orders!
-                    if (unit.combatTarget && unit.combatTarget.health > 0) {
+                    if (unit.combatTarget && unit.combatTarget.health > 0 && unit.taskState !== 'Moving' && unit.type !== 'chinook') {
                         if (unit.airState === 'landed') {
                             unit.airState = 'taking_off';
                         } else if (unit.airState !== 'taking_off') {

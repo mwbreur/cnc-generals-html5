@@ -3697,7 +3697,7 @@ function updateHUD() {
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 3.2; speed = 0.11; health = 180; scanRange = 60; }
             else if (type === 'dozer') { mesh = spawnFaction === 'china' ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 1.9; speed = 0.10; health = 300; }
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; }
-            else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
+            else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 550; scanRange = 0; isAir = true; capacity = 8; garrisoned = []; }
             else if (type === 'comanche') { mesh = createComancheMesh(); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }
             else if (type === 'mig') { mesh = createMigMesh(false); radius = 4.2; speed = 0.32; health = 280; scanRange = 30; isAir = true; }
             else if (type === 'raptor') { mesh = createRaptorMesh(false); radius = 4.2; speed = 0.32; health = 260; scanRange = 30; isAir = true; }
