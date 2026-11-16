@@ -129,7 +129,7 @@ window.getCachedNode = getCachedNode;
 // kind: 1 = rotor spinning +, 2 = rotor spinning -, 3 = other named animation
 // =========================================================================
 const ANIMATED_NODE_NAMES = new Set([
-    'radarDish', 'hazardBeacon', 'fusionCore', 'nukeCore', 'pumpjackArm',
+    'radarDish', 'radarDish2', 'hazardBeacon', 'fusionCore', 'nukeCore', 'pumpjackArm',
     'particleAcceleratorRing', 'particleEmitter', 'nukeTip', 'nukeBlastDoorL',
     'nukeBlastDoorR', 'scudGantry', 'factionFlag'
 ]);
@@ -854,7 +854,7 @@ function animate() {
                     obj.rotation.y += 0.45;
                 } else if (kind === 2) {
                     obj.rotation.y -= 0.45;
-                } else if (obj.name === "radarDish") {
+                } else if (obj.name === "radarDish" || obj.name === "radarDish2") {
                     // Continuous radar dish / array rotation
                     obj.rotation.y += 0.025;
                 } else if (obj.name === "hazardBeacon") {

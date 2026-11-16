@@ -277,7 +277,7 @@ function createUSAAirfield(isEnemy = false) {
     radarGroup.position.set(-5.6, 7.4, -4.5);
 
     const dish = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 6), matDarkMetal);
-    dish.scale.set(1.3, 0.35, 1.0); dish.rotation.x = -Math.PI / 4; dishGroup => {};
+    dish.scale.set(1.3, 0.35, 1.0); dish.rotation.x = -Math.PI / 4;
     radarGroup.add(dish);
     g.add(radarGroup);
 
@@ -748,9 +748,9 @@ function createChinaInternetCenter(isEnemy = false) {
     base.position.y = 2.0; base.castShadow = true; g.add(base);
 
     // Multiple rotating satellite communication dishes
-    [-2.6, 2.6].forEach(x => {
+    [-2.6, 2.6].forEach((x, idx) => {
         const dish = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), matDarkMetal);
-        dish.name = "radarDish";
+        dish.name = idx === 0 ? "radarDish" : "radarDish2";
         dish.scale.set(1.3, 0.35, 1.0); dish.rotation.x = -Math.PI / 4; dish.position.set(x, 4.6, 0); g.add(dish);
     });
 
