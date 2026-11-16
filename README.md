@@ -209,7 +209,7 @@ These check catalog grouping, lazy loading, faction voice selection, and caching
 - **`E`:** Select all on-screen units of the same type as the current selection (double-tap for all on map).
 - **`D` or `Ctrl + Up / Down`:** Cycle through your Dozers / Workers.
 - **`Ctrl + Left / Right`:** Cycle the active unit in a multi-unit selection.
-- **`1`–`9`:** Select control group (double-tap to center camera); **`Ctrl + 1`–`9`** assigns group; **`Alt + 1`–`9`** views group without selecting.
+- **`1`–`9`:** Select control group (double-tap to center camera); **`Shift + 1`–`9`** (or **`Ctrl + 1`–`9`** in fullscreen/app mode) assigns group; **`Alt + 1`–`9`** views group without selecting.
 
 ### Combat, Building & UI
 - **`A` + Right click:** Attack-Move.
