@@ -2144,8 +2144,17 @@
                     }
                     if (planeTick >= planeDuration) {
                         scene.remove(plane);
-                        fuselage.geometry.dispose(); wings.geometry.dispose(); tail.geometry.dispose(); hStab.geometry.dispose();
-                        bodyMat.dispose(); wingMat.dispose();
+                        if (!(plane.userData && plane.userData.isW3D)) {
+                            const mats = new Set();
+                            plane.traverse(c => {
+                                if (c.geometry && typeof c.geometry.dispose === 'function') c.geometry.dispose();
+                                if (c.material) {
+                                    if (Array.isArray(c.material)) c.material.forEach(m => mats.add(m));
+                                    else mats.add(c.material);
+                                }
+                            });
+                            mats.forEach(m => { if (m && typeof m.dispose === 'function') m.dispose(); });
+                        }
                         return false;
                     }
                     return true;
