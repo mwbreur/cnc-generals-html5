@@ -831,24 +831,32 @@
                     const y = getTerrainHeight(x, z);
                     if (y < currentWaterLevel + 0.3) return;
                     if (kind === 'palm') {
-                        const palm = createPalmTreeMesh();
+                        const palm = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_palm'])
+                            ? createW3DBuildingMesh('prop_palm', false)
+                            : createPalmTreeMesh();
                         palm.position.set(x, y, z);
                         mapPropsGroup.add(palm);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.6 });
                     } else if (kind === 'tree') {
-                        const tree = (theme === 'snow') ? createSnowPineMesh() : createJungleTreeMesh();
+                        const tree = (theme !== 'snow' && typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_tree'])
+                            ? createW3DBuildingMesh('prop_tree', false)
+                            : ((theme === 'snow') ? createSnowPineMesh() : createJungleTreeMesh());
                         tree.position.set(x, y, z);
                         mapPropsGroup.add(tree);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
                     } else if (kind === 'bush') {
-                        const bush = createJungleTreeMesh();
-                        bush.scale.set(0.5, 0.45, 0.5);
+                        const bush = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_bush'])
+                            ? createW3DBuildingMesh('prop_bush', false)
+                            : createJungleTreeMesh();
+                        if (!bush.userData || !bush.userData.isW3D) bush.scale.set(0.5, 0.45, 0.5);
                         bush.position.set(x, y, z);
                         mapPropsGroup.add(bush);
                     } else if (kind === 'rock') {
                         const rockCol = theme === 'snow' ? 0xbdc3c7 : theme === 'jungle' ? 0x5d6d5a : 0x8a775b;
-                        const rock = createRockMesh(rockCol);
-                        rock.position.set(x, y + 0.4, z);
+                        const rock = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_rock'])
+                            ? createW3DBuildingMesh('prop_rock', false)
+                            : createRockMesh(rockCol);
+                        rock.position.set(x, y + (rock.userData && rock.userData.isW3D ? 0 : 0.4), z);
                         mapPropsGroup.add(rock);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
                     }
@@ -868,7 +876,9 @@
                         const kind = bld[3] || 'civilian';
                         const by = getTerrainHeight(bx, bz);
                         let mesh = null;
-                        if (kind === 'bunker' && typeof createChinaBunker === 'function') {
+                        if (kind === 'bunker' && typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['civilian_bunker']) {
+                            mesh = createW3DBuildingMesh('civilian_bunker', false);
+                        } else if (kind === 'bunker' && typeof createChinaBunker === 'function') {
                             mesh = createChinaBunker(false);
                             mesh.scale.set(0.95, 0.95, 0.95);
                         } else {

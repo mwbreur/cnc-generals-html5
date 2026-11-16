@@ -58,11 +58,11 @@ function createOfficialMapTexture(mapType) {
     if (!mapObj || typeof document === 'undefined') return null;
     try {
         var canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
+        canvas.width = 1024;
+        canvas.height = 1024;
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = mapObj.theme === 'snow' ? '#dce4ec' : mapObj.theme === 'jungle' ? '#4a5d38' : '#bfa87a';
-        ctx.fillRect(0, 0, 512, 512);
+        ctx.fillRect(0, 0, 1024, 1024);
 
         var tex = new THREE.CanvasTexture(canvas);
         tex.wrapS = THREE.ClampToEdgeWrapping;
@@ -71,20 +71,40 @@ function createOfficialMapTexture(mapType) {
         tex.magFilter = THREE.LinearFilter;
         tex.generateMipmaps = true;
 
+        var applyDetail = function() {
+            if (mapObj.theme === 'desert' && window.RETAIL_DESERT_SAND_URI) {
+                var sandImg = new Image();
+                sandImg.onload = function() {
+                    var pat = ctx.createPattern(sandImg, 'repeat');
+                    if (pat) {
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'overlay';
+                        ctx.globalAlpha = 0.48;
+                        ctx.fillStyle = pat;
+                        ctx.fillRect(0, 0, 1024, 1024);
+                        ctx.restore();
+                        tex.needsUpdate = true;
+                    }
+                };
+                sandImg.src = window.RETAIL_DESERT_SAND_URI;
+            }
+        };
+
         var drawAerial = function(img) {
-            ctx.drawImage(img, 0, 0, 512, 512);
+            ctx.drawImage(img, 0, 0, 1024, 1024);
             // Add subtle surface micro-grain so close-up ground looks crisp
-            var imgData = ctx.getImageData(0, 0, 512, 512);
+            var imgData = ctx.getImageData(0, 0, 1024, 1024);
             var d = imgData.data;
             for (var i = 0; i < d.length; i += 4) {
-                var px = (i >> 2) & 511;
-                var py = (i >> 11);
+                var px = (i >> 2) & 1023;
+                var py = (i >> 12);
                 var n = (((px * 1664525 + py * 1013904223) ^ (px >> 2)) & 0x1f) - 16;
-                d[i] = Math.max(0, Math.min(255, d[i] + n * 0.55));
-                d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n * 0.55));
-                d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * 0.55));
+                d[i] = Math.max(0, Math.min(255, d[i] + n * 0.45));
+                d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n * 0.45));
+                d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * 0.45));
             }
             ctx.putImageData(imgData, 0, 0);
+            applyDetail();
             tex.needsUpdate = true;
             if (window._minimapTerrainCanvas && typeof currentMapType !== 'undefined' && currentMapType === mapKey) {
                 var mCtx = window._minimapTerrainCanvas.getContext('2d');
