@@ -2323,9 +2323,29 @@ function processEnemyAIEngine() {
         const _hbScratch = new THREE.Vector3();
         let _hbFrame = 0;
         let _hbContainer = null;
+        const _hbGroupMap = new Map();
+        const _VET_ICONS = [
+            '',
+            '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 7 L5 2 L9 7 L7.4 7 L5 4 L2.6 7 Z" fill="#ffd32a" stroke="#111" stroke-width="0.6"/></svg>',
+            '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 10 L6 5.5 L10.5 10 L8.8 10 L6 7.2 L3.2 10 Z" fill="#ffd32a" stroke="#111" stroke-width="0.5"/><path d="M1.5 6 L6 1.5 L10.5 6 L8.8 6 L6 3.2 L3.2 6 Z" fill="#ffd32a" stroke="#111" stroke-width="0.5"/></svg>',
+            '<svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,0.6 7.6,4.1 11.4,4.6 8.6,7.2 9.3,11 6,9.1 2.7,11 3.4,7.2 0.6,4.6 4.4,4.1" fill="#ffdd59" stroke="#c0392b" stroke-width="0.9"/></svg>'
+        ];
         function updateHealthBars() {
             _hbFrame++;
             if (!_hbContainer) _hbContainer = document.getElementById('health-bars');
+            _hbGroupMap.clear();
+            const cg = (typeof controlGroups !== 'undefined') ? controlGroups : (typeof window !== 'undefined' ? window.controlGroups : null);
+            if (cg) {
+                for (let g = 1; g <= 9; g++) {
+                    const grp = cg[g];
+                    if (grp && grp.length) {
+                        for (let k = 0; k < grp.length; k++) {
+                            if (!_hbGroupMap.has(grp[k])) _hbGroupMap.set(grp[k], g);
+                        }
+                    }
+                }
+            }
+            const selStruct = (typeof selectedStructure !== 'undefined') ? selectedStructure : null;
             const w = window.innerWidth, h = window.innerHeight;
             const lists = [units, enemyUnits, structures, enemyStructures];
             for (let li = 0; li < lists.length; li++) {
@@ -2333,19 +2353,38 @@ function processEnemyAIEngine() {
                 const isStructure = li >= 2;
                 for (let ai = 0; ai < list.length; ai++) {
                     const asset = list[ai];
-                    if (!(asset.health < asset.maxHealth && asset.health > 0 && !asset.garrisonedIn)) continue;
+                    if (!(asset.health > 0 && !asset.garrisonedIn)) continue;
+                    const isSelected = !!asset.selected || (isStructure && asset === selStruct);
+                    const showHealthBar = isSelected || asset.health < asset.maxHealth;
+                    const vetRank = Math.min(3, Math.max(0, asset.veterancy || 0));
+                    if (!showHealthBar && vetRank === 0) continue;
 
                     let bar = healthBarElements.get(asset);
                     if (!bar) {
                         const container = document.createElement('div');
-                        container.className = 'health-bar-container';
+                        container.className = 'hb-wrap';
                         container.style.left = '0px';
                         container.style.top = '0px';
+
+                        const groupBadge = document.createElement('span');
+                        groupBadge.className = 'hb-group-badge';
+                        groupBadge.style.display = 'none';
+                        container.appendChild(groupBadge);
+
+                        const barBox = document.createElement('div');
+                        barBox.className = 'health-bar-container';
                         const fill = document.createElement('div');
                         fill.className = 'health-bar-fill';
-                        container.appendChild(fill);
+                        barBox.appendChild(fill);
+                        container.appendChild(barBox);
+
+                        const vetBadge = document.createElement('span');
+                        vetBadge.className = 'hb-vet-badge';
+                        vetBadge.style.display = 'none';
+                        container.appendChild(vetBadge);
+
                         if (_hbContainer) _hbContainer.appendChild(container);
-                        bar = { container, fill, shown: null, tf: '', pct: -1, color: '' };
+                        bar = { container, barBox, fill, groupBadge, vetBadge, shown: null, hbShown: null, tf: '', pct: -1, color: '', grp: -1, vet: -1 };
                         healthBarElements.set(asset, bar);
                     }
                     bar.seen = _hbFrame;
@@ -2356,7 +2395,7 @@ function processEnemyAIEngine() {
                     const onScreen = position.z >= -1 && position.z <= 1 &&
                         Math.abs(position.x) <= 1.1 && Math.abs(position.y) <= 1.1;
                     if (bar.shown !== onScreen) {
-                        bar.container.style.display = onScreen ? 'block' : 'none';
+                        bar.container.style.display = onScreen ? 'flex' : 'none';
                         bar.shown = onScreen;
                     }
                     if (!onScreen) continue;
@@ -2366,11 +2405,30 @@ function processEnemyAIEngine() {
                     const tf = `translate(${px}px, ${py}px) translate(-50%, -50%)`;
                     if (bar.tf !== tf) { bar.container.style.transform = tf; bar.tf = tf; }
 
-                    const healthRatio = Math.max(0, Math.min(1, asset.health / asset.maxHealth));
-                    const pct = Math.round(healthRatio * 100);
-                    if (bar.pct !== pct) { bar.fill.style.width = pct + '%'; bar.pct = pct; }
-                    const color = healthRatio < 0.3 ? '#ff4757' : healthRatio < 0.6 ? '#ffd166' : '#42e66b';
-                    if (bar.color !== color) { bar.fill.style.backgroundColor = color; bar.color = color; }
+                    if (bar.hbShown !== showHealthBar) {
+                        bar.barBox.style.display = showHealthBar ? 'block' : 'none';
+                        bar.hbShown = showHealthBar;
+                    }
+                    if (showHealthBar) {
+                        const healthRatio = Math.max(0, Math.min(1, asset.health / asset.maxHealth));
+                        const pct = Math.round(healthRatio * 100);
+                        if (bar.pct !== pct) { bar.fill.style.width = pct + '%'; bar.pct = pct; }
+                        const color = healthRatio < 0.3 ? '#ff4757' : healthRatio < 0.6 ? '#ffd166' : '#42e66b';
+                        if (bar.color !== color) { bar.fill.style.backgroundColor = color; bar.color = color; }
+                    }
+
+                    const grpNum = (!isStructure && isSelected) ? (_hbGroupMap.get(asset) || 0) : 0;
+                    if (bar.grp !== grpNum) {
+                        bar.groupBadge.style.display = grpNum > 0 ? 'inline-block' : 'none';
+                        if (grpNum > 0) bar.groupBadge.textContent = String(grpNum);
+                        bar.grp = grpNum;
+                    }
+
+                    if (bar.vet !== vetRank) {
+                        bar.vetBadge.style.display = vetRank > 0 ? 'inline-flex' : 'none';
+                        bar.vetBadge.innerHTML = _VET_ICONS[vetRank] || '';
+                        bar.vet = vetRank;
+                    }
                 }
             }
 

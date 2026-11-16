@@ -2269,6 +2269,7 @@ function renderCommandGrid(container, slots) {
 
 // Control Groups (1-9)
 const controlGroups = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [] };
+window.controlGroups = controlGroups;
 const lastGroupTapTime = {};
 let lastQPressTime = 0;
 let lastWPressTime = 0;
@@ -3791,20 +3792,8 @@ function updateHUD() {
             group.name = "selectionReticle";
             group.position.y = 0.05;
 
-            const teamRingColor = (typeof window !== 'undefined' && window.selectedPlayerColorHex)
-                ? window.selectedPlayerColorHex
-                : ((typeof selectedFaction !== 'undefined' && selectedFaction === 'china') ? 0xff4757 :
-                   (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla') ? 0xffa502 : 0x00ffcc);
-
-            // 1. High-contrast ground circle
-            const ringGeo = new THREE.RingGeometry(r - 0.08, r, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: teamRingColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = -Math.PI / 2;
-            group.add(ring);
-
-            // 2. Four distinct L-shaped corner brackets [ ]
-            const bMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 });
+            // Corner selection brackets [ ] (health bar + group/veterancy icons are rendered above the unit)
+            const bMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
             const bOffset = r * 1.15;
             const bArm = r * 0.45;
 
