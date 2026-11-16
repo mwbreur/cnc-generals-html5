@@ -233,7 +233,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             grp.name = 'turretSystem';
         } else if ((upper.includes('BARRELS') || upper.includes('BARREL')) && (modelKey === 'gatling' || modelKey === 'overlord_gatling')) {
             grp.name = 'gatlingBarrels';
-        } else if (upper.includes('RADAR') || upper.includes('DISH')) {
+        } else if ((upper.includes('RADAR') || upper.includes('DISH')) && !upper.startsWith('RADARUPGRADE') && !upper.startsWith('RADARPIECE')) {
             grp.name = 'radarDish';
         }
         pivotGroups.push({ grp, parentIdx, name });
@@ -500,7 +500,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
             grp.name = 'turretSystem';
         } else if (upper.includes('BARRELS')) {
             grp.name = 'gatlingBarrels';
-        } else if (upper.includes('RADAR') || upper.includes('DISH')) {
+        } else if ((upper.includes('RADAR') || upper.includes('DISH')) && !upper.startsWith('RADARUPGRADE') && !upper.startsWith('RADARPIECE')) {
             grp.name = 'radarDish';
         }
         pivotGroups.push({ grp, parentIdx, name });
