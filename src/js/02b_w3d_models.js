@@ -639,9 +639,15 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         root.add(banner);
     } else if (buildingKey === 'china_speakerTower') {
         const towerPiv = root.getObjectByName('NBPTOWER');
-        if (towerPiv) towerPiv.rotation.z = -Math.PI / 2;
+        if (towerPiv) {
+            towerPiv.rotation.z = -Math.PI / 2;
+            towerPiv.position.y = -1.8;
+        }
         const hc1 = root.getObjectByName('HOUSECOLOR01');
-        if (hc1) hc1.rotation.z = -Math.PI / 2;
+        if (hc1) {
+            hc1.rotation.z = -Math.PI / 2;
+            hc1.position.y = -1.8;
+        }
     } else if (buildingKey === 'china_commandCenter') {
         const hc4 = root.getObjectByName('HOUSECOLOR04');
         if (hc4) hc4.rotation.z = Math.PI / 2;

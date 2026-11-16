@@ -768,17 +768,49 @@ function animate() {
                 if (unit.type === 'hacker' && unit.health > 0 && !unit.combatTarget) {
                     const moveDist = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
                     if (moveDist < 0.8) {
+                        unit._isHacking = true;
+                        // Show deployed hacking terminal + glowing green uplink ring when stationary
+                        if (unit.mesh && !unit._hackVisual && typeof THREE !== 'undefined' && typeof THREE.CylinderGeometry === 'function') {
+                            const hGrp = new THREE.Group();
+                            const matGlow = new THREE.MeshBasicMaterial({ color: 0x2ecc71, transparent: true, opacity: 0.75, side: THREE.DoubleSide });
+                            const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.45, 18), matGlow);
+                            ring.rotation.x = -Math.PI / 2;
+                            ring.position.y = 0.12;
+                            const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 6), matGlow);
+                            mast.position.set(0.55, 0.9, 0.45);
+                            const dish = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.28, 8), matGlow);
+                            dish.rotation.x = Math.PI * 0.75;
+                            dish.position.set(0.55, 1.85, 0.45);
+                            hGrp.add(ring, mast, dish);
+                            unit.mesh.add(hGrp);
+                            unit._hackVisual = hGrp;
+                        }
+                        if (unit._hackVisual) {
+                            unit._hackVisual.visible = true;
+                            unit._hackVisual.rotation.y += 0.04;
+                        }
                         unit._hackTimer = (unit._hackTimer || 0) + 1;
-                        if (unit._hackTimer >= 120) {
+                        if (unit._hackTimer >= 60) { // $5 -> $6 -> $8 -> $10 per second (matching Generals)
                             unit._hackTimer = 0;
-                            const hackGain = 6 + (unit.veterancy || 0) * 2;
+                            const vetRates = [5, 6, 8, 10];
+                            const vetIdx = Math.min(3, Math.max(0, unit.veterancy || 0));
+                            const hackGain = vetRates[vetIdx];
+                            unit._hackXp = (unit._hackXp || 0) + 1;
+                            if (unit._hackXp >= 15 && (unit.veterancy || 0) < 1) { unit.veterancy = 1; }
+                            else if (unit._hackXp >= 35 && (unit.veterancy || 0) < 2) { unit.veterancy = 2; }
+                            else if (unit._hackXp >= 60 && (unit.veterancy || 0) < 3) { unit.veterancy = 3; }
                             if (!unit.isAI) {
                                 playerResources += hackGain;
                                 if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(unit.mesh.position, hackGain);
                                 if (typeof updateHUD === 'function') updateHUD();
                             }
                         }
+                    } else {
+                        unit._isHacking = false;
+                        if (unit._hackVisual) unit._hackVisual.visible = false;
                     }
+                } else if (unit._hackVisual) {
+                    unit._hackVisual.visible = false;
                 }
 
                 // 6. Dozer & Worker Mine / Demo Trap Sweeping + China Troop Crawler Stealth Detection
@@ -1739,9 +1771,10 @@ function animate() {
                     }
 
                     const dMoved = unit.mesh.position.distanceTo(unit._lastPos);
-                    if (dMoved < 0.06 || unit._noProgressTicks > 90) {
+                    const minExpectedStep = Math.max(0.008, (unit.speed || 0.1) * combatDeltaScale * 0.35);
+                    if (dMoved < minExpectedStep || unit._noProgressTicks > 90) {
                         unit._stuckTimer++;
-                        if (unit._stuckTimer > 12 || unit._noProgressTicks > 90) {
+                        if (unit._stuckTimer > 28 || unit._noProgressTicks > 90) {
                             // If destination itself is inside a building, clamp it outside so the unit doesn't orbit forever
                             const targetBlocker = (!unit.isAir && unit.taskState === 'Moving')
                                 ? isPointBlockedByStructureOrObstacle(unit.targetPosition.x, unit.targetPosition.z, unit.radius || 1.2)
@@ -1753,8 +1786,14 @@ function animate() {
                                 unit._noProgressTicks = 0;
                                 unit._stuckTimer = 0;
                             } else {
-                                // Find which structure is blocking the path
-                                const blocking = structures.find(s => s !== unit.targetStructure && s.health > 0 && Math.hypot(unit.mesh.position.x - s.position.x, unit.mesh.position.z - s.position.z) < (s.radius + unit.radius + 4.0));
+                                // Find which structure is actually blocking the forward path (ignore buildings we are already walking away from)
+                                const blocking = structures.find(s => {
+                                    if (s === unit.targetStructure || s.health <= 0) return false;
+                                    const sdx = unit.mesh.position.x - s.position.x;
+                                    const sdz = unit.mesh.position.z - s.position.z;
+                                    if (Math.hypot(sdx, sdz) >= (s.radius + unit.radius + 1.8)) return false;
+                                    return (sdx * dx + sdz * dz) < 0; // Only if moving TOWARD the building
+                                });
                                 if (blocking) {
                                     const angleToS = Math.atan2(blocking.position.z - unit.mesh.position.z, blocking.position.x - unit.mesh.position.x);
                                     const bypassRadius = blocking.radius + unit.radius + 3.2;

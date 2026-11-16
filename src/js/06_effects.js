@@ -259,6 +259,49 @@
             });
         }
 
+        function spawnFloatingCashNumber(pos, amount) {
+            if (typeof THREE === 'undefined' || typeof scene === 'undefined' || !pos) return;
+            if (typeof document === 'undefined' || typeof THREE.Sprite !== 'function') return;
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.font = 'bold 34px Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.lineWidth = 5;
+                const label = `+$${amount}`;
+                ctx.strokeText(label, 64, 32);
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillText(label, 64, 32);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 1.0, depthWrite: false });
+            const sprite = new THREE.Sprite(mat);
+            sprite.position.set(pos.x, (pos.y || 0) + 3.2, pos.z);
+            sprite.scale.set(4.5, 2.25, 1);
+            scene.add(sprite);
+            let life = 54;
+            activeFX.push({
+                life,
+                update() {
+                    life--;
+                    sprite.position.y += 0.06;
+                    mat.opacity = Math.max(0, life / 54);
+                    if (life <= 0) {
+                        scene.remove(sprite);
+                        tex.dispose();
+                        mat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+        if (typeof window !== 'undefined') window.spawnFloatingCashNumber = spawnFloatingCashNumber;
+
         function spawnSmokePuff(pos, color = 0xdcdde1, initialSize = 0.3) {
             if (activeFX.length > 260) return;
             const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.75 });
