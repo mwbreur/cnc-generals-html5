@@ -115,7 +115,7 @@ function processCombatScanning() {
 
                 // Auto-Scan fallback loop if completely idle (Only engage hostile targets!)
                 // PERF: staggered every 4 frames per unit and uses squared distance to avoid Math.sqrt per enemy
-                const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker'].includes(unit.type);
+                const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker', 'pilot', 'drone_scout'].includes(unit.type);
                 if (!unit.combatTarget && ((_combatScanTick + ui) % 4 === 0) && !isNonCombatSupport) {
                     if (!(unit.isAir && unit.taskState === 'Moving')) {
                         const uPos = unit.mesh.position;

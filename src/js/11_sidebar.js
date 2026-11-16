@@ -3012,7 +3012,9 @@ function executeStructureUpgradeOrAction(upg, structure) {
         playerResources -= upg.cost;
         structure.abilityCooldownUntil = buildingTick + 900; // 15s cooldown
 
-        if (upg.id === 'spyDrone' || upg.id === 'radarVanScan') {
+        if (upg.id === 'spyDrone') {
+            if (typeof activateGeneralsPower === 'function') activateGeneralsPower('spyDrone');
+        } else if (upg.id === 'radarVanScan') {
             triggerReconnaissanceScan(upg.id);
         } else if (upg.id === 'empPulse') {
             triggerEmpPulseDisruption();

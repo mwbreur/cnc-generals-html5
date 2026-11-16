@@ -1229,7 +1229,7 @@ function processEnemyAIEngine() {
 }
 
         function onPointerDown(e) {
-            if (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.tagName === 'BUTTON') return;
+            if (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.closest('#general-powers-bar') || e.target.closest('#generals-powers-modal') || e.target.tagName === 'BUTTON') return;
 
             if (e.button === 0) {
                 if (typeof isSellMode !== 'undefined' && isSellMode) {
@@ -1727,7 +1727,7 @@ function processEnemyAIEngine() {
 
         function issueMoveCommand(e) {
             // Ignore if clicking inside UI elements
-            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu'))) {
+            if (e.target && (e.target.closest('#generals-command-bar') || e.target.closest('#top-hud-bar') || e.target.closest('#cnc-sidebar') || e.target.closest('#hud') || e.target.closest('#start-menu') || e.target.closest('#general-powers-bar') || e.target.closest('#generals-powers-modal'))) {
                 return;
             }
 
