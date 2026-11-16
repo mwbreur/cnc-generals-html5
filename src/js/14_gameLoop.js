@@ -1313,6 +1313,18 @@ function animate() {
             units.forEach(updateWorkerTools);
             enemyUnits.forEach(updateWorkerTools);
 
+            // Sync GLA Scorpion Tank turret rocket rack visibility with Scorpion Rocket tech / Salvage
+            const syncScorpionUpgradeMesh = (unit, isAIUnit) => {
+                if (!unit || unit.health <= 0 || !unit.mesh || unit.type !== 'scorpion') return;
+                const rack = getCachedNode(unit.mesh, 'MISSLERACK01');
+                if (rack) {
+                    const hasRocket = (unit.salvageLevel >= 1) || (!isAIUnit && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket'));
+                    rack.visible = !!hasRocket;
+                }
+            };
+            units.forEach(u => syncScorpionUpgradeMesh(u, false));
+            enemyUnits.forEach(u => syncScorpionUpgradeMesh(u, true));
+
             // PERF: single ground-unit separation pass using a spatial hash grid
             // (was two full O(N^2) passes per frame that fought each other)
             separateGroundUnits(units);

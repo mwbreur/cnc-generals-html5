@@ -258,7 +258,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const texKey = mdata.tex ? mdata.tex.replace(/\.(dds|tga)$/i, '').toLowerCase() : '';
         let mat = hullMat;
         if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
-            if (modelKey === 'crusader' && texKey === 'housecolor2' && upper.includes('HOUSECOLOR02')) {
+            if ((modelKey === 'crusader' || modelKey === 'scorpion') && texKey === 'housecolor2' && (upper.includes('HOUSECOLOR02') || upper.includes('HOUSECOLOR01'))) {
                 const hcTex = getW3dTexture(texKey);
                 if (hcTex) {
                     const hcHex = (houseMat && houseMat.color && typeof houseMat.color.getHex === 'function')
@@ -346,6 +346,30 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     } else if (modelKey === 'dragon') {
         const ch = root.getObjectByName('CHASSIS');
         if (ch) { ch.rotation.z = -Math.PI / 2; ch.position.y += 2.2; }
+    } else if (modelKey === 'scorpion') {
+        const ch = root.getObjectByName('CHASSIS');
+        if (ch) {
+            ch.rotation.z = -Math.PI / 2;
+            const tL = ch.getObjectByName('TREADSL01');
+            const tR = ch.getObjectByName('TREADSR01');
+            if (tL) tL.rotation.z = Math.PI / 2;
+            if (tR) tR.rotation.z = Math.PI / 2;
+            const turret = ch.getObjectByName('turretSystem');
+            if (turret) {
+                const turretMount = new THREE.Group();
+                turretMount.name = 'scorpionTurretMount';
+                turretMount.position.copy(turret.position);
+                turretMount.rotation.z = Math.PI / 2;
+                ch.remove(turret);
+                turret.position.set(0, 0, 0);
+                turretMount.add(turret);
+                ch.add(turretMount);
+            }
+        }
+        const rack = root.getObjectByName('MISSLERACK01');
+        if (rack) {
+            rack.visible = (!isEnemy && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket'));
+        }
     } else if (modelKey === 'nukecannon') {
         const eb = root.getObjectByName('ELEVATIONBARREL');
         if (eb) eb.rotation.x = Math.PI / 2;

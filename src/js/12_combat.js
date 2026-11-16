@@ -912,9 +912,13 @@ function executeWeaponFire(attacker, target) {
             spawnMuzzleFlash(mPosR, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
             spawnBulletTracer(mPosR, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
         } else if (attacker.type === 'scorpion' && (attacker.salvageLevel >= 1 || (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket')))) {
-            // Secondary Scorpion Rocket
+            // Secondary Scorpion Rocket (from turret rocket rack)
+            const rackNode = getCachedNode(attacker.mesh, 'WEAPONA01') || getCachedNode(attacker.mesh, 'MISSLERACK01');
+            const rocketPos = rackNode ? rackNode.getWorldPosition(new THREE.Vector3()) : muzzlePos;
+            const scRocketDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets')) ? 48 : 38;
             setTimeout(() => {
-                spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 38, damageType: 'EXPLOSIVE' });
+                if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                spawnRocketProjectile(rocketPos, targetPos, false, false, { attacker, target, damage: scRocketDmg, damageType: 'EXPLOSIVE' });
             }, 120);
         }
         if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
