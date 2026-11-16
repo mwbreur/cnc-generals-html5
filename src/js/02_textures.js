@@ -48,9 +48,9 @@ function createTerrainTexture() {
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.shadowMap.type = THREE.PCFShadowMap;
             container.appendChild(renderer.domElement);
 
             const ambientLight = new THREE.AmbientLight(0x445566, 1.3);
@@ -64,12 +64,31 @@ function createTerrainTexture() {
             dirLight.shadow.mapSize.width = 2048;
             dirLight.shadow.mapSize.height = 2048;
             dirLight.shadow.camera.near = 0.5;
-            dirLight.shadow.camera.far = 600;
-            const d = 220;
+            dirLight.shadow.camera.far = 420;
+            const d = 140;
             dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
             dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
-            dirLight.shadow.bias = -0.0003;
+            dirLight.shadow.bias = -0.0004;
             scene.add(dirLight);
+            if (dirLight.target) scene.add(dirLight.target);
+            window._mainDirLight = dirLight;
+
+            window.setGraphicsQuality = function(level) {
+                if (!renderer) return;
+                const lvl = String(level || 'medium').toLowerCase();
+                if (lvl === 'low') {
+                    renderer.setPixelRatio(1);
+                    renderer.shadowMap.enabled = false;
+                } else if (lvl === 'high') {
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                } else {
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = THREE.PCFShadowMap;
+                }
+            };
 
             groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
             initCustomMapsStorage();

@@ -260,6 +260,7 @@
         }
 
         function spawnSmokePuff(pos, color = 0xdcdde1, initialSize = 0.3) {
+            if (activeFX.length > 260) return;
             const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.75 });
             const mesh = new THREE.Mesh(_fxSphere6, mat);
             mesh.scale.set(initialSize, initialSize, initialSize);

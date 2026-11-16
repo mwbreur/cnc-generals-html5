@@ -383,6 +383,31 @@
                     target.health = packet.remainingHealth;
                 }
             }
+            else if (packet.type === 'state_sync' && !isMultiplayerHost) {
+                const unitMap = new Map();
+                for (let i = 0; i < units.length; i++) if (units[i].netId) unitMap.set(units[i].netId, units[i]);
+                for (let i = 0; i < enemyUnits.length; i++) if (enemyUnits[i].netId) unitMap.set(enemyUnits[i].netId, enemyUnits[i]);
+                if (Array.isArray(packet.u)) {
+                    for (let i = 0; i < packet.u.length; i++) {
+                        const [nid, x, z, ry, hp] = packet.u[i];
+                        const ent = unitMap.get(nid);
+                        if (ent) {
+                            ent.health = hp;
+                            ent._mpNetTarget = { x, z, ry };
+                        }
+                    }
+                }
+                if (Array.isArray(packet.s)) {
+                    const structMap = new Map();
+                    for (let i = 0; i < structures.length; i++) if (structures[i].netId) structMap.set(structures[i].netId, structures[i]);
+                    for (let i = 0; i < enemyStructures.length; i++) if (enemyStructures[i].netId) structMap.set(enemyStructures[i].netId, enemyStructures[i]);
+                    for (let i = 0; i < packet.s.length; i++) {
+                        const [nid, hp] = packet.s[i];
+                        const st = structMap.get(nid);
+                        if (st) st.health = hp;
+                    }
+                }
+            }
             else if (packet.type === 'chat') {
                 addMpChatMessage(packet.sender, packet.text);
             }
@@ -678,6 +703,43 @@
             if (typeof playAudio === 'function') playAudio('defeat', {}, selectedFaction);
         }
         window.onHostDisconnected = onHostDisconnected;
+
+        let _mpLastStateSyncMs = 0;
+        function broadcastHostStateSync() {
+            if (!isMultiplayerActive || !isMultiplayerHost) return;
+            const now = performance.now();
+            if (now - _mpLastStateSyncMs < 100) return; // 10 Hz host-authoritative delta snapshot
+            _mpLastStateSyncMs = now;
+            const uSnap = [];
+            const packUnits = (arr) => {
+                for (let i = 0; i < arr.length; i++) {
+                    const u = arr[i];
+                    if (u && u.netId && u.health > 0 && u.mesh) {
+                        uSnap.push([
+                            u.netId,
+                            Math.round(u.mesh.position.x * 10) / 10,
+                            Math.round(u.mesh.position.z * 10) / 10,
+                            Math.round(u.mesh.rotation.y * 100) / 100,
+                            Math.round(u.health)
+                        ]);
+                    }
+                }
+            };
+            packUnits(units);
+            packUnits(enemyUnits);
+            const sSnap = [];
+            const packStructs = (arr) => {
+                for (let i = 0; i < arr.length; i++) {
+                    const s = arr[i];
+                    if (s && s.netId && s.health > 0) {
+                        sSnap.push([s.netId, Math.round(s.health)]);
+                    }
+                }
+            };
+            packStructs(structures);
+            packStructs(enemyStructures);
+            broadcastNetPacket({ type: 'state_sync', u: uSnap, s: sSnap });
+        }
 
         function leaveMultiplayerSessionToMenu() {
             const modal = document.getElementById('host-disconnected-modal');

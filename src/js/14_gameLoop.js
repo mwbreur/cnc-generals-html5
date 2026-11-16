@@ -250,6 +250,37 @@ function animate() {
 
             const animTime = nowTime * 0.003;
 
+            // Keep shadow frustum centered near cameraTarget for crisp shadows & high FPS
+            if (window._mainDirLight && typeof cameraTarget !== 'undefined') {
+                const snapX = Math.round(cameraTarget.x / 8) * 8;
+                const snapZ = Math.round(cameraTarget.z / 8) * 8;
+                window._mainDirLight.position.set(snapX + 60, 80, snapZ + 40);
+                if (window._mainDirLight.target) {
+                    window._mainDirLight.target.position.set(snapX, 0, snapZ);
+                    window._mainDirLight.target.updateMatrixWorld();
+                }
+            }
+
+            // Host-authoritative 10 Hz WebRTC delta state sync & smooth client interpolation
+            if (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive) {
+                if (typeof isMultiplayerHost !== 'undefined' && isMultiplayerHost && typeof broadcastHostStateSync === 'function') {
+                    broadcastHostStateSync();
+                } else if (typeof isMultiplayerHost !== 'undefined' && !isMultiplayerHost) {
+                    const blendList = (arr) => {
+                        for (let i = 0; i < arr.length; i++) {
+                            const ent = arr[i];
+                            if (ent && ent._mpNetTarget && ent.mesh) {
+                                ent.mesh.position.x += (ent._mpNetTarget.x - ent.mesh.position.x) * 0.25;
+                                ent.mesh.position.z += (ent._mpNetTarget.z - ent.mesh.position.z) * 0.25;
+                                ent.mesh.rotation.y += (ent._mpNetTarget.ry - ent.mesh.rotation.y) * 0.25;
+                            }
+                        }
+                    };
+                    blendList(units);
+                    blendList(enemyUnits);
+                }
+            }
+
             // Update Weapon Effects & Particle System
             
             updateFXEngine();
