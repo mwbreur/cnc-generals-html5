@@ -8,7 +8,7 @@ function resolveObstacleCollisions(unit) {
 
     let totalPushX = 0, totalPushZ = 0;
     let colliderCount = 0;
-    var collisionCount = 0;
+    collisionCount = 0;
 
     // PERF: compute harvester dropoff once per call (was recomputed per structure, each doing structures.filter)
     const isDeliveringHarvester = (unit.type === 'truck' || unit.type === 'worker') && (unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing');

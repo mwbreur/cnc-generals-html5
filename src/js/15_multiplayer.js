@@ -384,28 +384,56 @@
                 }
             }
             else if (packet.type === 'state_sync' && !isMultiplayerHost) {
+                const seenUnitIds = new Set();
                 const unitMap = new Map();
-                for (let i = 0; i < units.length; i++) if (units[i].netId) unitMap.set(units[i].netId, units[i]);
+                const localSet = new Set();
+                for (let i = 0; i < units.length; i++) if (units[i].netId) { unitMap.set(units[i].netId, units[i]); localSet.add(units[i]); }
                 for (let i = 0; i < enemyUnits.length; i++) if (enemyUnits[i].netId) unitMap.set(enemyUnits[i].netId, enemyUnits[i]);
                 if (Array.isArray(packet.u)) {
                     for (let i = 0; i < packet.u.length; i++) {
                         const [nid, x, z, ry, hp] = packet.u[i];
+                        seenUnitIds.add(nid);
                         const ent = unitMap.get(nid);
                         if (ent) {
+                            ent._mpSeenOnce = true;
                             ent.health = hp;
-                            ent._mpNetTarget = { x, z, ry };
+                            if (ent.mesh) {
+                                const drift = Math.hypot(x - ent.mesh.position.x, z - ent.mesh.position.z);
+                                // Avoid rubber-banding local player units unless drift exceeds 2.5 units
+                                if (!localSet.has(ent) || drift > 2.5) {
+                                    ent._mpNetTarget = { x, z, ry };
+                                } else {
+                                    ent._mpNetTarget = null;
+                                }
+                            }
                         }
                     }
+                    // Clean up ghost units that died on host between snapshots
+                    unitMap.forEach((ent, nid) => {
+                        if (ent._mpSeenOnce && !seenUnitIds.has(nid) && ent.health > 0) {
+                            ent.health = 0;
+                        }
+                    });
                 }
                 if (Array.isArray(packet.s)) {
+                    const seenStructIds = new Set();
                     const structMap = new Map();
                     for (let i = 0; i < structures.length; i++) if (structures[i].netId) structMap.set(structures[i].netId, structures[i]);
                     for (let i = 0; i < enemyStructures.length; i++) if (enemyStructures[i].netId) structMap.set(enemyStructures[i].netId, enemyStructures[i]);
                     for (let i = 0; i < packet.s.length; i++) {
                         const [nid, hp] = packet.s[i];
+                        seenStructIds.add(nid);
                         const st = structMap.get(nid);
-                        if (st) st.health = hp;
+                        if (st) {
+                            st._mpSeenOnce = true;
+                            st.health = hp;
+                        }
                     }
+                    structMap.forEach((st, nid) => {
+                        if (st._mpSeenOnce && !seenStructIds.has(nid) && st.health > 0) {
+                            st.health = 0;
+                        }
+                    });
                 }
             }
             else if (packet.type === 'chat') {
@@ -669,8 +697,8 @@
                             closestEnemy.health -= 50;
                         }
 
-                        // Sync damage in multiplayer
-                        if (isMultiplayerActive && netConn && netConn.open && isPlayer && closestEnemy.netId) {
+                        // Sync damage in multiplayer (host-authoritative)
+                        if (isMultiplayerActive && netConn && netConn.open && isMultiplayerHost && closestEnemy.netId) {
                             broadcastNetPacket({
                                 type: 'unit_damage',
                                 targetNetId: closestEnemy.netId,
@@ -682,7 +710,7 @@
             });
         }
 
-        window.onload = init;
+        window.addEventListener('load', init);
     
         function onHostDisconnected(reason = "The host commander has left or closed the multiplayer match.") {
             isMatchActive = false;

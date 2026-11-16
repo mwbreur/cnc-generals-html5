@@ -1087,4 +1087,47 @@ vm.runInContext(`
 `, sandbox);
 console.log("✓ Verified 350-tick headless Skirmish simulation (deterministic PRNG, AI base placement, Dozer navigation & construction, zero NaNs).");
 
+// 18. Multiplayer Defense Combat & state_sync Ghost/Rubber-Band Regression Test
+vm.runInContext(`
+    {
+        resetEntireBattlefieldState();
+        isMultiplayerActive = true;
+        isMultiplayerHost = true;
+        netConn = { open: true, send: function() {} };
+
+        const gatling = {
+            type: 'gatlingCannon', faction: 'china', ownerId: 1, teamId: 1,
+            position: new THREE.Vector3(0, 0, 0), mesh: new THREE.Group(),
+            health: 800, maxHealth: 800, isBuilding: false, radius: 6, netId: 'mp_gatling_1', attackCooldown: 0
+        };
+        structures.push(gatling);
+        const foe = spawnEnemyUnit('tank', new THREE.Vector3(10, 0, 0), 'mp_foe_1', 'china');
+        foe.teamId = 2;
+
+        // Must not throw ReferenceError: isPlayer is not defined
+        processBaseDefenseCombat();
+        if (foe.health >= foe.maxHealth) {
+            throw new Error("Expected Patriot base defense to damage hostile unit in multiplayer!");
+        }
+
+        // Verify client state_sync: (a) local unit within 2.5u drift avoids _mpNetTarget, (b) missing _mpSeenOnce unit is cleaned up
+        isMultiplayerHost = false;
+        const localUnit = spawnUnit('tank', new THREE.Vector3(5, 0, 5));
+        localUnit.netId = 'mp_local_1';
+        handleNetworkPacket({ type: 'state_sync', u: [['mp_local_1', 5.5, 5.5, 0, 200], ['mp_foe_1', 10, 0, 0, 150]], s: [] });
+        if (localUnit._mpNetTarget) {
+            throw new Error("Client local unit within 2.5u drift should not set _mpNetTarget (causes rubber-banding)!");
+        }
+        handleNetworkPacket({ type: 'state_sync', u: [['mp_local_1', 5.5, 5.5, 0, 200]], s: [] });
+        if (foe.health !== 0) {
+            throw new Error("Expected ghost unit omitted from host state_sync to have health set to 0, got " + foe.health);
+        }
+
+        isMultiplayerActive = false;
+        isMultiplayerHost = false;
+        netConn = null;
+    }
+`, sandbox);
+console.log("✓ Verified multiplayer base defense combat & state_sync ghost-unit/rubber-band fixes.");
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");
