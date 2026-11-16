@@ -283,6 +283,20 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             mat = metalMat;
         } else if (upper.includes('GLASS') || upper.includes('WINDOW')) {
             mat = glassMat;
+        } else if (texKey && texKey !== modelKey.toLowerCase()) {
+            const subTex = getW3dTexture(texKey);
+            if (subTex) {
+                const isRotorBlur = texKey.endsWith('_p') || upper.includes('PROPS');
+                mat = getCachedW3DMaterial(matPrefix + 'sub:' + texKey, () => new THREE.MeshStandardMaterial({
+                    map: subTex,
+                    roughness: 0.6,
+                    metalness: 0.25,
+                    alphaTest: isRotorBlur ? 0.08 : 0.45,
+                    transparent: isRotorBlur,
+                    depthWrite: !isRotorBlur,
+                    side: THREE.DoubleSide
+                }));
+            }
         }
 
         const mesh = new THREE.Mesh(geom, mat);
@@ -377,12 +391,12 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     let bldMat, accentMat;
     if (isEnemy) {
         bldMat = bTex
-            ? new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25 })
+            ? new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide })
             : new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.65, metalness: 0.25 });
         accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28 });
     } else {
         if (bTex) {
-            bldMat = new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25 });
+            bldMat = new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide });
         } else {
             if (faction === 'usa') {
                 bldMat = (typeof matUSA !== 'undefined') ? matUSA : new THREE.MeshStandardMaterial({ color: 0x7a7d5a, roughness: 0.6, metalness: 0.28 });
@@ -480,8 +494,8 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
             // Authentic metallic cooling tower finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
         } else if (subTex) {
-            mat = new THREE.MeshStandardMaterial({ map: subTex, roughness: 0.65, metalness: 0.25 });
-            if (isEnemy) mat.color.setHex(0xaa4444);
+            mat = new THREE.MeshStandardMaterial({ map: subTex, roughness: 0.65, metalness: 0.25, alphaTest: 0.45, side: THREE.DoubleSide });
+            if (isEnemy && mat.color && typeof mat.color.setHex === 'function') mat.color.setHex(0xaa4444);
         } else if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
             mat = accentMat;
         } else if (bTex) {
