@@ -954,27 +954,58 @@
         // activeCustomMap & savedCustomMaps declared in 01_core.js
         let focusedSlotIdx = 0;
 
+        // Classic C&C Generals 8-Color Player Palette
+        const PLAYER_COLORS = [
+            { id: 'blue',   label: 'Blue',   css: '#2563eb', hex: 0x2563eb },
+            { id: 'red',    label: 'Red',    css: '#dc2626', hex: 0xdc2626 },
+            { id: 'green',  label: 'Green',  css: '#16a34a', hex: 0x16a34a },
+            { id: 'yellow', label: 'Yellow', css: '#eab308', hex: 0xeab308 },
+            { id: 'cyan',   label: 'Cyan',   css: '#06b6d4', hex: 0x06b6d4 },
+            { id: 'orange', label: 'Orange', css: '#ea580c', hex: 0xea580c },
+            { id: 'purple', label: 'Purple', css: '#9333ea', hex: 0x9333ea },
+            { id: 'pink',   label: 'Pink',   css: '#ec4899', hex: 0xec4899 }
+        ];
+        function getPlayerColorDef(colorId) {
+            return PLAYER_COLORS.find(c => c.id === colorId) || PLAYER_COLORS[0];
+        }
+        function getPlayerColorHex(colorId) {
+            return getPlayerColorDef(colorId).hex;
+        }
+        function applyPlayerColorToMaterials(hex) {
+            if (typeof window !== 'undefined') window.selectedPlayerColorHex = hex;
+            if (typeof matUSAColor !== 'undefined' && matUSAColor && matUSAColor.color) matUSAColor.color.setHex(hex);
+            if (typeof matChinaColor !== 'undefined' && matChinaColor && matChinaColor.color) matChinaColor.color.setHex(hex);
+            if (typeof matGLAColor !== 'undefined' && matGLAColor && matGLAColor.color) matGLAColor.color.setHex(hex);
+        }
+        if (typeof window !== 'undefined') {
+            window.PLAYER_COLORS = PLAYER_COLORS;
+            window.getPlayerColorHex = getPlayerColorHex;
+            window.applyPlayerColorToMaterials = applyPlayerColorToMaterials;
+            window.selectedPlayerColor = 'blue';
+            window.selectedPlayerColorHex = 0x2563eb;
+        }
+
         // --- SKIRMISH & MULTIPLAYER LOBBY SLOTS STATE ---
         let spSlots = [
-            { id: 1, name: 'Player (You)', isPlayer: true, isHuman: true, active: true, team: 1, faction: 'usa', spawnId: 1, difficulty: 'medium' },
-            { id: 2, name: 'AI Opponent 1', isPlayer: false, isHuman: false, active: true, team: 2, faction: 'china', spawnId: 2, difficulty: 'medium' },
-            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'gla', spawnId: 3, difficulty: 'medium' },
-            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, active: false, team: 1, faction: 'usa', spawnId: 4, difficulty: 'medium' },
-            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'china', spawnId: 5, difficulty: 'medium' },
-            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'gla', spawnId: 6, difficulty: 'medium' },
-            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'usa', spawnId: 7, difficulty: 'medium' },
-            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, active: false, team: 4, faction: 'china', spawnId: 8, difficulty: 'medium' }
+            { id: 1, name: 'Player (You)', isPlayer: true, isHuman: true, active: true, team: 1, faction: 'usa', color: 'blue', spawnId: 1, difficulty: 'medium' },
+            { id: 2, name: 'AI Opponent 1', isPlayer: false, isHuman: false, active: true, team: 2, faction: 'china', color: 'red', spawnId: 2, difficulty: 'medium' },
+            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'gla', color: 'green', spawnId: 3, difficulty: 'medium' },
+            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, active: false, team: 1, faction: 'usa', color: 'yellow', spawnId: 4, difficulty: 'medium' },
+            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'china', color: 'cyan', spawnId: 5, difficulty: 'medium' },
+            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'gla', color: 'orange', spawnId: 6, difficulty: 'medium' },
+            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'usa', color: 'purple', spawnId: 7, difficulty: 'medium' },
+            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, active: false, team: 4, faction: 'china', color: 'pink', spawnId: 8, difficulty: 'medium' }
         ];
 
         let mpSlots = [
-            { id: 1, name: 'Host (You)', isPlayer: true, isHuman: true, isHost: true, active: true, team: 1, faction: 'usa', spawnId: 1, difficulty: 'medium' },
-            { id: 2, name: 'Challenger', isPlayer: false, isHuman: true, isHost: false, active: true, team: 2, faction: 'china', spawnId: 2, difficulty: 'medium' },
-            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'gla', spawnId: 3, difficulty: 'medium' },
-            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, isHost: false, active: false, team: 1, faction: 'usa', spawnId: 4, difficulty: 'medium' },
-            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'china', spawnId: 5, difficulty: 'medium' },
-            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'gla', spawnId: 6, difficulty: 'medium' },
-            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'usa', spawnId: 7, difficulty: 'medium' },
-            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, isHost: false, active: false, team: 4, faction: 'china', spawnId: 8, difficulty: 'medium' }
+            { id: 1, name: 'Host (You)', isPlayer: true, isHuman: true, isHost: true, active: true, team: 1, faction: 'usa', color: 'blue', spawnId: 1, difficulty: 'medium' },
+            { id: 2, name: 'Challenger', isPlayer: false, isHuman: true, isHost: false, active: true, team: 2, faction: 'china', color: 'red', spawnId: 2, difficulty: 'medium' },
+            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'gla', color: 'green', spawnId: 3, difficulty: 'medium' },
+            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, isHost: false, active: false, team: 1, faction: 'usa', color: 'yellow', spawnId: 4, difficulty: 'medium' },
+            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'china', color: 'cyan', spawnId: 5, difficulty: 'medium' },
+            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'gla', color: 'orange', spawnId: 6, difficulty: 'medium' },
+            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'usa', color: 'purple', spawnId: 7, difficulty: 'medium' },
+            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, isHost: false, active: false, team: 4, faction: 'china', color: 'pink', spawnId: 8, difficulty: 'medium' }
         ];
         window.spSlots = spSlots;
         window.mpSlots = mpSlots;
@@ -1173,8 +1204,8 @@
                 ctx.arc(cx, cy, 13, 0, Math.PI * 2);
 
                 if (assignedSlot) {
-                    const teamColors = ['#0984e3', '#d63031', '#00b894', '#e17055'];
-                    ctx.fillStyle = teamColors[(assignedSlot.team - 1) % 4] || '#0984e3';
+                    const cDef = getPlayerColorDef(assignedSlot.color);
+                    ctx.fillStyle = cDef.css;
                     ctx.fill();
                     ctx.lineWidth = 2.5;
                     ctx.strokeStyle = assignedSlot.isPlayer ? '#00ffcc' : assignedSlot.isHuman ? '#f1c40f' : '#ffffff';
@@ -1318,6 +1349,16 @@
                 }
                 html += `</div>`;
 
+                // 2b. Player Color Selector
+                const curColorDef = getPlayerColorDef(s.color || PLAYER_COLORS[i % PLAYER_COLORS.length].id);
+                html += `<div style="display:flex; align-items:center; gap:4px;">`;
+                html += `<span style="width:10px; height:10px; border-radius:2px; background:${curColorDef.css}; border:1px solid rgba(255,255,255,0.45); display:inline-block; flex-shrink:0;"></span>`;
+                html += `<select class="slot-select" style="width:74px;" ${!s.active ? 'disabled' : ''} onclick="event.stopPropagation(); setFocusedSlot('${mode}', ${i});" onmousedown="event.stopPropagation();" onchange="updateSlot('${mode}', ${i}, 'color', this.value)">`;
+                PLAYER_COLORS.forEach(c => {
+                    html += `<option value="${c.id}" ${curColorDef.id===c.id?'selected':''}>${c.label}</option>`;
+                });
+                html += `</select></div>`;
+
                 // 3. Team Selector (Team 1, 2, 3, 4)
                 html += `<div>`;
                 html += `<select class="slot-select" ${!s.active ? 'disabled' : ''} onclick="event.stopPropagation(); setFocusedSlot('${mode}', ${i});" onmousedown="event.stopPropagation();" onchange="updateSlot('${mode}', ${i}, 'team', parseInt(this.value, 10))">
@@ -1367,6 +1408,10 @@
                 targetSlot.spawnId = value;
             } else {
                 targetSlot[field] = value;
+            }
+            if (field === 'color' && slotIdx === 0) {
+                if (typeof window !== 'undefined') window.selectedPlayerColor = value;
+                applyPlayerColorToMaterials(getPlayerColorHex(value));
             }
 
             renderSlotsUI(mode);

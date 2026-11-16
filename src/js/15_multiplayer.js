@@ -468,12 +468,19 @@
 
                 if (isMe) {
                     // Deploy Local Player Base
+                    if (typeof getPlayerColorHex === 'function' && typeof applyPlayerColorToMaterials === 'function') {
+                        window.selectedPlayerColor = slot.color || 'blue';
+                        applyPlayerColorToMaterials(getPlayerColorHex(window.selectedPlayerColor));
+                    }
                     deployBase(spawnPos, slot.faction, slot.team);
                     camera.position.set(spawnPos.x, 65, spawnPos.z + 65);
                     camera.lookAt(spawnPos.x, 0, spawnPos.z);
                 } else if (slot.isHuman) {
                     // Remote Human Peer Base
-                    const foeCCGroup = (slot.faction === 'china') ? createChinaCommandCenter() : (slot.faction === 'gla') ? createGLACommandCenter() : createUSACommandCenter();
+                    if (typeof getPlayerColorHex === 'function') {
+                        window.activeEnemyColorHex = getPlayerColorHex(slot.color || 'red');
+                    }
+                    const foeCCGroup = (slot.faction === 'china') ? createChinaCommandCenter(true) : (slot.faction === 'gla') ? createGLACommandCenter(true) : createUSACommandCenter(true);
                     foeCCGroup.position.copy(spawnPos);
                     scene.add(foeCCGroup);
                     enemyStructures.push({
@@ -484,7 +491,7 @@
                     });
                 } else {
                     // AI Base
-                    deployEnemyBase(spawnPos, slot.faction, 'ai_' + slot.id, slot.team, slot.difficulty);
+                    deployEnemyBase(spawnPos, slot.faction, 'ai_' + slot.id, slot.team, slot.difficulty, slot.color);
                 }
             });
 

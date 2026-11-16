@@ -3867,13 +3867,16 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     const scale = data.s || 0.09;
 
     const vTex = getW3dTexture(modelKey);
-    const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? 'E' : 'F') + ':';
+    const activeHouseHex = isEnemy
+        ? (typeof window !== 'undefined' && window.activeEnemyColorHex ? window.activeEnemyColorHex : 0xdc2626)
+        : (typeof window !== 'undefined' && window.selectedPlayerColorHex ? window.selectedPlayerColorHex : null);
+    const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? ('E:' + activeHouseHex.toString(16)) : 'F') + ':';
     let hullMat, houseMat;
     if (isEnemy) {
         hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => vTex 
-            ? new THREE.MeshStandardMaterial({ map: vTex, color: 0xaa4444, roughness: 0.6, metalness: 0.25 })
-            : new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.52, metalness: 0.35 }));
-        houseMat = getCachedW3DMaterial('veh:enemy:house', () => new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 }));
+            ? new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 })
+            : new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.52, metalness: 0.35 }));
+        houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28 }));
     } else {
         if (vTex) {
             hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 }));
@@ -3886,7 +3889,9 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
                 hullMat = (typeof matGLA !== 'undefined') ? matGLA : getCachedW3DMaterial('veh:gla:hull', () => new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 }));
             }
         }
-        if (faction === 'usa') {
+        if (activeHouseHex) {
+            houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28 }));
+        } else if (faction === 'usa') {
             houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : getCachedW3DMaterial('veh:usa:house', () => new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 }));
         } else if (faction === 'china') {
             houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : getCachedW3DMaterial('veh:china:house', () => new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 }));
@@ -4030,12 +4035,15 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     const scale = data.s || 0.26;
     const bTex = getW3dTexture(buildingKey);
 
+    const activeAccentHex = isEnemy
+        ? (typeof window !== 'undefined' && window.activeEnemyColorHex ? window.activeEnemyColorHex : 0xdc2626)
+        : (typeof window !== 'undefined' && window.selectedPlayerColorHex ? window.selectedPlayerColorHex : null);
     let bldMat, accentMat;
     if (isEnemy) {
         bldMat = bTex
-            ? new THREE.MeshStandardMaterial({ map: bTex, color: 0xaa4444, roughness: 0.65, metalness: 0.25 })
-            : new THREE.MeshStandardMaterial({ color: 0x772222, roughness: 0.65, metalness: 0.25 });
-        accentMat = new THREE.MeshStandardMaterial({ color: 0x992222, roughness: 0.55, metalness: 0.25 });
+            ? new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25 })
+            : new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.65, metalness: 0.25 });
+        accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28 });
     } else {
         if (bTex) {
             bldMat = new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25 });
@@ -4050,7 +4058,9 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 bldMat = new THREE.MeshStandardMaterial({ color: 0x6e6e6e, roughness: 0.7, metalness: 0.3 });
             }
         }
-        if (faction === 'usa') {
+        if (activeAccentHex) {
+            accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28 });
+        } else if (faction === 'usa') {
             accentMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 });
         } else if (faction === 'china') {
             accentMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 });
@@ -12859,27 +12869,58 @@ function resolveObstacleCollisions(unit) {
         // activeCustomMap & savedCustomMaps declared in 01_core.js
         let focusedSlotIdx = 0;
 
+        // Classic C&C Generals 8-Color Player Palette
+        const PLAYER_COLORS = [
+            { id: 'blue',   label: 'Blue',   css: '#2563eb', hex: 0x2563eb },
+            { id: 'red',    label: 'Red',    css: '#dc2626', hex: 0xdc2626 },
+            { id: 'green',  label: 'Green',  css: '#16a34a', hex: 0x16a34a },
+            { id: 'yellow', label: 'Yellow', css: '#eab308', hex: 0xeab308 },
+            { id: 'cyan',   label: 'Cyan',   css: '#06b6d4', hex: 0x06b6d4 },
+            { id: 'orange', label: 'Orange', css: '#ea580c', hex: 0xea580c },
+            { id: 'purple', label: 'Purple', css: '#9333ea', hex: 0x9333ea },
+            { id: 'pink',   label: 'Pink',   css: '#ec4899', hex: 0xec4899 }
+        ];
+        function getPlayerColorDef(colorId) {
+            return PLAYER_COLORS.find(c => c.id === colorId) || PLAYER_COLORS[0];
+        }
+        function getPlayerColorHex(colorId) {
+            return getPlayerColorDef(colorId).hex;
+        }
+        function applyPlayerColorToMaterials(hex) {
+            if (typeof window !== 'undefined') window.selectedPlayerColorHex = hex;
+            if (typeof matUSAColor !== 'undefined' && matUSAColor && matUSAColor.color) matUSAColor.color.setHex(hex);
+            if (typeof matChinaColor !== 'undefined' && matChinaColor && matChinaColor.color) matChinaColor.color.setHex(hex);
+            if (typeof matGLAColor !== 'undefined' && matGLAColor && matGLAColor.color) matGLAColor.color.setHex(hex);
+        }
+        if (typeof window !== 'undefined') {
+            window.PLAYER_COLORS = PLAYER_COLORS;
+            window.getPlayerColorHex = getPlayerColorHex;
+            window.applyPlayerColorToMaterials = applyPlayerColorToMaterials;
+            window.selectedPlayerColor = 'blue';
+            window.selectedPlayerColorHex = 0x2563eb;
+        }
+
         // --- SKIRMISH & MULTIPLAYER LOBBY SLOTS STATE ---
         let spSlots = [
-            { id: 1, name: 'Player (You)', isPlayer: true, isHuman: true, active: true, team: 1, faction: 'usa', spawnId: 1, difficulty: 'medium' },
-            { id: 2, name: 'AI Opponent 1', isPlayer: false, isHuman: false, active: true, team: 2, faction: 'china', spawnId: 2, difficulty: 'medium' },
-            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'gla', spawnId: 3, difficulty: 'medium' },
-            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, active: false, team: 1, faction: 'usa', spawnId: 4, difficulty: 'medium' },
-            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'china', spawnId: 5, difficulty: 'medium' },
-            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'gla', spawnId: 6, difficulty: 'medium' },
-            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'usa', spawnId: 7, difficulty: 'medium' },
-            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, active: false, team: 4, faction: 'china', spawnId: 8, difficulty: 'medium' }
+            { id: 1, name: 'Player (You)', isPlayer: true, isHuman: true, active: true, team: 1, faction: 'usa', color: 'blue', spawnId: 1, difficulty: 'medium' },
+            { id: 2, name: 'AI Opponent 1', isPlayer: false, isHuman: false, active: true, team: 2, faction: 'china', color: 'red', spawnId: 2, difficulty: 'medium' },
+            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'gla', color: 'green', spawnId: 3, difficulty: 'medium' },
+            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, active: false, team: 1, faction: 'usa', color: 'yellow', spawnId: 4, difficulty: 'medium' },
+            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'china', color: 'cyan', spawnId: 5, difficulty: 'medium' },
+            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'gla', color: 'orange', spawnId: 6, difficulty: 'medium' },
+            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'usa', color: 'purple', spawnId: 7, difficulty: 'medium' },
+            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, active: false, team: 4, faction: 'china', color: 'pink', spawnId: 8, difficulty: 'medium' }
         ];
 
         let mpSlots = [
-            { id: 1, name: 'Host (You)', isPlayer: true, isHuman: true, isHost: true, active: true, team: 1, faction: 'usa', spawnId: 1, difficulty: 'medium' },
-            { id: 2, name: 'Challenger', isPlayer: false, isHuman: true, isHost: false, active: true, team: 2, faction: 'china', spawnId: 2, difficulty: 'medium' },
-            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'gla', spawnId: 3, difficulty: 'medium' },
-            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, isHost: false, active: false, team: 1, faction: 'usa', spawnId: 4, difficulty: 'medium' },
-            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'china', spawnId: 5, difficulty: 'medium' },
-            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'gla', spawnId: 6, difficulty: 'medium' },
-            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'usa', spawnId: 7, difficulty: 'medium' },
-            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, isHost: false, active: false, team: 4, faction: 'china', spawnId: 8, difficulty: 'medium' }
+            { id: 1, name: 'Host (You)', isPlayer: true, isHuman: true, isHost: true, active: true, team: 1, faction: 'usa', color: 'blue', spawnId: 1, difficulty: 'medium' },
+            { id: 2, name: 'Challenger', isPlayer: false, isHuman: true, isHost: false, active: true, team: 2, faction: 'china', color: 'red', spawnId: 2, difficulty: 'medium' },
+            { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'gla', color: 'green', spawnId: 3, difficulty: 'medium' },
+            { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, isHost: false, active: false, team: 1, faction: 'usa', color: 'yellow', spawnId: 4, difficulty: 'medium' },
+            { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, isHost: false, active: false, team: 2, faction: 'china', color: 'cyan', spawnId: 5, difficulty: 'medium' },
+            { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'gla', color: 'orange', spawnId: 6, difficulty: 'medium' },
+            { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, isHost: false, active: false, team: 3, faction: 'usa', color: 'purple', spawnId: 7, difficulty: 'medium' },
+            { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, isHost: false, active: false, team: 4, faction: 'china', color: 'pink', spawnId: 8, difficulty: 'medium' }
         ];
         window.spSlots = spSlots;
         window.mpSlots = mpSlots;
@@ -13078,8 +13119,8 @@ function resolveObstacleCollisions(unit) {
                 ctx.arc(cx, cy, 13, 0, Math.PI * 2);
 
                 if (assignedSlot) {
-                    const teamColors = ['#0984e3', '#d63031', '#00b894', '#e17055'];
-                    ctx.fillStyle = teamColors[(assignedSlot.team - 1) % 4] || '#0984e3';
+                    const cDef = getPlayerColorDef(assignedSlot.color);
+                    ctx.fillStyle = cDef.css;
                     ctx.fill();
                     ctx.lineWidth = 2.5;
                     ctx.strokeStyle = assignedSlot.isPlayer ? '#00ffcc' : assignedSlot.isHuman ? '#f1c40f' : '#ffffff';
@@ -13223,6 +13264,16 @@ function resolveObstacleCollisions(unit) {
                 }
                 html += `</div>`;
 
+                // 2b. Player Color Selector
+                const curColorDef = getPlayerColorDef(s.color || PLAYER_COLORS[i % PLAYER_COLORS.length].id);
+                html += `<div style="display:flex; align-items:center; gap:4px;">`;
+                html += `<span style="width:10px; height:10px; border-radius:2px; background:${curColorDef.css}; border:1px solid rgba(255,255,255,0.45); display:inline-block; flex-shrink:0;"></span>`;
+                html += `<select class="slot-select" style="width:74px;" ${!s.active ? 'disabled' : ''} onclick="event.stopPropagation(); setFocusedSlot('${mode}', ${i});" onmousedown="event.stopPropagation();" onchange="updateSlot('${mode}', ${i}, 'color', this.value)">`;
+                PLAYER_COLORS.forEach(c => {
+                    html += `<option value="${c.id}" ${curColorDef.id===c.id?'selected':''}>${c.label}</option>`;
+                });
+                html += `</select></div>`;
+
                 // 3. Team Selector (Team 1, 2, 3, 4)
                 html += `<div>`;
                 html += `<select class="slot-select" ${!s.active ? 'disabled' : ''} onclick="event.stopPropagation(); setFocusedSlot('${mode}', ${i});" onmousedown="event.stopPropagation();" onchange="updateSlot('${mode}', ${i}, 'team', parseInt(this.value, 10))">
@@ -13272,6 +13323,10 @@ function resolveObstacleCollisions(unit) {
                 targetSlot.spawnId = value;
             } else {
                 targetSlot[field] = value;
+            }
+            if (field === 'color' && slotIdx === 0) {
+                if (typeof window !== 'undefined') window.selectedPlayerColor = value;
+                applyPlayerColorToMaterials(getPlayerColorHex(value));
             }
 
             renderSlotsUI(mode);
@@ -13974,6 +14029,10 @@ function resolveObstacleCollisions(unit) {
             const playerSlot = spSlots.find(s => s.active && s.isPlayer) || spSlots[0];
             playerTeamId = playerSlot.team;
             selectedFaction = playerSlot.faction;
+            if (typeof getPlayerColorHex === 'function' && typeof applyPlayerColorToMaterials === 'function') {
+                window.selectedPlayerColor = playerSlot.color || 'blue';
+                applyPlayerColorToMaterials(getPlayerColorHex(window.selectedPlayerColor));
+            }
 
             // Deploy all active slots
             const activeSlots = spSlots.filter(s => s.active);
@@ -13998,7 +14057,7 @@ function resolveObstacleCollisions(unit) {
                         const facList = ['usa', 'china', 'gla'];
                         fac = facList[Math.floor(Math.random() * facList.length)];
                     }
-                    deployEnemyBase(spawnPos, fac, 'ai_' + slot.id, slot.team, slot.difficulty);
+                    deployEnemyBase(spawnPos, fac, 'ai_' + slot.id, slot.team, slot.difficulty, slot.color);
                 }
             });
 
@@ -14091,10 +14150,16 @@ function resolveObstacleCollisions(unit) {
             });
         }
 
-        function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium') {
+        function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium', colorKey = 'red') {
             // Authentic C&C Generals Skirmish Start: Enemy starts with 1 Command Center + 1 Construction Builder (Dozer / Worker)
+            const enemyHex = (typeof getPlayerColorHex === 'function') ? getPlayerColorHex(colorKey) : 0xdc2626;
+            if (typeof window !== 'undefined') {
+                window.activeEnemyColorHex = enemyHex;
+                window.aiColorMap = window.aiColorMap || {};
+                window.aiColorMap[ownerId] = enemyHex;
+            }
             const ccType = 'center';
-            const ccGroup = faction === 'china' ? createChinaCommandCenter() : faction === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
+            const ccGroup = faction === 'china' ? createChinaCommandCenter(true) : faction === 'gla' ? createGLACommandCenter(true) : createUSACommandCenter(true);
             if (!ccGroup.userData || !ccGroup.userData.isW3D) ccGroup.scale.set(1.35, 1.35, 1.35);
             ccGroup.position.copy(pos);
             ccGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
@@ -20606,6 +20671,9 @@ function chooseAICounterUnitType(cmd, facilityType) {
 // Spawn AI structure for base construction or base perimeter defense (Requires active AI Builder: Dozer / Worker!)
 function spawnAIStructure(cmd, type, pos, builderUnit) {
     if (typeof createStructureMeshForFaction !== 'function' || typeof scene === 'undefined') return null;
+    if (typeof window !== 'undefined') {
+        window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
+    }
     const f = cmd.faction || 'china';
     const bType = (f === 'gla') ? 'worker' : 'dozer';
     const activeBuilder = builderUnit || (typeof enemyUnits !== 'undefined' ? enemyUnits.find(u =>
@@ -20676,6 +20744,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     if (supplyStruct && myGatherers.length < desiredGatherers && cmd.resources >= 600) {
         const hType = (cmd.faction === 'gla') ? 'worker' : (cmd.faction === 'usa' ? 'chinook' : 'truck');
         const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
+        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
         const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
         if (harv) {
             cmd.resources -= 600;
@@ -20698,6 +20767,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     if (cmdCenter && myBuilders.length === 0 && cmd.resources >= 1000) {
         const bType = (cmd.faction === 'gla') ? 'worker' : 'dozer';
         const spawnPos = adjustToPossibleDestination(cmdCenter.position.clone().add(new THREE.Vector3(-8, 0, 8)), cmdCenter);
+        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
         const bUnit = spawnEnemyUnit(bType, spawnPos, null, cmd.faction);
         if (bUnit) {
             cmd.resources -= 1000;
@@ -20829,6 +20899,7 @@ function processEnemyAIEngine() {
                 const spawnPos = adjustToPossibleDestination(rawSpawn, chosenFacility);
                 spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
                 const uType = chooseAICounterUnitType(cmd, chosenFacility.type);
+                if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
                 const eu = spawnEnemyUnit(uType, spawnPos, null, cmd.faction);
                 if (eu) {
                     cmd.resources = Math.max(0, (cmd.resources || 0) - 700);
@@ -25199,12 +25270,19 @@ function processScrapCrateCollection() {
 
                 if (isMe) {
                     // Deploy Local Player Base
+                    if (typeof getPlayerColorHex === 'function' && typeof applyPlayerColorToMaterials === 'function') {
+                        window.selectedPlayerColor = slot.color || 'blue';
+                        applyPlayerColorToMaterials(getPlayerColorHex(window.selectedPlayerColor));
+                    }
                     deployBase(spawnPos, slot.faction, slot.team);
                     camera.position.set(spawnPos.x, 65, spawnPos.z + 65);
                     camera.lookAt(spawnPos.x, 0, spawnPos.z);
                 } else if (slot.isHuman) {
                     // Remote Human Peer Base
-                    const foeCCGroup = (slot.faction === 'china') ? createChinaCommandCenter() : (slot.faction === 'gla') ? createGLACommandCenter() : createUSACommandCenter();
+                    if (typeof getPlayerColorHex === 'function') {
+                        window.activeEnemyColorHex = getPlayerColorHex(slot.color || 'red');
+                    }
+                    const foeCCGroup = (slot.faction === 'china') ? createChinaCommandCenter(true) : (slot.faction === 'gla') ? createGLACommandCenter(true) : createUSACommandCenter(true);
                     foeCCGroup.position.copy(spawnPos);
                     scene.add(foeCCGroup);
                     enemyStructures.push({
@@ -25215,7 +25293,7 @@ function processScrapCrateCollection() {
                     });
                 } else {
                     // AI Base
-                    deployEnemyBase(spawnPos, slot.faction, 'ai_' + slot.id, slot.team, slot.difficulty);
+                    deployEnemyBase(spawnPos, slot.faction, 'ai_' + slot.id, slot.team, slot.difficulty, slot.color);
                 }
             });
 

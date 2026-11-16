@@ -146,7 +146,7 @@ const THREE = {
     LinearMipmapLinearFilter: 1008,
     LinearFilter: 1006,
     MeshBasicMaterial: function() { this.dispose = () => {}; },
-    MeshStandardMaterial: function() { this.dispose = () => {}; },
+    MeshStandardMaterial: function(opts) { this.dispose = () => {}; this.color = { setHex: () => {}, set: () => {} }; this.map = opts && opts.map; },
     MeshLambertMaterial: function() { this.dispose = () => {}; },
     MeshPhongMaterial: function() { this.dispose = () => {}; },
     LineBasicMaterial: function() { this.dispose = () => {}; },

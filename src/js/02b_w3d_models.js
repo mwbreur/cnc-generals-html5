@@ -183,13 +183,16 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     const scale = data.s || 0.09;
 
     const vTex = getW3dTexture(modelKey);
-    const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? 'E' : 'F') + ':';
+    const activeHouseHex = isEnemy
+        ? (typeof window !== 'undefined' && window.activeEnemyColorHex ? window.activeEnemyColorHex : 0xdc2626)
+        : (typeof window !== 'undefined' && window.selectedPlayerColorHex ? window.selectedPlayerColorHex : null);
+    const matPrefix = 'veh:' + modelKey + ':' + (isEnemy ? ('E:' + activeHouseHex.toString(16)) : 'F') + ':';
     let hullMat, houseMat;
     if (isEnemy) {
         hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => vTex 
-            ? new THREE.MeshStandardMaterial({ map: vTex, color: 0xaa4444, roughness: 0.6, metalness: 0.25 })
-            : new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.52, metalness: 0.35 }));
-        houseMat = getCachedW3DMaterial('veh:enemy:house', () => new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.55, metalness: 0.25 }));
+            ? new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 })
+            : new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.52, metalness: 0.35 }));
+        houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28 }));
     } else {
         if (vTex) {
             hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 }));
@@ -202,7 +205,9 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
                 hullMat = (typeof matGLA !== 'undefined') ? matGLA : getCachedW3DMaterial('veh:gla:hull', () => new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 }));
             }
         }
-        if (faction === 'usa') {
+        if (activeHouseHex) {
+            houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28 }));
+        } else if (faction === 'usa') {
             houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : getCachedW3DMaterial('veh:usa:house', () => new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 }));
         } else if (faction === 'china') {
             houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : getCachedW3DMaterial('veh:china:house', () => new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 }));
@@ -346,12 +351,15 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     const scale = data.s || 0.26;
     const bTex = getW3dTexture(buildingKey);
 
+    const activeAccentHex = isEnemy
+        ? (typeof window !== 'undefined' && window.activeEnemyColorHex ? window.activeEnemyColorHex : 0xdc2626)
+        : (typeof window !== 'undefined' && window.selectedPlayerColorHex ? window.selectedPlayerColorHex : null);
     let bldMat, accentMat;
     if (isEnemy) {
         bldMat = bTex
-            ? new THREE.MeshStandardMaterial({ map: bTex, color: 0xaa4444, roughness: 0.65, metalness: 0.25 })
-            : new THREE.MeshStandardMaterial({ color: 0x772222, roughness: 0.65, metalness: 0.25 });
-        accentMat = new THREE.MeshStandardMaterial({ color: 0x992222, roughness: 0.55, metalness: 0.25 });
+            ? new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25 })
+            : new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.65, metalness: 0.25 });
+        accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28 });
     } else {
         if (bTex) {
             bldMat = new THREE.MeshStandardMaterial({ map: bTex, roughness: 0.65, metalness: 0.25 });
@@ -366,7 +374,9 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 bldMat = new THREE.MeshStandardMaterial({ color: 0x6e6e6e, roughness: 0.7, metalness: 0.3 });
             }
         }
-        if (faction === 'usa') {
+        if (activeAccentHex) {
+            accentMat = new THREE.MeshStandardMaterial({ color: activeAccentHex, roughness: 0.55, metalness: 0.28 });
+        } else if (faction === 'usa') {
             accentMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 });
         } else if (faction === 'china') {
             accentMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 });

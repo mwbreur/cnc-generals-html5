@@ -663,6 +663,10 @@
             const playerSlot = spSlots.find(s => s.active && s.isPlayer) || spSlots[0];
             playerTeamId = playerSlot.team;
             selectedFaction = playerSlot.faction;
+            if (typeof getPlayerColorHex === 'function' && typeof applyPlayerColorToMaterials === 'function') {
+                window.selectedPlayerColor = playerSlot.color || 'blue';
+                applyPlayerColorToMaterials(getPlayerColorHex(window.selectedPlayerColor));
+            }
 
             // Deploy all active slots
             const activeSlots = spSlots.filter(s => s.active);
@@ -687,7 +691,7 @@
                         const facList = ['usa', 'china', 'gla'];
                         fac = facList[Math.floor(Math.random() * facList.length)];
                     }
-                    deployEnemyBase(spawnPos, fac, 'ai_' + slot.id, slot.team, slot.difficulty);
+                    deployEnemyBase(spawnPos, fac, 'ai_' + slot.id, slot.team, slot.difficulty, slot.color);
                 }
             });
 
@@ -780,10 +784,16 @@
             });
         }
 
-        function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium') {
+        function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty = 'medium', colorKey = 'red') {
             // Authentic C&C Generals Skirmish Start: Enemy starts with 1 Command Center + 1 Construction Builder (Dozer / Worker)
+            const enemyHex = (typeof getPlayerColorHex === 'function') ? getPlayerColorHex(colorKey) : 0xdc2626;
+            if (typeof window !== 'undefined') {
+                window.activeEnemyColorHex = enemyHex;
+                window.aiColorMap = window.aiColorMap || {};
+                window.aiColorMap[ownerId] = enemyHex;
+            }
             const ccType = 'center';
-            const ccGroup = faction === 'china' ? createChinaCommandCenter() : faction === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
+            const ccGroup = faction === 'china' ? createChinaCommandCenter(true) : faction === 'gla' ? createGLACommandCenter(true) : createUSACommandCenter(true);
             if (!ccGroup.userData || !ccGroup.userData.isW3D) ccGroup.scale.set(1.35, 1.35, 1.35);
             ccGroup.position.copy(pos);
             ccGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });

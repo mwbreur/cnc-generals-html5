@@ -673,6 +673,9 @@ function chooseAICounterUnitType(cmd, facilityType) {
 // Spawn AI structure for base construction or base perimeter defense (Requires active AI Builder: Dozer / Worker!)
 function spawnAIStructure(cmd, type, pos, builderUnit) {
     if (typeof createStructureMeshForFaction !== 'function' || typeof scene === 'undefined') return null;
+    if (typeof window !== 'undefined') {
+        window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
+    }
     const f = cmd.faction || 'china';
     const bType = (f === 'gla') ? 'worker' : 'dozer';
     const activeBuilder = builderUnit || (typeof enemyUnits !== 'undefined' ? enemyUnits.find(u =>
@@ -743,6 +746,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     if (supplyStruct && myGatherers.length < desiredGatherers && cmd.resources >= 600) {
         const hType = (cmd.faction === 'gla') ? 'worker' : (cmd.faction === 'usa' ? 'chinook' : 'truck');
         const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
+        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
         const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
         if (harv) {
             cmd.resources -= 600;
@@ -765,6 +769,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     if (cmdCenter && myBuilders.length === 0 && cmd.resources >= 1000) {
         const bType = (cmd.faction === 'gla') ? 'worker' : 'dozer';
         const spawnPos = adjustToPossibleDestination(cmdCenter.position.clone().add(new THREE.Vector3(-8, 0, 8)), cmdCenter);
+        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
         const bUnit = spawnEnemyUnit(bType, spawnPos, null, cmd.faction);
         if (bUnit) {
             cmd.resources -= 1000;
@@ -896,6 +901,7 @@ function processEnemyAIEngine() {
                 const spawnPos = adjustToPossibleDestination(rawSpawn, chosenFacility);
                 spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
                 const uType = chooseAICounterUnitType(cmd, chosenFacility.type);
+                if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
                 const eu = spawnEnemyUnit(uType, spawnPos, null, cmd.faction);
                 if (eu) {
                     cmd.resources = Math.max(0, (cmd.resources || 0) - 700);
