@@ -179,6 +179,13 @@ function renderRadarMinimap() {
         });
     }
 
+    const playerRadarColor = (typeof window !== 'undefined' && window.selectedPlayerColorHex)
+        ? ('#' + window.selectedPlayerColorHex.toString(16).padStart(6, '0'))
+        : '#2ecc71';
+    const enemyRadarColor = (typeof window !== 'undefined' && window.activeEnemyColorHex)
+        ? ('#' + window.activeEnemyColorHex.toString(16).padStart(6, '0'))
+        : '#ff3838';
+
     // 6. Draw Friendly Structures
     structures.forEach(s => {
         if (s.health > 0) {
@@ -187,7 +194,7 @@ function renderRadarMinimap() {
             const sz = Math.max(4.5, (s.radius || 4) / mapSize * w * 2.2);
             ctx.fillStyle = '#000000';
             ctx.fillRect(rx - sz/2 - 0.5, rz - sz/2 - 0.5, sz + 1, sz + 1);
-            ctx.fillStyle = '#2ecc71';
+            ctx.fillStyle = playerRadarColor;
             ctx.fillRect(rx - sz/2, rz - sz/2, sz, sz);
         }
     });
@@ -203,7 +210,7 @@ function renderRadarMinimap() {
             const sz = Math.max(4.5, (es.radius || 4) / mapSize * w * 2.2);
             ctx.fillStyle = '#000000';
             ctx.fillRect(rx - sz/2 - 0.5, rz - sz/2 - 0.5, sz + 1, sz + 1);
-            ctx.fillStyle = isAlly ? '#00cec9' : '#ff3838';
+            ctx.fillStyle = isAlly ? '#00cec9' : enemyRadarColor;
             ctx.fillRect(rx - sz/2, rz - sz/2, sz, sz);
         }
     });
@@ -215,7 +222,7 @@ function renderRadarMinimap() {
             const rz = toRZ(u.mesh.position.z);
             ctx.fillStyle = '#000000';
             ctx.fillRect(rx - 2.5, rz - 2.5, 5, 5);
-            ctx.fillStyle = u.selected ? '#ffffff' : '#55efc4';
+            ctx.fillStyle = u.selected ? '#ffffff' : playerRadarColor;
             ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);
         }
     });
@@ -229,7 +236,7 @@ function renderRadarMinimap() {
             const rz = toRZ(eu.mesh.position.z);
             ctx.fillStyle = '#000000';
             ctx.fillRect(rx - 2.5, rz - 2.5, 5, 5);
-            ctx.fillStyle = isAlly ? '#81ecec' : '#ff4757';
+            ctx.fillStyle = isAlly ? '#81ecec' : enemyRadarColor;
             ctx.fillRect(rx - 1.5, rz - 1.5, 3, 3);
         }
     });
@@ -3639,12 +3646,14 @@ function updateHUD() {
             group.name = "selectionReticle";
             group.position.y = 0.05;
 
-            const factionColor = (typeof selectedFaction !== 'undefined' && selectedFaction === 'china') ? 0xff4757 : 
-                                 (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla') ? 0xffa502 : 0x00ffcc;
+            const teamRingColor = (typeof window !== 'undefined' && window.selectedPlayerColorHex)
+                ? window.selectedPlayerColorHex
+                : ((typeof selectedFaction !== 'undefined' && selectedFaction === 'china') ? 0xff4757 :
+                   (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla') ? 0xffa502 : 0x00ffcc);
 
             // 1. High-contrast ground circle
             const ringGeo = new THREE.RingGeometry(r - 0.08, r, 32);
-            const ringMat = new THREE.MeshBasicMaterial({ color: factionColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+            const ringMat = new THREE.MeshBasicMaterial({ color: teamRingColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
             const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.rotation.x = -Math.PI / 2;
             group.add(ring);

@@ -954,19 +954,20 @@
         // activeCustomMap & savedCustomMaps declared in 01_core.js
         let focusedSlotIdx = 0;
 
-        // Classic C&C Generals 8-Color Player Palette
+        // Classic C&C Generals 8-Color Player Palette (multiplayer.ini)
         const PLAYER_COLORS = [
-            { id: 'blue',   label: 'Blue',   css: '#2563eb', hex: 0x2563eb },
-            { id: 'red',    label: 'Red',    css: '#dc2626', hex: 0xdc2626 },
-            { id: 'green',  label: 'Green',  css: '#16a34a', hex: 0x16a34a },
-            { id: 'yellow', label: 'Yellow', css: '#eab308', hex: 0xeab308 },
-            { id: 'cyan',   label: 'Cyan',   css: '#06b6d4', hex: 0x06b6d4 },
-            { id: 'orange', label: 'Orange', css: '#ea580c', hex: 0xea580c },
-            { id: 'purple', label: 'Purple', css: '#9333ea', hex: 0x9333ea },
-            { id: 'pink',   label: 'Pink',   css: '#ec4899', hex: 0xec4899 }
+            { id: 'red',    label: 'Red',            css: '#dc2626', hex: 0xdc2626 },
+            { id: 'blue',   label: 'Blue',           css: '#2563eb', hex: 0x2563eb },
+            { id: 'green',  label: 'Green',          css: '#16a34a', hex: 0x16a34a },
+            { id: 'yellow', label: 'Yellow',         css: '#eab308', hex: 0xeab308 },
+            { id: 'orange', label: 'Orange',         css: '#ea580c', hex: 0xea580c },
+            { id: 'purple', label: 'Purple',         css: '#9333ea', hex: 0x9333ea },
+            { id: 'teal',   label: 'Teal',           css: '#06b6d4', hex: 0x06b6d4 },
+            { id: 'pink',   label: 'Pink / Magenta', css: '#ec4899', hex: 0xec4899 }
         ];
         function getPlayerColorDef(colorId) {
-            return PLAYER_COLORS.find(c => c.id === colorId) || PLAYER_COLORS[0];
+            const normalized = colorId === 'cyan' ? 'teal' : (colorId === 'magenta' ? 'pink' : colorId);
+            return PLAYER_COLORS.find(c => c.id === normalized) || PLAYER_COLORS[1];
         }
         function getPlayerColorHex(colorId) {
             return getPlayerColorDef(colorId).hex;
