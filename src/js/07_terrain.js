@@ -743,47 +743,62 @@
                     const isSnow = (effectiveTheme === 'snow');
                     const isJungle = (effectiveTheme === 'jungle');
                     const isCity = (effectiveTheme === 'city');
-                    // Bright neutral base so vertexColors drive macro hues without washing out contrast
-                    tCtx.fillStyle = isCity ? '#c8ccd2' : isSnow ? '#f2f6fa' : isJungle ? '#d8e4cf' : '#ede0c8';
+                    // Warm neutral base so vertexColors drive macro hues without washing out contrast
+                    tCtx.fillStyle = isCity ? '#c2c6cc' : isSnow ? '#f0f4f8' : isJungle ? '#d2dec8' : '#e0cfb2';
                     tCtx.fillRect(0, 0, 512, 512);
 
                     let seed = 4242;
                     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 
-                    // Soft organic dirt/grass/sand patches
+                    // Toroidally wrapped organic dirt/grass/sand patches (zero tile seams)
                     for (let i = 0; i < 450; i++) {
+                        const ex = rand() * 512, ey = rand() * 512;
+                        const rx = 8 + rand() * 28, ry = 5 + rand() * 20, rot = rand() * Math.PI;
                         tCtx.fillStyle = rand() > 0.5
-                            ? (isCity ? 'rgba(90,95,102,0.14)' : isSnow ? 'rgba(185,202,220,0.18)' : isJungle ? 'rgba(72,96,52,0.18)' : 'rgba(155,112,62,0.16)')
-                            : 'rgba(255,250,240,0.16)';
-                        tCtx.beginPath();
-                        tCtx.ellipse(rand() * 512, rand() * 512, 8 + rand() * 28, 5 + rand() * 20, rand() * Math.PI, 0, Math.PI * 2);
-                        tCtx.fill();
+                            ? (isCity ? 'rgba(90,95,102,0.16)' : isSnow ? 'rgba(185,202,220,0.18)' : isJungle ? 'rgba(64,88,44,0.20)' : 'rgba(145,104,54,0.18)')
+                            : 'rgba(255,248,234,0.15)';
+                        for (let ox = -512; ox <= 512; ox += 512) {
+                            if (ex + ox < -40 || ex + ox > 552) continue;
+                            for (let oy = -512; oy <= 512; oy += 512) {
+                                if (ey + oy < -40 || ey + oy > 552) continue;
+                                tCtx.beginPath();
+                                tCtx.ellipse(ex + ox, ey + oy, rx, ry, rot, 0, Math.PI * 2);
+                                tCtx.fill();
+                            }
+                        }
                     }
 
-                    // Wind-swept sand ripples for desert/snow
+                    // Periodic wind-swept sand ripples for desert/snow (exact integer period across 512px)
                     if (!isCity && !isJungle) {
+                        const twoPi = Math.PI * 2;
                         for (let y = 0; y < 512; y += 8) {
-                            tCtx.strokeStyle = (y % 16 === 0) ? 'rgba(140,104,58,0.20)' : 'rgba(255,252,244,0.20)';
-                            tCtx.lineWidth = 1.6;
+                            tCtx.strokeStyle = (y % 16 === 0) ? 'rgba(135,98,52,0.18)' : 'rgba(255,250,240,0.16)';
+                            tCtx.lineWidth = 1.5;
                             tCtx.beginPath();
                             for (let x = 0; x <= 512; x += 16) {
-                                const yy = y + Math.sin(x * 0.049 + y * 0.08) * 2.4;
+                                const yy = y + Math.sin((x / 512) * twoPi * 4 + (y / 512) * twoPi * 6) * 2.2;
                                 if (x === 0) tCtx.moveTo(x, yy); else tCtx.lineTo(x, yy);
                             }
                             tCtx.stroke();
                         }
                     }
 
-                    // Crisp high-frequency pebbles, gravel & mineral speckles
-                    for (let i = 0; i < 6500; i++) {
+                    // Crisp high-frequency pebbles, gravel & mineral speckles (wrapped across edges)
+                    for (let i = 0; i < 7500; i++) {
                         const px = rand() * 512, py = rand() * 512;
-                        const r = 0.5 + rand() * 1.9;
-                        tCtx.fillStyle = rand() > 0.45
-                            ? (isSnow ? 'rgba(150,170,190,0.28)' : 'rgba(78,58,36,0.28)')
-                            : 'rgba(255,255,255,0.24)';
-                        tCtx.beginPath();
-                        tCtx.arc(px, py, r, 0, Math.PI * 2);
-                        tCtx.fill();
+                        const r = 0.55 + rand() * 2.1;
+                        tCtx.fillStyle = rand() > 0.42
+                            ? (isSnow ? 'rgba(145,165,185,0.30)' : 'rgba(68,48,28,0.32)')
+                            : 'rgba(255,252,245,0.22)';
+                        for (let ox = -512; ox <= 512; ox += 512) {
+                            if (px + ox < -4 || px + ox > 516) continue;
+                            for (let oy = -512; oy <= 512; oy += 512) {
+                                if (py + oy < -4 || py + oy > 516) continue;
+                                tCtx.beginPath();
+                                tCtx.arc(px + ox, py + oy, r, 0, Math.PI * 2);
+                                tCtx.fill();
+                            }
+                        }
                     }
 
                     terrainTexture = new THREE.CanvasTexture(tileCanvas);
@@ -840,8 +855,8 @@
             const terrainMat = new THREE.MeshStandardMaterial({
                 map: terrainTexture,
                 vertexColors: !isCustom,
-                bumpMap: (typeof texBumpConcrete !== 'undefined') ? texBumpConcrete : null,
-                bumpScale: 0.45,
+                bumpMap: terrainTexture,
+                bumpScale: 0.30,
                 roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.92,
                 metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
             });
