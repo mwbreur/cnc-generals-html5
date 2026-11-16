@@ -2043,14 +2043,15 @@
                 const hStab = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.2, 1.2), wingMat);
                 hStab.position.set(0, 0.7, -3.9);
                 plane.add(fuselage, wings, tail, hStab);
+                plane.scale.set(1.6, 1.6, 1.6);
             }
             const c130Props = [];
             plane.traverse(c => {
                 if (c.name && c.name.toUpperCase().startsWith('PROPELLER')) c130Props.push(c);
             });
 
-            const startPos = new THREE.Vector3(dropCenter.x - 85, groundY + 28, dropCenter.z - 35);
-            const endPos = new THREE.Vector3(dropCenter.x + 85, groundY + 28, dropCenter.z + 35);
+            const startPos = new THREE.Vector3(dropCenter.x - 105, groundY + 16, dropCenter.z - 42);
+            const endPos = new THREE.Vector3(dropCenter.x + 105, groundY + 16, dropCenter.z + 42);
             plane.position.copy(startPos);
             plane.lookAt(endPos);
             scene.add(plane);
@@ -2058,7 +2059,7 @@
             if (typeof playAudio === 'function') playAudio('radio_chirp', {}, 'usa');
 
             let planeTick = 0;
-            const planeDuration = 180;
+            const planeDuration = 220;
             let crateDropped = false;
 
             // 2. Parachute Supply Crate

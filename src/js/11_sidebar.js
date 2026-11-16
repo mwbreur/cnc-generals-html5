@@ -3402,8 +3402,9 @@ function updateHUD() {
                             spawnSmokePuff(smokePos, 0xff2e2e);
                         }
                     }
-                    // Continues timer & functions even during Low Power or EMP (2-minute = 7200 ticks cycle)
-                    structure.dropTicks = (structure.dropTicks || 0) + 60;
+                    // Continues timer & functions even during Low Power or EMP (first drop ~10s after build, then every 2m = 7200 ticks)
+                    if (structure.dropTicks === undefined) structure.dropTicks = 6600;
+                    structure.dropTicks += 60;
                     if (structure.dropTicks >= 7200) {
                         structure.dropTicks = 0;
                         if (typeof triggerSupplyDropZoneDelivery === 'function') {
