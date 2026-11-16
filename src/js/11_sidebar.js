@@ -3267,13 +3267,23 @@ function updateHUD() {
                     // Animate 3D superweapon buildup state based on chargeRatio (0.0 -> 1.0)
                     if (structure.mesh) {
                         if (structure.type === 'nukeSilo') {
+                            const roof = getCachedNode(structure.mesh, 'LINE38');
                             const doorL = getCachedNode(structure.mesh, 'nukeBlastDoorL');
                             const doorR = getCachedNode(structure.mesh, 'nukeBlastDoorR');
                             const tip = getCachedNode(structure.mesh, 'nukeTip');
-                            const openFactor = chargeRatio > 0.5 ? (chargeRatio - 0.5) * 2.0 : 0;
+                            const openFactor = chargeRatio > 0.45 ? Math.min(1, (chargeRatio - 0.45) / 0.35) : 0;
+                            if (roof) roof.rotation.z = (Math.PI / 2) * (1 - openFactor);
                             if (doorL) doorL.position.x = -2.2 - openFactor * 1.1;
                             if (doorR) doorR.position.x = 2.2 + openFactor * 1.1;
-                            if (tip) tip.position.y = 0.8 + chargeRatio * 1.8;
+                            if (tip) {
+                                const isW3D = structure.mesh.userData && structure.mesh.userData.isW3D;
+                                tip.position.y = isW3D
+                                    ? (2 + Math.max(0, (chargeRatio - 0.5) * 2.0) * 22)
+                                    : (0.8 + chargeRatio * 1.8);
+                            }
+                            if (chargeRatio < 1.0 && buildingTick % 20 === 0 && typeof spawnSmokePuff === 'function') {
+                                spawnSmokePuff(structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4, 2.5, (Math.random() - 0.5) * 4 - 4)), 0xdcdde1, 0.7);
+                            }
                         } else if (structure.type === 'scudStorm') {
                             const gantry = getCachedNode(structure.mesh, 'scudGantry');
                             if (gantry) gantry.rotation.x = -0.15 - chargeRatio * 0.75; // Elevate 9 Scuds toward vertical launch angle

@@ -578,6 +578,21 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const stripeSideR = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 74), accentMat);
         stripeSideR.position.set(21.2, 21.8, -2);
         root.add(stripeFront, stripeSideL, stripeSideR);
+    } else if (buildingKey === 'china_nukeSilo') {
+        // Close silo blast roof flat over the shaft at start (opens up as countdown progresses)
+        const roof = root.getObjectByName('LINE38');
+        if (roof) roof.rotation.z = Math.PI / 2;
+        const nukeTipGroup = new THREE.Group();
+        nukeTipGroup.name = 'nukeTip';
+        nukeTipGroup.position.set(0, 2, -20.5);
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 20, 12), new THREE.MeshStandardMaterial({ color: 0xecf0f1, metalness: 0.65, roughness: 0.3 }));
+        body.position.y = 10;
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(3.35, 3.35, 3.5, 12), nukeMat);
+        band.position.y = 14;
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(3.2, 7.5, 12), new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.35 }));
+        cone.position.y = 23.75;
+        nukeTipGroup.add(body, band, cone);
+        root.add(nukeTipGroup);
         // USA Command Center Radar Lattice Tower + Rotating Parabolic Dish at OBJECT22 pad
         const towerGrp = new THREE.Group();
         towerGrp.position.set(49.03, 0.89, 19.94);
