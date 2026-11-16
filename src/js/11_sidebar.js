@@ -3091,7 +3091,9 @@ function attachControlRodsVisual(structure) {
     if (!structure || !structure.mesh) return;
     if (structure.mesh.userData && structure.mesh.userData.isW3D) {
         structure.mesh.traverse(child => {
-            if (child.name === 'controlRodCap') {
+            if (child.name === 'controlRodsOfficialUpgrade') {
+                child.visible = true;
+            } else if (child.name === 'controlRodCap') {
                 child.position.y = 31.2;
             } else if (child.name === 'controlRodCore') {
                 child.visible = true;
