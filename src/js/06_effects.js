@@ -456,6 +456,7 @@
             for (let i = 0; i < count; i++) {
                 const mesh = new THREE.Mesh(_fxSparkGeo, mat);
                 mesh.position.copy(pos);
+                mesh.position.y += 0.35;
                 scene.add(mesh);
 
                 const angle = Math.random() * Math.PI * 2;
@@ -494,10 +495,14 @@
                 color: 0x111111,
                 transparent: true,
                 opacity: 0.85,
-                depthWrite: false
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor: -2,
+                polygonOffsetUnits: -2
             });
             const crater = new THREE.Mesh(geo, mat);
-            crater.position.set(pos.x, groundY + 0.03, pos.z);
+            crater.position.set(pos.x, groundY + 0.18, pos.z);
+            crater.renderOrder = 2;
             scene.add(crater);
 
             activeFX.push({
@@ -1087,14 +1092,19 @@
             const patchGeo = new THREE.CircleGeometry(2.6, 12);
             patchGeo.rotateX(-Math.PI / 2);
             const patchMat = new THREE.MeshBasicMaterial({
-                color: 0xff6b00,
+                color: 0xff7b1a,
                 transparent: true,
-                opacity: 0.65,
-                depthWrite: false
+                opacity: 0.85,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                polygonOffset: true,
+                polygonOffsetFactor: -3,
+                polygonOffsetUnits: -3
             });
             const patch = new THREE.Mesh(patchGeo, patchMat);
             const py = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
-            patch.position.set(pos.x, py + 0.14, pos.z);
+            patch.position.set(pos.x, py + 0.22, pos.z);
+            patch.renderOrder = 3;
             scene.add(patch);
 
             let fireLife = 210; // ~3.5 seconds of residual fire
@@ -1143,35 +1153,49 @@
             window.activeParticleCannonSpeed = 0.42;
             if (isPlayerOwned) setParticleBeamCursor(true);
 
+            const addBlend = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
+
             // 1. Searing inner white-hot core + outer cyan orbital plasma column
             const coreGeo = new THREE.CylinderGeometry(0.45, 0.75, 110, 16);
-            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98 });
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, depthWrite: false, ...addBlend });
             const coreBeam = new THREE.Mesh(coreGeo, coreMat);
             coreBeam.position.y = 55;
+            coreBeam.renderOrder = 6;
             group.add(coreBeam);
 
-            const beamGeo = new THREE.CylinderGeometry(1.15, 2.1, 110, 20, 1, true);
-            const beamMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.72, side: THREE.DoubleSide });
+            const beamGeo = new THREE.CylinderGeometry(1.25, 2.35, 110, 20, 1, true);
+            const beamMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false, ...addBlend });
             const beam = new THREE.Mesh(beamGeo, beamMat);
             beam.position.y = 55;
+            beam.renderOrder = 5;
             group.add(beam);
 
-            // Ground impact plasma flare disc
-            const flareGeo = new THREE.RingGeometry(0.4, 4.2, 28);
+            // Ground impact plasma flare disc + inner white-hot core pool
+            const flareGeo = new THREE.CircleGeometry(4.8, 28);
             flareGeo.rotateX(-Math.PI / 2);
-            const flareMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+            const flareMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, ...addBlend });
             const flareDisc = new THREE.Mesh(flareGeo, flareMat);
-            flareDisc.position.y = 0.25;
+            flareDisc.position.y = 0.35;
+            flareDisc.renderOrder = 5;
             group.add(flareDisc);
+
+            const impactCoreGeo = new THREE.CircleGeometry(2.1, 20);
+            impactCoreGeo.rotateX(-Math.PI / 2);
+            const impactCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5, ...addBlend });
+            const impactCore = new THREE.Mesh(impactCoreGeo, impactCoreMat);
+            impactCore.position.y = 0.42;
+            impactCore.renderOrder = 6;
+            group.add(impactCore);
 
             // 2. Rotating orbital energy vortex rings
             const rings = [];
             for (let i = 0; i < 5; i++) {
                 const rGeo = new THREE.RingGeometry(1.8 + i * 0.65, 2.35 + i * 0.65, 24);
                 rGeo.rotateX(-Math.PI / 2);
-                const rMat = new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xffffff : 0x00f2fe, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+                const rMat = new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xffffff : 0x00f2fe, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, ...addBlend });
                 const r = new THREE.Mesh(rGeo, rMat);
-                r.position.y = 4 + i * 14;
+                r.position.y = 1.2 + i * 14;
+                r.renderOrder = 5;
                 group.add(r);
                 rings.push(r);
             }
@@ -1234,17 +1258,45 @@
                     const pulse = 0.92 + Math.sin(life * 0.6) * 0.16;
                     coreBeam.scale.set(pulse, 1, pulse);
                     beam.scale.set(1.0 + Math.cos(life * 0.4) * 0.18, 1, 1.0 + Math.cos(life * 0.4) * 0.18);
-                    flareDisc.scale.setScalar(0.9 + Math.sin(life * 0.5) * 0.25);
+                    flareDisc.scale.setScalar(0.92 + Math.sin(life * 0.5) * 0.22);
+                    impactCore.scale.setScalar(0.85 + Math.cos(life * 0.7) * 0.2);
 
                     rings.forEach((r, idx) => {
                         r.rotation.z += 0.16 * (idx % 2 === 0 ? 1 : -1);
                         r.scale.setScalar(1 + Math.sin(Date.now() * 0.02 + idx) * 0.22);
                     });
 
-                    // Ground electrical sizzle, molten scorch & sparks
-                    if (Math.random() < 0.85) {
-                        spawnSparks(group.position, 0x00f2fe, 9);
-                        spawnSmokePuff(group.position, 0x222f3e, 0.65);
+                    // Ground electrical sizzle, molten scorch, shockwave rings & sparks
+                    if (Math.random() < 0.9) {
+                        spawnSparks(group.position, 0x00f2fe, 10);
+                        if (Math.random() < 0.5) spawnSparks(group.position, 0xffffff, 5);
+                        spawnSmokePuff(group.position, 0x222f3e, 0.75);
+                    }
+                    if (life % 16 === 0) {
+                        const swGeo = new THREE.RingGeometry(1.2, 2.2, 24);
+                        swGeo.rotateX(-Math.PI / 2);
+                        const swMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, ...addBlend });
+                        const sw = new THREE.Mesh(swGeo, swMat);
+                        sw.position.set(group.position.x, group.position.y + 0.32, group.position.z);
+                        sw.renderOrder = 5;
+                        scene.add(sw);
+                        let swLife = 22;
+                        activeFX.push({
+                            life: swLife,
+                            update() {
+                                swLife--;
+                                const prog = 1 - swLife / 22;
+                                sw.scale.setScalar(1 + prog * 3.8);
+                                swMat.opacity = 0.9 * (1 - prog);
+                                if (swLife <= 0) {
+                                    scene.remove(sw);
+                                    swGeo.dispose();
+                                    swMat.dispose();
+                                    return false;
+                                }
+                                return true;
+                            }
+                        });
                     }
                     if (life % 20 === 0 && typeof triggerScreenShake === 'function') {
                         triggerScreenShake(0.35);
