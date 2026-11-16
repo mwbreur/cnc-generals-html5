@@ -2172,6 +2172,32 @@ function animate() {
                 });
             }
 
+            function evacuateGarrisonedUnits(container) {
+                if (!container || !container.garrisoned || container.garrisoned.length === 0) return;
+                const occupants = container.garrisoned.slice();
+                container.garrisoned = [];
+                const center = container.position || (container.mesh && container.mesh.position);
+                if (!center) return;
+                const exitDist = (container.radius || 5.0) + 2.5;
+                const runDist = exitDist + 5.5;
+                occupants.forEach((unit, idx) => {
+                    unit.garrisonedIn = null;
+                    if (!unit.mesh) return;
+                    const angle = (idx / Math.max(1, occupants.length)) * Math.PI * 2 + 0.35;
+                    const ex = center.x + Math.cos(angle) * exitDist;
+                    const ez = center.z + Math.sin(angle) * exitDist;
+                    const ey = typeof getTerrainHeight === 'function' ? getTerrainHeight(ex, ez) : (center.y || 0);
+                    unit.mesh.position.set(ex, ey, ez);
+                    unit.mesh.visible = true;
+                    const rx = center.x + Math.cos(angle) * runDist;
+                    const rz = center.z + Math.sin(angle) * runDist;
+                    const ry = typeof getTerrainHeight === 'function' ? getTerrainHeight(rx, rz) : ey;
+                    if (unit.targetPosition) unit.targetPosition.set(rx, ry, rz);
+                    unit.taskState = 'Moving';
+                    unit.combatTarget = null;
+                });
+            }
+
             if (structures.some(s => s.health <= 0)) {
                 structures = structures.filter(structure => {
                     if (structure.health > 0) return true;
@@ -2184,10 +2210,7 @@ function animate() {
                         structure.dozerRef.targetStructure = null;
                         structure.dozerRef = null;
                     }
-                    (structure.garrisoned || []).forEach(unit => {
-                        unit.garrisonedIn = null;
-                        unit.health = 0;
-                    });
+                    evacuateGarrisonedUnits(structure);
                     if (selectedStructure === structure) {
                         selectedStructure = null;
                         updateSidebar();
@@ -2208,11 +2231,33 @@ function animate() {
                     createImpactExplosion(expPos);
                     spawnExplosion(expPos, 0xff4757, 4.0);
                     showNotification(`Hostile ${structure.type} eradicated!`, 'success');
+                    evacuateGarrisonedUnits(structure);
                     units.forEach(unit => {
                         if (unit.combatTarget === structure) unit.combatTarget = null;
                     });
                     return false;
                 });
+            }
+
+            if (typeof worldBuildings !== 'undefined' && worldBuildings.some(wb => wb.health <= 0)) {
+                for (let wi = worldBuildings.length - 1; wi >= 0; wi--) {
+                    const wb = worldBuildings[wi];
+                    if (wb.health > 0) continue;
+                    evacuateGarrisonedUnits(wb);
+                    if (wb.mesh) scene.remove(wb.mesh);
+                    if (wb.position) {
+                        createImpactExplosion(wb.position);
+                        spawnExplosion(wb.position, 0xff793f, 3.2);
+                    }
+                    if (typeof mapObstacles !== 'undefined' && Array.isArray(mapObstacles)) {
+                        for (let oi = mapObstacles.length - 1; oi >= 0; oi--) {
+                            if (mapObstacles[oi].position && wb.position && mapObstacles[oi].position.distanceTo(wb.position) < 2.0) {
+                                mapObstacles.splice(oi, 1);
+                            }
+                        }
+                    }
+                    worldBuildings.splice(wi, 1);
+                }
             }
 
             if (units.some(u => u.health <= 0)) {
