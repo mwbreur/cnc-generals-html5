@@ -2935,6 +2935,18 @@ function useStructureAbility(action) {
     executeStructureUpgradeOrAction({ id: action, name: action, cost: 0 }, structure);
 }
 
+function applyBattlePlanEffects() {
+    if (typeof units === 'undefined') return;
+    const isSearch = (typeof battlePlan !== 'undefined' && battlePlan === 'search');
+    units.forEach(u => {
+        if (u._baseScanRange === undefined) u._baseScanRange = u.scanRange || 0;
+        if (u._baseScanRange > 0) {
+            u.scanRange = isSearch ? Math.round(u._baseScanRange * 1.20) : u._baseScanRange;
+        }
+    });
+}
+window.applyBattlePlanEffects = applyBattlePlanEffects;
+
 function executeStructureUpgradeOrAction(upg, structure) {
     if (!structure || structure.health <= 0 || structure.isBuilding) return;
     if (structure.ownerId && structure.ownerId !== 'player') {
@@ -2944,6 +2956,7 @@ function executeStructureUpgradeOrAction(upg, structure) {
 
     if (upg.isStance) {
         battlePlan = upg.stance;
+        applyBattlePlanEffects();
         playUSASound('radio_chirp');
         const stanceNames = {
             bombard: 'Bombardment (+20% Firepower)',
@@ -3400,6 +3413,14 @@ function updateHUD() {
             if (typeof window !== 'undefined') window.isPlayerLowPower = isPlayerLowPower;
 
             const activeStructures = structures.filter(structure => !structure.isBuilding && structure.health > 0);
+            // Reset Strategy Center battlePlan if player no longer has an active Strategy Center
+            if (typeof battlePlan !== 'undefined' && battlePlan !== 'balanced') {
+                const hasStrat = activeStructures.some(s => s.type === 'strategyCenter');
+                if (!hasStrat) {
+                    battlePlan = 'balanced';
+                    applyBattlePlanEffects();
+                }
+            }
             activeStructures.forEach(structure => {
                 // Superweapon Buildup / Cooldown Management & 3D Silo/Gantry/Lens Buildup Animation
                 if (['particleCannon', 'nukeSilo', 'scudStorm'].includes(structure.type)) {
@@ -3852,6 +3873,9 @@ function updateHUD() {
             newUnitObj.ownerId = 'player';
             newUnitObj.faction = spawnFaction;
             newUnitObj.isAI = false;
+            if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && newUnitObj._baseScanRange > 0) {
+                newUnitObj.scanRange = Math.round(newUnitObj._baseScanRange * 1.20);
+            }
             units.push(newUnitObj);
             if (type === 'crawler') {
                 for (let rg = 0; rg < 4; rg++) {

@@ -261,7 +261,8 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     let finalDmg = Math.max(1, Math.round(baseDamage * mult));
 
     // Attacker offensive buffs (USA Strategy Center Bombardment: +20% damage)
-    if (typeof battlePlan !== 'undefined' && battlePlan === 'bombard' && typeof units !== 'undefined' && units.includes(attacker)) {
+    const isAttackerPlayer = attacker && ((typeof units !== 'undefined' && units.includes(attacker)) || (typeof structures !== 'undefined' && structures.includes(attacker)));
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'bombard' && isAttackerPlayer) {
         finalDmg = Math.round(finalDmg * 1.20);
     }
     // China Horde Bonus: 5+ friendly horde units (Red Guard, Battlemaster) within 22m grant +20% damage (+35% with Nationalism)
@@ -330,7 +331,8 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     }
 
     // Target defensive upgrade buffs (USA Strategy Center Hold the Line: +20% armor / -20% damage taken)
-    if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(target)) {
+    const isTargetPlayer = target && ((typeof units !== 'undefined' && units.includes(target)) || (typeof structures !== 'undefined' && structures.includes(target)));
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && isTargetPlayer) {
         finalDmg = Math.max(1, Math.round(finalDmg * 0.80));
     }
     if (target.salvageLevel >= 2) finalDmg = Math.max(1, Math.round(finalDmg * 0.8)); // GLA Level 2 Scrap Armor
@@ -518,8 +520,7 @@ function executeWeaponFire(attacker, target) {
     if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('autoloader') && attacker.type === 'battlemaster') {
         attacker.attackCooldown = Math.max(6, Math.floor(attacker.attackCooldown * 0.75));
     }
-    if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 0.75);
-    if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 1.25);
+    if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && typeof units !== 'undefined' && units.includes(attacker)) attacker.attackCooldown = Math.floor(attacker.attackCooldown * 0.85);
 
     const targetPos = (target.position || target.mesh.position).clone();
     targetPos.y += (target.isAir ? 0.2 : 0.5);
