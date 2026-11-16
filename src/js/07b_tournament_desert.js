@@ -39,7 +39,7 @@ function getOfficialMapHeight(mapType, x, z) {
     var h01 = grid[z1][x0], h11 = grid[z1][x1];
     var h0 = h00 * (1 - fx) + h10 * fx;
     var h1 = h01 * (1 - fx) + h11 * fx;
-    return h0 * (1 - fz) + h1 * fz;
+    return (h0 * (1 - fz) + h1 * fz) * 1.75;
 }
 window.getOfficialMapHeight = getOfficialMapHeight;
 
@@ -57,18 +57,20 @@ function createOfficialMapTexture(mapType) {
     var mapObj = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapKey];
     if (!mapObj || typeof document === 'undefined') return null;
     try {
+        var texSize = 2048;
         var canvas = document.createElement('canvas');
-        canvas.width = 1024;
-        canvas.height = 1024;
+        canvas.width = texSize;
+        canvas.height = texSize;
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = mapObj.theme === 'snow' ? '#dce4ec' : mapObj.theme === 'jungle' ? '#4a5d38' : '#bfa87a';
-        ctx.fillRect(0, 0, 1024, 1024);
+        ctx.fillRect(0, 0, texSize, texSize);
 
         var tex = new THREE.CanvasTexture(canvas);
         tex.wrapS = THREE.ClampToEdgeWrapping;
         tex.wrapT = THREE.ClampToEdgeWrapping;
         tex.minFilter = THREE.LinearMipmapLinearFilter;
         tex.magFilter = THREE.LinearFilter;
+        tex.anisotropy = 8;
         tex.generateMipmaps = true;
 
         var applyDetail = function() {
@@ -78,11 +80,11 @@ function createOfficialMapTexture(mapType) {
                     var pat = ctx.createPattern(sandImg, 'repeat');
                     if (pat) {
                         ctx.save();
-                        ctx.scale(0.16, 0.16);
+                        ctx.scale(0.12, 0.12);
                         ctx.globalCompositeOperation = 'overlay';
-                        ctx.globalAlpha = mapObj.theme === 'desert' ? 0.62 : 0.30;
+                        ctx.globalAlpha = mapObj.theme === 'desert' ? 0.72 : mapObj.theme === 'snow' ? 0.35 : 0.48;
                         ctx.fillStyle = pat;
-                        ctx.fillRect(0, 0, 1024 / 0.16, 1024 / 0.16);
+                        ctx.fillRect(0, 0, texSize / 0.12, texSize / 0.12);
                         ctx.restore();
                         tex.needsUpdate = true;
                     }
@@ -92,17 +94,62 @@ function createOfficialMapTexture(mapType) {
         };
 
         var drawAerial = function(img) {
-            ctx.drawImage(img, 0, 0, 1024, 1024);
-            // Add subtle surface micro-grain so close-up ground looks crisp
-            var imgData = ctx.getImageData(0, 0, 1024, 1024);
+            ctx.drawImage(img, 0, 0, texSize, texSize);
+            // Height/slope-aware cliff strata, contrast enrichment & crisp micro-grain
+            var imgData = ctx.getImageData(0, 0, texSize, texSize);
             var d = imgData.data;
-            for (var i = 0; i < d.length; i += 4) {
-                var px = (i >> 2) & 1023;
-                var py = (i >> 12);
-                var n = (((px * 1664525 + py * 1013904223) ^ (px >> 2)) & 0x1f) - 16;
-                d[i] = Math.max(0, Math.min(255, d[i] + n * 0.45));
-                d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n * 0.45));
-                d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * 0.45));
+            var grid = mapObj.grid;
+            var gRes = grid ? grid.length : 0;
+            var isSnow = mapObj.theme === 'snow';
+            var isJungle = mapObj.theme === 'jungle';
+
+            for (var py = 0; py < texSize; py++) {
+                var gyF = gRes > 1 ? (py / (texSize - 1)) * (gRes - 1) : 0;
+                var gy0 = gRes > 1 ? Math.floor(gyF) : 0;
+                var gy1 = gRes > 1 ? Math.min(gRes - 1, gy0 + 1) : 0;
+                var fy = gyF - gy0;
+                var rowOffset = py * texSize;
+
+                for (var px = 0; px < texSize; px++) {
+                    var idx = (rowOffset + px) << 2;
+                    var r = d[idx], g = d[idx + 1], b = d[idx + 2];
+
+                    // Boost contrast & reduce washed-out haze
+                    r = 114 + (r - 122) * 1.18;
+                    g = 112 + (g - 122) * 1.18;
+                    b = 108 + (b - 122) * 1.16;
+
+                    if (gRes > 1) {
+                        var gxF = (px / (texSize - 1)) * (gRes - 1);
+                        var gx0 = Math.floor(gxF);
+                        var gx1 = Math.min(gRes - 1, gx0 + 1);
+                        var fx = gxF - gx0;
+                        var h00 = grid[gy0][gx0], h10 = grid[gy0][gx1];
+                        var h01 = grid[gy1][gx0], h11 = grid[gy1][gx1];
+                        var h = (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy;
+                        var slope = Math.abs((h10 - h00) * (1 - fy) + (h11 - h01) * fy) + Math.abs((h01 - h00) * (1 - fx) + (h11 - h10) * fx);
+
+                        if (slope > 0.55) {
+                            var cliffBlend = Math.min(0.68, (slope - 0.55) * 0.45);
+                            var strata = Math.sin(h * 3.2 + px * 0.018) * 18;
+                            var cr = (isSnow ? 92 : isJungle ? 76 : 134) + strata;
+                            var cg = (isSnow ? 102 : isJungle ? 78 : 98) + strata * 0.8;
+                            var cb = (isSnow ? 116 : isJungle ? 68 : 68) + strata * 0.6;
+                            r = r * (1 - cliffBlend) + cr * cliffBlend;
+                            g = g * (1 - cliffBlend) + cg * cliffBlend;
+                            b = b * (1 - cliffBlend) + cb * cliffBlend;
+                        } else if (h < 0.2) {
+                            // Subtle depth darkening in low canyon/riverbeds
+                            r *= 0.90; g *= 0.90; b *= 0.90;
+                        }
+                    }
+
+                    var n = (((px * 1664525 + py * 1013904223) ^ (px >> 2)) & 0x1f) - 16;
+                    var grain = n * 0.72;
+                    d[idx] = Math.max(0, Math.min(255, r + grain));
+                    d[idx + 1] = Math.max(0, Math.min(255, g + grain));
+                    d[idx + 2] = Math.max(0, Math.min(255, b + grain));
+                }
             }
             ctx.putImageData(imgData, 0, 0);
             applyDetail();

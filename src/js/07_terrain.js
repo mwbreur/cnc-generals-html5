@@ -541,10 +541,13 @@
                 ? createCustomTerrainTexture(activeCustomMap)
                 : createTerrainTextureForMap(mapType);
 
+            if (terrainTexture && 'anisotropy' in terrainTexture) {
+                terrainTexture.anisotropy = 8;
+            }
             const terrainMat = new THREE.MeshStandardMaterial({
                 map: terrainTexture,
                 bumpMap: (typeof texBumpConcrete !== 'undefined') ? texBumpConcrete : null,
-                bumpScale: 0.22,
+                bumpScale: 0.55,
                 roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.92,
                 metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
             });
