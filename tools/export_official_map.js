@@ -136,6 +136,123 @@ const allEntries = [
     ...readBigIndex(path.join(bigDir, 'Maps.big'))
 ];
 
+function decodeTgaBuffer(tgaBuf) {
+    if (!tgaBuf || tgaBuf.length < 18) return null;
+    const idLen = tgaBuf[0];
+    const imageType = tgaBuf[2];
+    const w = tgaBuf.readUInt16LE(12);
+    const h = tgaBuf.readUInt16LE(14);
+    const bpp = tgaBuf[16];
+    const desc = tgaBuf[17];
+    const topOrigin = Boolean(desc & 0x20);
+    const bytesPerPel = bpp >> 3;
+    if (!w || !h || (bytesPerPel !== 3 && bytesPerPel !== 4)) return null;
+    let p = 18 + idLen;
+    const rgba = Buffer.alloc(w * h * 4);
+    const writePel = (idx, r, g, b, a) => {
+        const row = Math.floor(idx / w);
+        const col = idx % w;
+        const dstRow = topOrigin ? row : (h - 1 - row);
+        const dst = (dstRow * w + col) * 4;
+        rgba[dst] = r; rgba[dst + 1] = g; rgba[dst + 2] = b; rgba[dst + 3] = a;
+    };
+    if (imageType === 2) {
+        for (let i = 0; i < w * h && p + bytesPerPel <= tgaBuf.length; i++) {
+            const b = tgaBuf[p], g = tgaBuf[p + 1], r = tgaBuf[p + 2];
+            const a = bytesPerPel === 4 ? tgaBuf[p + 3] : 255;
+            writePel(i, r, g, b, a);
+            p += bytesPerPel;
+        }
+    } else if (imageType === 10) {
+        let i = 0;
+        while (i < w * h && p < tgaBuf.length) {
+            const hdr = tgaBuf[p++];
+            const count = (hdr & 0x7f) + 1;
+            if (hdr & 0x80) {
+                const b = tgaBuf[p], g = tgaBuf[p + 1], r = tgaBuf[p + 2];
+                const a = bytesPerPel === 4 ? tgaBuf[p + 3] : 255;
+                p += bytesPerPel;
+                for (let k = 0; k < count && i < w * h; k++, i++) writePel(i, r, g, b, a);
+            } else {
+                for (let k = 0; k < count && i < w * h && p + bytesPerPel <= tgaBuf.length; k++, i++) {
+                    const b = tgaBuf[p], g = tgaBuf[p + 1], r = tgaBuf[p + 2];
+                    const a = bytesPerPel === 4 ? tgaBuf[p + 3] : 255;
+                    writePel(i, r, g, b, a);
+                    p += bytesPerPel;
+                }
+            }
+        }
+    } else {
+        return null;
+    }
+    return { w, h, rgba };
+}
+
+function loadTerrainAndRoadAssets() {
+    const terrainClassToFile = {};
+    const roadDefs = {};
+    for (const iniBig of ['INIZH.big', 'INI.big']) {
+        const bigPath = path.join(bigDir, iniBig);
+        if (!fs.existsSync(bigPath)) continue;
+        for (const e of readBigIndex(bigPath)) {
+            if (e.lower.endsWith('terrain.ini')) {
+                const txt = e.buf.subarray(e.off, e.off + e.sz).toString('ascii');
+                let curName = null;
+                for (const rawLine of txt.split(/\r?\n/)) {
+                    const line = rawLine.split(';')[0].trim();
+                    const mStart = /^Terrain\s+(\S+)/i.exec(line);
+                    if (mStart) curName = mStart[1].toLowerCase();
+                    else if (/^End$/i.test(line)) curName = null;
+                    else if (curName) {
+                        const mTex = /^Texture\s*=\s*(\S+)/i.exec(line);
+                        if (mTex && !terrainClassToFile[curName]) terrainClassToFile[curName] = mTex[1].toLowerCase();
+                    }
+                }
+            } else if (e.lower.endsWith('roads.ini')) {
+                const txt = e.buf.subarray(e.off, e.off + e.sz).toString('ascii');
+                let curRoad = null;
+                for (const rawLine of txt.split(/\r?\n/)) {
+                    const line = rawLine.split(';')[0].trim();
+                    const mStart = /^Road\s+(\S+)/i.exec(line);
+                    if (mStart) curRoad = { name: mStart[1].toLowerCase(), width: 35, tex: '' };
+                    else if (/^End$/i.test(line)) {
+                        if (curRoad && !roadDefs[curRoad.name]) roadDefs[curRoad.name] = curRoad;
+                        curRoad = null;
+                    } else if (curRoad) {
+                        const mTex = /^Texture\s*=\s*(\S+)/i.exec(line);
+                        if (mTex) curRoad.tex = mTex[1].toLowerCase();
+                        const mW = /^RoadWidth\s*=\s*([0-9.]+)/i.exec(line);
+                        if (mW) curRoad.width = parseFloat(mW[1]) || 35;
+                    }
+                }
+            }
+        }
+    }
+    const tgaFiles = {};
+    for (const terrBig of ['TerrainZH.big', 'Terrain.big']) {
+        const bigPath = path.join(bigDir, terrBig);
+        if (!fs.existsSync(bigPath)) continue;
+        for (const e of readBigIndex(bigPath)) {
+            const base = path.basename(e.lower);
+            if (base.endsWith('.tga') && !tgaFiles[base]) {
+                tgaFiles[base] = e;
+            }
+        }
+    }
+    const decodedCache = {};
+    const getTga = (fileName) => {
+        if (!fileName) return null;
+        const key = fileName.toLowerCase();
+        if (decodedCache[key] !== undefined) return decodedCache[key];
+        const entry = tgaFiles[key];
+        decodedCache[key] = entry ? decodeTgaBuffer(entry.buf.subarray(entry.off, entry.off + entry.sz)) : null;
+        return decodedCache[key];
+    };
+    return { terrainClassToFile, roadDefs, getTga };
+}
+
+const TERRAIN_ASSETS = loadTerrainAndRoadAssets();
+
 function findMapEntries(searchKey) {
     const key = searchKey.toLowerCase();
     const mapEntry = allEntries.find(e => e.lower.includes(`maps\\${key}\\`) && e.lower.endsWith('.map'));
@@ -167,9 +284,11 @@ function parseOfficialMap(mapKey, meta) {
         dict[id] = str;
     }
 
-    // 2. Locate HeightMapData and ObjectsList chunks
+    // 2. Locate HeightMapData, BlendTileData, ObjectsList, and PolygonTriggers chunks
     let hmChunkPos = -1;
+    let blendPos = -1, blendEnd = -1;
     let objListPos = -1, objListEnd = -1;
+    let trigPos = -1, trigEnd = -1;
     let scanPos = pos;
     while (scanPos + 10 <= decomp.length) {
         const cid = decomp.readUInt32LE(scanPos);
@@ -179,9 +298,15 @@ function parseOfficialMap(mapKey, meta) {
         const dataStart = scanPos + 10;
         if (cname === 'HeightMapData') {
             hmChunkPos = dataStart;
+        } else if (cname === 'BlendTileData') {
+            blendPos = dataStart;
+            blendEnd = dataStart + csz;
         } else if (cname === 'ObjectsList') {
             objListPos = dataStart;
             objListEnd = dataStart + csz;
+        } else if (cname === 'PolygonTriggers') {
+            trigPos = dataStart;
+            trigEnd = dataStart + csz;
         }
         if (csz <= 0 || dataStart + csz > decomp.length) break;
         scanPos = dataStart + csz;
@@ -206,16 +331,16 @@ function parseOfficialMap(mapKey, meta) {
     sampleVals.sort((a, b) => a - b);
     const baseByte = sampleVals[Math.floor(sampleVals.length * 0.25)] || 64;
 
-    const GRID = 65;
+    const GRID = 97;
     const grid = [];
     for (let r = 0; r < GRID; r++) {
         const row = [];
-        // Flip Y so North (high SAGE Y) is row 0 (z = -size/2) and South (low SAGE Y) is row 64 (z = +size/2)
+        // Flip Y so North (high SAGE Y) is row 0 (z = -size/2) and South (low SAGE Y) is row 96 (z = +size/2)
         const srcY = Math.min(H - 1, Math.max(0, Math.floor(border + (1 - r / (GRID - 1)) * (playH - 1))));
         for (let c = 0; c < GRID; c++) {
             const srcX = Math.min(W - 1, Math.max(0, Math.floor(border + (c / (GRID - 1)) * (playW - 1))));
             const val = decomp[hmDataStart + srcY * W + srcX];
-            const hVal = Math.max(-4.5, Math.min(14.0, (val - baseByte) * 0.11));
+            const hVal = Math.max(-5.5, Math.min(22.0, (val - baseByte) * 0.155));
             row.push(parseFloat(hVal.toFixed(2)));
         }
         grid.push(row);
@@ -231,6 +356,8 @@ function parseOfficialMap(mapKey, meta) {
     const rawBridges = [];
     const rawBuildings = [];
     const rawProps = [];
+    const rawRoads = [];
+    let pendingRoadPt1 = null;
     let p = objListPos;
     while (p > 0 && p + 10 <= objListEnd) {
         const cid = decomp.readUInt32LE(p);
@@ -281,6 +408,23 @@ function parseOfficialMap(mapKey, meta) {
             // Convert SAGE playable coordinates (0..playW*10, 0..playH*10) to normalized [-0.41 .. +0.41]
             const nx = Math.max(-0.41, Math.min(0.41, (x / (playW * 10)) - 0.5));
             const nz = Math.max(-0.41, Math.min(0.41, 0.5 - (y / (playH * 10))));
+
+            if (flags & 0x02) {
+                pendingRoadPt1 = {
+                    nx: (x / (playW * 10)) - 0.5,
+                    nz: 0.5 - (y / (playH * 10)),
+                    tName: templateName.toLowerCase()
+                };
+            } else if ((flags & 0x04) && pendingRoadPt1) {
+                rawRoads.push({
+                    x1: pendingRoadPt1.nx,
+                    z1: pendingRoadPt1.nz,
+                    x2: (x / (playW * 10)) - 0.5,
+                    z2: 0.5 - (y / (playH * 10)),
+                    tName: pendingRoadPt1.tName || templateName.toLowerCase()
+                });
+                pendingRoadPt1 = null;
+            }
 
             const mStart = /^Player_(\d)_Start$/i.exec(waypointName);
             if (mStart) {
@@ -376,7 +520,165 @@ function parseOfficialMap(mapKey, meta) {
         tgaDataUrl = encodePngDataUrl(rgba, tgaW, tgaH);
     }
 
-    console.log(`  [OK] ${meta.name.padEnd(20)} | ${W}x${H} (border ${border}) | Spawns: ${rawSpawns.length} | Supplies: ${rawSupplies.length} | TGA: ${(tgaDataUrl.length / 1024).toFixed(1)} KB`);
+    // 5b. Parse PolygonTriggers for localized water areas (oases, lakes, rivers)
+    const waterPolygons = [];
+    if (trigPos > 0 && trigPos < trigEnd) {
+        let tp = trigPos;
+        const nTrig = decomp.readInt32LE(tp); tp += 4;
+        for (let i = 0; i < nTrig && tp + 16 <= trigEnd; i++) {
+            const nLen = decomp.readUInt16LE(tp); tp += 2;
+            const tName = decomp.toString('ascii', tp, tp + nLen); tp += nLen;
+            tp += 4; // trigId
+            const isWater = decomp[tp++];
+            tp += 1; // isRiver
+            tp += 4; // riverStart
+            const nPts = decomp.readInt32LE(tp); tp += 4;
+            const pts = [];
+            let sumZ = 0;
+            for (let j = 0; j < nPts && tp + 12 <= trigEnd; j++) {
+                const px = decomp.readInt32LE(tp);
+                const py = decomp.readInt32LE(tp + 4);
+                const pz = decomp.readInt32LE(tp + 8);
+                tp += 12;
+                const pnx = (px / (playW * 10)) - 0.5;
+                const pnz = 0.5 - (py / (playH * 10));
+                pts.push([parseFloat(pnx.toFixed(4)), parseFloat(pnz.toFixed(4))]);
+                sumZ += pz;
+            }
+            if (isWater === 1 && pts.length >= 3) {
+                const avgByte = (sumZ / pts.length) / 0.625; // SAGE height unit -> heightmap byte approx
+                const waterY = Math.max(-4.0, Math.min(18.0, (avgByte - baseByte) * 0.155));
+                waterPolygons.push({ name: tName, waterY: parseFloat(waterY.toFixed(2)), points: pts });
+            }
+        }
+    }
+
+    // 5c. Bake 384x384 Retail Terrain Texture from BlendTileData + Terrain.big + Roads
+    let terrainDataUrl = '';
+    if (blendPos > 0 && blendPos < blendEnd) {
+        const N = decomp.readInt32LE(blendPos);
+        // Find TextureClass array start by locating numTexClasses right before first TextureClass
+        const texClasses = [];
+        let tcStart = -1;
+        for (let probe = blendPos + 4 + N * 8; probe + 26 < blendEnd; probe++) {
+            const cnt = decomp.readInt32LE(probe);
+            if (cnt > 0 && cnt < 128 && decomp.readInt32LE(probe + 4) === 0) {
+                const nTiles = decomp.readInt32LE(probe + 8);
+                const width = decomp.readInt32LE(probe + 12);
+                const sLen = decomp.readUInt16LE(probe + 20);
+                if (nTiles > 0 && nTiles <= 256 && width > 0 && width <= 16 && sLen > 2 && sLen < 48 && probe + 22 + sLen <= blendEnd) {
+                    const candidate = decomp.toString('ascii', probe + 22, probe + 22 + sLen);
+                    if (/^[A-Za-z0-9_]+$/.test(candidate)) {
+                        tcStart = probe;
+                        break;
+                    }
+                }
+            }
+        }
+        if (tcStart !== -1) {
+            let bp = tcStart;
+            const numTexClasses = decomp.readInt32LE(bp); bp += 4;
+            for (let i = 0; i < numTexClasses && bp + 18 <= blendEnd; i++) {
+                const firstTile = decomp.readInt32LE(bp); bp += 4;
+                const numTiles = decomp.readInt32LE(bp); bp += 4;
+                const width = decomp.readInt32LE(bp); bp += 4;
+                bp += 4; // isGDI
+                const nLen = decomp.readUInt16LE(bp); bp += 2;
+                const name = decomp.toString('ascii', bp, bp + nLen); bp += nLen;
+                const file = TERRAIN_ASSETS.terrainClassToFile[name.toLowerCase()] || '';
+                const tga = TERRAIN_ASSETS.getTga(file);
+                texClasses.push({ firstTile, numTiles, width, name, tga });
+            }
+        }
+        if (texClasses.length > 0) {
+            const TEX_RES = 384;
+            const rgba = Buffer.alloc(TEX_RES * TEX_RES * 4);
+            const cliffOff = blendPos + 4 + N * 6;
+            for (let py = 0; py < TEX_RES; py++) {
+                const normY = py / (TEX_RES - 1);
+                const srcY = Math.min(H - 1, Math.max(0, Math.floor(border + (1 - normY) * (playH - 1))));
+                for (let px = 0; px < TEX_RES; px++) {
+                    const normX = px / (TEX_RES - 1);
+                    const srcX = Math.min(W - 1, Math.max(0, Math.floor(border + normX * (playW - 1))));
+                    const cellIdx = srcY * W + srcX;
+                    const tileIdx = decomp.readUInt16LE(blendPos + 4 + cellIdx * 2) >> 2;
+                    let cls = texClasses[0];
+                    for (let c = 0; c < texClasses.length; c++) {
+                        if (tileIdx >= texClasses[c].firstTile && tileIdx < texClasses[c].firstTile + texClasses[c].numTiles) {
+                            cls = texClasses[c];
+                            break;
+                        }
+                    }
+                    let r = 180, g = 150, b = 105;
+                    if (cls && cls.tga) {
+                        const sub = Math.max(0, tileIdx - cls.firstTile);
+                        const tw = Math.max(1, cls.width || 1);
+                        const subX = sub % tw;
+                        const subY = Math.floor(sub / tw) % tw;
+                        const tileW = cls.tga.w / tw;
+                        const tileH = cls.tga.h / tw;
+                        const u = ((px % 16) / 16);
+                        const v = ((py % 16) / 16);
+                        const tx = Math.min(cls.tga.w - 1, Math.floor(subX * tileW + u * tileW));
+                        const ty = Math.min(cls.tga.h - 1, Math.floor(subY * tileH + v * tileH));
+                        const si = (ty * cls.tga.w + tx) * 4;
+                        r = cls.tga.rgba[si]; g = cls.tga.rgba[si + 1]; b = cls.tga.rgba[si + 2];
+                    }
+                    const isCliff = decomp[cliffOff + cellIdx] > 0;
+                    if (isCliff) {
+                        r = Math.round(r * 0.72);
+                        g = Math.round(g * 0.70);
+                        b = Math.round(b * 0.68);
+                    }
+                    const di = (py * TEX_RES + px) * 4;
+                    rgba[di] = r; rgba[di + 1] = g; rgba[di + 2] = b; rgba[di + 3] = 255;
+                }
+            }
+            // Stamp retail roads onto the 384x384 ground texture
+            for (const rd of rawRoads) {
+                const rDef = TERRAIN_ASSETS.roadDefs[rd.tName] || { width: 35, tex: '' };
+                const rTga = TERRAIN_ASSETS.getTga(rDef.tex);
+                const x1 = (rd.x1 + 0.5) * TEX_RES, y1 = (rd.z1 + 0.5) * TEX_RES;
+                const x2 = (rd.x2 + 0.5) * TEX_RES, y2 = (rd.z2 + 0.5) * TEX_RES;
+                const segLen = Math.hypot(x2 - x1, y2 - y1);
+                if (segLen < 0.5) continue;
+                const halfW = Math.max(2.0, (rDef.width / (playW * 10)) * TEX_RES * 0.55);
+                const minX = Math.max(0, Math.floor(Math.min(x1, x2) - halfW - 1));
+                const maxX = Math.min(TEX_RES - 1, Math.ceil(Math.max(x1, x2) + halfW + 1));
+                const minY = Math.max(0, Math.floor(Math.min(y1, y2) - halfW - 1));
+                const maxY = Math.min(TEX_RES - 1, Math.ceil(Math.max(y1, y2) + halfW + 1));
+                const dx = (x2 - x1) / segLen, dy = (y2 - y1) / segLen;
+                for (let py = minY; py <= maxY; py++) {
+                    for (let px = minX; px <= maxX; px++) {
+                        const vx = px - x1, vy = py - y1;
+                        const proj = Math.max(0, Math.min(segLen, vx * dx + vy * dy));
+                        const cx = x1 + dx * proj, cy = y1 + dy * proj;
+                        const dist = Math.hypot(px - cx, py - cy);
+                        if (dist <= halfW) {
+                            const di = (py * TEX_RES + px) * 4;
+                            let rr = 96, rg = 92, rb = 84, alpha = 0.85;
+                            if (rTga) {
+                                const cross = ((vx * (-dy) + vy * dx) / (halfW * 2)) + 0.5;
+                                const tx = Math.min(rTga.w - 1, Math.max(0, Math.floor(cross * rTga.w)));
+                                const ty = Math.min(rTga.h - 1, Math.max(0, Math.floor(((proj * 0.12) % 1) * rTga.h)));
+                                const si = (ty * rTga.w + tx) * 4;
+                                rr = rTga.rgba[si]; rg = rTga.rgba[si + 1]; rb = rTga.rgba[si + 2];
+                                alpha = (rTga.rgba[si + 3] / 255);
+                            } else {
+                                alpha = Math.max(0, 1 - (dist / halfW) * 0.35) * 0.78;
+                            }
+                            rgba[di] = Math.round(rgba[di] * (1 - alpha) + rr * alpha);
+                            rgba[di + 1] = Math.round(rgba[di + 1] * (1 - alpha) + rg * alpha);
+                            rgba[di + 2] = Math.round(rgba[di + 2] * (1 - alpha) + rb * alpha);
+                        }
+                    }
+                }
+            }
+            terrainDataUrl = encodePngDataUrl(rgba, TEX_RES, TEX_RES);
+        }
+    }
+
+    console.log(`  [OK] ${meta.name.padEnd(20)} | ${W}x${H} (border ${border}) | Spawns: ${rawSpawns.length} | Roads: ${rawRoads.length} | WaterPolys: ${waterPolygons.length} | Tex: ${(terrainDataUrl.length / 1024).toFixed(1)} KB`);
 
     return {
         id: mapKey,
@@ -394,7 +696,9 @@ function parseOfficialMap(mapKey, meta) {
         bridges: rawBridges,
         buildings: rawBuildings,
         props: rawProps,
-        tgaDataUrl
+        waterPolygons,
+        tgaDataUrl,
+        terrainDataUrl
     };
 }
 
@@ -540,7 +844,11 @@ function createOfficialMapTexture(mapType) {
         };
 
         var cachedImg = window._officialMapImages && window._officialMapImages[mapKey];
-        if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) {
+        if (mapObj.terrainDataUrl) {
+            var tImg = new Image();
+            tImg.onload = function() { drawAerial(tImg); };
+            tImg.src = mapObj.terrainDataUrl;
+        } else if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) {
             drawAerial(cachedImg);
         } else if (mapObj.tgaDataUrl) {
             var img = cachedImg || new Image();

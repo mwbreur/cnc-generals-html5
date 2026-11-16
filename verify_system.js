@@ -796,7 +796,7 @@ vm.runInContext(`
         ];
         for (const mapKey of expectedOfficialMaps) {
             const m = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapKey];
-            if (!m || !Array.isArray(m.grid) || m.grid.length !== 65 || m.grid[0].length !== 65 || !Array.isArray(m.spawns) || m.spawns.length < 2 || !Array.isArray(m.supplies) || m.supplies.length < 2 || !m.tgaDataUrl) {
+            if (!m || !Array.isArray(m.grid) || m.grid.length < 65 || m.grid[0].length !== m.grid.length || !Array.isArray(m.spawns) || m.spawns.length < 2 || !Array.isArray(m.supplies) || m.supplies.length < 2 || !m.tgaDataUrl || !m.terrainDataUrl) {
                 throw new Error("Invalid or incomplete official skirmish map data for: " + mapKey);
             }
             setupMapEnvironment(mapKey);

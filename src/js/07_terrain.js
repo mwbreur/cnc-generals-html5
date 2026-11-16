@@ -812,34 +812,38 @@
                 terrainTexture = createTerrainTextureForMap(mapType);
             }
 
-            // Sample official aerial TGA layout (roads, oases, cliff rims) smoothly into vertexColors + minimap
+            const useRetailMacroTex = Boolean(officialMap && !isCustom && officialMap.terrainDataUrl && typeof createOfficialMapTexture === 'function');
+            const officialGroundTex = useRetailMacroTex ? createOfficialMapTexture(mapType) : null;
+
+            // Sample official aerial TGA layout into minimap (and into vertexColors only when retail macro texture is unavailable)
             if (officialMap && !isCustom && officialMap.tgaDataUrl && typeof document !== 'undefined') {
                 const aerialImg = new Image();
                 aerialImg.onload = function() {
-                    const aSize = 256;
-                    const aCan = document.createElement('canvas');
-                    aCan.width = aCan.height = aSize;
-                    const aCtx = aCan.getContext('2d');
-                    aCtx.drawImage(aerialImg, 0, 0, aSize, aSize);
-                    const aData = aCtx.getImageData(0, 0, aSize, aSize).data;
-                    const cAttr = geo.attributes.color;
-                    if (cAttr) {
-                        for (let i = 0; i < posAttr.count; i++) {
-                            const vx = posAttr.getX(i);
-                            const vz = posAttr.getZ(i);
-                            const u = Math.max(0, Math.min(1, (vx / mapSize) + 0.5));
-                            const v = Math.max(0, Math.min(1, (vz / mapSize) + 0.5));
-                            const ax = Math.min(aSize - 1, Math.floor(u * (aSize - 1)));
-                            const ay = Math.min(aSize - 1, Math.floor(v * (aSize - 1)));
-                            const aIdx = (ay * aSize + ax) << 2;
-                            // Boost aerial macro contrast slightly so roads/oases pop without washing out
-                            const ar = Math.max(0, Math.min(1, (112 + (aData[aIdx] - 122) * 1.22) / 255));
-                            const ag = Math.max(0, Math.min(1, (110 + (aData[aIdx + 1] - 122) * 1.22) / 255));
-                            const ab = Math.max(0, Math.min(1, (105 + (aData[aIdx + 2] - 122) * 1.20) / 255));
-                            const br = cAttr.getX(i), bg = cAttr.getY(i), bb = cAttr.getZ(i);
-                            cAttr.setXYZ(i, br * 0.30 + ar * 0.70, bg * 0.30 + ag * 0.70, bb * 0.30 + ab * 0.70);
+                    if (!officialGroundTex) {
+                        const aSize = 256;
+                        const aCan = document.createElement('canvas');
+                        aCan.width = aCan.height = aSize;
+                        const aCtx = aCan.getContext('2d');
+                        aCtx.drawImage(aerialImg, 0, 0, aSize, aSize);
+                        const aData = aCtx.getImageData(0, 0, aSize, aSize).data;
+                        const cAttr = geo.attributes.color;
+                        if (cAttr) {
+                            for (let i = 0; i < posAttr.count; i++) {
+                                const vx = posAttr.getX(i);
+                                const vz = posAttr.getZ(i);
+                                const u = Math.max(0, Math.min(1, (vx / mapSize) + 0.5));
+                                const v = Math.max(0, Math.min(1, (vz / mapSize) + 0.5));
+                                const ax = Math.min(aSize - 1, Math.floor(u * (aSize - 1)));
+                                const ay = Math.min(aSize - 1, Math.floor(v * (aSize - 1)));
+                                const aIdx = (ay * aSize + ax) << 2;
+                                const ar = Math.max(0, Math.min(1, (112 + (aData[aIdx] - 122) * 1.22) / 255));
+                                const ag = Math.max(0, Math.min(1, (110 + (aData[aIdx + 1] - 122) * 1.22) / 255));
+                                const ab = Math.max(0, Math.min(1, (105 + (aData[aIdx + 2] - 122) * 1.20) / 255));
+                                const br = cAttr.getX(i), bg = cAttr.getY(i), bb = cAttr.getZ(i);
+                                cAttr.setXYZ(i, br * 0.30 + ar * 0.70, bg * 0.30 + ag * 0.70, bb * 0.30 + ab * 0.70);
+                            }
+                            cAttr.needsUpdate = true;
                         }
-                        cAttr.needsUpdate = true;
                     }
                     if (window._minimapTerrainCanvas && typeof currentMapType !== 'undefined' && currentMapType === mapType) {
                         const mCtx = window._minimapTerrainCanvas.getContext('2d');
@@ -852,11 +856,14 @@
             if (terrainTexture && 'anisotropy' in terrainTexture) {
                 terrainTexture.anisotropy = 8;
             }
+            if (officialGroundTex && 'anisotropy' in officialGroundTex) {
+                officialGroundTex.anisotropy = 8;
+            }
             const terrainMat = new THREE.MeshStandardMaterial({
-                map: terrainTexture,
-                vertexColors: !isCustom,
+                map: officialGroundTex || terrainTexture,
+                vertexColors: !isCustom && !officialGroundTex,
                 bumpMap: terrainTexture,
-                bumpScale: 0.30,
+                bumpScale: 0.38,
                 roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.92,
                 metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
             });
@@ -899,6 +906,27 @@
             waterMesh.visible = (waterLevel > -100);
             waterMesh.receiveShadow = true;
             scene.add(waterMesh);
+
+            // Render localized PolygonTriggers water pools (e.g., oases/basins on dry maps)
+            if (officialMap && !isCustom && Array.isArray(officialMap.waterPolygons) && typeof THREE.Shape === 'function' && typeof THREE.ShapeGeometry === 'function') {
+                officialMap.waterPolygons.forEach(wp => {
+                    if (!wp || !Array.isArray(wp.points) || wp.points.length < 3) return;
+                    const shape = new THREE.Shape();
+                    wp.points.forEach((pt, idx) => {
+                        const sx = pt[0] * mapSize;
+                        const sy = -pt[1] * mapSize;
+                        if (idx === 0) shape.moveTo(sx, sy);
+                        else shape.lineTo(sx, sy);
+                    });
+                    shape.closePath();
+                    const pGeo = new THREE.ShapeGeometry(shape);
+                    pGeo.rotateX(-Math.PI / 2);
+                    const pMesh = new THREE.Mesh(pGeo, waterMat);
+                    pMesh.position.y = wp.waterY !== undefined ? wp.waterY : -0.8;
+                    pMesh.receiveShadow = true;
+                    mapPropsGroup.add(pMesh);
+                });
+            }
 
             // 4. Procedural Trees, Rocks & City Buildings
             spawnMapProps(effectiveTheme, mapSize);

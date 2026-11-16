@@ -2528,10 +2528,20 @@ window.addEventListener('keydown', e => {
         return;
     }
 
-    // 2. SPACEBAR: Jump camera to Command Center or last radar alert
-    if (e.key === ' ' || e.code === 'Space') {
+    // 2. SPACEBAR / H: Jump camera to Command Center or last radar alert
+    if (e.key === ' ' || e.code === 'Space' || (k === 'h' && !isCtrl && !isAlt)) {
         e.preventDefault();
         recenterBase();
+        return;
+    }
+
+    // BACKSPACE: Reset camera rotation back to default North-up view (C&C Generals)
+    if (e.key === 'Backspace' && !isCtrl && !isAlt) {
+        e.preventDefault();
+        if (typeof cameraAlpha !== 'undefined') {
+            cameraAlpha = 0;
+            if (typeof updateCameraPosition === 'function') updateCameraPosition();
+        }
         return;
     }
 
@@ -3980,12 +3990,51 @@ function updateHUD() {
         function processCameraKeyboardPanning() {
             const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); forward.y = 0; forward.normalize();
             const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); right.y = 0; right.normalize();
-            if (keysPressed['arrowup']) cameraTarget.addScaledVector(forward, panSpeed);
-            if (keysPressed['arrowdown']) cameraTarget.addScaledVector(forward, -panSpeed);
-            if (keysPressed['arrowleft']) cameraTarget.addScaledVector(right, -panSpeed);
-            if (keysPressed['arrowright']) cameraTarget.addScaledVector(right, panSpeed);
-            if (keysPressed['arrowup'] || keysPressed['arrowdown'] || 
-                keysPressed['arrowleft'] || keysPressed['arrowright']) updateCameraPosition();
+            let moved = false;
+            if (keysPressed['arrowup']) { cameraTarget.addScaledVector(forward, panSpeed); moved = true; }
+            if (keysPressed['arrowdown']) { cameraTarget.addScaledVector(forward, -panSpeed); moved = true; }
+            if (keysPressed['arrowleft']) { cameraTarget.addScaledVector(right, -panSpeed); moved = true; }
+            if (keysPressed['arrowright']) { cameraTarget.addScaledVector(right, panSpeed); moved = true; }
+            if (!blueprintMesh && typeof cameraAlpha !== 'undefined') {
+                if (keysPressed['q']) { cameraAlpha -= 0.032; moved = true; }
+                if (keysPressed['e']) { cameraAlpha += 0.032; moved = true; }
+            }
+            if (moved) updateCameraPosition();
+        }
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('dblclick', e => {
+                if (!e.target || e.target.tagName !== 'CANVAS') return;
+                if (typeof raycaster === 'undefined' || typeof camera === 'undefined' || typeof units === 'undefined') return;
+                const rect = e.target.getBoundingClientRect();
+                const ndc = new THREE.Vector2(
+                    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                    -((e.clientY - rect.top) / rect.height) * 2 + 1
+                );
+                raycaster.setFromCamera(ndc, camera);
+                const meshes = units.filter(u => u.health > 0 && u.mesh && (!u.ownerId || u.ownerId === 'player')).map(u => u.mesh);
+                const hits = raycaster.intersectObjects(meshes, true);
+                if (hits.length > 0) {
+                    let hitObj = hits[0].object;
+                    while (hitObj && !hitObj.userData?.unitRef) hitObj = hitObj.parent;
+                    const clickedUnit = hitObj && hitObj.userData ? hitObj.userData.unitRef : units.find(u => u.mesh === hitObj);
+                    if (clickedUnit && clickedUnit.type) {
+                        if (typeof deselectAll === 'function') deselectAll();
+                        let count = 0;
+                        units.forEach(u => {
+                            if (u.health > 0 && u.type === clickedUnit.type && (!u.ownerId || u.ownerId === 'player')) {
+                                u.selected = true;
+                                if (typeof addSelectionCircle === 'function') addSelectionCircle(u);
+                                count++;
+                            }
+                        });
+                        if (typeof updateSidebar === 'function') updateSidebar();
+                        if (count > 0 && typeof showNotification === 'function') {
+                            showNotification(`Selected ${count} × ${clickedUnit.type}`, 'info');
+                        }
+                    }
+                }
+            });
         }
 
         function processCameraScreenEdgePanning(clientX, clientY) {
