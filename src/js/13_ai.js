@@ -467,8 +467,11 @@ function initAICommanders() {
     aiCommanders = {};
     window.aiCommanders = aiCommanders;
     const mapSize = (typeof currentMapSize !== 'undefined' ? currentMapSize : 1500);
-    const env = (typeof activeTheme !== 'undefined' ? activeTheme : 'desert');
-    const allSpawns = (typeof getSpawnPointsForMap === 'function') ? getSpawnPointsForMap(mapSize, env, null) : [];
+    const mapType = (typeof currentMapType !== 'undefined' && currentMapType)
+        ? currentMapType
+        : (typeof activeTheme !== 'undefined' ? activeTheme : 'desert');
+    const customMap = (typeof activeCustomMap !== 'undefined') ? activeCustomMap : null;
+    const allSpawns = (typeof getSpawnPointsForMap === 'function') ? getSpawnPointsForMap(mapSize, mapType, customMap) : [];
     const activeAISlots = (typeof spSlots !== 'undefined' ? spSlots : []).filter(s => s.active && !s.isPlayer);
 
     if (activeAISlots.length === 0) {
@@ -483,9 +486,17 @@ function initAICommanders() {
 
     activeAISlots.forEach(slot => {
         const ownerId = 'ai_' + slot.id;
+        const deployedCC = (typeof enemyStructures !== 'undefined')
+            ? enemyStructures.find(es => es.ownerId === ownerId && es.type === 'center') || enemyStructures.find(es => es.ownerId === ownerId)
+            : null;
         const mySpawn = allSpawns.find(sp => sp.id === slot.spawnId);
-        const myBasePos = mySpawn ? new THREE.Vector3(mySpawn.x, 0, mySpawn.z) : new THREE.Vector3(20, 0, -20);
-        createCommanderState(ownerId, slot.team, slot.faction, myBasePos, slot.difficulty || 'medium', slot.spawnId);
+        const myBasePos = deployedCC && deployedCC.position
+            ? deployedCC.position.clone()
+            : (mySpawn ? new THREE.Vector3(mySpawn.x, 0, mySpawn.z) : new THREE.Vector3(20, 0, -20));
+        const actualFaction = (deployedCC && deployedCC.faction)
+            ? deployedCC.faction
+            : (slot.faction === 'random' ? 'china' : slot.faction);
+        createCommanderState(ownerId, slot.team, actualFaction, myBasePos, slot.difficulty || 'medium', slot.spawnId);
     });
 
     function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0) {

@@ -1264,7 +1264,9 @@
         // --- SKIRMISH & MULTIPLAYER LOBBY SLOTS MANAGEMENT ---
         function initLobbySlots(mode) {
             const mapSize = parseInt(document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size').value, 10);
-            const maxSpawns = mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8;
+            const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
+            const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
+            const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
             const slots = mode === 'single' ? spSlots : mpSlots;
 
             slots.forEach((s, idx) => {
@@ -1273,12 +1275,12 @@
                 } else {
                     s.active = false;
                 }
-                s.spawnId = (idx % maxSpawns) + 1;
+                const fallbackSpawnId = spawns[idx % maxSpawns] ? spawns[idx % maxSpawns].id : ((idx % maxSpawns) + 1);
+                s.spawnId = fallbackSpawnId;
             });
 
             renderSlotsUI(mode);
             const canvasId = mode === 'single' ? 'sp-map-preview' : 'mp-map-preview';
-            const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
             renderMapPreview(canvasId, mapType, mapSize, slots, true);
 
             const countEl = document.getElementById(mode === 'single' ? 'sp-slots-count' : 'mp-slots-count');
@@ -1306,10 +1308,10 @@
             const listEl = document.getElementById(mode === 'single' ? 'sp-slots-list' : 'mp-slots-list');
             if (!listEl) return;
             const mapSize = parseInt(document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size').value, 10);
-            const maxSpawns = mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8;
             const slots = mode === 'single' ? spSlots : mpSlots;
             const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
             const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
+            const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
 
             let html = '';
             for (let i = 0; i < maxSpawns; i++) {
