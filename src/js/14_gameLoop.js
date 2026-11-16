@@ -966,6 +966,12 @@ function animate() {
                         s.dozerRef.taskState = 'Building';
                         const buildRate = (s.type === 'supplyDrop') ? (100 / 2700) : 0.35; // 45s build time for Supply Drop Zone
                         s.buildProgress += buildRate * combatDeltaScale;
+                        if (s.mesh) {
+                            if (s._baseScaleY === undefined) s._baseScaleY = s.mesh.scale.y || 1;
+                            const pct = Math.min(1, Math.max(0, s.buildProgress / 100));
+                            s.mesh.scale.y = s._baseScaleY * (0.18 + 0.82 * pct);
+                            s.mesh.traverse(c => { if (c.isMesh && c.material && c.material.transparent) c.material.opacity = 0.28 + 0.62 * pct; });
+                        }
 
                         // Rotate builder to face the building under construction
                         const toX = s.position.x - dPos.x;
@@ -990,6 +996,7 @@ function animate() {
                         if (s.buildProgress >= 100) {
                             s.isBuilding = false;
                             s.buildProgress = 100;
+                            if (s.mesh && s._baseScaleY !== undefined) s.mesh.scale.y = s._baseScaleY;
                             if (s.dozerRef) {
                                 const finishedBuilder = s.dozerRef;
                                 finishedBuilder.taskState = 'Idle';
@@ -1317,7 +1324,7 @@ function animate() {
                         const mine = landmines[mi];
                         if (mine && !isFriendly(unit, mine) && mine.position) {
                             const dx = mine.position.x - uX, dz = mine.position.z - uZ;
-                            if (dx * dx + dz * dz <= 18.0 * 18.0) { isDetectingMines = true; break; }
+                            if (dx * dx + dz * dz <= 13.5 * 13.5) { isDetectingMines = true; break; }
                         }
                     }
                 }

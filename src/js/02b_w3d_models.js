@@ -827,8 +827,8 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
 
         if (infantryKey === 'worker' && (meshName === 'BOX' || meshName === 'MINED_SKIN')) {
             mesh.visible = false;
-            if (meshName === 'BOX') mesh.position.set(6.5, -1.0, 1.5);
-            if (meshName === 'MINED_SKIN') mesh.position.set(-1.0, 0.0, 10.5);
+            if (meshName === 'BOX') mesh.position.set(6.5, -0.5, 3.0);
+            if (meshName === 'MINED_SKIN') mesh.position.set(-2.5, 0.0, 13.5);
         }
 
         mesh.userData.runFrames = mdata.run;
@@ -840,7 +840,7 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
     if (infantryKey === 'worker') {
         const hammerGrp = new THREE.Group();
         hammerGrp.name = 'workerHammer';
-        hammerGrp.position.set(4.8, 8.5, 4.5);
+        hammerGrp.position.set(1.8, 9.8, 7.2);
         hammerGrp.visible = false;
         const handle = new THREE.Mesh(
             new THREE.CylinderGeometry(0.22, 0.22, 3.6, 6),
