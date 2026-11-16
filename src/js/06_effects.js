@@ -1769,3 +1769,133 @@
                 }
             });
         }
+
+        // =========================================================================
+        // USA SUPPLY DROP ZONE: C-130 HERCULES CRATE DELIVERY ($1,500 / $1,650)
+        // =========================================================================
+        function triggerSupplyDropZoneDelivery(structure) {
+            if (!structure || !structure.position || structure.health <= 0 || structure.isBuilding) return;
+            const dropCenter = structure.position.clone();
+            const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+
+            // 1. C-130 Hercules Flyover Mesh
+            const plane = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6c7a89, roughness: 0.55, metalness: 0.35 });
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0x56616e, roughness: 0.6, metalness: 0.3 });
+            const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.5, 9.0), bodyMat);
+            const wings = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.25, 2.2), wingMat);
+            wings.position.set(0, 0.35, 0.5);
+            const tail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.4, 1.6), wingMat);
+            tail.position.set(0, 1.4, -3.8);
+            const hStab = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.2, 1.2), wingMat);
+            hStab.position.set(0, 0.7, -3.9);
+            plane.add(fuselage, wings, tail, hStab);
+
+            const startPos = new THREE.Vector3(dropCenter.x - 85, groundY + 28, dropCenter.z - 35);
+            const endPos = new THREE.Vector3(dropCenter.x + 85, groundY + 28, dropCenter.z + 35);
+            plane.position.copy(startPos);
+            plane.lookAt(endPos);
+            scene.add(plane);
+
+            if (typeof playAudio === 'function') playAudio('radio_chirp', {}, 'usa');
+
+            let planeTick = 0;
+            const planeDuration = 180;
+            let crateDropped = false;
+
+            // 2. Parachute Supply Crate
+            function spawnParachuteCrate() {
+                const offX = (Math.random() - 0.5) * 5.0;
+                const offZ = (Math.random() - 0.5) * 5.0;
+                const landX = dropCenter.x + offX;
+                const landZ = dropCenter.z + offZ;
+                const landY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(landX, landZ) : groundY;
+
+                const crateGrp = new THREE.Group();
+                const boxMat = new THREE.MeshStandardMaterial({ color: 0x4b5d3b, roughness: 0.7 });
+                const strapMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.4 });
+                const chuteMat = new THREE.MeshBasicMaterial({ color: 0xecf0f1, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+
+                const box = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.5), boxMat);
+                const strap = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.22, 1.58), strapMat);
+                const chute = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.8, 8, 1, true), chuteMat);
+                chute.position.y = 3.2;
+                crateGrp.add(box, strap, chute);
+
+                crateGrp.position.set(landX, groundY + 24, landZ);
+                scene.add(crateGrp);
+
+                let landed = false;
+                let groundTicks = 0;
+                let lifeTicks = 0;
+
+                activeFX.push({
+                    update() {
+                        lifeTicks++;
+                        if (!landed) {
+                            crateGrp.position.y -= 0.22;
+                            crateGrp.rotation.y += 0.02;
+                            if (crateGrp.position.y <= landY + 0.55) {
+                                crateGrp.position.y = landY + 0.55;
+                                landed = true;
+                                chute.visible = false;
+                            }
+                            return true;
+                        }
+
+                        groundTicks++;
+                        // Check if an enemy unit intercepts/steals/destroys the crate
+                        if (typeof enemyUnits !== 'undefined') {
+                            const interceptor = enemyUnits.find(e => e.health > 0 && e.mesh && Math.hypot(e.mesh.position.x - landX, e.mesh.position.z - landZ) < 4.5);
+                            if (interceptor) {
+                                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(crateGrp.position, 0xff4757, 2.2);
+                                if (typeof showNotification === 'function') showNotification('⚠ Enemy forces intercepted a Supply Drop Zone crate!', 'warning');
+                                scene.remove(crateGrp);
+                                box.geometry.dispose(); strap.geometry.dispose(); chute.geometry.dispose();
+                                boxMat.dispose(); strapMat.dispose(); chuteMat.dispose();
+                                return false;
+                            }
+                        }
+
+                        // Collect immediately if a friendly unit touches it, or after ~4s (240 ticks) uncontested on the drop pad
+                        const friendlyTouch = (typeof units !== 'undefined') && units.some(u => u.health > 0 && u.mesh && Math.hypot(u.mesh.position.x - landX, u.mesh.position.z - landZ) < 4.5);
+                        if (friendlyTouch || groundTicks >= 240) {
+                            const hasSupplyLines = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines'));
+                            const bonus = hasSupplyLines ? 1650 : 1500;
+                            if (typeof playerResources !== 'undefined') {
+                                playerResources += bonus;
+                                const resEl = (typeof document !== 'undefined') ? document.getElementById('resource-display') : null;
+                                if (resEl) resEl.innerText = `$${playerResources}`;
+                            }
+                            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(crateGrp.position, 0x2ecc71, 2.0);
+                            if (typeof showNotification === 'function') showNotification(`📦 C-130 Supply Drop collected: +$${bonus}!`, 'success');
+                            scene.remove(crateGrp);
+                            box.geometry.dispose(); strap.geometry.dispose(); chute.geometry.dispose();
+                            boxMat.dispose(); strapMat.dispose(); chuteMat.dispose();
+                            return false;
+                        }
+                        return lifeTicks < 1200;
+                    }
+                });
+            }
+
+            activeFX.push({
+                update() {
+                    planeTick++;
+                    const t = planeTick / planeDuration;
+                    plane.position.lerpVectors(startPos, endPos, t);
+                    if (!crateDropped && t >= 0.5) {
+                        crateDropped = true;
+                        spawnParachuteCrate();
+                    }
+                    if (planeTick >= planeDuration) {
+                        scene.remove(plane);
+                        fuselage.geometry.dispose(); wings.geometry.dispose(); tail.geometry.dispose(); hStab.geometry.dispose();
+                        bodyMat.dispose(); wingMat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+        window.triggerSupplyDropZoneDelivery = triggerSupplyDropZoneDelivery;

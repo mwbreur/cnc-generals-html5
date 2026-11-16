@@ -9900,6 +9900,136 @@ window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
             });
         }
 
+        // =========================================================================
+        // USA SUPPLY DROP ZONE: C-130 HERCULES CRATE DELIVERY ($1,500 / $1,650)
+        // =========================================================================
+        function triggerSupplyDropZoneDelivery(structure) {
+            if (!structure || !structure.position || structure.health <= 0 || structure.isBuilding) return;
+            const dropCenter = structure.position.clone();
+            const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+
+            // 1. C-130 Hercules Flyover Mesh
+            const plane = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6c7a89, roughness: 0.55, metalness: 0.35 });
+            const wingMat = new THREE.MeshStandardMaterial({ color: 0x56616e, roughness: 0.6, metalness: 0.3 });
+            const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.5, 9.0), bodyMat);
+            const wings = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.25, 2.2), wingMat);
+            wings.position.set(0, 0.35, 0.5);
+            const tail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.4, 1.6), wingMat);
+            tail.position.set(0, 1.4, -3.8);
+            const hStab = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.2, 1.2), wingMat);
+            hStab.position.set(0, 0.7, -3.9);
+            plane.add(fuselage, wings, tail, hStab);
+
+            const startPos = new THREE.Vector3(dropCenter.x - 85, groundY + 28, dropCenter.z - 35);
+            const endPos = new THREE.Vector3(dropCenter.x + 85, groundY + 28, dropCenter.z + 35);
+            plane.position.copy(startPos);
+            plane.lookAt(endPos);
+            scene.add(plane);
+
+            if (typeof playAudio === 'function') playAudio('radio_chirp', {}, 'usa');
+
+            let planeTick = 0;
+            const planeDuration = 180;
+            let crateDropped = false;
+
+            // 2. Parachute Supply Crate
+            function spawnParachuteCrate() {
+                const offX = (Math.random() - 0.5) * 5.0;
+                const offZ = (Math.random() - 0.5) * 5.0;
+                const landX = dropCenter.x + offX;
+                const landZ = dropCenter.z + offZ;
+                const landY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(landX, landZ) : groundY;
+
+                const crateGrp = new THREE.Group();
+                const boxMat = new THREE.MeshStandardMaterial({ color: 0x4b5d3b, roughness: 0.7 });
+                const strapMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.4 });
+                const chuteMat = new THREE.MeshBasicMaterial({ color: 0xecf0f1, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+
+                const box = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.5), boxMat);
+                const strap = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.22, 1.58), strapMat);
+                const chute = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.8, 8, 1, true), chuteMat);
+                chute.position.y = 3.2;
+                crateGrp.add(box, strap, chute);
+
+                crateGrp.position.set(landX, groundY + 24, landZ);
+                scene.add(crateGrp);
+
+                let landed = false;
+                let groundTicks = 0;
+                let lifeTicks = 0;
+
+                activeFX.push({
+                    update() {
+                        lifeTicks++;
+                        if (!landed) {
+                            crateGrp.position.y -= 0.22;
+                            crateGrp.rotation.y += 0.02;
+                            if (crateGrp.position.y <= landY + 0.55) {
+                                crateGrp.position.y = landY + 0.55;
+                                landed = true;
+                                chute.visible = false;
+                            }
+                            return true;
+                        }
+
+                        groundTicks++;
+                        // Check if an enemy unit intercepts/steals/destroys the crate
+                        if (typeof enemyUnits !== 'undefined') {
+                            const interceptor = enemyUnits.find(e => e.health > 0 && e.mesh && Math.hypot(e.mesh.position.x - landX, e.mesh.position.z - landZ) < 4.5);
+                            if (interceptor) {
+                                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(crateGrp.position, 0xff4757, 2.2);
+                                if (typeof showNotification === 'function') showNotification('⚠ Enemy forces intercepted a Supply Drop Zone crate!', 'warning');
+                                scene.remove(crateGrp);
+                                box.geometry.dispose(); strap.geometry.dispose(); chute.geometry.dispose();
+                                boxMat.dispose(); strapMat.dispose(); chuteMat.dispose();
+                                return false;
+                            }
+                        }
+
+                        // Collect immediately if a friendly unit touches it, or after ~4s (240 ticks) uncontested on the drop pad
+                        const friendlyTouch = (typeof units !== 'undefined') && units.some(u => u.health > 0 && u.mesh && Math.hypot(u.mesh.position.x - landX, u.mesh.position.z - landZ) < 4.5);
+                        if (friendlyTouch || groundTicks >= 240) {
+                            const hasSupplyLines = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines'));
+                            const bonus = hasSupplyLines ? 1650 : 1500;
+                            if (typeof playerResources !== 'undefined') {
+                                playerResources += bonus;
+                                const resEl = (typeof document !== 'undefined') ? document.getElementById('resource-display') : null;
+                                if (resEl) resEl.innerText = `$${playerResources}`;
+                            }
+                            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(crateGrp.position, 0x2ecc71, 2.0);
+                            if (typeof showNotification === 'function') showNotification(`📦 C-130 Supply Drop collected: +$${bonus}!`, 'success');
+                            scene.remove(crateGrp);
+                            box.geometry.dispose(); strap.geometry.dispose(); chute.geometry.dispose();
+                            boxMat.dispose(); strapMat.dispose(); chuteMat.dispose();
+                            return false;
+                        }
+                        return lifeTicks < 1200;
+                    }
+                });
+            }
+
+            activeFX.push({
+                update() {
+                    planeTick++;
+                    const t = planeTick / planeDuration;
+                    plane.position.lerpVectors(startPos, endPos, t);
+                    if (!crateDropped && t >= 0.5) {
+                        crateDropped = true;
+                        spawnParachuteCrate();
+                    }
+                    if (planeTick >= planeDuration) {
+                        scene.remove(plane);
+                        fuselage.geometry.dispose(); wings.geometry.dispose(); tail.geometry.dispose(); hStab.geometry.dispose();
+                        bodyMat.dispose(); wingMat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+        window.triggerSupplyDropZoneDelivery = triggerSupplyDropZoneDelivery;
+
 
 // --- MODULE: 07_terrain.js ---
 // MAP ENVIRONMENTS, PROCEDURAL TERRAIN, WATER & PROPS (TREES / CITY)
@@ -11552,13 +11682,14 @@ function resolveObstacleCollisions(unit) {
             }
 
             
+            const structMaxHp = (type === 'supplyDrop') ? 1000 : 1200;
             const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
             const structObj = {
                 type: type, mesh: group, position: pos.clone(),
                 rotationY: rotationY || 0,
                 radius: getStructureFootprint(type).radius,
                 isBuilding: !instant, buildProgress: instant ? 100 : 0, dozerRef: null,
-                health: 1200, maxHealth: 1200,
+                health: structMaxHp, maxHealth: structMaxHp,
                 netId: structNetId,
                 teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
                 ownerId: 'player',
@@ -11842,7 +11973,7 @@ function resolveObstacleCollisions(unit) {
                         barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
                         strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
                         propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                        particleCannon: 4, nukeSilo: 4
+                        particleCannon: 4, nukeSilo: 4, supplyDrop: 4
                     }[s.type] || 0;
                     consumed += drain;
                 });
@@ -12135,7 +12266,7 @@ function resolveObstacleCollisions(unit) {
                     { id: 'droneArmor', name: 'DRONE ARMOR', cost: 500, desc: 'Increases all vehicle and base drones armor and durability by +25%.' },
                     { id: 'advancedTraining', name: 'ADVANCED TRAINING', cost: 800, desc: 'Doubles combat experience gain, rapidly promoting units to Veteran rank.' },
                     { id: 'chemicalSuits', name: 'CHEMICAL SUITS', cost: 800, desc: 'USA forces gain +50% resistance to toxin, anthrax, and radiation damage.' },
-                    { id: 'supplyLines', name: 'SUPPLY LINES', cost: 800, desc: 'USA Supply Trucks and Chinooks bring back +10% extra cash per delivery.' }
+                    { id: 'supplyLines', name: 'SUPPLY LINES', cost: 800, desc: 'Increases Supply Center and Supply Drop Zone crate income by +10% ($1,500 -> $1,650).' }
                 ],
                 particleCannon: [
                     { id: 'superweapon', name: 'PARTICLE BEAM STRIKE', cost: 0, isSuperweapon: true, desc: 'Channels space-based orbital particle beam weapon at target coordinates anywhere on the battlefield.' }
@@ -12254,7 +12385,7 @@ function resolveObstacleCollisions(unit) {
         const factionBuildings = {
             usa: [
                 ['power', 'Cold Fusion Reactor', 300], ['barracks', 'Barracks', 400], ['factory', 'War Factory', 700],
-                ['supplyCenter', 'Supply Center', 500], ['supplyDrop', 'Supply Drop Zone', 1200], ['airfield', 'Air Field', 1000],
+                ['supplyCenter', 'Supply Center', 500], ['supplyDrop', 'Supply Drop Zone', 2500], ['airfield', 'Air Field', 1000],
                 ['strategyCenter', 'Strategy Center', 1500], ['detentionCamp', 'Detention Camp', 900],
                 ['patriot', 'Patriot Missile System', 800], ['particleCannon', 'Particle Cannon', 2500]
             ],
@@ -12549,7 +12680,7 @@ function resolveObstacleCollisions(unit) {
             particleCannon: { name: 'Particle Cannon', role: 'Orbital Particle Superweapon', cost: '$2500', desc: 'USA space-based orbital particle beam weapon. Channels high-energy particle stream across the battlefield.', req: 'Strategy Center', unlock: 'Orbital Particle Beam Strike' },
             nukeSilo: { name: 'Nuclear Missile Silo', role: 'Thermonuclear ICBM Silo', cost: '$2500', desc: 'China thermonuclear ICBM silo. Delivers a devastating atomic warhead that incinerates entire bases.', req: 'Propaganda Center', unlock: 'Thermonuclear Ballistic Missile Strike' },
             scudStorm: { name: 'SCUD Storm', role: 'Chemical Ballistic Superweapon', cost: '$2500', desc: 'GLA multiple ballistic missile complex. Salvo fires 9 chemical SCUD rockets loaded with Anthrax Beta.', req: 'Palace', unlock: 'SCUD Storm Ballistic Salvo' },
-            supplyDrop: { name: 'Supply Drop Zone', role: 'Airborne Resupply Zone', cost: '$1200', desc: 'USA logistics landing zone. Cargo planes deliver $250 supply pallets at regular intervals.', req: 'Strategy Center', unlock: 'Automated Passive Income Flow' },
+            supplyDrop: { name: 'Supply Drop Zone', role: 'Airborne Resupply Zone', cost: '$2500', desc: 'USA Tier 3 logistics drop zone with red smoke signal. Calls a C-130 Hercules every 2 minutes to drop $1,500 crates ($1,650 with Supply Lines). Functions during power outages & EMP.', req: 'Strategy Center', unlock: 'C-130 Airborne Supply Drops' },
             internetCenter: { name: 'Internet Center', role: 'Cyber Warfare Facility', cost: '$1000', desc: 'China electronic intelligence facility. Stations Hackers to steal funds and track enemy positions.', req: 'Propaganda Center', unlock: 'Global Satellite Spy Uplink' },
             blackMarket: { name: 'Black Market', role: 'Covert Commerce Bazaar', cost: '$1200', desc: 'GLA subterranean black market. Generates continuous funds and sells illegal black market weapons tech.', req: 'Palace', unlock: 'Continuous Black Market Income' },
             detentionCamp: { name: 'Detention Camp', role: 'Military Intelligence Facility', cost: '$900', desc: 'USA interrogation and surveillance facility. Grants radar intelligence sweeps of hostile forces.', req: 'Strategy Center', unlock: 'Hostile Intelligence Sweeps' },
@@ -15030,7 +15161,7 @@ function updateSidebar() {
                 barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
                 strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
                 propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                particleCannon: 4, nukeSilo: 4
+                particleCannon: 4, nukeSilo: 4, supplyDrop: 4
             }[s.type] || 0;
             consumed += drain;
         });
@@ -17464,7 +17595,7 @@ function updateHUD() {
                         barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
                         strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
                         propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                        particleCannon: 4, nukeSilo: 4
+                        particleCannon: 4, nukeSilo: 4, supplyDrop: 4, supplyDrop: 4
                     }[s.type] || 0;
                     pConsumed += drain;
                 });
@@ -17518,9 +17649,23 @@ function updateHUD() {
                     }
                 }
 
-                if (structure.type === 'supplyDrop' && buildingTick % 900 === 0) {
-                    const bonus = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines')) ? 275 : 250;
-                    playerResources += bonus;
+                if (structure.type === 'supplyDrop') {
+                    // Red smoke beacon on Supply Drop Zone
+                    if (buildingTick % 120 === 0 && typeof spawnSmokePuff === 'function') {
+                        const smokePos = structure.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+                        spawnSmokePuff(smokePos, 0xff2e2e);
+                    }
+                    // Continues timer & functions even during Low Power or EMP (2-minute = 7200 ticks cycle)
+                    structure.dropTicks = (structure.dropTicks || 0) + 60;
+                    if (structure.dropTicks >= 7200) {
+                        structure.dropTicks = 0;
+                        if (typeof triggerSupplyDropZoneDelivery === 'function') {
+                            triggerSupplyDropZoneDelivery(structure);
+                        } else {
+                            const bonus = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines')) ? 1650 : 1500;
+                            playerResources += bonus;
+                        }
+                    }
                 }
                 if (structure.type === 'blackMarket' && buildingTick % 300 === 0) playerResources += 30;
                 if (structure.type === 'internetCenter' && buildingTick % 300 === 0) playerResources += 20;
@@ -22956,7 +23101,8 @@ function animate() {
                     const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 2.5;
                     if (dist2D <= buildThreshold) {
                         s.dozerRef.taskState = 'Building';
-                        s.buildProgress += 0.35 * combatDeltaScale;
+                        const buildRate = (s.type === 'supplyDrop') ? (100 / 2700) : 0.35; // 45s build time for Supply Drop Zone
+                        s.buildProgress += buildRate * combatDeltaScale;
 
                         // Rotate builder to face the building under construction
                         const toX = s.position.x - dPos.x;

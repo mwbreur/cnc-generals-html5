@@ -287,13 +287,14 @@ function resolveObstacleCollisions(unit) {
             }
 
             
+            const structMaxHp = (type === 'supplyDrop') ? 1000 : 1200;
             const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
             const structObj = {
                 type: type, mesh: group, position: pos.clone(),
                 rotationY: rotationY || 0,
                 radius: getStructureFootprint(type).radius,
                 isBuilding: !instant, buildProgress: instant ? 100 : 0, dozerRef: null,
-                health: 1200, maxHealth: 1200,
+                health: structMaxHp, maxHealth: structMaxHp,
                 netId: structNetId,
                 teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
                 ownerId: 'player',

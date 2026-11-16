@@ -736,7 +736,7 @@ function updateSidebar() {
                 barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
                 strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
                 propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                particleCannon: 4, nukeSilo: 4
+                particleCannon: 4, nukeSilo: 4, supplyDrop: 4
             }[s.type] || 0;
             consumed += drain;
         });
@@ -3170,7 +3170,7 @@ function updateHUD() {
                         barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
                         strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
                         propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                        particleCannon: 4, nukeSilo: 4
+                        particleCannon: 4, nukeSilo: 4, supplyDrop: 4, supplyDrop: 4
                     }[s.type] || 0;
                     pConsumed += drain;
                 });
@@ -3224,9 +3224,23 @@ function updateHUD() {
                     }
                 }
 
-                if (structure.type === 'supplyDrop' && buildingTick % 900 === 0) {
-                    const bonus = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines')) ? 275 : 250;
-                    playerResources += bonus;
+                if (structure.type === 'supplyDrop') {
+                    // Red smoke beacon on Supply Drop Zone
+                    if (buildingTick % 120 === 0 && typeof spawnSmokePuff === 'function') {
+                        const smokePos = structure.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+                        spawnSmokePuff(smokePos, 0xff2e2e);
+                    }
+                    // Continues timer & functions even during Low Power or EMP (2-minute = 7200 ticks cycle)
+                    structure.dropTicks = (structure.dropTicks || 0) + 60;
+                    if (structure.dropTicks >= 7200) {
+                        structure.dropTicks = 0;
+                        if (typeof triggerSupplyDropZoneDelivery === 'function') {
+                            triggerSupplyDropZoneDelivery(structure);
+                        } else {
+                            const bonus = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines')) ? 1650 : 1500;
+                            playerResources += bonus;
+                        }
+                    }
                 }
                 if (structure.type === 'blackMarket' && buildingTick % 300 === 0) playerResources += 30;
                 if (structure.type === 'internetCenter' && buildingTick % 300 === 0) playerResources += 20;

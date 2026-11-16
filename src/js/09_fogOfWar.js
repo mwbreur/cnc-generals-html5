@@ -81,7 +81,7 @@
                         barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
                         strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
                         propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                        particleCannon: 4, nukeSilo: 4
+                        particleCannon: 4, nukeSilo: 4, supplyDrop: 4
                     }[s.type] || 0;
                     consumed += drain;
                 });
@@ -374,7 +374,7 @@
                     { id: 'droneArmor', name: 'DRONE ARMOR', cost: 500, desc: 'Increases all vehicle and base drones armor and durability by +25%.' },
                     { id: 'advancedTraining', name: 'ADVANCED TRAINING', cost: 800, desc: 'Doubles combat experience gain, rapidly promoting units to Veteran rank.' },
                     { id: 'chemicalSuits', name: 'CHEMICAL SUITS', cost: 800, desc: 'USA forces gain +50% resistance to toxin, anthrax, and radiation damage.' },
-                    { id: 'supplyLines', name: 'SUPPLY LINES', cost: 800, desc: 'USA Supply Trucks and Chinooks bring back +10% extra cash per delivery.' }
+                    { id: 'supplyLines', name: 'SUPPLY LINES', cost: 800, desc: 'Increases Supply Center and Supply Drop Zone crate income by +10% ($1,500 -> $1,650).' }
                 ],
                 particleCannon: [
                     { id: 'superweapon', name: 'PARTICLE BEAM STRIKE', cost: 0, isSuperweapon: true, desc: 'Channels space-based orbital particle beam weapon at target coordinates anywhere on the battlefield.' }
@@ -493,7 +493,7 @@
         const factionBuildings = {
             usa: [
                 ['power', 'Cold Fusion Reactor', 300], ['barracks', 'Barracks', 400], ['factory', 'War Factory', 700],
-                ['supplyCenter', 'Supply Center', 500], ['supplyDrop', 'Supply Drop Zone', 1200], ['airfield', 'Air Field', 1000],
+                ['supplyCenter', 'Supply Center', 500], ['supplyDrop', 'Supply Drop Zone', 2500], ['airfield', 'Air Field', 1000],
                 ['strategyCenter', 'Strategy Center', 1500], ['detentionCamp', 'Detention Camp', 900],
                 ['patriot', 'Patriot Missile System', 800], ['particleCannon', 'Particle Cannon', 2500]
             ],
@@ -788,7 +788,7 @@
             particleCannon: { name: 'Particle Cannon', role: 'Orbital Particle Superweapon', cost: '$2500', desc: 'USA space-based orbital particle beam weapon. Channels high-energy particle stream across the battlefield.', req: 'Strategy Center', unlock: 'Orbital Particle Beam Strike' },
             nukeSilo: { name: 'Nuclear Missile Silo', role: 'Thermonuclear ICBM Silo', cost: '$2500', desc: 'China thermonuclear ICBM silo. Delivers a devastating atomic warhead that incinerates entire bases.', req: 'Propaganda Center', unlock: 'Thermonuclear Ballistic Missile Strike' },
             scudStorm: { name: 'SCUD Storm', role: 'Chemical Ballistic Superweapon', cost: '$2500', desc: 'GLA multiple ballistic missile complex. Salvo fires 9 chemical SCUD rockets loaded with Anthrax Beta.', req: 'Palace', unlock: 'SCUD Storm Ballistic Salvo' },
-            supplyDrop: { name: 'Supply Drop Zone', role: 'Airborne Resupply Zone', cost: '$1200', desc: 'USA logistics landing zone. Cargo planes deliver $250 supply pallets at regular intervals.', req: 'Strategy Center', unlock: 'Automated Passive Income Flow' },
+            supplyDrop: { name: 'Supply Drop Zone', role: 'Airborne Resupply Zone', cost: '$2500', desc: 'USA Tier 3 logistics drop zone with red smoke signal. Calls a C-130 Hercules every 2 minutes to drop $1,500 crates ($1,650 with Supply Lines). Functions during power outages & EMP.', req: 'Strategy Center', unlock: 'C-130 Airborne Supply Drops' },
             internetCenter: { name: 'Internet Center', role: 'Cyber Warfare Facility', cost: '$1000', desc: 'China electronic intelligence facility. Stations Hackers to steal funds and track enemy positions.', req: 'Propaganda Center', unlock: 'Global Satellite Spy Uplink' },
             blackMarket: { name: 'Black Market', role: 'Covert Commerce Bazaar', cost: '$1200', desc: 'GLA subterranean black market. Generates continuous funds and sells illegal black market weapons tech.', req: 'Palace', unlock: 'Continuous Black Market Income' },
             detentionCamp: { name: 'Detention Camp', role: 'Military Intelligence Facility', cost: '$900', desc: 'USA interrogation and surveillance facility. Grants radar intelligence sweeps of hostile forces.', req: 'Strategy Center', unlock: 'Hostile Intelligence Sweeps' },

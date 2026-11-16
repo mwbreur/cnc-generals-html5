@@ -911,7 +911,8 @@ function animate() {
                     const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 2.5;
                     if (dist2D <= buildThreshold) {
                         s.dozerRef.taskState = 'Building';
-                        s.buildProgress += 0.35 * combatDeltaScale;
+                        const buildRate = (s.type === 'supplyDrop') ? (100 / 2700) : 0.35; // 45s build time for Supply Drop Zone
+                        s.buildProgress += buildRate * combatDeltaScale;
 
                         // Rotate builder to face the building under construction
                         const toX = s.position.x - dPos.x;
