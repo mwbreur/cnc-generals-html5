@@ -1740,18 +1740,6 @@ body.control-bar-collapsed #generals-command-bar {
     backdrop-filter: blur(1.5px);
 }
 
-.pause-screen-watermark {
-    position: fixed;
-    top: 18px;
-    left: 22px;
-    z-index: 35;
-    pointer-events: none;
-    font-family: 'Arial', sans-serif;
-    font-size: 14px;
-    font-weight: bold;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
-    line-height: 1.35;
-}
 .pause-screen-clock {
     position: fixed;
     top: 18px;
@@ -1779,11 +1767,6 @@ body.control-bar-collapsed #generals-command-bar {
     display: flex;
     flex-direction: column;
 }
-
-.pause-watermark-title { color: #f1f2f6; }
-.pause-watermark-pro { color: #2ed573; }
-.pause-watermark-hd { color: #ffa502; }
-.pause-watermark-gentool { color: #ff4757; }
 
 .pause-table-container {
     flex: 1;

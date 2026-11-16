@@ -1751,18 +1751,6 @@ body.control-bar-collapsed #generals-command-bar {
     backdrop-filter: blur(1.5px);
 }
 
-.pause-screen-watermark {
-    position: fixed;
-    top: 18px;
-    left: 22px;
-    z-index: 35;
-    pointer-events: none;
-    font-family: 'Arial', sans-serif;
-    font-size: 14px;
-    font-weight: bold;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
-    line-height: 1.35;
-}
 .pause-screen-clock {
     position: fixed;
     top: 18px;
@@ -1790,11 +1778,6 @@ body.control-bar-collapsed #generals-command-bar {
     display: flex;
     flex-direction: column;
 }
-
-.pause-watermark-title { color: #f1f2f6; }
-.pause-watermark-pro { color: #2ed573; }
-.pause-watermark-hd { color: #ffa502; }
-.pause-watermark-gentool { color: #ff4757; }
 
 .pause-table-container {
     flex: 1;
@@ -2426,13 +2409,7 @@ body.control-bar-collapsed #generals-command-bar {
 </head>
 <body>
 <div id="start-menu">
-        <!-- TOP-LEFT & TOP-RIGHT LIVE SCREEN OVERLAYS (Control Bar Pro replica) -->
-        <div id="pause-screen-watermark" class="pause-screen-watermark" style="display: none;">
-            <div class="pause-watermark-title">C&amp;C Generals Zero Hour</div>
-            <div class="pause-watermark-pro">Control Bar Pro</div>
-            <div class="pause-watermark-hd">+ Control Bar HD</div>
-            <div class="pause-watermark-gentool">+ GenTool</div>
-        </div>
+        <!-- TOP-RIGHT LIVE SCREEN OVERLAY -->
         <div id="pause-screen-clock" class="pause-screen-clock" style="display: none;">00:00:00</div>
 
         <!-- AUTHENTIC ZERO HOUR IN-GAME DIPLOMACY & PAUSE MODAL -->
@@ -14786,8 +14763,6 @@ function resumeGame() {
         startCard.style.display = 'none';
         startCard.classList.remove('main-menu-active');
     }
-    const pauseWatermark = document.getElementById('pause-screen-watermark');
-    if (pauseWatermark) pauseWatermark.style.display = 'none';
     const pauseClock = document.getElementById('pause-screen-clock');
     if (pauseClock) pauseClock.style.display = 'none';
 }
@@ -14796,7 +14771,6 @@ function showInGamePauseModal(view = 'options') {
     const menu = document.getElementById('start-menu');
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
-    const pauseWatermark = document.getElementById('pause-screen-watermark');
     const pauseClock = document.getElementById('pause-screen-clock');
     const matchClock = document.getElementById('match-clock');
     if (!menu) return;
@@ -14810,7 +14784,6 @@ function showInGamePauseModal(view = 'options') {
         pauseModal.classList.toggle('options-mode', view !== 'diplomacy');
         updatePauseModalPlayerList();
     }
-    if (pauseWatermark) pauseWatermark.style.display = 'block';
     if (pauseClock) {
         pauseClock.style.display = 'block';
         if (matchClock) pauseClock.innerText = matchClock.innerText;
@@ -14822,7 +14795,6 @@ function showStartSetupCard() {
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
     const resumeBtn = document.getElementById('resume-game-btn');
-    const pauseWatermark = document.getElementById('pause-screen-watermark');
     const pauseClock = document.getElementById('pause-screen-clock');
     const mainMenuScreen = document.getElementById('main-menu-screen');
     const setupScreen = document.getElementById('start-setup-screen');
@@ -14832,7 +14804,6 @@ function showStartSetupCard() {
     menu.style.display = 'flex';
     menu.classList.remove('pause-mode');
     if (pauseModal) pauseModal.style.display = 'none';
-    if (pauseWatermark) pauseWatermark.style.display = 'none';
     if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
         startCard.classList.remove('main-menu-active');

@@ -283,8 +283,6 @@ function resumeGame() {
         startCard.style.display = 'none';
         startCard.classList.remove('main-menu-active');
     }
-    const pauseWatermark = document.getElementById('pause-screen-watermark');
-    if (pauseWatermark) pauseWatermark.style.display = 'none';
     const pauseClock = document.getElementById('pause-screen-clock');
     if (pauseClock) pauseClock.style.display = 'none';
 }
@@ -293,7 +291,6 @@ function showInGamePauseModal(view = 'options') {
     const menu = document.getElementById('start-menu');
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
-    const pauseWatermark = document.getElementById('pause-screen-watermark');
     const pauseClock = document.getElementById('pause-screen-clock');
     const matchClock = document.getElementById('match-clock');
     if (!menu) return;
@@ -307,7 +304,6 @@ function showInGamePauseModal(view = 'options') {
         pauseModal.classList.toggle('options-mode', view !== 'diplomacy');
         updatePauseModalPlayerList();
     }
-    if (pauseWatermark) pauseWatermark.style.display = 'block';
     if (pauseClock) {
         pauseClock.style.display = 'block';
         if (matchClock) pauseClock.innerText = matchClock.innerText;
@@ -319,7 +315,6 @@ function showStartSetupCard() {
     const pauseModal = document.getElementById('ingame-pause-modal');
     const startCard = document.getElementById('start-card');
     const resumeBtn = document.getElementById('resume-game-btn');
-    const pauseWatermark = document.getElementById('pause-screen-watermark');
     const pauseClock = document.getElementById('pause-screen-clock');
     const mainMenuScreen = document.getElementById('main-menu-screen');
     const setupScreen = document.getElementById('start-setup-screen');
@@ -329,7 +324,6 @@ function showStartSetupCard() {
     menu.style.display = 'flex';
     menu.classList.remove('pause-mode');
     if (pauseModal) pauseModal.style.display = 'none';
-    if (pauseWatermark) pauseWatermark.style.display = 'none';
     if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
         startCard.classList.remove('main-menu-active');
