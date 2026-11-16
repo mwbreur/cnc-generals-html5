@@ -988,24 +988,51 @@ function activateBlueprint(type) {
     const group = new THREE.Group();
     group.name = "blueprintGroup";
 
-    // 1. Semi-transparent foundation footprint box
-    const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
-    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.45 });
-    const boxMesh = new THREE.Mesh(geo, mat);
-    boxMesh.name = "blueprintBox";
-    group.add(boxMesh);
+    let hasModelPreview = false;
+    if (typeof createStructureMeshForFaction === 'function') {
+        const f = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+        const previewMesh = createStructureMeshForFaction(type, f);
+        if (previewMesh) {
+            const wireMat = new THREE.MeshBasicMaterial({
+                color: 0x00ffcc,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.55
+            });
+            previewMesh.traverse(child => {
+                if (child.isMesh) {
+                    child.material = wireMat;
+                    child.castShadow = false;
+                    child.receiveShadow = false;
+                }
+            });
+            previewMesh.name = "blueprintModel";
+            group.add(previewMesh);
+            hasModelPreview = true;
+        }
+    }
 
-    // 2. Wireframe grid cage
-    const wireGeo = new THREE.EdgesGeometry(geo);
-    const wireMat = new THREE.LineBasicMaterial({ color: 0x00ffcc, linewidth: 2 });
-    const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
-    wireMesh.name = "blueprintWire";
-    group.add(wireMesh);
+    if (!hasModelPreview) {
+        // Fallback: semi-transparent foundation footprint box & wireframe cage
+        const geo = new THREE.BoxGeometry(size.x, size.y, size.z);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.45 });
+        const boxMesh = new THREE.Mesh(geo, mat);
+        boxMesh.name = "blueprintBox";
+        boxMesh.position.y = size.y / 2;
+        group.add(boxMesh);
 
-    // 3. Directional Front-Facing Pointer Arrow (shows building front entrance/facing orientation)
+        const wireGeo = new THREE.EdgesGeometry(geo);
+        const wireMat = new THREE.LineBasicMaterial({ color: 0x00ffcc, linewidth: 2 });
+        const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
+        wireMesh.name = "blueprintWire";
+        wireMesh.position.y = size.y / 2;
+        group.add(wireMesh);
+    }
+
+    // Directional Front-Facing Pointer Arrow (shows building front entrance/facing orientation)
     const arrowGroup = new THREE.Group();
     arrowGroup.name = "blueprintArrow";
-    arrowGroup.position.set(0, -size.y / 2 + 0.15, size.z / 2 + 1.2);
+    arrowGroup.position.set(0, 0.15, size.z / 2 + 1.2);
 
     const arrowHead = new THREE.Mesh(new THREE.ConeGeometry(size.x * 0.18, 1.8, 4), new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
     arrowHead.rotation.x = Math.PI / 2;
@@ -1018,7 +1045,7 @@ function activateBlueprint(type) {
     group.add(arrowGroup);
 
     blueprintMesh = group;
-    blueprintMesh.position.set(0, size.y / 2, 0);
+    blueprintMesh.position.set(0, 0, 0);
     blueprintMesh.rotation.y = 0;
     scene.add(blueprintMesh);
 
@@ -1030,7 +1057,7 @@ function updateBlueprintPosition(intersectPoint) {
     blueprintMesh.position.x = intersectPoint.x;
     blueprintMesh.position.z = intersectPoint.z;
     const groundH = getTerrainHeight(intersectPoint.x, intersectPoint.z);
-    blueprintMesh.position.y = groundH + getStructureFootprint(activeBlueprintType).height / 2;
+    blueprintMesh.position.y = groundH;
     blueprintMesh.rotation.y = (typeof blueprintRotationY !== 'undefined') ? blueprintRotationY : 0;
 
     isBlueprintValid = true;
