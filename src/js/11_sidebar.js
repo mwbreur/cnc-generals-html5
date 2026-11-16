@@ -3006,6 +3006,25 @@ function executeStructureUpgradeOrAction(upg, structure) {
 
 function attachControlRodsVisual(structure) {
     if (!structure || !structure.mesh) return;
+    if (structure.mesh.userData && structure.mesh.userData.isW3D) {
+        structure.mesh.traverse(child => {
+            if (child.name === 'CYLINDER01' || child.name === 'CYLINDER02') {
+                child.visible = true;
+            } else if (child.name === 'coldFusionGlowLight' && child.isPointLight) {
+                child.visible = true;
+                child.intensity = 2.5;
+            } else if (child.isMesh && child.userData && child.userData.isColdFusionConduit && child.material) {
+                child.material.color.setHex(0x00d2ff);
+                if (child.material.emissive) child.material.emissive.setHex(0x0088ff);
+                child.material.emissiveIntensity = 1.6;
+                child.material.roughness = 0.2;
+                child.material.metalness = 0.5;
+                child.material.needsUpdate = true;
+            }
+        });
+        return;
+    }
+    if (structure.mesh.getObjectByName('controlRodsAttachment')) return;
     const rodGroup = new THREE.Group();
     rodGroup.name = "controlRodsAttachment";
     const rodMat = new THREE.MeshStandardMaterial({ color: 0x00f2fe, emissive: 0x00c6ff, emissiveIntensity: 0.8, metalness: 0.8, roughness: 0.2 });

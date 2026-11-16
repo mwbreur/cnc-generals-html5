@@ -542,17 +542,19 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         }
 
         let mat = bldMat;
+        let isColdFusionConduit = false;
         if (buildingKey === 'usa_power' && (upper.includes('CYLINDER01') || upper.includes('CYLINDER02') || upper.includes('CYLINDER'))) {
             mat = coldFusionGlowMat;
         } else if (buildingKey === 'usa_power' && (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2')))) {
-            // Vibrant glowing blue plasma energy conduit connecting cooling towers to power grid
+            // Dormant metallic conduit until Control Rods upgrade is installed
             mat = new THREE.MeshStandardMaterial({
-                color: 0x00d2ff,
-                emissive: 0x0088ff,
-                emissiveIntensity: 1.6,
-                roughness: 0.2,
-                metalness: 0.5
+                color: 0x3b4856,
+                emissive: 0x000000,
+                emissiveIntensity: 0,
+                roughness: 0.45,
+                metalness: 0.45
             });
+            isColdFusionConduit = true;
         } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
             // Authentic metallic cooling tower finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
@@ -581,6 +583,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         mesh.name = meshName;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        if (isColdFusionConduit) mesh.userData.isColdFusionConduit = true;
 
         if (pivotGroups[boneIdx]) {
             pivotGroups[boneIdx].grp.add(mesh);
@@ -595,12 +598,22 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     }
 
     if (buildingKey === 'usa_power') {
-        const glow1 = new THREE.PointLight(0x00d2ff, 2.5, 35);
+        // Control Rods cylinders and plasma glow remain retracted/off until Control Rods upgrade is purchased
+        ['CYLINDER01', 'CYLINDER02'].forEach(cname => {
+            const cyl = root.getObjectByName(cname);
+            if (cyl) cyl.visible = false;
+        });
+
+        const glow1 = new THREE.PointLight(0x00d2ff, 0, 35);
+        glow1.name = 'coldFusionGlowLight';
         glow1.position.set(-4.65, 18.0, -0.54);
+        glow1.visible = false;
         root.add(glow1);
 
-        const glow2 = new THREE.PointLight(0x00d2ff, 2.5, 35);
+        const glow2 = new THREE.PointLight(0x00d2ff, 0, 35);
+        glow2.name = 'coldFusionGlowLight';
         glow2.position.set(-17.54, 18.0, -13.16);
+        glow2.visible = false;
         root.add(glow2);
     } else if (buildingKey === 'usa_commandCenter') {
         // Fix sideways W3D flag orientation (flat in X-Z) -> hang vertically from flagpole
