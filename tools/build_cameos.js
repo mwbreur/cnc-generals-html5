@@ -359,7 +359,7 @@ const CAMEO_MAP = {
     'airfield_usa': 'SAACommand',
     'patriot': 'SAPatriot',
     'strategyCenter': 'SAStrategyCenter',
-    'particleCannon': 'SALaserCan',
+    'particleCannon': 'SAUplink',
     'supplyDrop': 'SADropZone',
     'detentionCamp': 'SAPrison',
     'firebase': 'SAFirebase',
@@ -482,7 +482,7 @@ const CAMEO_MAP = {
     'gpsScrambler': 'SUGPS01',
 
     // Superweapon Launch Icons
-    'superweapon_usa': 'SALaserCan',
+    'superweapon_usa': 'SSParticleFire',
     'superweapon_china': 'SNNukeLaunch',
     'superweapon_gla': 'SSScudStorm',
 

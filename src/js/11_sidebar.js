@@ -3537,6 +3537,11 @@ function updateHUD() {
             else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 1.4; speed = 0.08; health = 280; scanRange = 18; }
             else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.8; speed = 0.11; health = 120; }
             else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.09; health = 220; scanRange = 34; }
+            else if (type === 'drone_scout') {
+                mesh = (typeof createW3DVehicleMesh === 'function') ? createW3DVehicleMesh('drone_scout', false) : new THREE.Group();
+                radius = 1.4; speed = 0.25; health = 80; scanRange = 45; isAir = true;
+                mesh.userData = Object.assign(mesh.userData || {}, { flightAltitude: 14.0 });
+            }
             else {
                 mesh = spawnFaction === 'china' ? createBattlemasterTankMesh(false) : spawnFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);
             }
