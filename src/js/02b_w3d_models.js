@@ -22,7 +22,9 @@ function getW3dTexture(modelKey) {
 
     try {
         const item = window.W3D_TEXTURE_DATA[cleanKey];
-        const b64 = item.d;
+        if (!item || typeof item.d !== 'string' || !item.d) return null;
+        const b64 = item.d.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+        if (!b64) return null;
         const binaryStr = (typeof atob === 'function') ? atob(b64) : (typeof Buffer !== 'undefined' ? Buffer.from(b64, 'base64').toString('binary') : '');
         const len = binaryStr.length;
         const bytes = new Uint8Array(len);
