@@ -838,7 +838,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
 // Find a clear, non-overlapping build site with enough clearance for Dozers/Workers and vehicles to pass between buildings
 function findAIStructureBuildLocation(cmd, type, desiredPos) {
     const newR = (typeof getStructureFootprint === 'function') ? (getStructureFootprint(type).radius || 6.0) : 6.0;
-    const minClearanceGap = 7.5; // Enough room for Dozers/tanks between building footprints
+    const minClearanceGap = 16.0; // Wide corridors so heavy tanks (e.g. Overlords) & Dozers never wedge between buildings
     const mapHalf = (typeof currentMapSize !== 'undefined' ? currentMapSize * 0.46 : 680);
     const allStructs = [
         ...(typeof structures !== 'undefined' ? structures : []),
@@ -859,6 +859,15 @@ function findAIStructureBuildLocation(cmd, type, desiredPos) {
             const dx = cx - sp.x, dz = cz - sp.z;
             if (dx * dx + dz * dz < minD * minD) return false;
         }
+        if (typeof supplyPoints !== 'undefined' && Array.isArray(supplyPoints)) {
+            for (let i = 0; i < supplyPoints.length; i++) {
+                const sp = supplyPoints[i];
+                if (!sp || !sp.position) continue;
+                const minD = (sp.radius || 5.0) + newR + 8.0;
+                const dx = cx - sp.position.x, dz = cz - sp.position.z;
+                if (dx * dx + dz * dz < minD * minD) return false;
+            }
+        }
         return true;
     };
 
@@ -867,7 +876,7 @@ function findAIStructureBuildLocation(cmd, type, desiredPos) {
         return new THREE.Vector3(desiredPos.x, y, desiredPos.z);
     }
 
-    for (let ring = 8; ring <= 48; ring += 8) {
+    for (let ring = 10; ring <= 90; ring += 10) {
         for (let step = 0; step < 12; step++) {
             const ang = (step / 12) * Math.PI * 2;
             const cx = desiredPos.x + Math.cos(ang) * ring;
@@ -884,15 +893,15 @@ function findAIStructureBuildLocation(cmd, type, desiredPos) {
 // Essential base structures to construct / reconstruct in priority order
     const f = cmd.faction || 'china';
     const essentialList = [
-        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-30, 0, -24) },
-        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(30, 0, -24) },
-        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-30, 0, 26) },
-        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(32, 0, 26) },
-        { check: s => s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace', build: f === 'china' ? 'propagandaCenter' : f === 'gla' ? 'palace' : 'strategyCenter', cost: 1500, offset: new THREE.Vector3(-42, 0, 0) }
+        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-44, 0, -34) },
+        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(44, 0, -34) },
+        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-44, 0, 36) },
+        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(46, 0, 36) },
+        { check: s => s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace', build: f === 'china' ? 'propagandaCenter' : f === 'gla' ? 'palace' : 'strategyCenter', cost: 1500, offset: new THREE.Vector3(-62, 0, 0) }
     ];
     if (cmd.difficulty !== 'easy') {
         essentialList.push(
-            { check: s => s.type === 'particleCannon' || s.type === 'nukeSilo' || s.type === 'scudStorm', build: f === 'china' ? 'nukeSilo' : f === 'gla' ? 'scudStorm' : 'particleCannon', cost: 2500, offset: new THREE.Vector3(42, 0, 0) }
+            { check: s => s.type === 'particleCannon' || s.type === 'nukeSilo' || s.type === 'scudStorm', build: f === 'china' ? 'nukeSilo' : f === 'gla' ? 'scudStorm' : 'particleCannon', cost: 2500, offset: new THREE.Vector3(64, 0, 0) }
         );
     }
 
@@ -919,9 +928,9 @@ function findAIStructureBuildLocation(cmd, type, desiredPos) {
         frontDir.y = 0;
         frontDir.normalize();
         const sideDir = new THREE.Vector3(-frontDir.z, 0, frontDir.x);
-        const spread = (currentDefenses.length % 2 === 0 ? 1 : -1) * (14 + Math.floor(currentDefenses.length / 2) * 14);
+        const spread = (currentDefenses.length % 2 === 0 ? 1 : -1) * (20 + Math.floor(currentDefenses.length / 2) * 22);
         const defPos = cmd.basePos.clone()
-            .addScaledVector(frontDir, 36)
+            .addScaledVector(frontDir, 52)
             .addScaledVector(sideDir, spread);
         const clearPos = findAIStructureBuildLocation(cmd, defType, defPos);
         const builtDef = spawnAIStructure(cmd, defType, clearPos, availBuilder);
