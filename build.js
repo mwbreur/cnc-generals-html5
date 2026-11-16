@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const crypto = require('crypto');
 
 const srcDir = path.join(__dirname, 'src');
 const pagesOutput = path.join(__dirname, 'index.html');
@@ -14,6 +15,11 @@ const startTime = Date.now();
 
 // 1. Read Template, CSS, and HTML Body
 const template = fs.readFileSync(path.join(srcDir, 'index_template.html'), 'utf8');
+for (const marker of ['/* {{CSS_CONTENT}} */', '<!-- {{BODY_CONTENT}} -->', '// {{JS_CONTENT}}']) {
+    if (!template.includes(marker)) {
+        throw new Error(`Missing required template placeholder ${marker} in src/index_template.html`);
+    }
+}
 const css = fs.readFileSync(path.join(srcDir, 'css', 'style.css'), 'utf8');
 const body = fs.readFileSync(path.join(srcDir, 'html', 'body.html'), 'utf8');
 
@@ -22,7 +28,8 @@ const jsDir = path.join(srcDir, 'js');
 const jsFiles = fs.readdirSync(jsDir).filter(f => f.endsWith('.js')).sort();
 const EXTERNAL_DATA_FILES = new Set(['02b_w3d_models.js', '07b_tournament_desert.js', '10b_cameos.js']);
 const dataOutDir = path.join(__dirname, 'assets', 'data');
-if (!fs.existsSync(dataOutDir)) fs.mkdirSync(dataOutDir, { recursive: true });
+fs.rmSync(dataOutDir, { recursive: true, force: true });
+fs.mkdirSync(dataOutDir, { recursive: true });
 
 console.log(`Assembling ${jsFiles.length} JavaScript modules:`);
 let assembledJS = '';
@@ -34,8 +41,9 @@ jsFiles.forEach(file => {
     fullSyntaxCheckJS += `\n// --- MODULE: ${file} ---\n` + content + '\n';
     if (EXTERNAL_DATA_FILES.has(file)) {
         fs.writeFileSync(path.join(dataOutDir, file), content, 'utf8');
-        externalTags.push(`<script src="assets/data/${file}"></script>`);
-        console.log(`  ~ ${file} (${(content.length / 1024).toFixed(1)} KB -> cached assets/data/${file})`);
+        const hash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 8);
+        externalTags.push(`<script src="assets/data/${file}?v=${hash}"></script>`);
+        console.log(`  ~ ${file} (${(content.length / 1024).toFixed(1)} KB -> cached assets/data/${file}?v=${hash})`);
     } else {
         console.log(`  + ${file} (${(content.length / 1024).toFixed(1)} KB)`);
         assembledJS += `\n// --- MODULE: ${file} ---\n` + content + '\n';
