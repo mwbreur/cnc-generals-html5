@@ -835,25 +835,71 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     const baseUnderAttack = hostileUnits.some(hu => hu.mesh && hu.mesh.position.distanceTo(cmd.basePos) < 35);
     if (baseUnderAttack || cmd.resources < 600) return;
 
-    // Essential base structures to construct / reconstruct in priority order
+// Find a clear, non-overlapping build site with enough clearance for Dozers/Workers and vehicles to pass between buildings
+function findAIStructureBuildLocation(cmd, type, desiredPos) {
+    const newR = (typeof getStructureFootprint === 'function') ? (getStructureFootprint(type).radius || 6.0) : 6.0;
+    const minClearanceGap = 7.5; // Enough room for Dozers/tanks between building footprints
+    const mapHalf = (typeof currentMapSize !== 'undefined' ? currentMapSize * 0.46 : 680);
+    const allStructs = [
+        ...(typeof structures !== 'undefined' ? structures : []),
+        ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])
+    ];
+
+    const isClear = (cx, cz) => {
+        if (Math.abs(cx) > mapHalf || Math.abs(cz) > mapHalf) return false;
+        if (typeof getTerrainHeight === 'function' && typeof currentWaterLevel !== 'undefined') {
+            if (getTerrainHeight(cx, cz) < currentWaterLevel + 0.3) return false;
+        }
+        for (let i = 0; i < allStructs.length; i++) {
+            const s = allStructs[i];
+            if (!s || s.health <= 0) continue;
+            const sp = s.position || (s.mesh && s.mesh.position);
+            if (!sp) continue;
+            const minD = (s.radius || 6.0) + newR + minClearanceGap;
+            const dx = cx - sp.x, dz = cz - sp.z;
+            if (dx * dx + dz * dz < minD * minD) return false;
+        }
+        return true;
+    };
+
+    if (isClear(desiredPos.x, desiredPos.z)) {
+        const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(desiredPos.x, desiredPos.z) : 0;
+        return new THREE.Vector3(desiredPos.x, y, desiredPos.z);
+    }
+
+    for (let ring = 8; ring <= 48; ring += 8) {
+        for (let step = 0; step < 12; step++) {
+            const ang = (step / 12) * Math.PI * 2;
+            const cx = desiredPos.x + Math.cos(ang) * ring;
+            const cz = desiredPos.z + Math.sin(ang) * ring;
+            if (isClear(cx, cz)) {
+                const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(cx, cz) : 0;
+                return new THREE.Vector3(cx, y, cz);
+            }
+        }
+    }
+    return adjustToPossibleDestination(desiredPos);
+}
+
+// Essential base structures to construct / reconstruct in priority order
     const f = cmd.faction || 'china';
     const essentialList = [
-        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-22, 0, -18) },
-        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(22, 0, -18) },
-        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-22, 0, 20) },
-        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(24, 0, 20) },
-        { check: s => s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace', build: f === 'china' ? 'propagandaCenter' : f === 'gla' ? 'palace' : 'strategyCenter', cost: 1500, offset: new THREE.Vector3(-28, 0, 0) }
+        { check: s => s.type === 'power' || s.type === 'nuclearReactor', build: f === 'china' ? 'nuclearReactor' : 'power', cost: 800, offset: new THREE.Vector3(-30, 0, -24) },
+        { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(30, 0, -24) },
+        { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-30, 0, 26) },
+        { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(32, 0, 26) },
+        { check: s => s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace', build: f === 'china' ? 'propagandaCenter' : f === 'gla' ? 'palace' : 'strategyCenter', cost: 1500, offset: new THREE.Vector3(-42, 0, 0) }
     ];
     if (cmd.difficulty !== 'easy') {
         essentialList.push(
-            { check: s => s.type === 'particleCannon' || s.type === 'nukeSilo' || s.type === 'scudStorm', build: f === 'china' ? 'nukeSilo' : f === 'gla' ? 'scudStorm' : 'particleCannon', cost: 2500, offset: new THREE.Vector3(28, 0, 0) }
+            { check: s => s.type === 'particleCannon' || s.type === 'nukeSilo' || s.type === 'scudStorm', build: f === 'china' ? 'nukeSilo' : f === 'gla' ? 'scudStorm' : 'particleCannon', cost: 2500, offset: new THREE.Vector3(42, 0, 0) }
         );
     }
 
     for (let item of essentialList) {
         if (f === 'gla' && (item.build === 'power' || item.build === 'nuclearReactor')) continue;
         if (!myStructures.some(item.check) && cmd.resources >= item.cost) {
-            const candidatePos = adjustToPossibleDestination(cmd.basePos.clone().add(item.offset));
+            const candidatePos = findAIStructureBuildLocation(cmd, item.build, cmd.basePos.clone().add(item.offset));
             const built = spawnAIStructure(cmd, item.build, candidatePos, availBuilder);
             if (built) {
                 cmd.resources -= item.cost;
@@ -873,11 +919,11 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         frontDir.y = 0;
         frontDir.normalize();
         const sideDir = new THREE.Vector3(-frontDir.z, 0, frontDir.x);
-        const spread = (currentDefenses.length % 2 === 0 ? 1 : -1) * (8 + currentDefenses.length * 4);
+        const spread = (currentDefenses.length % 2 === 0 ? 1 : -1) * (14 + Math.floor(currentDefenses.length / 2) * 14);
         const defPos = cmd.basePos.clone()
-            .addScaledVector(frontDir, 24)
+            .addScaledVector(frontDir, 36)
             .addScaledVector(sideDir, spread);
-        const clearPos = adjustToPossibleDestination(defPos);
+        const clearPos = findAIStructureBuildLocation(cmd, defType, defPos);
         const builtDef = spawnAIStructure(cmd, defType, clearPos, availBuilder);
         if (builtDef) {
             cmd.resources -= 1000;

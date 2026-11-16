@@ -1243,13 +1243,31 @@ function animate() {
                 if (unit.taskState === 'MovingToBuild' && s) {
                     if (s.health > 0 && s.isBuilding) {
                         const distToS = Math.hypot(unit.mesh.position.x - s.position.x, unit.mesh.position.z - s.position.z);
-                        const buildThreshold = s.radius + (unit.radius || 1.8) + 2.5;
-                        if ((!unit.waypoints || unit.waypoints.length === 0) && distToS <= buildThreshold) {
+                        const buildThreshold = s.radius + (unit.radius || 1.8) + 3.2;
+                        if (distToS <= buildThreshold && (!unit.waypoints || unit.waypoints.length === 0 || distToS <= s.radius + (unit.radius || 1.8) + 2.0)) {
                             unit.taskState = 'Building';
+                            unit.waypoints = [];
+                            unit._buildStuckTicks = 0;
+                        } else {
+                            const prevPos = unit._lastBuildMovePos;
+                            const moved = prevPos ? Math.hypot(unit.mesh.position.x - prevPos.x, unit.mesh.position.z - prevPos.z) : 1;
+                            if (!unit._lastBuildMovePos) unit._lastBuildMovePos = unit.mesh.position.clone();
+                            else unit._lastBuildMovePos.copy(unit.mesh.position);
+                            unit._buildStuckTicks = (moved < 0.02) ? ((unit._buildStuckTicks || 0) + 1) : 0;
+                            if (unit._buildStuckTicks > 60) {
+                                unit._buildStuckTicks = 0;
+                                if (distToS <= buildThreshold + 2.5) {
+                                    unit.taskState = 'Building';
+                                    unit.waypoints = [];
+                                } else if (typeof assignDozerToStructure === 'function') {
+                                    assignDozerToStructure(unit, s);
+                                }
+                            }
                         }
                     } else if (!s.isBuilding || s.health <= 0) {
                         unit.taskState = 'Idle';
                         unit.targetStructure = null;
+                        unit._buildStuckTicks = 0;
                     }
                 } else if ((unit.taskState === 'MovingToRepair' || unit.taskState === 'Repairing') && s) {
                     // Sole-benefactor check (DozerAIUpdate.cpp:723 attemptHealingFromSoleBenefactor)
