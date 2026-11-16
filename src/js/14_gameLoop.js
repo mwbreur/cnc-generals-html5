@@ -940,6 +940,14 @@ function animate() {
                         }
                     }
                 }
+                if (s.type === 'supplyDrop' && !s.isBuilding && s.health > 0 && (buildingTick % 4 === 0) && typeof spawnSmokePuff === 'function') {
+                    const smokePos = s.position.clone().add(new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.7,
+                        0.9,
+                        (Math.random() - 0.5) * 0.7
+                    ));
+                    spawnSmokePuff(smokePos, (buildingTick % 8 === 0) ? 0xff4d4d : 0xd63031, 0.85);
+                }
             });
 
             processPointDefenseLasers();

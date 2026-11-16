@@ -3450,17 +3450,7 @@ function updateHUD() {
                 }
 
                 if (structure.type === 'supplyDrop') {
-                    // Tall, dense rising red smoke signal flare column on Supply Drop Zone
-                    if (typeof spawnSmokePuff === 'function') {
-                        for (let sp = 0; sp < 6; sp++) {
-                            const smokePos = structure.position.clone().add(new THREE.Vector3(
-                                (Math.random() - 0.5) * (0.9 + sp * 0.35),
-                                0.8 + sp * 1.9,
-                                (Math.random() - 0.5) * (0.9 + sp * 0.35)
-                            ));
-                            spawnSmokePuff(smokePos, sp === 0 ? 0xff4d4d : 0xd63031, 0.75 + sp * 0.18);
-                        }
-                    }
+                    // Continuous smoke flare is emitted every 4 frames in animate(); timer runs every 60 ticks
                     // Continues timer & functions even during Low Power or EMP (first drop ~10s after build, then every 2m = 7200 ticks)
                     if (structure.dropTicks === undefined) structure.dropTicks = 6600;
                     structure.dropTicks += 60;
