@@ -1274,6 +1274,45 @@ function animate() {
             units.forEach(updateBuilderTaskUnit);
             enemyUnits.forEach(updateBuilderTaskUnit);
 
+            // GLA Worker Tool Visibility & Animation (Box when carrying, Hammer when building/repairing, Metal Detector when sweeping mines)
+            const updateWorkerTools = (unit) => {
+                if (!unit || unit.health <= 0 || !unit.mesh || unit.type !== 'worker') return;
+                const boxMesh = getCachedNode(unit.mesh, 'cargoHold');
+                const hammerMesh = getCachedNode(unit.mesh, 'workerHammer');
+                const mineDetMesh = getCachedNode(unit.mesh, 'mineDetector');
+
+                const isCarrying = !!(unit.cargoLoaded > 0 || unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing');
+                const isBuildingOrRepairing = (unit.taskState === 'Building' || unit.taskState === 'Repairing');
+
+                let isDetectingMines = !!unit.isClearingMines;
+                if (!isDetectingMines && !isCarrying && !isBuildingOrRepairing && typeof landmines !== 'undefined' && landmines.length > 0) {
+                    const uX = unit.mesh.position.x, uZ = unit.mesh.position.z;
+                    for (let mi = 0; mi < landmines.length; mi++) {
+                        const mine = landmines[mi];
+                        if (mine && !isFriendly(unit, mine) && mine.position) {
+                            const dx = mine.position.x - uX, dz = mine.position.z - uZ;
+                            if (dx * dx + dz * dz <= 18.0 * 18.0) { isDetectingMines = true; break; }
+                        }
+                    }
+                }
+
+                if (boxMesh) boxMesh.visible = isCarrying;
+                if (hammerMesh) {
+                    hammerMesh.visible = !isCarrying && isBuildingOrRepairing;
+                    if (hammerMesh.visible) {
+                        hammerMesh.rotation.x = Math.sin(buildingTick * 0.35) * 0.85;
+                    }
+                }
+                if (mineDetMesh) {
+                    mineDetMesh.visible = !isCarrying && !isBuildingOrRepairing && isDetectingMines;
+                    if (mineDetMesh.visible) {
+                        mineDetMesh.rotation.y = Math.sin(buildingTick * 0.2) * 0.35;
+                    }
+                }
+            };
+            units.forEach(updateWorkerTools);
+            enemyUnits.forEach(updateWorkerTools);
+
             // PERF: single ground-unit separation pass using a spatial hash grid
             // (was two full O(N^2) passes per frame that fought each other)
             separateGroundUnits(units);

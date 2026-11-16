@@ -756,8 +756,12 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
         const mdata = data.m[meshName];
         if (!mdata || !mdata.v || !mdata.i) return;
 
+        // GLA Worker's raw bind pose (mdata.v) is a T-pose; use neutral run[1] for standing pose
+        const useRunStand = (infantryKey === 'worker' && meshName === 'WORKER' && mdata.run && mdata.run[1]);
+        const initVerts = useRunStand ? mdata.run[1] : mdata.v;
+
         const geom = new THREE.BufferGeometry();
-        geom.setAttribute('position', new THREE.Float32BufferAttribute(mdata.v.slice(), 3));
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(initVerts.slice(), 3));
         if (mdata.u && mdata.u.length > 0) {
             geom.setAttribute('uv', new THREE.Float32BufferAttribute(mdata.u, 2));
         }
@@ -779,15 +783,45 @@ function createW3DInfantryMesh(infantryKey, isEnemy = false, fallbackFn = null) 
         }
 
         const mesh = new THREE.Mesh(geom, subMat);
+        mesh.name = (infantryKey === 'worker' && meshName === 'BOX') ? 'cargoHold' :
+                    (infantryKey === 'worker' && meshName === 'MINED_SKIN') ? 'mineDetector' : meshName;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false;
 
+        if (infantryKey === 'worker' && (meshName === 'BOX' || meshName === 'MINED_SKIN')) {
+            mesh.visible = false;
+            if (meshName === 'BOX') mesh.position.set(6.5, -1.0, 1.5);
+            if (meshName === 'MINED_SKIN') mesh.position.set(-1.0, 0.0, 10.5);
+        }
+
         mesh.userData.runFrames = mdata.run;
-        mesh.userData.standVerts = mdata.v;
+        mesh.userData.standVerts = initVerts;
         root.userData.animatedMeshes.push(mesh);
         root.add(mesh);
     });
+
+    if (infantryKey === 'worker') {
+        const hammerGrp = new THREE.Group();
+        hammerGrp.name = 'workerHammer';
+        hammerGrp.position.set(4.8, 8.5, 4.5);
+        hammerGrp.visible = false;
+        const handle = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.22, 0.22, 3.6, 6),
+            new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 })
+        );
+        handle.position.set(0, 1.4, 0.8);
+        handle.rotation.x = 0.65;
+        hammerGrp.add(handle);
+        const head = new THREE.Mesh(
+            new THREE.BoxGeometry(0.9, 0.9, 2.0),
+            new THREE.MeshStandardMaterial({ color: 0x3b4248, roughness: 0.45, metalness: 0.7 })
+        );
+        head.position.set(0, 2.9, 1.9);
+        head.rotation.x = 0.65;
+        hammerGrp.add(head);
+        root.add(hammerGrp);
+    }
 
     root.userData.isW3D = true;
     root.scale.set(scale, scale, scale);
