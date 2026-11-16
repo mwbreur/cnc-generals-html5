@@ -2,10 +2,13 @@
         // =========================================================================
         let fogCanvas = null;
         let fogCtx = null;
+        let _fogRawCanvas = null;
+        let _fogRawCtx = null;
         let fogTexture = null;
         let fogMesh = null;
         let fogGrid = null; // Uint8Array: 0 = Shroud, 1 = Fog (explored), 2 = Visible
         const FOG_RES = 128;
+        const FOG_TEX_RES = 512;
         let fogUpdateTick = 0;
         const activeVisionBeacons = [];
 
@@ -27,13 +30,18 @@
             }
 
             fogCanvas = document.createElement('canvas');
-            fogCanvas.width = FOG_RES;
-            fogCanvas.height = FOG_RES;
+            fogCanvas.width = FOG_TEX_RES;
+            fogCanvas.height = FOG_TEX_RES;
             fogCtx = fogCanvas.getContext('2d');
+
+            _fogRawCanvas = document.createElement('canvas');
+            _fogRawCanvas.width = FOG_RES;
+            _fogRawCanvas.height = FOG_RES;
+            _fogRawCtx = _fogRawCanvas.getContext('2d');
 
             // Fill completely black with 100% opacity (Initial Shroud)
             fogCtx.fillStyle = 'rgba(0, 0, 0, 1.0)';
-            fogCtx.fillRect(0, 0, FOG_RES, FOG_RES);
+            fogCtx.fillRect(0, 0, FOG_TEX_RES, FOG_TEX_RES);
 
             fogGrid = new Uint8Array(FOG_RES * FOG_RES); // All 0 (Shroud)
 
@@ -42,8 +50,8 @@
             fogTexture.minFilter = THREE.LinearFilter;
             fogTexture.magFilter = THREE.LinearFilter;
 
-            // Subdivided terrain-hugging mesh: contours smoothly over hills, dunes, mesas and valleys
-            const segments = 64;
+            // High-resolution terrain-hugging mesh: contours smoothly over 256x256 hills, cliffs, and valleys
+            const segments = 160;
             const fogGeo = new THREE.PlaneGeometry(mapSize * 1.02, mapSize * 1.02, segments, segments);
             fogGeo.rotateX(-Math.PI / 2);
             const posAttr = fogGeo.attributes.position;
@@ -51,7 +59,7 @@
                 const vx = posAttr.getX(i);
                 const vz = posAttr.getZ(i);
                 const th = typeof getTerrainHeight === 'function' ? getTerrainHeight(vx, vz) : 0;
-                posAttr.setY(i, th + 1.2);
+                posAttr.setY(i, th + 1.8);
             }
             fogGeo.computeVertexNormals();
 
@@ -183,36 +191,46 @@
                 }
             });
 
-            // 3. Render Shroud & Fog canvas
-            fogCtx.clearRect(0, 0, FOG_RES, FOG_RES);
-            fogCtx.fillStyle = 'rgba(10, 14, 18, 0.62)'; // Explored fog
-            fogCtx.fillRect(0, 0, FOG_RES, FOG_RES);
+            // 3. Render Shroud & Fog at 512x512 with Gaussian blur to eliminate staircase pixels
+            if (_fogRawCtx) {
+                _fogRawCtx.clearRect(0, 0, FOG_RES, FOG_RES);
+                _fogRawCtx.fillStyle = 'rgba(10, 14, 18, 0.62)'; // Explored fog
+                _fogRawCtx.fillRect(0, 0, FOG_RES, FOG_RES);
 
-            fogCtx.fillStyle = 'rgba(5, 7, 10, 1.0)'; // Unexplored pitch shroud
-            for (let y = 0; y < FOG_RES; y++) {
-                const idxRow = y * FOG_RES;
-                for (let x = 0; x < FOG_RES; x++) {
-                    if (fogGrid[idxRow + x] === 0) {
-                        fogCtx.fillRect(x, y, 1, 1);
+                _fogRawCtx.fillStyle = 'rgba(5, 7, 10, 1.0)'; // Unexplored pitch shroud
+                for (let y = 0; y < FOG_RES; y++) {
+                    const idxRow = y * FOG_RES;
+                    for (let x = 0; x < FOG_RES; x++) {
+                        if (fogGrid[idxRow + x] === 0) {
+                            _fogRawCtx.fillRect(x, y, 1, 1);
+                        }
                     }
                 }
+                fogCtx.clearRect(0, 0, FOG_TEX_RES, FOG_TEX_RES);
+                if ('filter' in fogCtx) fogCtx.filter = 'blur(6px)';
+                fogCtx.drawImage(_fogRawCanvas, 0, 0, FOG_TEX_RES, FOG_TEX_RES);
+                if ('filter' in fogCtx) fogCtx.filter = 'none';
+            } else {
+                fogCtx.clearRect(0, 0, FOG_TEX_RES, FOG_TEX_RES);
+                fogCtx.fillStyle = 'rgba(10, 14, 18, 0.62)';
+                fogCtx.fillRect(0, 0, FOG_TEX_RES, FOG_TEX_RES);
             }
 
-            // 4. Punch soft circular vision holes for currently visible areas
+            // 4. Punch soft high-res circular vision holes for currently visible areas
             fogCtx.globalCompositeOperation = 'destination-out';
             visionSources.forEach(src => {
                 const pos = src.position || src.mesh.position;
                 const range = src.scanRange || (src.radius ? src.radius + 18 : 26);
-                const cx = ((pos.x + halfMap) / mapSize) * FOG_RES;
-                const cy = ((pos.z + halfMap) / mapSize) * FOG_RES;
-                const rPx = (range / mapSize) * FOG_RES;
+                const cx = ((pos.x + halfMap) / mapSize) * FOG_TEX_RES;
+                const cy = ((pos.z + halfMap) / mapSize) * FOG_TEX_RES;
+                const rPx = (range / mapSize) * FOG_TEX_RES;
 
-                const grad = fogCtx.createRadialGradient(cx, cy, rPx * 0.45, cx, cy, rPx);
+                const grad = fogCtx.createRadialGradient(cx, cy, rPx * 0.40, cx, cy, rPx * 1.05);
                 grad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
                 grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
                 fogCtx.fillStyle = grad;
                 fogCtx.beginPath();
-                fogCtx.arc(cx, cy, rPx, 0, Math.PI * 2);
+                fogCtx.arc(cx, cy, rPx * 1.05, 0, Math.PI * 2);
                 fogCtx.fill();
             });
             fogCtx.globalCompositeOperation = 'source-over';
@@ -579,9 +597,6 @@
                 internetCenter: [20, 9, 18], propagandaCenter: [22, 10, 20], bunker: [14, 8, 14], gatlingCannon: [12, 9, 12],
                 speakerTower: [10, 12, 10], nukeSilo: [24, 14, 24], supplyStash: [18, 9, 18], blackMarket: [20, 9, 18],
                 tunnel: [16, 8, 16], stingerSite: [12, 9, 12], demoTrap: [6, 2, 6], palace: [26, 12, 22],
-                fakeCommandCenter: [
-                    { id: 'upgradeToReal', name: 'UPGRADE TO REAL COMMAND CENTER', cost: 1500, isAddon: true, desc: 'Converts this decoy fake command center into a real functional Command Center.' }
-                ],
                 fakeCommandCenter: [26, 12, 24], fakeBarracks: [18, 9, 18], fakeArmsDealer: [26, 10, 22], scudStorm: [26, 14, 26]
             };
             const [baseW, baseH, baseD] = sizes[type] || [16, 8, 16];
