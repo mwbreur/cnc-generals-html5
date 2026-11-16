@@ -2477,10 +2477,12 @@ window.addEventListener('keydown', e => {
         return;
     }
 
-    // 3. CONTROL GROUPS: 1-9
-    if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
-        const num = parseInt(e.key);
-        if (isCtrl) {
+    // 3. CONTROL GROUPS: 1-9 (supports both Ctrl+1-9 in fullscreen/app mode and Shift+1-9 in browser tabs)
+    const digitMatch = (e.code && /^(?:Digit|Numpad)([1-9])$/.exec(e.code)) || (/^([1-9])$/.exec(e.key || ''));
+    if (digitMatch) {
+        const num = parseInt(digitMatch[1], 10);
+        if (isCtrl || e.shiftKey) {
+            e.preventDefault();
             // Assign selected units to group
             const selectedList = units.filter(u => u.selected && u.health > 0);
             controlGroups[num] = [...selectedList];
