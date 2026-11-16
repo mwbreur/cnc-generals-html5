@@ -490,13 +490,13 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 });
     const nukeMat = (typeof matNukeGreen !== 'undefined') ? matNukeGreen : new THREE.MeshStandardMaterial({ color: 0x2ed573, emissive: 0x2ed573, emissiveIntensity: 0.8 });
     
-    // Iconic Cold Fusion Reactor glowing blue plasma rods material
+    // Iconic Cold Fusion Reactor glowing yellow-green control rods material
     const coldFusionGlowMat = new THREE.MeshStandardMaterial({
-        color: 0x00d2d3,
-        emissive: 0x00a8ff,
+        color: 0xc8ff00,
+        emissive: 0x99ff00,
         emissiveIntensity: 1.8,
-        roughness: 0.1,
-        metalness: 0.3
+        roughness: 0.15,
+        metalness: 0.25
     });
 
     // 1. Build Pivot hierarchy
@@ -598,21 +598,54 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     }
 
     if (buildingKey === 'usa_power') {
-        // Control Rods cylinders and plasma glow remain retracted/off until Control Rods upgrade is purchased
+        // Control Rods cylinders, glowing core, and raised cap remain retracted/off until Control Rods upgrade is purchased
         ['CYLINDER01', 'CYLINDER02'].forEach(cname => {
             const cyl = root.getObjectByName(cname);
             if (cyl) cyl.visible = false;
         });
 
-        const glow1 = new THREE.PointLight(0x00d2ff, 0, 35);
+        // Upper reactor cap (sits closed on roof at y=25.8; rises to y=31.0 when Control Rods are upgraded)
+        const capGrp = new THREE.Group();
+        capGrp.name = 'controlRodCap';
+        capGrp.position.set(-9.0, 25.8, -7.0);
+        const capTop = new THREE.Mesh(
+            new THREE.BoxGeometry(20.5, 2.8, 20.5),
+            new THREE.MeshStandardMaterial({ color: 0x4b5158, roughness: 0.6, metalness: 0.4 })
+        );
+        const capTrim = new THREE.Mesh(
+            new THREE.BoxGeometry(21.4, 0.9, 21.4),
+            new THREE.MeshStandardMaterial({ color: 0x35393e, roughness: 0.65, metalness: 0.45 })
+        );
+        capTrim.position.y = -1.2;
+        capGrp.add(capTop, capTrim);
+        root.add(capGrp);
+
+        // Glowing yellow-green control rod core & vertical slats revealed under the lifted cap
+        const coreGrp = new THREE.Group();
+        coreGrp.name = 'controlRodCore';
+        coreGrp.position.set(-9.0, 27.6, -7.0);
+        coreGrp.visible = false;
+        const coreGlow = new THREE.Mesh(new THREE.BoxGeometry(17.5, 5.2, 17.5), coldFusionGlowMat);
+        coreGrp.add(coreGlow);
+        const slatMat = new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 0.5, metalness: 0.6 });
+        for (let si = -6.0; si <= 6.0; si += 4.0) {
+            const slatX = new THREE.Mesh(new THREE.BoxGeometry(0.9, 5.4, 18.2), slatMat);
+            slatX.position.x = si;
+            const slatZ = new THREE.Mesh(new THREE.BoxGeometry(18.2, 5.4, 0.9), slatMat);
+            slatZ.position.z = si;
+            coreGrp.add(slatX, slatZ);
+        }
+        root.add(coreGrp);
+
+        const glow1 = new THREE.PointLight(0xb8ff00, 0, 38);
         glow1.name = 'coldFusionGlowLight';
-        glow1.position.set(-4.65, 18.0, -0.54);
+        glow1.position.set(-9.0, 28.5, -7.0);
         glow1.visible = false;
         root.add(glow1);
 
-        const glow2 = new THREE.PointLight(0x00d2ff, 0, 35);
+        const glow2 = new THREE.PointLight(0xb8ff00, 0, 32);
         glow2.name = 'coldFusionGlowLight';
-        glow2.position.set(-17.54, 18.0, -13.16);
+        glow2.position.set(-17.54, 24.0, -13.16);
         glow2.visible = false;
         root.add(glow2);
     } else if (buildingKey === 'usa_particleCannon') {
