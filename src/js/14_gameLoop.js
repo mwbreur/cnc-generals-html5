@@ -1336,6 +1336,16 @@ function animate() {
                         t2.visible = (lvl >= 2);
                         if (t0 && t2.visible) t2.rotation.y = t0.rotation.y;
                     }
+                } else if (unit.type === 'scud') {
+                    const turretEl = getCachedNode(unit.mesh, 'TURRETEL');
+                    if (turretEl) {
+                        const targetElev = (unit.combatTarget && unit.combatTarget.health > 0) ? -1.05 : 0;
+                        turretEl.rotation.x += (targetElev - turretEl.rotation.x) * 0.08;
+                    }
+                    const missile = getCachedNode(unit.mesh, 'MISSILE');
+                    if (missile) {
+                        missile.visible = !(unit.attackCooldown && unit.attackCooldown > 280);
+                    }
                 }
             };
             units.forEach(u => syncGLASalvageMeshes(u, false));

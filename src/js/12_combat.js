@@ -578,11 +578,21 @@ function executeWeaponFire(attacker, target) {
         });
         if (typeof playUSASound === 'function') playUSASound('missile_launch');
     } else if (['tomahawk', 'scud'].includes(attacker.type)) {
+        // SCUD Launcher must elevate its launch rail into firing position before launching
+        if (attacker.type === 'scud') {
+            const turretEl = getCachedNode(attacker.mesh, 'TURRETEL');
+            if (turretEl && turretEl.rotation.x > -0.75) {
+                attacker.attackCooldown = 6;
+                return;
+            }
+        }
         // Heavy cruise / ballistic missile (Tracked for Point Defense Laser interception!)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.2);
+        const scudMuzzle = (attacker.type === 'scud') ? (getCachedNode(attacker.mesh, 'WEAPONA01') || getCachedNode(attacker.mesh, 'MISSILE')) : null;
+        const launchPos = scudMuzzle ? scudMuzzle.getWorldPosition(new THREE.Vector3()) : muzzlePos;
+        spawnMuzzleFlash(launchPos, isHeroic ? heroicFlashColor : 0xff793f, 1.2);
         const mDmg = attacker.type === 'scud' ? 150 : 150;
         const mSplash = attacker.type === 'tomahawk' ? 7.5 : 5.5;
-        spawnRocketProjectile(muzzlePos, targetPos, true, attacker.type === 'scud', {
+        spawnRocketProjectile(launchPos, targetPos, true, attacker.type === 'scud', {
             attacker: attacker,
             target: target,
             damage: mDmg,

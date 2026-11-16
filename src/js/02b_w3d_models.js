@@ -379,6 +379,9 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             const ms = root.getObjectByName(msName);
             if (ms) ms.visible = false;
         });
+    } else if (modelKey === 'scud') {
+        const missile = root.getObjectByName('MISSILE');
+        if (missile) missile.rotation.x = Math.PI / 2;
     } else if (modelKey === 'nukecannon') {
         const eb = root.getObjectByName('ELEVATIONBARREL');
         if (eb) eb.rotation.x = Math.PI / 2;
