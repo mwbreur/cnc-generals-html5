@@ -1313,17 +1313,33 @@ function animate() {
             units.forEach(updateWorkerTools);
             enemyUnits.forEach(updateWorkerTools);
 
-            // Sync GLA Scorpion Tank turret rocket rack visibility with Scorpion Rocket tech / Salvage
-            const syncScorpionUpgradeMesh = (unit, isAIUnit) => {
-                if (!unit || unit.health <= 0 || !unit.mesh || unit.type !== 'scorpion') return;
-                const rack = getCachedNode(unit.mesh, 'MISSLERACK01');
-                if (rack) {
-                    const hasRocket = (unit.salvageLevel >= 1) || (!isAIUnit && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket'));
-                    rack.visible = !!hasRocket;
+            // Sync GLA Scorpion Tank turret rocket rack & Quad Cannon salvage turret tiers
+            const syncGLASalvageMeshes = (unit, isAIUnit) => {
+                if (!unit || unit.health <= 0 || !unit.mesh) return;
+                if (unit.type === 'scorpion') {
+                    const rack = getCachedNode(unit.mesh, 'MISSLERACK01');
+                    if (rack) {
+                        const hasRocket = (unit.salvageLevel >= 1) || (!isAIUnit && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket'));
+                        rack.visible = !!hasRocket;
+                    }
+                } else if (unit.type === 'quad') {
+                    const lvl = unit.salvageLevel || 0;
+                    const t0 = getCachedNode(unit.mesh, 'turretSystem');
+                    const t1 = getCachedNode(unit.mesh, 'TURRETUP01');
+                    const t2 = getCachedNode(unit.mesh, 'TURRETUP02');
+                    if (t0) t0.visible = (lvl === 0);
+                    if (t1) {
+                        t1.visible = (lvl === 1);
+                        if (t0 && t1.visible) t1.rotation.y = t0.rotation.y;
+                    }
+                    if (t2) {
+                        t2.visible = (lvl >= 2);
+                        if (t0 && t2.visible) t2.rotation.y = t0.rotation.y;
+                    }
                 }
             };
-            units.forEach(u => syncScorpionUpgradeMesh(u, false));
-            enemyUnits.forEach(u => syncScorpionUpgradeMesh(u, true));
+            units.forEach(u => syncGLASalvageMeshes(u, false));
+            enemyUnits.forEach(u => syncGLASalvageMeshes(u, true));
 
             // PERF: single ground-unit separation pass using a spatial hash grid
             // (was two full O(N^2) passes per frame that fought each other)

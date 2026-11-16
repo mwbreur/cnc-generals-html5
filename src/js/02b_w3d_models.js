@@ -370,6 +370,15 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         if (rack) {
             rack.visible = (!isEnemy && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket'));
         }
+    } else if (modelKey === 'quad') {
+        const up1 = root.getObjectByName('TURRETUP01');
+        const up2 = root.getObjectByName('TURRETUP02');
+        if (up1) up1.visible = false;
+        if (up2) up2.visible = false;
+        ['uvquadcann.barrelup02ms01', 'uvquadcann.barrelup02ms02', 'uvquadcann.barrelup02ms03', 'uvquadcann.barrelup02ms04'].forEach(msName => {
+            const ms = root.getObjectByName(msName);
+            if (ms) ms.visible = false;
+        });
     } else if (modelKey === 'nukecannon') {
         const eb = root.getObjectByName('ELEVATIONBARREL');
         if (eb) eb.rotation.x = Math.PI / 2;
