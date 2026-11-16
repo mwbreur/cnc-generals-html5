@@ -872,7 +872,7 @@
                     });
                 }
                 if (Array.isArray(offMap.buildings)) {
-                    const civPool = ['civilian_house1', 'civilian_house2', 'civilian_warehouse', 'civilian_hangar'];
+                    const civPool = ['civilian_house1', 'civilian_house2', 'civilian_hangar'];
                     offMap.buildings.forEach((bld, bIdx) => {
                         const bx = bld[0] * mapSize, bz = bld[1] * mapSize;
                         const angle = bld[2] || 0;
