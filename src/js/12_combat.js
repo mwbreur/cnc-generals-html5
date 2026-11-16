@@ -986,6 +986,7 @@ function activateBlueprint(type) {
     activeBlueprintType = type;
     blueprintRotationY = 0;
     window.blueprintRotationY = 0;
+    window._blueprintManualRotated = false;
 
     const footprint = getStructureFootprint(type);
     const size = { x: footprint.width, y: footprint.height, z: footprint.depth };
@@ -1063,6 +1064,10 @@ function updateBlueprintPosition(intersectPoint) {
     blueprintMesh.position.z = intersectPoint.z;
     const groundH = getTerrainHeight(intersectPoint.x, intersectPoint.z);
     blueprintMesh.position.y = groundH;
+    if (!window._blueprintManualRotated && Math.hypot(intersectPoint.x, intersectPoint.z) > 0.5) {
+        blueprintRotationY = Math.atan2(-intersectPoint.x, -intersectPoint.z);
+        window.blueprintRotationY = blueprintRotationY;
+    }
     blueprintMesh.rotation.y = (typeof blueprintRotationY !== 'undefined') ? blueprintRotationY : 0;
 
     isBlueprintValid = true;

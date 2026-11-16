@@ -2410,11 +2410,13 @@ window.addEventListener('keydown', e => {
     if (blueprintMesh) {
         if (k === 'r' || k === 'e') {
             blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) + Math.PI / 4;
+            window._blueprintManualRotated = true;
             blueprintMesh.rotation.y = blueprintRotationY;
             return;
         }
         if (k === 'q') {
             blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) - Math.PI / 4;
+            window._blueprintManualRotated = true;
             blueprintMesh.rotation.y = blueprintRotationY;
             return;
         }

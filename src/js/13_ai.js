@@ -1376,6 +1376,7 @@ function processEnemyAIEngine() {
                         const dz = groundHit.z - blueprintPlacementPos.z;
                         if (Math.hypot(dx, dz) > 1.2) {
                             blueprintRotationY = Math.atan2(dx, dz);
+                            window._blueprintManualRotated = true;
                             blueprintMesh.rotation.y = blueprintRotationY;
                         }
                         return;
@@ -1657,6 +1658,7 @@ function processEnemyAIEngine() {
             if (blueprintMesh) {
                 e.preventDefault();
                 blueprintRotationY = (typeof blueprintRotationY !== 'undefined' ? blueprintRotationY : 0) + (e.deltaY > 0 ? Math.PI / 8 : -Math.PI / 8);
+                window._blueprintManualRotated = true;
                 blueprintMesh.rotation.y = blueprintRotationY;
                 return;
             }
