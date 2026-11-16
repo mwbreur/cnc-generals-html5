@@ -228,6 +228,8 @@ function parseOfficialMap(mapKey, meta) {
     const rawHospitals = [];
     const rawRefineries = [];
     const rawBunkers = [];
+    const rawBridges = [];
+    const rawBuildings = [];
     const rawProps = [];
     let p = objListPos;
     while (p > 0 && p + 10 <= objListEnd) {
@@ -304,6 +306,13 @@ function parseOfficialMap(mapKey, meta) {
                 rawRefineries.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)) });
             } else if (/CivilianBunker/i.test(templateName)) {
                 rawBunkers.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)), angle: parseFloat(angle.toFixed(2)) });
+                rawBuildings.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), parseFloat(angle.toFixed(2)), 'bunker']);
+            } else if (/Bridge/i.test(templateName)) {
+                if (!rawBridges.some(b => Math.hypot(b.nx - nx, b.nz - nz) < 0.04)) {
+                    rawBridges.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)), angle: parseFloat(angle.toFixed(2)) });
+                }
+            } else if (/Warehouse|Wherehouse|WatchTower|Hanger|Garage|IndustrialBuilding|AmmoCache|Apartment|Hut/i.test(templateName)) {
+                rawBuildings.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), parseFloat(angle.toFixed(2)), 'civilian']);
             } else if (/TreePalm/i.test(templateName)) {
                 rawProps.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), 'palm']);
             } else if (/Tree/i.test(templateName)) {
@@ -373,6 +382,7 @@ function parseOfficialMap(mapKey, meta) {
         id: mapKey,
         name: meta.name,
         theme: meta.theme,
+        waterLevel: meta.waterLevel !== undefined ? meta.waterLevel : -999,
         maxPlayers: rawSpawns.length,
         grid,
         spawns: rawSpawns,
@@ -381,24 +391,26 @@ function parseOfficialMap(mapKey, meta) {
         hospitals: rawHospitals,
         refineries: rawRefineries,
         bunkers: rawBunkers,
+        bridges: rawBridges,
+        buildings: rawBuildings,
         props: rawProps,
         tgaDataUrl
     };
 }
 
 const OFFICIAL_MAP_LIST = [
-    { id: 'tournament_desert', folder: 'tournament desert', name: 'Tournament Desert', theme: 'desert' },
-    { id: 'scorched_earth', folder: 'scorched earth', name: 'Scorched Earth', theme: 'desert' },
-    { id: 'desert_fury', folder: 'desert fury', name: 'Desert Fury', theme: 'desert' },
-    { id: 'golden_oasis', folder: 'golden oasis', name: 'Golden Oasis', theme: 'desert' },
-    { id: 'barren_badlands', folder: 'barrenbadlands', name: 'Barren Badlands', theme: 'desert' },
-    { id: 'flash_fire', folder: 'flash fire', name: 'Flash Fire', theme: 'desert' },
-    { id: 'winter_wolf', folder: 'winter wolf', name: 'Winter Wolf', theme: 'snow' },
-    { id: 'alpine_assault', folder: 'alpine assault', name: 'Alpine Assault', theme: 'snow' },
-    { id: 'final_crusade', folder: 'final crusade', name: 'Final Crusade', theme: 'jungle' },
-    { id: 'heartland_shield', folder: 'heartland shield', name: 'Heartland Shield', theme: 'jungle' },
-    { id: 'lone_eagle', folder: 'lone eagle', name: 'Lone Eagle', theme: 'jungle' },
-    { id: 'twilight_flame', folder: 'twilight flame', name: 'Twilight Flame', theme: 'desert' }
+    { id: 'tournament_desert', folder: 'tournament desert', name: 'Tournament Desert', theme: 'desert', waterLevel: -999 },
+    { id: 'scorched_earth', folder: 'scorched earth', name: 'Scorched Earth', theme: 'desert', waterLevel: -999 },
+    { id: 'desert_fury', folder: 'desert fury', name: 'Desert Fury', theme: 'desert', waterLevel: -999 },
+    { id: 'golden_oasis', folder: 'golden oasis', name: 'Golden Oasis', theme: 'desert', waterLevel: -0.8 },
+    { id: 'barren_badlands', folder: 'barrenbadlands', name: 'Barren Badlands', theme: 'desert', waterLevel: -999 },
+    { id: 'flash_fire', folder: 'flash fire', name: 'Flash Fire', theme: 'desert', waterLevel: -999 },
+    { id: 'winter_wolf', folder: 'winter wolf', name: 'Winter Wolf', theme: 'snow', waterLevel: -0.8 },
+    { id: 'alpine_assault', folder: 'alpine assault', name: 'Alpine Assault', theme: 'snow', waterLevel: -0.8 },
+    { id: 'final_crusade', folder: 'final crusade', name: 'Final Crusade', theme: 'jungle', waterLevel: -0.8 },
+    { id: 'heartland_shield', folder: 'heartland shield', name: 'Heartland Shield', theme: 'jungle', waterLevel: -0.8 },
+    { id: 'lone_eagle', folder: 'lone eagle', name: 'Lone Eagle', theme: 'jungle', waterLevel: -0.8 },
+    { id: 'twilight_flame', folder: 'twilight flame', name: 'Twilight Flame', theme: 'desert', waterLevel: -999 }
 ];
 
 console.log('Extracting 12 Official EA Skirmish Maps from MapsZH.big & Maps.big...');

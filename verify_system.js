@@ -796,8 +796,8 @@ vm.runInContext(`
                 throw new Error("Invalid or incomplete official skirmish map data for: " + mapKey);
             }
             setupMapEnvironment(mapKey);
-            if (currentWaterLevel > -100) {
-                throw new Error("Official map " + mapKey + " should have SAGE dry-valley water level (-999), got: " + currentWaterLevel);
+            if (currentWaterLevel !== m.waterLevel) {
+                throw new Error("Official map " + mapKey + " waterLevel mismatch: expected " + m.waterLevel + ", got: " + currentWaterLevel);
             }
             const sp = getSpawnPointsForMap(mapKey);
             if (!sp || sp.length < 2) {

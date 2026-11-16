@@ -505,26 +505,26 @@
             mapPropsGroup = new THREE.Group();
             scene.add(mapPropsGroup);
 
-            // 1. Atmosphere Lighting & Fog
+            // 1. Bright Daytime Atmosphere Lighting & Light Horizon Haze
             if (effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert') {
-                scene.background.setHex(0x1a150e);
-                scene.fog = new THREE.FogExp2(0x1a150e, 0.0025);
+                scene.background.setHex(0xd8c39e);
+                scene.fog = new THREE.FogExp2(0xd8c39e, 0.0004);
             } else if (effectiveTheme === 'jungle') {
-                scene.background.setHex(0x0e1811);
-                scene.fog = new THREE.FogExp2(0x0e1811, 0.0028);
+                scene.background.setHex(0xa8d0e6);
+                scene.fog = new THREE.FogExp2(0xa8d0e6, 0.00038);
             } else if (effectiveTheme === 'snow') {
-                scene.background.setHex(0x121a22);
-                scene.fog = new THREE.FogExp2(0x121a22, 0.0022);
+                scene.background.setHex(0xcfdce6);
+                scene.fog = new THREE.FogExp2(0xcfdce6, 0.00042);
             } else if (effectiveTheme === 'city') {
-                scene.background.setHex(0x111317);
-                scene.fog = new THREE.FogExp2(0x111317, 0.0024);
+                scene.background.setHex(0xb8c4d0);
+                scene.fog = new THREE.FogExp2(0xb8c4d0, 0.00045);
             } else {
-                scene.background.setHex(0x1a150e);
-                scene.fog = new THREE.FogExp2(0x1a150e, 0.0025);
+                scene.background.setHex(0xd8c39e);
+                scene.fog = new THREE.FogExp2(0xd8c39e, 0.0004);
             }
 
-            // 2. Procedural Displaced Terrain Mesh
-            const segments = mapSize >= 2200 ? 180 : mapSize >= 1400 ? 140 : 100;
+            // 2. High-Resolution Displaced Terrain Mesh (256x256 on standard maps for sharp cliff ledges)
+            const segments = mapSize >= 2200 ? 280 : mapSize >= 1400 ? 256 : 160;
             const geo = new THREE.PlaneGeometry(mapSize, mapSize, segments, segments);
             geo.rotateX(-Math.PI / 2);
 
@@ -550,10 +550,11 @@
             terrainMesh.receiveShadow = true;
             scene.add(terrainMesh);
 
-            // 3. Water Body (SAGE official skirmish maps use dry passable valleys with no global water plane so AI never stalls)
+            // 3. Water Body (per-map waterLevel on official maps so river/lake maps render water while dry canyons stay passable)
             mapBridges.length = 0; // Clear previous bridges
-            const isOfficialDryMap = Boolean(officialMap || effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert');
-            let waterLevel = isOfficialDryMap ? -999.0 : -1.0;
+            let waterLevel = (officialMap && officialMap.waterLevel !== undefined)
+                ? Number(officialMap.waterLevel)
+                : ((effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert') ? -999.0 : -1.0);
             let waterColor = 0x0984e3;
             let waterOpacity = 0.82;
 
@@ -852,6 +853,46 @@
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
                     }
                 });
+                // Spawn official EA bridges & civilian structures/bunkers from ObjectsList
+                if (Array.isArray(offMap.bridges)) {
+                    offMap.bridges.forEach(b => {
+                        const bx = b.nx * mapSize, bz = b.nz * mapSize;
+                        const by = Math.max(getTerrainHeight(bx, bz), currentWaterLevel + 1.0);
+                        spawnBridge(bx, by, bz, b.angle || 0, 20, 62);
+                    });
+                }
+                if (Array.isArray(offMap.buildings)) {
+                    offMap.buildings.forEach(bld => {
+                        const bx = bld[0] * mapSize, bz = bld[1] * mapSize;
+                        const angle = bld[2] || 0;
+                        const kind = bld[3] || 'civilian';
+                        const by = getTerrainHeight(bx, bz);
+                        let mesh = null;
+                        if (kind === 'bunker' && typeof createChinaBunker === 'function') {
+                            mesh = createChinaBunker(false);
+                            mesh.scale.set(0.95, 0.95, 0.95);
+                        } else {
+                            mesh = new THREE.Group();
+                            const body = new THREE.Mesh(
+                                new THREE.BoxGeometry(9.0, 5.5, 7.5),
+                                typeof matConcrete !== 'undefined' ? matConcrete : new THREE.MeshStandardMaterial({ color: 0xb5a68c, roughness: 0.9 })
+                            );
+                            body.position.y = 2.75;
+                            body.castShadow = true;
+                            body.receiveShadow = true;
+                            const roof = new THREE.Mesh(
+                                new THREE.BoxGeometry(9.4, 0.5, 7.9),
+                                typeof matDarkMetal !== 'undefined' ? matDarkMetal : new THREE.MeshStandardMaterial({ color: 0x3b3b3b, roughness: 0.7 })
+                            );
+                            roof.position.y = 5.65;
+                            mesh.add(body, roof);
+                        }
+                        mesh.position.set(bx, by, bz);
+                        mesh.rotation.y = angle;
+                        mapPropsGroup.add(mesh);
+                        mapObstacles.push({ position: new THREE.Vector3(bx, by, bz), radius: kind === 'bunker' ? 5.0 : 6.0 });
+                    });
+                }
             } else {
             const count = activeCustomMap
                 ? Math.min(32, Math.floor(mapSize * 0.035))
