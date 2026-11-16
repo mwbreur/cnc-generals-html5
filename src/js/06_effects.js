@@ -2133,8 +2133,9 @@
                 if (c.name && c.name.toUpperCase().startsWith('PROPELLER')) c130Props.push(c);
             });
 
-            const startPos = new THREE.Vector3(dropCenter.x - 220, groundY + 14, dropCenter.z - 90);
-            const endPos = new THREE.Vector3(dropCenter.x + 220, groundY + 14, dropCenter.z + 90);
+            const flightY = groundY + 26;
+            const startPos = new THREE.Vector3(dropCenter.x - 180, flightY, dropCenter.z - 80);
+            const endPos = new THREE.Vector3(dropCenter.x + 180, flightY, dropCenter.z + 80);
             plane.position.copy(startPos);
             plane.lookAt(endPos);
             scene.add(plane);
@@ -2150,7 +2151,7 @@
             if (typeof showNotification === 'function') showNotification('✈ C-130 Supply Drop inbound!', 'info');
 
             let planeTick = 0;
-            const planeDuration = 300;
+            const planeDuration = 360;
             let crateDropped = false;
 
             // 2. Parachute Supply Crate
