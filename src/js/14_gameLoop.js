@@ -863,8 +863,8 @@ function animate() {
 
 
             // Water surface ripple animation
-            if (waterMesh) {
-                const baseWaterY = (currentMapType === 'jungle' ? -1.2 : currentMapType === 'snow' ? -1.8 : currentMapType === 'city' ? -2.2 : -0.6);
+            if (waterMesh && waterMesh.visible) {
+                const baseWaterY = (typeof currentWaterLevel !== 'undefined') ? currentWaterLevel : -0.6;
                 waterMesh.position.y = baseWaterY + Math.sin(animTime * 2.5) * 0.05;
             }
 
