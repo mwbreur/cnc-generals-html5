@@ -350,7 +350,7 @@
                 const isAlly = (structTeam === playerTeamId);
                 const foeFaction = packet.faction || (isMultiplayerHost ? mpOpponentFaction : 'usa');
                 const group = (typeof createStructureMeshForFaction === 'function') 
-                    ? createStructureMeshForFaction(packet.structType, foeFaction)
+                    ? createStructureMeshForFaction(packet.structType, foeFaction, true)
                     : createChinaWarFactory();
                 if (!group.userData || !group.userData.isW3D) {
                     group.scale.set(1.35, 1.35, 1.35);

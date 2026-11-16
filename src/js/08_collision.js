@@ -196,63 +196,63 @@ function resolveObstacleCollisions(unit) {
             return null;
         }
 
-        function createStructureMeshForFaction(type, faction = 'usa') {
+        function createStructureMeshForFaction(type, faction = 'usa', isEnemy = false) {
             let group;
             const f = faction || 'usa';
             if (type === 'center' || type === 'commandCenter') {
-                group = f === 'china' ? createChinaCommandCenter() : f === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
+                group = f === 'china' ? createChinaCommandCenter(isEnemy) : f === 'gla' ? createGLACommandCenter(isEnemy) : createUSACommandCenter(isEnemy);
             } else if (type === 'power' || type === 'nuclearReactor') {
-                group = (f === 'china' || type === 'nuclearReactor') ? createChinaNuclearReactor() : createUSAColdFusionReactor();
+                group = (f === 'china' || type === 'nuclearReactor') ? createChinaNuclearReactor(isEnemy) : createUSAColdFusionReactor(isEnemy);
             } else if (type === 'barracks') {
-                group = f === 'china' ? createChinaBarracks() : f === 'gla' ? createGLABarracks(false) : createUSABarracks();
+                group = f === 'china' ? createChinaBarracks(isEnemy) : f === 'gla' ? createGLABarracks(false, isEnemy) : createUSABarracks(isEnemy);
             } else if (type === 'fakeBarracks') {
-                group = createGLABarracks(true);
+                group = createGLABarracks(true, isEnemy);
             } else if (type === 'factory') {
-                group = f === 'china' ? createChinaWarFactory() : f === 'gla' ? createGLAArmsDealer(false) : createUSAWarFactory();
+                group = f === 'china' ? createChinaWarFactory(isEnemy) : f === 'gla' ? createGLAArmsDealer(false, isEnemy) : createUSAWarFactory(isEnemy);
             } else if (type === 'fakeArmsDealer') {
-                group = createGLAArmsDealer(true);
+                group = createGLAArmsDealer(true, isEnemy);
             } else if (type === 'supplyCenter') {
-                group = f === 'china' ? createChinaSupplyCenter() : createUSASupplyCenter();
+                group = f === 'china' ? createChinaSupplyCenter(isEnemy) : createUSASupplyCenter(isEnemy);
             } else if (type === 'supplyStash') {
-                group = createGLASupplyStash();
+                group = createGLASupplyStash(isEnemy);
             } else if (type === 'supplyDrop') {
-                group = createUSASupplyDropZone();
+                group = createUSASupplyDropZone(isEnemy);
             } else if (type === 'airfield') {
-                group = f === 'china' ? createChinaAirfield() : createUSAAirfield();
+                group = f === 'china' ? createChinaAirfield(isEnemy) : createUSAAirfield(isEnemy);
             } else if (type === 'strategyCenter') {
-                group = createUSAStrategyCenter();
+                group = createUSAStrategyCenter(isEnemy);
             } else if (type === 'detentionCamp') {
-                group = createUSADetentionCamp();
+                group = createUSADetentionCamp(isEnemy);
             } else if (type === 'patriot') {
-                group = createUSAPatriotSystem();
+                group = createUSAPatriotSystem(isEnemy);
             } else if (type === 'particleCannon') {
-                group = createUSAParticleCannon();
+                group = createUSAParticleCannon(isEnemy);
             } else if (type === 'bunker') {
-                group = createChinaBunker();
+                group = createChinaBunker(isEnemy);
             } else if (type === 'gatlingCannon') {
-                group = createChinaGatlingCannon();
+                group = createChinaGatlingCannon(isEnemy);
             } else if (type === 'speakerTower') {
-                group = createChinaSpeakerTower();
+                group = createChinaSpeakerTower(isEnemy);
             } else if (type === 'propagandaCenter') {
-                group = createChinaPropagandaCenter();
+                group = createChinaPropagandaCenter(isEnemy);
             } else if (type === 'internetCenter') {
-                group = createChinaInternetCenter();
+                group = createChinaInternetCenter(isEnemy);
             } else if (type === 'nukeSilo') {
-                group = createChinaNukeSilo();
+                group = createChinaNukeSilo(isEnemy);
             } else if (type === 'tunnel') {
-                group = createGLATunnelNetwork();
+                group = createGLATunnelNetwork(isEnemy);
             } else if (type === 'stingerSite') {
-                group = createGLAStingerSite();
+                group = createGLAStingerSite(isEnemy);
             } else if (type === 'demoTrap') {
-                group = createGLADemoTrap();
+                group = createGLADemoTrap(isEnemy);
             } else if (type === 'blackMarket') {
-                group = createGLABlackMarket();
+                group = createGLABlackMarket(isEnemy);
             } else if (type === 'palace') {
-                group = createGLAPalace();
+                group = createGLAPalace(isEnemy);
             } else if (type === 'scudStorm') {
-                group = createGLAScudStorm();
+                group = createGLAScudStorm(isEnemy);
             } else {
-                group = f === 'china' ? createChinaCommandCenter() : f === 'gla' ? createGLACommandCenter() : createUSACommandCenter();
+                group = f === 'china' ? createChinaCommandCenter(isEnemy) : f === 'gla' ? createGLACommandCenter(isEnemy) : createUSACommandCenter(isEnemy);
             }
             return group;
         }

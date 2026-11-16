@@ -713,7 +713,7 @@ function spawnAIStructure(cmd, type, pos, builderUnit) {
     // Authentic C&C Generals Rule: AI CANNOT construct buildings without a live Dozer / Worker!
     if (!activeBuilder || activeBuilder.health <= 0) return null;
 
-    const group = createStructureMeshForFaction(type, f);
+    const group = createStructureMeshForFaction(type, f, true);
     if (!group.userData || !group.userData.isW3D) {
         group.scale.set(1.35, 1.35, 1.35);
     }
