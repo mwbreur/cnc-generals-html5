@@ -2546,14 +2546,14 @@ function updateShellMapDemo(dt) {
     const t = st.time;
     const hAt = (x, z) => (typeof getTerrainHeight === 'function' ? getTerrainHeight(x, z) : 0);
 
-    // Smooth Zero Hour ShellMap cinematic camera orbit
-    const camAngle = t * 0.075;
-    const camRadius = 112 + Math.sin(t * 0.14) * 18;
+    // Smooth Zero Hour ShellMap cinematic camera flyover (sweeping figure-8 + altitude banks)
+    const camAngle = t * 0.085;
+    const camRadius = 96 + Math.sin(t * 0.17) * 24;
     const camX = Math.cos(camAngle) * camRadius;
-    const camZ = Math.sin(camAngle) * camRadius * 0.78;
-    const camY = hAt(camX, camZ) + 42 + Math.sin(t * 0.19) * 8;
+    const camZ = Math.sin(camAngle * 1.15) * camRadius * 0.72;
+    const camY = hAt(camX, camZ) + 34 + Math.sin(t * 0.23) * 11;
     camera.position.set(camX, camY, camZ);
-    camera.lookAt(Math.sin(t * 0.09) * 18, hAt(0, 0) + 4, Math.cos(t * 0.08) * 14);
+    camera.lookAt(Math.sin(t * 0.11) * 26, hAt(0, 0) + 5, Math.cos(t * 0.09) * 18);
 
     // Move armored columns & fire periodic tracers across the valley
     for (let i = 0; i < st.convoys.length; i++) {
