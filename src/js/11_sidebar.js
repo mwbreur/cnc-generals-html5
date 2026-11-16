@@ -532,13 +532,17 @@ function unloadTransportPassengers(transport) {
         passengers.forEach((p, idx) => {
             p.garrisonedIn = null;
             const angle = (idx / Math.max(1, passengers.length)) * Math.PI * 2;
-            const dropPos = t.mesh.position.clone().add(new THREE.Vector3(Math.cos(angle) * (t.radius + 1.8), 0, Math.sin(angle) * (t.radius + 1.8)));
+            const basePos = (t.position || t.mesh.position).clone();
+            const dropPos = basePos.add(new THREE.Vector3(Math.cos(angle) * ((t.radius || 4) + 1.8), 0, Math.sin(angle) * ((t.radius || 4) + 1.8)));
             dropPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropPos.x, dropPos.z) : 0;
             p.mesh.position.copy(dropPos);
             p.targetPosition.copy(dropPos);
             p.mesh.visible = true;
             count++;
         });
+        if (t.isWorldBuilding && typeof updateWorldBuildingGarrisonVisual === 'function') {
+            updateWorldBuildingGarrisonVisual(t);
+        }
     });
     if (count > 0) {
         playAudio('click');
@@ -1291,6 +1295,20 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         factionUpgs.slice(0, 13).forEach((upg, idx) => {
             assignUpgradeToSlot(idx, upg, structure, isConstructing);
         });
+    }
+
+    if (structure.isWorldBuilding) {
+        const gCount = (structure.garrisoned || []).length;
+        currentGridSlots[0] = {
+            id: 'evacuate',
+            name: `EVACUATE (${gCount})`,
+            cost: '',
+            badge: 'EXIT',
+            disabled: gCount === 0,
+            action: () => unloadTransportPassengers(structure),
+            desc: 'Evacuate all garrisoned infantry from this building'
+        };
+        return;
     }
 
     // Slot 13 (Bottom-Right): SELL STRUCTURE
@@ -3620,7 +3638,7 @@ function updateHUD() {
             else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; capacity = 5; garrisoned = []; }
             else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 18; capacity = 4; garrisoned = []; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 3.2; speed = 0.11; health = 180; scanRange = 60; }
-            else if (type === 'dozer') { mesh = spawnFaction === 'china' ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 3.2; speed = 0.10; health = 300; }
+            else if (type === 'dozer') { mesh = spawnFaction === 'china' ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 1.9; speed = 0.10; health = 300; }
             else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; }
             else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 550; isAir = true; capacity = 8; garrisoned = []; }
             else if (type === 'comanche') { mesh = createComancheMesh(); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }

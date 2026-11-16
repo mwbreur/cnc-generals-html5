@@ -367,7 +367,7 @@ function resolveObstacleCollisions(unit) {
             else if (type === 'humvee') { mesh = createHumveeMesh(true); radius = 2.8; speed = 0.22; health = 280; scanRange = 26; }
             else if (type === 'ambulance') { mesh = createAmbulanceMesh(true); radius = 2.8; speed = 0.18; health = 220; scanRange = 15; }
             else if (type === 'tomahawk') { mesh = createTomahawkMesh(true); radius = 3.2; speed = 0.11; health = 180; scanRange = 60; }
-            else if (type === 'dozer') { mesh = (faction === 'china' || (typeof enemyFaction !== 'undefined' && enemyFaction === 'china')) ? createChinaDozerMesh(true) : createUSADozerMesh(true); radius = 3.2; speed = 0.10; health = 300; scanRange = 18; }
+            else if (type === 'dozer') { mesh = (faction === 'china' || (typeof enemyFaction !== 'undefined' && enemyFaction === 'china')) ? createChinaDozerMesh(true) : createUSADozerMesh(true); radius = 1.9; speed = 0.10; health = 300; scanRange = 18; }
             else if (type === 'truck') { mesh = createUSATruckMesh(true); radius = 3.2; speed = 0.13; health = 260; scanRange = 16; }
             else if (type === 'chinook') { mesh = createChinookMesh(true); radius = 4.8; speed = 0.22; health = 550; scanRange = 22; isAir = true; }
             else if (type === 'comanche') { mesh = createComancheMesh(true); radius = 3.8; speed = 0.26; health = 340; scanRange = 28; isAir = true; }

@@ -60,7 +60,7 @@ function markPathfindGridDirty() {
 }
 window.markPathfindGridDirty = markPathfindGridDirty;
 
-function classifyPathfindPosition(wx, wz, ignoreStruct = null, extraClearance = 1.6) {
+function classifyPathfindPosition(wx, wz, ignoreStruct = null, extraClearance = 0.6) {
     // Bridge cells override water/cliff underneath (AIPathfind.cpp classifyMap)
     if (typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0 && typeof isPointOnBridge === 'function') {
         for (let i = 0; i < mapBridges.length; i++) {
@@ -1932,6 +1932,37 @@ function processEnemyAIEngine() {
                 }
             }
 
+            // 1b2. Check if right-clicking on a garrisonable civilian/world building with infantry!
+            const selectedInfForBld = units.filter(u => u.selected && isInfantryType(u.type));
+            if (selectedInfForBld.length > 0 && typeof worldBuildings !== 'undefined' && worldBuildings.length > 0) {
+                const wbMeshes = worldBuildings.map(wb => wb.mesh).filter(Boolean);
+                const wbHits = wbMeshes.length ? raycaster.intersectObjects(wbMeshes, true) : [];
+                if (wbHits.length > 0) {
+                    const hitLeaf = wbHits[0].object;
+                    const wbTarget = worldBuildings.find(wb => {
+                        let o = hitLeaf;
+                        while (o) { if (o === wb.mesh) return true; o = o.parent; }
+                        return false;
+                    });
+                    if (wbTarget && wbTarget.health > 0) {
+                        const occupiedByEnemy = wbTarget.garrisoned && wbTarget.garrisoned.length > 0 && !isFriendly({ teamId: playerTeamId }, wbTarget);
+                        if (occupiedByEnemy) {
+                            showNotification('Building is garrisoned by hostile forces! Clear it with fire or toxins.', 'error');
+                            return;
+                        }
+                        selectedInfForBld.forEach(inf => {
+                            inf.embarkTarget = wbTarget;
+                            inf.taskState = 'MovingToEmbark';
+                            inf.combatTarget = null;
+                            inf.targetPosition.copy(wbTarget.position);
+                        });
+                        showNotification(`Infantry ordered to garrison building (${(wbTarget.garrisoned || []).length}/${wbTarget.capacity} slots).`, 'info');
+                        updateSidebar();
+                        return;
+                    }
+                }
+            }
+
             // 1c. Check if right-clicking on a neutral capturable tech structure!
             if (window.neutralStructures && window.neutralStructures.length > 0) {
                 const neutralMeshes = window.neutralStructures.map(ns => ns.mesh).filter(Boolean);
@@ -2176,6 +2207,26 @@ function processEnemyAIEngine() {
                     }
                     if (structures.includes(hitCandidate)) {
                         selectedStructure = hitCandidate;
+                        activeSidebarTab = 'production';
+                        updateSidebar();
+                        return;
+                    }
+                }
+            }
+
+            // 2b. Check Garrisoned World Buildings owned by the player (allows Evacuate)
+            if (typeof worldBuildings !== 'undefined' && worldBuildings.length > 0) {
+                const wbMeshes = worldBuildings.filter(wb => wb.garrisoned && wb.garrisoned.length > 0 && wb.teamId === playerTeamId).map(wb => wb.mesh).filter(Boolean);
+                const wbHits = wbMeshes.length ? raycaster.intersectObjects(wbMeshes, true) : [];
+                if (wbHits.length > 0) {
+                    const hitLeaf = wbHits[0].object;
+                    const wbTarget = worldBuildings.find(wb => {
+                        let o = hitLeaf;
+                        while (o) { if (o === wb.mesh) return true; o = o.parent; }
+                        return false;
+                    });
+                    if (wbTarget) {
+                        selectedStructure = wbTarget;
                         activeSidebarTab = 'production';
                         updateSidebar();
                         return;

@@ -6,20 +6,24 @@ function processCombatScanning() {
                 if (unit.isUnmanned || (unit.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < unit.disabledUntil)) return;
                 if (unit.garrisonedIn) {
                     const tr = unit.garrisonedIn;
-                    const hasFireports = tr && tr.health > 0 && tr.mesh && (tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus' || (tr.type === 'overlord' && tr.overlordUpgrade === 'bunker'));
+                    const isBuildingGarrison = !!(tr && (tr.isWorldBuilding || tr.type === 'bunker'));
+                    const hasFireports = tr && tr.health > 0 && tr.mesh && (isBuildingGarrison || tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus' || (tr.type === 'overlord' && tr.overlordUpgrade === 'bunker'));
                     if (!hasFireports) return;
-                    unit.mesh.position.copy(tr.mesh.position);
+                    const trPos = tr.position || tr.mesh.position;
+                    unit.mesh.position.copy(trPos);
+                    if (isBuildingGarrison) unit.mesh.position.y += 2.0;
                     if (tr.combatTarget && tr.combatTarget.health > 0) {
                         unit.combatTarget = tr.combatTarget;
                     } else if (!unit.combatTarget || unit.combatTarget.health <= 0) {
+                        const rangeBonus = isBuildingGarrison ? 1.5 : 1.0;
                         const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
-                        let bestGTarget = null, bestGD = (unit.scanRange || 22) + 8;
+                        let bestGTarget = null, bestGD = (unit.scanRange || 22) * rangeBonus + 8;
                         for (let hi = 0; hi < hostiles.length; hi++) {
                             const h = hostiles[hi];
                             if (!h || h.health <= 0 || isFriendly(unit, h)) continue;
                             const hp = h.position || (h.mesh && h.mesh.position);
                             if (!hp) continue;
-                            const d = tr.mesh.position.distanceTo(hp);
+                            const d = trPos.distanceTo(hp);
                             if (d < bestGD) { bestGD = d; bestGTarget = h; }
                         }
                         if (bestGTarget) unit.combatTarget = bestGTarget;
@@ -33,7 +37,8 @@ function processCombatScanning() {
                     const targetPos = unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position);
                     const targetRadius = unit.combatTarget.radius || 0;
                     const distance = targetPos ? unit.mesh.position.distanceTo(targetPos) : Infinity;
-                    const maxEffectiveRange = unit.scanRange + targetRadius;
+                    const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker')) ? 1.5 : 1.0;
+                    const maxEffectiveRange = unit.scanRange * garrisonRangeMult + targetRadius;
                     const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
 
                     if ((unit.type === 'tomahawk' && unit.combatTarget.isAir) || distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {

@@ -1466,14 +1466,21 @@ function animate() {
                         const distToT = Math.hypot(unit.mesh.position.x - tPos.x, unit.mesh.position.z - tPos.z);
                         if (distToT < ((transport.radius || 1.4) + 2.8)) {
                             if (!transport.garrisoned) transport.garrisoned = [];
-                            if (transport.garrisoned.length < cap) {
+                            const enemyOccupied = transport.isWorldBuilding && transport.garrisoned.length > 0 && typeof isFriendly === 'function' && !isFriendly(unit, transport);
+                            if (!enemyOccupied && transport.garrisoned.length < cap) {
                                 transport.garrisoned.push(unit);
                                 unit.garrisonedIn = transport;
                                 unit.mesh.visible = false;
                                 unit.taskState = 'Idle';
                                 unit.embarkTarget = null;
+                                if (transport.isWorldBuilding && typeof updateWorldBuildingGarrisonVisual === 'function') {
+                                    updateWorldBuildingGarrisonVisual(transport);
+                                }
                                 showNotification(`${unit.type} entered ${transport.type} (${transport.garrisoned.length}/${cap}).`, 'success');
                                 updateSidebar();
+                            } else if (enemyOccupied || transport.garrisoned.length >= cap) {
+                                unit.taskState = 'Idle';
+                                unit.embarkTarget = null;
                             }
                         }
                     } else {

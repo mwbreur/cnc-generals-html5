@@ -6,6 +6,112 @@
         let waterMesh = null;
         let mapPropsGroup = null;
         const mapObstacles = []; // Solid obstacles with collision (trees, rocks, buildings)
+        const worldBuildings = []; // Garrisonable civilian buildings & bunkers on the map
+        window.worldBuildings = worldBuildings;
+
+        function registerWorldBuilding(mesh, x, y, z, angle = 0, radius = 6.0, isBunker = false) {
+            if (!mesh) return null;
+            const bld = {
+                type: isBunker ? 'civilianBunker' : 'civilianBuilding',
+                isWorldBuilding: true,
+                isNeutral: true,
+                mesh: mesh,
+                position: new THREE.Vector3(x, y, z),
+                rotationY: angle || 0,
+                radius: radius,
+                health: isBunker ? 1400 : 1200,
+                maxHealth: isBunker ? 1400 : 1200,
+                capacity: isBunker ? 6 : 8,
+                garrisoned: [],
+                ownerId: null,
+                teamId: 0,
+                faction: null,
+                _garrisonVisual: null
+            };
+            worldBuildings.push(bld);
+            return bld;
+        }
+
+        function updateWorldBuildingGarrisonVisual(bld) {
+            if (!bld || !bld.mesh) return;
+            if (!bld.garrisoned || bld.garrisoned.length === 0) {
+                if (bld._garrisonVisual) {
+                    bld.mesh.remove(bld._garrisonVisual);
+                    bld._garrisonVisual.traverse(c => {
+                        if (c.geometry && typeof c.geometry.dispose === 'function') c.geometry.dispose();
+                        if (c.material && typeof c.material.dispose === 'function') c.material.dispose();
+                    });
+                    bld._garrisonVisual = null;
+                }
+                bld.ownerId = null;
+                bld.teamId = 0;
+                bld.faction = null;
+                return;
+            }
+
+            const occupant = bld.garrisoned[0];
+            bld.ownerId = occupant.ownerId || 'player';
+            bld.teamId = occupant.teamId || 1;
+            bld.faction = occupant.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+
+            if (!bld._garrisonVisual) {
+                const grp = new THREE.Group();
+                grp.name = 'worldBuildingGarrisonVisual';
+                const sx = (bld.mesh.scale && bld.mesh.scale.x) ? bld.mesh.scale.x : 1;
+                const sy = (bld.mesh.scale && bld.mesh.scale.y) ? bld.mesh.scale.y : 1;
+                const sz = (bld.mesh.scale && bld.mesh.scale.z) ? bld.mesh.scale.z : 1;
+                grp.scale.set(1 / sx, 1 / sy, 1 / sz);
+
+                const r = (bld.radius || 5.5) * 0.92;
+                const sandMat = new THREE.MeshStandardMaterial({ color: 0x9c8964, roughness: 0.95, metalness: 0.05 });
+                const wireMat = new THREE.MeshStandardMaterial({ color: 0x6c757d, roughness: 0.5, metalness: 0.75 });
+                const flagColor = (bld.teamId !== 1) ? 0xdc2626 :
+                    (bld.faction === 'china' ? 0xe74c3c : bld.faction === 'gla' ? 0x2ecc71 : 0x1e90ff);
+                const flagMat = new THREE.MeshStandardMaterial({ color: flagColor, roughness: 0.55, side: THREE.DoubleSide });
+                const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a3f44, metalness: 0.7, roughness: 0.4 });
+
+                // Perimeter sandbag walls + barbed wire coils on all 4 sides
+                for (let side = 0; side < 4; side++) {
+                    const ang = side * (Math.PI / 2);
+                    const wallGrp = new THREE.Group();
+                    wallGrp.rotation.y = ang;
+
+                    const bag = new THREE.Mesh(new THREE.BoxGeometry(r * 1.45, 0.72, 0.55), sandMat);
+                    bag.position.set(0, 0.36, r);
+                    bag.castShadow = true;
+                    bag.receiveShadow = true;
+                    wallGrp.add(bag);
+
+                    const bagTop = new THREE.Mesh(new THREE.BoxGeometry(r * 1.25, 0.42, 0.44), sandMat);
+                    bagTop.position.set(0, 0.88, r);
+                    bagTop.castShadow = true;
+                    wallGrp.add(bagTop);
+
+                    // Coiled barbed wire loops in front of the sandbags
+                    if (typeof THREE.TorusGeometry === 'function') {
+                        const coils = 4;
+                        for (let ci = 0; ci < coils; ci++) {
+                            const coil = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 6, 10), wireMat);
+                            coil.position.set((ci - (coils - 1) * 0.5) * (r * 0.36), 0.35, r + 0.65);
+                            coil.rotation.y = Math.PI / 2 + 0.25;
+                            wallGrp.add(coil);
+                        }
+                    }
+                    grp.add(wallGrp);
+                }
+
+                // Faction garrison flag banner
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6.8, 6), poleMat);
+                pole.position.set(r * 0.45, 3.4, r * 0.45);
+                const flag = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 0.08), flagMat);
+                flag.position.set(r * 0.45 + 0.9, 6.2, r * 0.45);
+                grp.add(pole, flag);
+
+                bld.mesh.add(grp);
+                bld._garrisonVisual = grp;
+            }
+        }
+        window.updateWorldBuildingGarrisonVisual = updateWorldBuildingGarrisonVisual;
 
         // Mathematical Heightmap Generator
         function getCustomMapHeight(x, z) {
@@ -500,6 +606,7 @@
             if (waterMesh) { scene.remove(waterMesh); waterMesh.geometry.dispose(); waterMesh = null; }
             if (mapPropsGroup) { scene.remove(mapPropsGroup); mapPropsGroup = null; }
             mapObstacles.length = 0;
+            worldBuildings.length = 0;
             supplyPoints.forEach(sp => { if (sp.mesh) scene.remove(sp.mesh); });
             supplyPoints.length = 0;
 
@@ -882,6 +989,7 @@
                         building.position.set(p.x, py, p.z);
                         mapPropsGroup.add(building);
                         mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 5.5 });
+                        registerWorldBuilding(building, p.x, py, p.z, 0, 5.5, false);
                     }
                 });
             }
@@ -974,7 +1082,9 @@
                         mesh.position.set(bx, yPos, bz);
                         mesh.rotation.y = angle;
                         mapPropsGroup.add(mesh);
-                        mapObstacles.push({ position: new THREE.Vector3(bx, by, bz), radius: kind === 'bunker' ? 5.0 : 6.0 });
+                        const wbRadius = kind === 'bunker' ? 5.0 : 6.0;
+                        mapObstacles.push({ position: new THREE.Vector3(bx, by, bz), radius: wbRadius });
+                        registerWorldBuilding(mesh, bx, by, bz, angle, wbRadius, kind === 'bunker');
                     });
                 }
             } else {
@@ -1072,6 +1182,7 @@
                             building.position.set(x, y, z);
                             mapPropsGroup.add(building);
                             mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 5.5 });
+                            registerWorldBuilding(building, x, y, z, 0, 5.5, false);
                         } else if (roll > 0.2) {
                             const light = createStreetLightMesh();
                             light.position.set(x, y, z);
