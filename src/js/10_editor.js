@@ -550,6 +550,7 @@
         }
 
         function resetEntireBattlefieldState(mapSize = 1500) {
+            if (typeof cleanupShellMapDemo === 'function') cleanupShellMapDemo();
             // 1. Deselect everything and reset cursors & blueprint states
             if (typeof selectedStructure !== 'undefined') selectedStructure = null;
             if (typeof selectedSupplyPoint !== 'undefined') selectedSupplyPoint = null;

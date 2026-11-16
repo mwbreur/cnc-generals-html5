@@ -37,16 +37,43 @@
 
         <div id="start-card" class="main-menu-active">
             <div id="main-menu-screen" class="zh-main-menu-screen">
+                <!-- Animated Zero Hour MainMenuRuler + Sweeping Tactical Scan -->
+                <div class="zh-ruler-bar" aria-hidden="true">
+                    <div class="zh-ruler-track">
+                        <img id="main-menu-ruler-a" class="zh-ruler-img" alt="" />
+                        <img id="main-menu-ruler-b" class="zh-ruler-img" alt="" />
+                    </div>
+                    <div class="zh-ruler-scan"></div>
+                </div>
+                <div class="zh-menu-scanlines" aria-hidden="true"></div>
+
                 <div class="zh-main-menu-brand">
                     <img id="main-menu-emblem" class="zh-main-menu-emblem" alt="" />
                     <div class="zh-main-menu-title">COMMAND &amp; CONQUER</div>
                     <div class="zh-main-menu-subtitle">GENERALS <span>ZERO:HOUR</span></div>
                 </div>
-                <nav class="zh-main-menu-actions" aria-label="Main menu">
-                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('single')"><span>SKIRMISH</span><small>Configure a battle against AI</small></button>
-                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('multiplayer')"><span>MULTIPLAYER</span><small>Host or join a battle</small></button>
-                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('editor')"><span>MAP EDITOR</span><small>Create or edit a battlefield</small></button>
-                </nav>
+
+                <!-- Zero Hour MapBorder2 / EarthMap2 Animated Command Panel -->
+                <div class="zh-earth-panel">
+                    <div class="zh-earth-radar" aria-hidden="true">
+                        <div class="zh-earth-grid"></div>
+                        <div class="zh-earth-sweep"></div>
+                        <span class="zh-radar-blip zh-blip-1"></span>
+                        <span class="zh-radar-blip zh-blip-2"></span>
+                        <span class="zh-radar-blip zh-blip-3"></span>
+                    </div>
+                    <div class="zh-earth-header">
+                        <span class="zh-green-dot" title="Command Uplink Active"></span>
+                        <span class="zh-earth-status">TACTICAL UPLINK // SHELL MAP</span>
+                        <span id="zh-menu-clock" class="zh-menu-clock">00:00:00</span>
+                    </div>
+                    <nav class="zh-main-menu-actions" aria-label="Main menu">
+                        <button class="zh-main-menu-button" style="--btn-i:0" onclick="enterStartMenuMode('single')"><span>SKIRMISH</span><small>Configure a battle against AI</small></button>
+                        <button class="zh-main-menu-button" style="--btn-i:1" onclick="enterStartMenuMode('multiplayer')"><span>MULTIPLAYER</span><small>Host or join a battle</small></button>
+                        <button class="zh-main-menu-button" style="--btn-i:2" onclick="enterStartMenuMode('editor')"><span>MAP EDITOR</span><small>Create or edit a battlefield</small></button>
+                    </nav>
+                </div>
+
                 <div class="zh-main-menu-footer">TACTICAL COMMAND SYSTEM <span>·</span> ZERO HOUR</div>
             </div>
             <div id="start-setup-screen" hidden>

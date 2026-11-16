@@ -27,7 +27,10 @@ body {
         }
         #start-menu {
             position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
-            background: rgba(3, 7, 11, 0.92); color: #e0e6ed;
+            background: rgba(3, 7, 11, 0.72); color: #e0e6ed;
+        }
+        #start-menu.main-menu-transparent {
+            background: transparent;
         }
         #start-card {
             box-sizing: border-box; width: min(940px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto;
@@ -37,41 +40,169 @@ body {
         #start-card.main-menu-active {
             position: relative; width: 100vw; height: 100vh; max-width: none; max-height: none;
             overflow: hidden; padding: 0; border: 0; border-radius: 0; box-shadow: none;
+            background: transparent !important;
         }
         #start-setup-screen[hidden], .zh-main-menu-screen[hidden] { display: none !important; }
         .zh-main-menu-screen {
             position: absolute; inset: 0; overflow: hidden; color: #f0f2f3;
-            background: linear-gradient(90deg, rgba(2, 8, 14, .12) 0%, rgba(2, 8, 14, .02) 43%, rgba(2, 8, 14, .66) 100%);
+            background: linear-gradient(90deg, rgba(2, 8, 14, .10) 0%, rgba(2, 8, 14, .02) 45%, rgba(2, 8, 14, .68) 100%);
             font-family: 'Segoe UI', Arial, sans-serif;
         }
+        .zh-menu-scanlines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 1;
+            background: repeating-linear-gradient(180deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 3px);
+        }
+        /* Animated Zero Hour MainMenuRuler */
+        .zh-ruler-bar {
+            position: absolute; top: 34%; left: 0; right: 0; height: 28px;
+            overflow: hidden; pointer-events: none; z-index: 2;
+            border-top: 1px solid rgba(155, 195, 224, 0.25);
+            border-bottom: 1px solid rgba(155, 195, 224, 0.22);
+            background: linear-gradient(90deg, rgba(8, 22, 34, 0.15), rgba(16, 40, 60, 0.42), rgba(8, 22, 34, 0.18));
+        }
+        .zh-ruler-track {
+            display: flex; width: 200%; height: 100%;
+            animation: zhRulerScroll 36s linear infinite;
+            opacity: 0.72;
+        }
+        .zh-ruler-img { width: 50%; height: 100%; object-fit: cover; object-position: left center; filter: brightness(1.15) contrast(1.1); }
+        .zh-ruler-scan {
+            position: absolute; top: 0; bottom: 0; width: 140px;
+            background: linear-gradient(90deg, transparent, rgba(120, 215, 255, 0.45), transparent);
+            animation: zhRulerSweep 5.5s ease-in-out infinite;
+        }
+        @keyframes zhRulerScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        @keyframes zhRulerSweep {
+            0% { left: -160px; opacity: 0.2; }
+            50% { opacity: 0.9; }
+            100% { left: 100%; opacity: 0.2; }
+        }
         .zh-main-menu-brand {
-            position: absolute; top: 7.5%; right: 6.5%; width: min(47vw, 620px);
+            position: absolute; top: 6.5%; right: 6.5%; width: min(47vw, 620px); z-index: 4;
             text-align: right; text-shadow: 0 3px 10px #000, 0 0 24px rgba(0,0,0,.85);
+            animation: zhBrandEnter 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
         }
-        .zh-main-menu-emblem { display: block; width: min(100%, 520px); max-height: 150px; object-fit: contain; object-position: right center; margin: 0 0 8px auto; filter: drop-shadow(0 4px 10px #000); }
+        @keyframes zhBrandEnter {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .zh-main-menu-emblem { display: block; width: min(100%, 500px); max-height: 140px; object-fit: contain; object-position: right center; margin: 0 0 8px auto; filter: drop-shadow(0 4px 10px #000); }
         .zh-main-menu-title { color: #edf3f6; font-size: clamp(17px, 2.1vw, 28px); font-weight: 800; letter-spacing: .19em; }
-        .zh-main-menu-subtitle { color: #f1f2e9; font-size: clamp(29px, 4.6vw, 64px); font-weight: 900; line-height: .94; letter-spacing: .035em; }
-        .zh-main-menu-subtitle span { color: #d9e7f3; }
-        .zh-main-menu-actions { position: absolute; top: 49%; right: 7.5%; transform: translateY(-18%); display: grid; gap: 7px; width: min(340px, 38vw); }
-        .zh-main-menu-button {
-            min-height: 62px; padding: 9px 17px; text-align: left; color: #f0f1ee; cursor: pointer;
-            border: 1px solid rgba(175, 199, 213, .45); border-left: 4px solid #8aa0b2;
-            background: linear-gradient(90deg, rgba(15, 27, 37, .88), rgba(18, 33, 45, .64));
-            box-shadow: 0 3px 10px rgba(0, 0, 0, .45); text-shadow: 0 1px 3px #000; transition: background .14s, border-color .14s, transform .14s;
+        .zh-main-menu-subtitle {
+            position: relative; display: inline-block; overflow: hidden;
+            color: #f1f2e9; font-size: clamp(29px, 4.6vw, 64px); font-weight: 900; line-height: .94; letter-spacing: .035em;
         }
+        .zh-main-menu-subtitle span { color: #d9e7f3; }
+        .zh-main-menu-subtitle::after {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+            transform: translateX(-120%);
+            animation: zhTitleSheen 6.5s ease-in-out infinite;
+        }
+        @keyframes zhTitleSheen {
+            0%, 62% { transform: translateX(-120%); }
+            85%, 100% { transform: translateX(130%); }
+        }
+        /* Zero Hour MapBorder2 / EarthMap2 Right-Hand Command Frame */
+        .zh-earth-panel {
+            position: absolute; top: 44%; right: 6.5%; width: min(365px, 40vw); z-index: 4;
+            padding: 12px 14px 14px;
+            background: linear-gradient(160deg, rgba(13, 27, 40, 0.84), rgba(6, 15, 24, 0.88));
+            border: 1px solid rgba(132, 174, 206, 0.48);
+            border-top: 2px solid #8ec5eb;
+            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.65), inset 0 0 24px rgba(56, 128, 184, 0.16);
+            clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+            overflow: hidden;
+        }
+        .zh-earth-radar {
+            position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: 0.42;
+        }
+        .zh-earth-grid {
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(rgba(110, 180, 230, 0.14) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(110, 180, 230, 0.14) 1px, transparent 1px);
+            background-size: 28px 28px;
+        }
+        .zh-earth-sweep {
+            position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: conic-gradient(from 0deg, rgba(90, 200, 255, 0.24) 0deg, transparent 48deg, transparent 360deg);
+            animation: zhRadarSweep 8s linear infinite;
+        }
+        @keyframes zhRadarSweep {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .zh-radar-blip {
+            position: absolute; width: 5px; height: 5px; border-radius: 50%;
+            background: #55efc4; box-shadow: 0 0 8px #55efc4;
+            animation: zhBlipPulse 2.8s ease-in-out infinite;
+        }
+        .zh-blip-1 { top: 24%; left: 18%; animation-delay: 0s; }
+        .zh-blip-2 { top: 58%; left: 74%; animation-delay: 0.9s; }
+        .zh-blip-3 { top: 76%; left: 32%; animation-delay: 1.8s; }
+        @keyframes zhBlipPulse {
+            0%, 100% { opacity: 0.25; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.35); }
+        }
+        .zh-earth-header {
+            position: relative; z-index: 2; display: flex; align-items: center; gap: 8px;
+            margin-bottom: 10px; padding-bottom: 7px;
+            border-bottom: 1px solid rgba(132, 174, 206, 0.28);
+            font: 700 10px/1 Consolas, monospace; letter-spacing: .12em; color: #9fc2dc;
+        }
+        .zh-green-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+            background: #2ed573; box-shadow: 0 0 8px #2ed573;
+            animation: zhGreenDotPulse 1.6s ease-in-out infinite;
+        }
+        @keyframes zhGreenDotPulse {
+            0%, 100% { opacity: 0.45; transform: scale(0.85); }
+            50% { opacity: 1; transform: scale(1.15); }
+        }
+        .zh-earth-status { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .zh-menu-clock { color: #e6f2fa; font-weight: bold; letter-spacing: .08em; }
+        .zh-main-menu-actions { position: relative; z-index: 2; display: grid; gap: 7px; width: 100%; }
+        .zh-main-menu-button {
+            position: relative; overflow: hidden;
+            min-height: 60px; padding: 9px 17px; text-align: left; color: #f0f1ee; cursor: pointer;
+            border: 1px solid rgba(175, 199, 213, .45); border-left: 4px solid #8aa0b2;
+            background: linear-gradient(90deg, rgba(17, 33, 47, .90), rgba(14, 26, 38, .72));
+            box-shadow: 0 3px 10px rgba(0, 0, 0, .45); text-shadow: 0 1px 3px #000;
+            transition: background .16s, border-color .16s, transform .16s, box-shadow .16s;
+            animation: zhButtonSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) calc(0.12s + var(--btn-i, 0) * 0.09s) both;
+        }
+        @keyframes zhButtonSlideIn {
+            from { opacity: 0; transform: translateX(34px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .zh-main-menu-button::after {
+            content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 45%; pointer-events: none;
+            background: linear-gradient(90deg, transparent, rgba(165, 225, 255, 0.22), transparent);
+            transform: skewX(-20deg); transition: left 0.42s ease;
+        }
+        .zh-main-menu-button:hover::after, .zh-main-menu-button:focus-visible::after { left: 125%; }
         .zh-main-menu-button span { display: block; font-weight: 800; font-size: 15px; letter-spacing: .14em; }
         .zh-main-menu-button small { display: block; margin-top: 3px; color: #bdc8ce; font-size: 11px; letter-spacing: .035em; }
-        .zh-main-menu-button:hover, .zh-main-menu-button:focus-visible { outline: none; border-color: #d3e2ec; border-left-color: #d3e2ec; background: linear-gradient(90deg, rgba(56, 80, 98, .96), rgba(25, 46, 61, .84)); transform: translateX(-3px); }
-        .zh-main-menu-footer { position: absolute; right: 7.5%; bottom: 5%; color: rgba(230, 237, 240, .72); font: 700 9px/1.3 Consolas, monospace; letter-spacing: .22em; }
+        .zh-main-menu-button:hover, .zh-main-menu-button:focus-visible {
+            outline: none; border-color: #d3e2ec; border-left-color: #6bc6ff;
+            background: linear-gradient(90deg, rgba(56, 86, 108, .96), rgba(25, 48, 66, .88));
+            box-shadow: 0 4px 16px rgba(60, 165, 230, 0.28); transform: translateX(-4px);
+        }
+        .zh-main-menu-footer { position: absolute; right: 6.5%; bottom: 4.5%; z-index: 4; color: rgba(230, 237, 240, .78); font: 700 9px/1.3 Consolas, monospace; letter-spacing: .22em; }
         .zh-main-menu-footer span { padding: 0 5px; color: #e6c86c; }
         .return-main-menu-btn { margin: 0 0 12px; padding: 6px 10px; font-size: 10px; }
         @media (max-width: 700px) {
-            .zh-main-menu-brand { top: 9%; right: 5%; width: 90%; }
+            .zh-ruler-bar { top: 31%; height: 22px; }
+            .zh-main-menu-brand { top: 8%; right: 5%; width: 90%; }
             .zh-main-menu-emblem { max-height: 96px; }
             .zh-main-menu-title { font-size: 15px; }
             .zh-main-menu-subtitle { font-size: clamp(32px, 9vw, 54px); }
-            .zh-main-menu-actions { top: 48%; right: 5%; transform: none; width: min(340px, 90vw); }
-            .zh-main-menu-button { min-height: 56px; }
+            .zh-earth-panel { top: 44%; right: 5%; width: min(340px, 90vw); }
+            .zh-main-menu-button { min-height: 54px; }
             .zh-main-menu-footer { right: 5%; bottom: 3%; font-size: 8px; }
         }
         /* Skirmish & Multiplayer 2-Column Grid Layout */
@@ -2447,16 +2578,43 @@ body.control-bar-collapsed #generals-command-bar {
 
         <div id="start-card" class="main-menu-active">
             <div id="main-menu-screen" class="zh-main-menu-screen">
+                <!-- Animated Zero Hour MainMenuRuler + Sweeping Tactical Scan -->
+                <div class="zh-ruler-bar" aria-hidden="true">
+                    <div class="zh-ruler-track">
+                        <img id="main-menu-ruler-a" class="zh-ruler-img" alt="" />
+                        <img id="main-menu-ruler-b" class="zh-ruler-img" alt="" />
+                    </div>
+                    <div class="zh-ruler-scan"></div>
+                </div>
+                <div class="zh-menu-scanlines" aria-hidden="true"></div>
+
                 <div class="zh-main-menu-brand">
                     <img id="main-menu-emblem" class="zh-main-menu-emblem" alt="" />
                     <div class="zh-main-menu-title">COMMAND &amp; CONQUER</div>
                     <div class="zh-main-menu-subtitle">GENERALS <span>ZERO:HOUR</span></div>
                 </div>
-                <nav class="zh-main-menu-actions" aria-label="Main menu">
-                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('single')"><span>SKIRMISH</span><small>Configure a battle against AI</small></button>
-                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('multiplayer')"><span>MULTIPLAYER</span><small>Host or join a battle</small></button>
-                    <button class="zh-main-menu-button" onclick="enterStartMenuMode('editor')"><span>MAP EDITOR</span><small>Create or edit a battlefield</small></button>
-                </nav>
+
+                <!-- Zero Hour MapBorder2 / EarthMap2 Animated Command Panel -->
+                <div class="zh-earth-panel">
+                    <div class="zh-earth-radar" aria-hidden="true">
+                        <div class="zh-earth-grid"></div>
+                        <div class="zh-earth-sweep"></div>
+                        <span class="zh-radar-blip zh-blip-1"></span>
+                        <span class="zh-radar-blip zh-blip-2"></span>
+                        <span class="zh-radar-blip zh-blip-3"></span>
+                    </div>
+                    <div class="zh-earth-header">
+                        <span class="zh-green-dot" title="Command Uplink Active"></span>
+                        <span class="zh-earth-status">TACTICAL UPLINK // SHELL MAP</span>
+                        <span id="zh-menu-clock" class="zh-menu-clock">00:00:00</span>
+                    </div>
+                    <nav class="zh-main-menu-actions" aria-label="Main menu">
+                        <button class="zh-main-menu-button" style="--btn-i:0" onclick="enterStartMenuMode('single')"><span>SKIRMISH</span><small>Configure a battle against AI</small></button>
+                        <button class="zh-main-menu-button" style="--btn-i:1" onclick="enterStartMenuMode('multiplayer')"><span>MULTIPLAYER</span><small>Host or join a battle</small></button>
+                        <button class="zh-main-menu-button" style="--btn-i:2" onclick="enterStartMenuMode('editor')"><span>MAP EDITOR</span><small>Create or edit a battlefield</small></button>
+                    </nav>
+                </div>
+
                 <div class="zh-main-menu-footer">TACTICAL COMMAND SYSTEM <span>·</span> ZERO HOUR</div>
             </div>
             <div id="start-setup-screen" hidden>
@@ -13893,6 +14051,7 @@ function resolveObstacleCollisions(unit) {
         }
 
         function resetEntireBattlefieldState(mapSize = 1500) {
+            if (typeof cleanupShellMapDemo === 'function') cleanupShellMapDemo();
             // 1. Deselect everything and reset cursors & blueprint states
             if (typeof selectedStructure !== 'undefined') selectedStructure = null;
             if (typeof selectedSupplyPoint !== 'undefined') selectedSupplyPoint = null;
@@ -14802,7 +14961,7 @@ function showStartSetupCard() {
     if (!menu) return;
 
     menu.style.display = 'flex';
-    menu.classList.remove('pause-mode');
+    menu.classList.remove('pause-mode', 'main-menu-transparent');
     if (pauseModal) pauseModal.style.display = 'none';
     if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
@@ -14815,6 +14974,7 @@ function showStartSetupCard() {
             resumeBtn.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'block' : 'none';
         }
     }
+    applyOfficialMenuArt(selectedFaction);
 }
 
 function showMainMenuScreen() {
@@ -14826,14 +14986,19 @@ function showMainMenuScreen() {
     if (!menu || !startCard || !mainMenuScreen || !setupScreen) return;
     menu.style.display = 'flex';
     menu.classList.remove('pause-mode');
+    menu.classList.add('main-menu-transparent');
     startCard.style.display = 'block';
     startCard.classList.add('main-menu-active');
     mainMenuScreen.hidden = false;
     setupScreen.hidden = true;
     applyOfficialMenuArt(selectedFaction);
+    if (typeof initShellMapDemo === 'function') initShellMapDemo();
 }
 
 function enterStartMenuMode(mode) {
+    if (mode === 'editor' && typeof cleanupShellMapDemo === 'function') {
+        cleanupShellMapDemo();
+    }
     showStartSetupCard();
     if (typeof switchGameModeTab === 'function') switchGameModeTab(mode);
 }
@@ -15138,17 +15303,22 @@ function applyOfficialMenuArt(facOverride) {
     if (!ui || typeof document === 'undefined') return;
     const fac = facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
 
+    const startMenu = document.getElementById('start-menu');
     const startCard = document.getElementById('start-card');
-    if (startCard && ui.mainMenuBackdrop) {
+    if (startCard) {
         const isMain = startCard.classList.contains('main-menu-active');
-        const isMp = !isMain && typeof currentStartMenuMode !== 'undefined' && currentStartMenuMode === 'multiplayer' && ui.mpLoadBackdrop;
-        const backdropSrc = isMp ? ui.mpLoadBackdrop : ui.mainMenuBackdrop;
-        const menuScrim = isMain
-            ? 'linear-gradient(90deg, rgba(2, 8, 14, 0.18) 0%, rgba(2, 8, 14, 0.04) 48%, rgba(2, 8, 14, 0.62) 100%)'
-            : 'linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%)';
-        startCard.style.backgroundImage = `${menuScrim}, url("${backdropSrc}")`;
-        startCard.style.backgroundSize = 'cover';
-        startCard.style.backgroundPosition = 'center';
+        if (startMenu) startMenu.classList.toggle('main-menu-transparent', isMain);
+        if (isMain) {
+            startCard.style.backgroundImage = 'none';
+            startCard.style.backgroundColor = 'transparent';
+        } else if (ui.mainMenuBackdrop) {
+            const isMp = typeof currentStartMenuMode !== 'undefined' && currentStartMenuMode === 'multiplayer' && ui.mpLoadBackdrop;
+            const backdropSrc = isMp ? ui.mpLoadBackdrop : ui.mainMenuBackdrop;
+            const menuScrim = 'linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%)';
+            startCard.style.backgroundImage = `${menuScrim}, url("${backdropSrc}")`;
+            startCard.style.backgroundSize = 'cover';
+            startCard.style.backgroundPosition = 'center';
+        }
     }
 
     const setImg = (id, src) => {
@@ -15161,6 +15331,8 @@ function applyOfficialMenuArt(facOverride) {
     setImg('menu-skirmish-emblem', ui.skirmishEmblem);
     setImg('main-menu-emblem', ui.skirmishEmblem);
     setImg('menu-ruler-img', ui.mainMenuRuler);
+    setImg('main-menu-ruler-a', ui.mainMenuRuler);
+    setImg('main-menu-ruler-b', ui.mainMenuRuler);
     setImg('menu-faction-crest', ui['logo_' + fac] || ui.logo_usa);
     setImg('fc-logo-usa', ui.logo_usa);
     setImg('fc-logo-china', ui.logo_china);
@@ -15177,7 +15349,20 @@ function applyOfficialMenuArt(facOverride) {
 }
 window.applyOfficialMenuArt = applyOfficialMenuArt;
 if (typeof window !== 'undefined') {
-    setTimeout(() => applyOfficialMenuArt(), 0);
+    setTimeout(() => {
+        applyOfficialMenuArt();
+        if (typeof initShellMapDemo === 'function' && (typeof isMatchActive === 'undefined' || !isMatchActive)) {
+            initShellMapDemo();
+        }
+        const updateMenuClock = () => {
+            const el = document.getElementById('zh-menu-clock');
+            if (!el) return;
+            const now = new Date();
+            el.textContent = now.toTimeString().slice(0, 8);
+        };
+        updateMenuClock();
+        setInterval(updateMenuClock, 1000);
+    }, 0);
 }
 
 function updateSidebar() {
@@ -24366,6 +24551,9 @@ function animate() {
                 }
             }
 
+            if (!isMatchActive && typeof updateShellMapDemo === 'function') {
+                updateShellMapDemo(dt);
+            }
             if (typeof renderRadarMinimap === 'function') renderRadarMinimap();
             renderer.render(scene, camera);
         }
@@ -24768,6 +24956,174 @@ function processScrapCrateCollection() {
         }
     }
 }
+
+// =========================================================================
+// AUTHENTIC ZERO HOUR ANIMATED 3D SHELL MAP (MAIN MENU BACKGROUND)
+// =========================================================================
+window._shellMapState = null;
+
+function cleanupShellMapDemo() {
+    const st = window._shellMapState;
+    if (!st) return;
+    if (st.group && typeof scene !== 'undefined' && scene) {
+        scene.remove(st.group);
+    }
+    window._shellMapState = null;
+}
+window.cleanupShellMapDemo = cleanupShellMapDemo;
+
+function initShellMapDemo() {
+    if (typeof scene === 'undefined' || !scene || typeof camera === 'undefined' || !camera || typeof THREE === 'undefined') return;
+    if (typeof isMatchActive !== 'undefined' && isMatchActive) return;
+
+    cleanupShellMapDemo();
+
+    if (typeof terrainMesh === 'undefined' || !terrainMesh) {
+        if (typeof setupMapEnvironment === 'function') {
+            setupMapEnvironment('tournament_desert', 900);
+        }
+    }
+
+    const group = new THREE.Group();
+    group.name = 'ShellMapDemoGroup';
+    scene.add(group);
+
+    const hAt = (x, z) => (typeof getTerrainHeight === 'function' ? getTerrainHeight(x, z) : 0);
+    const placeBuilding = (w3dKey, fallbackFn, x, z, rotY, isEnemy) => {
+        let mesh = null;
+        if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA[w3dKey]) {
+            mesh = createW3DBuildingMesh(w3dKey, isEnemy);
+        } else if (typeof fallbackFn === 'function') {
+            mesh = fallbackFn(isEnemy);
+        }
+        if (!mesh) return;
+        mesh.position.set(x, hAt(x, z), z);
+        mesh.rotation.y = rotY;
+        group.add(mesh);
+    };
+
+    // West Ridge: USA Airbase & Forward Command
+    placeBuilding('usa_commandCenter', typeof createUSACommandCenter === 'function' ? createUSACommandCenter : null, -92, -35, 0.4, false);
+    placeBuilding('usa_airfield', typeof createAirfield === 'function' ? createAirfield : null, -118, 10, 0.25, false);
+    placeBuilding('usa_strategyCenter', typeof createStrategyCenter === 'function' ? createStrategyCenter : null, -72, -62, 0.6, false);
+    placeBuilding('usa_patriot', typeof createPatriotBattery === 'function' ? createPatriotBattery : null, -52, -18, 0.5, false);
+    placeBuilding('usa_patriot', typeof createPatriotBattery === 'function' ? createPatriotBattery : null, -58, 28, 0.2, false);
+
+    // East Ridge: China / GLA Forward Position
+    placeBuilding('china_commandCenter', typeof createChinaCommandCenter === 'function' ? createChinaCommandCenter : null, 95, 30, -2.5, true);
+    placeBuilding('china_warFactory', typeof createChinaWarFactory === 'function' ? createChinaWarFactory : null, 118, -12, -2.7, true);
+    placeBuilding('china_propagandaCenter', typeof createPropagandaCenter === 'function' ? createPropagandaCenter : null, 72, 58, -2.2, true);
+    placeBuilding('gla_bunker', null, 52, 16, -2.4, true);
+
+    const makeUnit = (key, isEnemy) => {
+        if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA[key]) {
+            return createW3DVehicleMesh(key, isEnemy);
+        }
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(3.2, 1.4, 4.6),
+            new THREE.MeshStandardMaterial({ color: isEnemy ? 0x9b2c2c : 0x2c5282, roughness: 0.6 })
+        );
+        body.position.y = 0.8;
+        g.add(body);
+        return g;
+    };
+
+    const convoys = [
+        { key: 'paladin', isEnemy: false, cx: -28, cz: -14, rx: 22, rz: 18, speed: 0.22, phase: 0.0 },
+        { key: 'crusader', isEnemy: false, cx: -34, cz: 16, rx: 18, rz: 20, speed: 0.24, phase: 1.8 },
+        { key: 'humvee', isEnemy: false, cx: -20, cz: 4, rx: 16, rz: 14, speed: 0.34, phase: 3.1 },
+        { key: 'overlord', isEnemy: true, cx: 28, cz: 12, rx: 20, rz: 18, speed: -0.18, phase: 0.6 },
+        { key: 'battlemaster', isEnemy: true, cx: 36, cz: -16, rx: 18, rz: 16, speed: -0.24, phase: 2.5 },
+        { key: 'scorpion', isEnemy: true, cx: 22, cz: -4, rx: 15, rz: 14, speed: -0.32, phase: 4.2 }
+    ];
+    convoys.forEach(c => {
+        c.mesh = makeUnit(c.key, c.isEnemy);
+        c.fireTimer = 0.8 + Math.random() * 2.2;
+        group.add(c.mesh);
+    });
+
+    const aircraft = [
+        { key: 'raptor', isEnemy: false, rx: 135, rz: 95, alt: 34, speed: 0.36, phase: 0.0 },
+        { key: 'aurora', isEnemy: false, rx: 155, rz: 110, alt: 42, speed: 0.42, phase: 2.1 },
+        { key: 'comanche', isEnemy: false, rx: 85, rz: 65, alt: 22, speed: 0.28, phase: 4.0 },
+        { key: 'mig', isEnemy: true, rx: 130, rz: 90, alt: 36, speed: -0.38, phase: 1.2 }
+    ];
+    aircraft.forEach(a => {
+        a.mesh = makeUnit(a.key, a.isEnemy);
+        group.add(a.mesh);
+    });
+
+    window._shellMapState = {
+        group,
+        time: 0,
+        convoys,
+        aircraft
+    };
+}
+window.initShellMapDemo = initShellMapDemo;
+
+function updateShellMapDemo(dt) {
+    const st = window._shellMapState;
+    if (!st || !st.group) return;
+    if (typeof camera === 'undefined' || !camera) return;
+
+    st.time += dt;
+    const t = st.time;
+    const hAt = (x, z) => (typeof getTerrainHeight === 'function' ? getTerrainHeight(x, z) : 0);
+
+    // Smooth Zero Hour ShellMap cinematic camera orbit
+    const camAngle = t * 0.075;
+    const camRadius = 112 + Math.sin(t * 0.14) * 18;
+    const camX = Math.cos(camAngle) * camRadius;
+    const camZ = Math.sin(camAngle) * camRadius * 0.78;
+    const camY = hAt(camX, camZ) + 42 + Math.sin(t * 0.19) * 8;
+    camera.position.set(camX, camY, camZ);
+    camera.lookAt(Math.sin(t * 0.09) * 18, hAt(0, 0) + 4, Math.cos(t * 0.08) * 14);
+
+    // Move armored columns & fire periodic tracers across the valley
+    for (let i = 0; i < st.convoys.length; i++) {
+        const c = st.convoys[i];
+        const ang = t * c.speed + c.phase;
+        const x = c.cx + Math.cos(ang) * c.rx;
+        const z = c.cz + Math.sin(ang) * c.rz;
+        const dx = -Math.sin(ang) * c.rx * c.speed;
+        const dz = Math.cos(ang) * c.rz * c.speed;
+        c.mesh.position.set(x, hAt(x, z), z);
+        c.mesh.rotation.y = Math.atan2(dx, dz);
+
+        c.fireTimer -= dt;
+        if (c.fireTimer <= 0) {
+            c.fireTimer = 1.6 + Math.random() * 2.6;
+            const opp = st.convoys[(i + 3) % st.convoys.length];
+            if (opp && opp.mesh) {
+                const startPos = c.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+                const endPos = opp.mesh.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 1.5, (Math.random() - 0.5) * 8));
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(startPos, c.isEnemy ? 0xff7733 : 0xffcc44, 0.75);
+                if (typeof spawnTracer === 'function') {
+                    spawnTracer(startPos, endPos, c.isEnemy ? 0xff5533 : 0xffdd55);
+                }
+                if (typeof spawnExplosion === 'function' && Math.random() < 0.45) {
+                    spawnExplosion(endPos, 1.4, 0xff8833);
+                }
+            }
+        }
+    }
+
+    // Fly aircraft overhead in banked passes
+    for (let i = 0; i < st.aircraft.length; i++) {
+        const a = st.aircraft[i];
+        const ang = t * a.speed + a.phase;
+        const x = Math.cos(ang) * a.rx;
+        const z = Math.sin(ang) * a.rz;
+        const dx = -Math.sin(ang) * a.rx * a.speed;
+        const dz = Math.cos(ang) * a.rz * a.speed;
+        a.mesh.position.set(x, hAt(x, z) + a.alt + Math.sin(t * 0.9 + i) * 2.5, z);
+        a.mesh.rotation.y = Math.atan2(dx, dz);
+        a.mesh.rotation.z = (a.speed > 0 ? -1 : 1) * 0.24;
+    }
+}
+window.updateShellMapDemo = updateShellMapDemo;
 
 
 // --- MODULE: 15_multiplayer.js ---

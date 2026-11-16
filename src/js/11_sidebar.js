@@ -322,7 +322,7 @@ function showStartSetupCard() {
     if (!menu) return;
 
     menu.style.display = 'flex';
-    menu.classList.remove('pause-mode');
+    menu.classList.remove('pause-mode', 'main-menu-transparent');
     if (pauseModal) pauseModal.style.display = 'none';
     if (pauseClock) pauseClock.style.display = 'none';
     if (startCard) {
@@ -335,6 +335,7 @@ function showStartSetupCard() {
             resumeBtn.style.display = (typeof isMatchActive !== 'undefined' && isMatchActive) ? 'block' : 'none';
         }
     }
+    applyOfficialMenuArt(selectedFaction);
 }
 
 function showMainMenuScreen() {
@@ -346,14 +347,19 @@ function showMainMenuScreen() {
     if (!menu || !startCard || !mainMenuScreen || !setupScreen) return;
     menu.style.display = 'flex';
     menu.classList.remove('pause-mode');
+    menu.classList.add('main-menu-transparent');
     startCard.style.display = 'block';
     startCard.classList.add('main-menu-active');
     mainMenuScreen.hidden = false;
     setupScreen.hidden = true;
     applyOfficialMenuArt(selectedFaction);
+    if (typeof initShellMapDemo === 'function') initShellMapDemo();
 }
 
 function enterStartMenuMode(mode) {
+    if (mode === 'editor' && typeof cleanupShellMapDemo === 'function') {
+        cleanupShellMapDemo();
+    }
     showStartSetupCard();
     if (typeof switchGameModeTab === 'function') switchGameModeTab(mode);
 }
@@ -658,17 +664,22 @@ function applyOfficialMenuArt(facOverride) {
     if (!ui || typeof document === 'undefined') return;
     const fac = facOverride || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
 
+    const startMenu = document.getElementById('start-menu');
     const startCard = document.getElementById('start-card');
-    if (startCard && ui.mainMenuBackdrop) {
+    if (startCard) {
         const isMain = startCard.classList.contains('main-menu-active');
-        const isMp = !isMain && typeof currentStartMenuMode !== 'undefined' && currentStartMenuMode === 'multiplayer' && ui.mpLoadBackdrop;
-        const backdropSrc = isMp ? ui.mpLoadBackdrop : ui.mainMenuBackdrop;
-        const menuScrim = isMain
-            ? 'linear-gradient(90deg, rgba(2, 8, 14, 0.18) 0%, rgba(2, 8, 14, 0.04) 48%, rgba(2, 8, 14, 0.62) 100%)'
-            : 'linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%)';
-        startCard.style.backgroundImage = `${menuScrim}, url("${backdropSrc}")`;
-        startCard.style.backgroundSize = 'cover';
-        startCard.style.backgroundPosition = 'center';
+        if (startMenu) startMenu.classList.toggle('main-menu-transparent', isMain);
+        if (isMain) {
+            startCard.style.backgroundImage = 'none';
+            startCard.style.backgroundColor = 'transparent';
+        } else if (ui.mainMenuBackdrop) {
+            const isMp = typeof currentStartMenuMode !== 'undefined' && currentStartMenuMode === 'multiplayer' && ui.mpLoadBackdrop;
+            const backdropSrc = isMp ? ui.mpLoadBackdrop : ui.mainMenuBackdrop;
+            const menuScrim = 'linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%)';
+            startCard.style.backgroundImage = `${menuScrim}, url("${backdropSrc}")`;
+            startCard.style.backgroundSize = 'cover';
+            startCard.style.backgroundPosition = 'center';
+        }
     }
 
     const setImg = (id, src) => {
@@ -681,6 +692,8 @@ function applyOfficialMenuArt(facOverride) {
     setImg('menu-skirmish-emblem', ui.skirmishEmblem);
     setImg('main-menu-emblem', ui.skirmishEmblem);
     setImg('menu-ruler-img', ui.mainMenuRuler);
+    setImg('main-menu-ruler-a', ui.mainMenuRuler);
+    setImg('main-menu-ruler-b', ui.mainMenuRuler);
     setImg('menu-faction-crest', ui['logo_' + fac] || ui.logo_usa);
     setImg('fc-logo-usa', ui.logo_usa);
     setImg('fc-logo-china', ui.logo_china);
@@ -697,7 +710,20 @@ function applyOfficialMenuArt(facOverride) {
 }
 window.applyOfficialMenuArt = applyOfficialMenuArt;
 if (typeof window !== 'undefined') {
-    setTimeout(() => applyOfficialMenuArt(), 0);
+    setTimeout(() => {
+        applyOfficialMenuArt();
+        if (typeof initShellMapDemo === 'function' && (typeof isMatchActive === 'undefined' || !isMatchActive)) {
+            initShellMapDemo();
+        }
+        const updateMenuClock = () => {
+            const el = document.getElementById('zh-menu-clock');
+            if (!el) return;
+            const now = new Date();
+            el.textContent = now.toTimeString().slice(0, 8);
+        };
+        updateMenuClock();
+        setInterval(updateMenuClock, 1000);
+    }, 0);
 }
 
 function updateSidebar() {
