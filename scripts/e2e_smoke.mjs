@@ -58,7 +58,10 @@ try {
     await page.waitForFunction(() => Boolean(window.THREE && window.OFFICIAL_CAMEOS && window.OFFICIAL_SKIRMISH_MAPS && window.W3D_INFANTRY_DATA), { timeout: 20000 });
 
     // Launch a Skirmish match and render 20 frames to verify terrain, W3D units/buildings, shaders, and audio JSON loading
-    await page.click('#start-game');
+    await page.evaluate(() => {
+        if (typeof startGame !== 'function') throw new Error('startGame() is not defined');
+        startGame();
+    });
     await page.evaluate(() => new Promise((resolve) => {
         let frames = 0;
         const step = () => (++frames >= 20 ? resolve() : requestAnimationFrame(step));
