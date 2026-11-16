@@ -263,7 +263,7 @@
                     paladin: ['Paladin Tank', 600, 'Advanced battle tank with point-defense laser.'],
                     humvee: ['Humvee', 350, 'Fast scout transport. Carries 5 infantry.'],
                     ambulance: ['Ambulance', 300, 'Field medical unit. Cleans toxins & heals nearby troops.'],
-                    tomahawk: ['Tomahawk Missile', 900, 'Long-range cruise missile mobile artillery.']
+                    tomahawk: ['Tomahawk Missile', 1200, 'Long-range cruise missile mobile artillery (100-350 range, blind spot).']
                 },
                 airfield: {
                     raptor: ['Raptor', 1100, 'Supersonic strike jet with laser-guided missiles.'],
@@ -722,7 +722,7 @@
             humvee: { name: 'Humvee', role: 'Rapid Recon Vehicle', cost: '$350', desc: 'High-mobility light combat transport. Mounts a heavy .50 cal gun and carries up to 5 infantry squads who can fire out.', req: 'War Factory', unlock: 'Fire-from-within, High Speed Raids' },
             ambulance: { name: 'Ambulance', role: 'Field Support Vehicle', cost: '$300', desc: 'Mobile battlefield medical unit that decontaminates chemical/radiation zones and rapidly heals nearby friendly infantry.', req: 'War Factory', unlock: 'Mass Infantry Healing, Decontamination' },
             paladin: { name: 'Paladin Tank', role: 'Advanced Defense Tank', cost: '$600', desc: 'High-tech main battle tank equipped with anti-missile Point Defense Laser and heavy 120mm cannon.', req: 'Strategy Center', unlock: 'Active Anti-Missile Laser Shield' },
-            tomahawk: { name: 'Tomahawk Launcher', role: 'Cruise Missile Artillery', cost: '$900', desc: 'Mobile launcher firing long-range Tomahawk cruise missiles. Devastating against static base defenses.', req: 'Strategy Center', unlock: 'Extreme Long-Range Bombardment' },
+            tomahawk: { name: 'Tomahawk Launcher', role: 'Cruise Missile Artillery', cost: '$1200', desc: 'Mobile launcher firing long-range Tomahawk cruise missiles (150 dmg + splash, min-range blind spot). Vulnerable to aircraft & light rushes.', req: 'Strategy Center', unlock: 'Extreme Long-Range Bombardment' },
             chinook: { name: 'Chinook', role: 'Heavy Cargo Transport', cost: '$1200', desc: 'Twin-rotor heavy cargo helicopter. Gathers combat supplies from resource zones and transports heavy infantry.', req: 'Airfield', unlock: 'Supply Harvesting, Airborne Insertion' },
             raptor: { name: 'Raptor', role: 'Air Superiority Fighter', cost: '$1100', desc: 'Supersonic tactical strike jet armed with 4 precision-guided Sidewinder / Maverick missiles.', req: 'Airfield', unlock: 'Precision Air Strikes, Hit-and-Run' },
             comanche: { name: 'Comanche', role: 'Attack Gunship Helicopter', cost: '$1000', desc: 'Rotary-wing close air support gunship equipped with 20mm rotary vulcan cannon and rocket pods.', req: 'Airfield', unlock: 'Continuous Close Air Support' },

@@ -22,9 +22,9 @@ function processCombatScanning() {
                     const targetRadius = unit.combatTarget.radius || 0;
                     const distance = targetPos ? unit.mesh.position.distanceTo(targetPos) : Infinity;
                     const maxEffectiveRange = unit.scanRange + targetRadius;
-                    const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank') ? (unit.minRange || 14.0) : 0;
+                    const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
 
-                    if (distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
+                    if ((unit.type === 'tomahawk' && unit.combatTarget.isAir) || distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
                         unit.combatTarget = null; // Target lost, too close for siege artillery, or destroyed
                     } else {
                         // Point Turret systems directly at target coordinates
@@ -495,10 +495,12 @@ function executeWeaponFire(attacker, target) {
     } else if (attacker.type === 'dragon') {
         // Dragon Tank NAPALM FLAMETHROWER!
         spawnFlamethrowerBurst(muzzlePos, targetPos);
+        playAudio('flamethrower', {}, 'china');
         applyCalculatedDamage(attacker, target, 35, 'FLAME');
     } else if (attacker.type === 'toxintractor') {
         // Toxin Tractor CHEMICAL ANTHRAX SPRAY!
         spawnToxinSprayBurst(muzzlePos, targetPos);
+        playAudio('flamethrower', {}, 'gla');
         let toxDmg = 32;
         if (attacker.salvageLevel >= 1) toxDmg = Math.round(toxDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
         applyCalculatedDamage(attacker, target, toxDmg, 'TOXIN');
@@ -507,6 +509,7 @@ function executeWeaponFire(attacker, target) {
         let rDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets')) ? 15 : 12;
         if (attacker.salvageLevel >= 1) rDmg = Math.round(rDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
         const rCount = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('buggyAmmo')) ? 8 : 4;
+        if (typeof playUSASound === 'function') playUSASound('missile_launch');
         for (let r = 0; r < rCount; r++) {
             setTimeout(() => {
                 const mPos = getMuzzleWorldPosition(attacker, (r % 2 === 0 ? -0.25 : 0.25));
@@ -531,16 +534,18 @@ function executeWeaponFire(attacker, target) {
             damageType: 'EXPLOSIVE',
             splashRadius: 2.0
         });
+        if (typeof playUSASound === 'function') playUSASound('missile_launch');
     } else if (['tomahawk', 'scud'].includes(attacker.type)) {
         // Heavy cruise / ballistic missile (Tracked for Point Defense Laser interception!)
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.2);
-        const mDmg = attacker.type === 'scud' ? 130 : 95;
+        const mDmg = attacker.type === 'scud' ? 150 : 150;
+        const mSplash = attacker.type === 'tomahawk' ? 7.5 : 5.5;
         spawnRocketProjectile(muzzlePos, targetPos, true, attacker.type === 'scud', {
             attacker: attacker,
             target: target,
             damage: mDmg,
             damageType: 'EXPLOSIVE',
-            splashRadius: 5.5
+            splashRadius: mSplash
         });
         if (attacker.type === 'tomahawk') playUSASound('missile_launch');
         if (attacker.type === 'scud') playAudio('scud_launch', {}, 'gla');
@@ -548,6 +553,7 @@ function executeWeaponFire(attacker, target) {
         // Inferno Cannon Napalm Artillery
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff5252, 1.0);
         spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5);
+        playAudio('china_cannon', {}, 'china');
         setTimeout(() => spawnNapalmScorchPool(targetPos), 300);
         applyCalculatedDamage(attacker, target, 65, 'FLAME');
     } else if (attacker.type === 'nukecannon' || attacker.type === 'nuketank') {
@@ -700,11 +706,13 @@ function executeWeaponFire(attacker, target) {
         });
         let qDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 40 : 32;
         if (attacker.salvageLevel >= 1) qDmg = Math.round(qDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
+        playAudio('gatling_fire', {}, 'gla');
         applyCalculatedDamage(attacker, target, qDmg, 'GATLING');
     } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
         // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry, Jarmen Kell also snipes vehicle drivers!)
         spawnMuzzleFlash(muzzlePos, 0xffffff, 0.3);
         spawnLaserBeam(muzzlePos, targetPos, 0xffffff, 2);
+        if (typeof playUSASound === 'function') playUSASound('cannon');
         const tArmor = getArmorCategory(target);
         if (attacker.type === 'jarmen' && (tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh && !target.isUnmanned) {
             target.isUnmanned = true;
@@ -728,6 +736,7 @@ function executeWeaponFire(attacker, target) {
         } else if ((tArmor === 'building' || tArmor === 'heavy_vehicle' || tArmor === 'light_vehicle') && dist <= 11.0) {
             // C4 Demolition Charge!
             spawnExplosion(targetPos, 0xff4757);
+            playAudio('explosion');
             if (typeof triggerScreenShake === 'function') triggerScreenShake(0.8);
             applyCalculatedDamage(attacker, target, 350, 'EXPLOSIVE');
         } else {
@@ -739,6 +748,7 @@ function executeWeaponFire(attacker, target) {
     } else if (attacker.type === 'blacklotus') {
         // China Hero Black Lotus: Cyber Capture Building, Cash Hack ($1,000), or Vehicle Disable!
         spawnLaserBeam(muzzlePos, targetPos, 0x00ffaa, 2);
+        playAudio('radio_chirp', {}, 'china');
         const tArmor = getArmorCategory(target);
         if (tArmor === 'building') {
             if ((target.type === 'supplyCenter' || target.type === 'supplyStash') && !attacker.isAI) {
@@ -756,6 +766,7 @@ function executeWeaponFire(attacker, target) {
     } else if (attacker.type === 'hacker') {
         // China Hacker: Cyber-Disable Beam vs Enemy Vehicles/Turrets (generates cash when idle in gameLoop!)
         spawnLaserBeam(muzzlePos, targetPos, 0x10ac84, 2);
+        playAudio('radio_chirp', {}, 'china');
         target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 210;
         if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(targetPos);
         applyCalculatedDamage(attacker, target, 10, 'SMALL_ARMS');
@@ -809,6 +820,7 @@ function executeWeaponFire(attacker, target) {
         const blastDmg = attacker.type === 'bombtruck' ? (attacker.highExplosive ? 480 : 340) : 220;
         const blastRad = attacker.type === 'bombtruck' ? (attacker.highExplosive ? 15 : 11) : 7.5;
         spawnExplosion(targetPos, isBio ? 0x2ecc71 : 0xff4757);
+        playAudio('explosion', {}, 'gla');
         if (isBio && typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
         if (typeof triggerScreenShake === 'function') triggerScreenShake(attacker.type === 'bombtruck' ? 1.2 : 0.7);
         applyCalculatedDamage(attacker, target, blastDmg, isBio ? 'TOXIN' : 'EXPLOSIVE');
@@ -838,6 +850,7 @@ function executeWeaponFire(attacker, target) {
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
         spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
         if (['tank', 'crusader'].includes(attacker.type)) playUSASound('cannon');
+        else playAudio('china_cannon', {}, 'gla');
         let tkDmg = 50;
         if (attacker.type === 'marauder' && attacker.salvageLevel >= 1) {
             tkDmg = Math.round(tkDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
@@ -876,6 +889,7 @@ function executeWeaponFire(attacker, target) {
         // Infantry Rifle / Carbine burst
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.25);
         spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 1.8);
+        if (typeof playUSASound === 'function') playUSASound('machine_gun');
         let infDmg = (typeof units !== 'undefined' && units.includes(attacker) && attacker.type === 'rebel' && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 20 : 16;
         applyCalculatedDamage(attacker, target, infDmg, 'SMALL_ARMS');
     }
