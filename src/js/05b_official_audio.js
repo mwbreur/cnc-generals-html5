@@ -9,6 +9,7 @@ function getOfficialAudioGroup(soundKey, fallbackFaction = null) {
         if (soundKey.includes('_' + faction + '_')) return faction;
     }
     if (soundKey.startsWith('voice_dozer_')) return 'usa';
+    if (soundKey.startsWith('voice_truck_')) return 'china';
     const faction = fallbackFaction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa';
     return ['usa', 'china', 'gla'].includes(faction.toLowerCase()) ? faction.toLowerCase() : 'usa';
 }
@@ -75,6 +76,8 @@ function playUnitVoice(unitType, action = 'select', faction = null) {
         norm = fac === 'china' ? 'tankhunter' : (fac === 'gla' ? 'rpg' : 'rocket');
     } else if (t === 'worker' || t.includes('dozer') || t.includes('builder')) {
         norm = fac === 'china' ? 'dozer_china' : (fac === 'gla' ? 'worker' : 'dozer_usa');
+    } else if (t === 'truck') {
+        norm = fac === 'usa' ? 'chinook' : (fac === 'gla' ? 'worker' : 'truck');
     } else if (t.includes('crusader')) norm = 'crusader';
     else if (t.includes('paladin')) norm = 'paladin';
     else if (t.includes('ranger')) norm = 'ranger';
@@ -118,7 +121,7 @@ function playUnitVoice(unitType, action = 'select', faction = null) {
 
     let act = (action || 'select').toLowerCase();
     // Non-combat units re-route attack to move
-    if (act === 'attack' && (norm === 'dozer_usa' || norm === 'dozer_china' || norm === 'worker' || norm === 'chinook' || norm === 'ambulance' || norm === 'radarvan')) {
+    if (act === 'attack' && (norm === 'dozer_usa' || norm === 'dozer_china' || norm === 'worker' || norm === 'chinook' || norm === 'ambulance' || norm === 'radarvan' || norm === 'truck')) {
         act = 'move';
     }
 

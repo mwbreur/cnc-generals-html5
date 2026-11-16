@@ -67,6 +67,7 @@ const unitPrefixes = {
     inferno: 'vinf',
     nukecannon: 'vnuk',
     dozer_china: 'vdoc',
+    truck: 'vsup',
     mig: 'vmig',
     redguard: 'ired',
     tankhunter: 'itan',

@@ -666,10 +666,13 @@ function applyOfficialMenuArt(facOverride) {
 
     const startCard = document.getElementById('start-card');
     if (startCard && ui.mainMenuBackdrop) {
-        const menuScrim = startCard.classList.contains('main-menu-active')
+        const isMain = startCard.classList.contains('main-menu-active');
+        const isMp = !isMain && typeof currentStartMenuMode !== 'undefined' && currentStartMenuMode === 'multiplayer' && ui.mpLoadBackdrop;
+        const backdropSrc = isMp ? ui.mpLoadBackdrop : ui.mainMenuBackdrop;
+        const menuScrim = isMain
             ? 'linear-gradient(90deg, rgba(2, 8, 14, 0.18) 0%, rgba(2, 8, 14, 0.04) 48%, rgba(2, 8, 14, 0.62) 100%)'
             : 'linear-gradient(180deg, rgba(10, 16, 13, 0.88) 0%, rgba(8, 12, 10, 0.92) 100%)';
-        startCard.style.backgroundImage = `${menuScrim}, url("${ui.mainMenuBackdrop}")`;
+        startCard.style.backgroundImage = `${menuScrim}, url("${backdropSrc}")`;
         startCard.style.backgroundSize = 'cover';
         startCard.style.backgroundPosition = 'center';
     }

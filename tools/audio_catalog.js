@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..');
 const catalogDir = path.join(root, 'src', 'audio');
 const factions = {
     usa: ['crusader','paladin','ranger','rocket','humvee','comanche','chinook','raptor','stealthfighter','aurora','tomahawk','dozer_usa','burton','pathfinder','ambulance','dozer'],
-    china: ['battlemaster','overlord','gatling','dragon','crawler','inferno','nukecannon','dozer_china','mig','redguard','tankhunter','hacker','lotus'],
+    china: ['battlemaster','overlord','gatling','dragon','crawler','inferno','nukecannon','dozer_china','truck','mig','redguard','tankhunter','hacker','lotus'],
     gla: ['rebel','rpg','terrorist','jarmen','worker','scorpion','marauder','technical','quad','buggy','toxintractor','bombtruck','scud','radarvan','mob','hijacker']
 };
 

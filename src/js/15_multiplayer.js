@@ -40,6 +40,7 @@
                 renderEditorCanvas();
                 loadSavedMapsList();
             }
+            if (typeof applyOfficialMenuArt === 'function') applyOfficialMenuArt();
         }
 
         function switchMpSubTab(tab) {

@@ -780,11 +780,19 @@ function parseAndBakeSkinnedMesh(cfg) {
                     while (tSub < sub + 8 + ss) {
                         const tst = buf.readUInt32LE(tSub);
                         const tss = buf.readUInt32LE(tSub + 4) & 0x7fffffff;
-                        if (tst === 0x31) {
-                            const nameBuf = buf.slice(tSub + 8, tSub + 8 + tss);
-                            let raw = nameBuf.toString('ascii').replace(/\0/g, '').trim();
-                            raw = raw.replace(/^[^a-zA-Z0-9_]+/, '');
-                            meshTex = raw.toLowerCase();
+                        if (tst === 0x31) { // W3D_CHUNK_TEXTURE container
+                            let texSub = tSub + 8;
+                            while (texSub < tSub + 8 + tss) {
+                                const tt = buf.readUInt32LE(texSub);
+                                const ts = buf.readUInt32LE(texSub + 4) & 0x7fffffff;
+                                if (tt === 0x32) { // W3D_CHUNK_TEXTURE_NAME
+                                    const nameBuf = buf.slice(texSub + 8, texSub + 8 + ts);
+                                    const raw = nameBuf.toString('ascii').replace(/\0/g, '').trim();
+                                    meshTex = raw.toLowerCase();
+                                    break;
+                                }
+                                texSub += 8 + ts;
+                            }
                         }
                         tSub += 8 + tss;
                     }
