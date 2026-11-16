@@ -56,6 +56,11 @@ The repository is organized around source modules and generated browser builds:
 
 ```text
 .
+├── assets/
+│   └── data/
+│       ├── 02b_w3d_models.js
+│       ├── 07b_tournament_desert.js
+│       └── 10b_cameos.js
 ├── src/
 │   ├── css/
 │   │   └── style.css
@@ -132,12 +137,14 @@ Some browser features, especially WebRTC and audio playback, require a secure co
 
 ## Build output and large files
 
-The build concatenates JavaScript source modules into `index.html`. Audio stays external so the game can lazy-load shared effects and the player's faction catalog.
+The build concatenates core gameplay JavaScript modules into `index.html` (~1.3 MB), while externalizing heavy static data modules into `assets/data/` (`02b_w3d_models.js`, `07b_tournament_desert.js`, and `10b_cameos.js`) loaded via `<script src="assets/data/...">` so browsers cache models, official maps, and cameos across updates. Audio stays external in `src/audio/` so the game can lazy-load shared effects and the player's faction catalog.
 
-Two particularly large source modules identified during a repository review are:
+The largest data assets in the repository are:
 
-- `src/audio/*.json` — current official-audio catalogs.
-- `src/js/02b_w3d_models.js` — W3D model data.
+- `assets/data/02b_w3d_models.js` / `src/js/02b_w3d_models.js` — W3D model data.
+- `assets/data/10b_cameos.js` / `src/js/10b_cameos.js` — Official EA cameos & shell UI graphics.
+- `assets/data/07b_tournament_desert.js` / `src/js/07b_tournament_desert.js` — 12 official EA skirmish maps.
+- `src/audio/*.json` — Official-audio catalogs.
 
 The generated `index.html` size is reported by `node scripts/report-project-size.js`. This is an on-disk size, not a compressed transfer size.
 
@@ -216,7 +223,7 @@ To keep the project manageable as it grows:
 
 ## Testing and profiling
 
-The repository includes `verify_system.js`, a Node-based verification script. The build currently performs JavaScript syntax validation, which is useful but does not prove that gameplay works in a browser.
+The repository includes `verify_system.js`, a Node VM verification suite that validates syntax, spawns all unit/structure permutations, verifies SAGE armor math, A* pathfinding, obstacle collision, Generals' Powers, and runs a 350-tick headless Skirmish simulation test (using deterministic `simRandom()`). Browser-level WebGL rendering and UI interactions still benefit from manual or Playwright smoke checks.
 
 Before a release, manually check at least:
 
@@ -235,13 +242,13 @@ For performance investigations, record the browser, device, map size, unit count
 
 This project is still evolving. In particular:
 
-- The web build still embeds large model data; only audio has been separated so far.
+- `index.html` and `assets/data/` are currently committed on `master` for branch-based GitHub Pages hosting; switching GitHub Pages to a GitHub Actions `deploy-pages` artifact workflow would keep generated files out of `master`.
 - The audio catalogs contain the clips already present in the project; completeness against the original game archives is not yet confirmed.
-- Automated build validation currently checks syntax; gameplay regression coverage and browser-level smoke tests should be expanded.
-- Multiplayer currently relies heavily on peers applying the same orders locally; synchronization behavior should be tested under latency and different frame rates.
-- Large-map pathfinding and builder routing need regression testing across the full map-size range.
+- `verify_system.js` covers headless simulation and 350-tick AI Skirmish checks, while browser-level WebGL/UI smoke tests (e.g., Playwright) are still manual.
+- Multiplayer uses PeerJS WebRTC with 10 Hz host-authoritative `state_sync` and client interpolation; further multi-peer stress testing under high latency is ongoing.
+- Large-map pathfinding and builder routing should continue to be tested across all 12 official skirmish maps.
 
-A sensible order of work is: **asset/build separation → repeatable tests → pathfinding correctness → profiling-led rendering and simulation optimization → multiplayer synchronization improvements.**
+A sensible order of work is: **GitHub Pages artifact deployment → browser E2E smoke tests → ongoing multiplayer & large-battle tuning.**
 
 ---
 
