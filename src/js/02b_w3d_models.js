@@ -727,9 +727,8 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
             if (c.isMesh && c.geometry && c.geometry.attributes && c.geometry.attributes.position) {
                 const pos = c.geometry.attributes.position;
                 for (let i = 0; i < pos.count; i++) {
-                    const vy = pos.getY(i);
-                    let curY = vy;
-                    let p = c.parent;
+                    let curY = pos.getY(i);
+                    let p = c;
                     while (p && p !== root) {
                         curY += p.position.y;
                         p = p.parent;
