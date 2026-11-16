@@ -1,79 +1,91 @@
+let _unitTrackBoxGeo = null, _unitTrackCyl12Geo = null, _unitTrackCyl8Geo = null;
 function createTrackAssembly(width, height, length, matHull, isEnemy = false) {
+    if (!_unitTrackBoxGeo) {
+        _unitTrackBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+        _unitTrackCyl12Geo = new THREE.CylinderGeometry(1, 1, 1, 12);
+        _unitTrackCyl8Geo = new THREE.CylinderGeometry(1, 1, 1, 8);
+    }
     const trackGroup = new THREE.Group();
     const treadWidth = 0.44;
     const wheelRadius = height * 0.42;
     const numRoadWheels = 5;
+    const skirtMat = isEnemy ? (typeof matEnemySkirt !== 'undefined' ? matEnemySkirt : matHull) : matHull;
 
     [-width / 2 + treadWidth / 2, width / 2 - treadWidth / 2].forEach(xOffset => {
-        // Continuous tread track: segmented loop with sloped front climb and rear drop
         const segMat = matTread;
-        // Central main track section
-        const mainTread = new THREE.Mesh(new THREE.BoxGeometry(treadWidth, height * 0.88, length * 0.82), segMat);
+        const mainTread = new THREE.Mesh(_unitTrackBoxGeo, segMat);
+        mainTread.scale.set(treadWidth, height * 0.88, length * 0.82);
         mainTread.position.set(xOffset, height * 0.5, 0);
         mainTread.castShadow = true;
         trackGroup.add(mainTread);
 
-        // Angled front track climb
-        const frontClimb = new THREE.Mesh(new THREE.BoxGeometry(treadWidth, height * 0.55, length * 0.22), segMat);
+        const frontClimb = new THREE.Mesh(_unitTrackBoxGeo, segMat);
+        frontClimb.scale.set(treadWidth, height * 0.55, length * 0.22);
         frontClimb.rotation.x = -Math.PI / 6;
         frontClimb.position.set(xOffset, height * 0.46, length * 0.45);
         frontClimb.castShadow = true;
         trackGroup.add(frontClimb);
 
-        // Angled rear track drop
-        const rearDrop = new THREE.Mesh(new THREE.BoxGeometry(treadWidth, height * 0.55, length * 0.22), segMat);
+        const rearDrop = new THREE.Mesh(_unitTrackBoxGeo, segMat);
+        rearDrop.scale.set(treadWidth, height * 0.55, length * 0.22);
         rearDrop.rotation.x = Math.PI / 6;
         rearDrop.position.set(xOffset, height * 0.46, -length * 0.45);
         rearDrop.castShadow = true;
         trackGroup.add(rearDrop);
 
-        // Armored ballistic side skirts with modular segments and bolts
-        const skirtMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x992d22, roughness: 0.6 }) : matHull;
         const skirtX = xOffset + (xOffset > 0 ? 0.23 : -0.23);
-        const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.08, height * 0.72, length * 0.95), skirtMat);
+        const skirt = new THREE.Mesh(_unitTrackBoxGeo, skirtMat);
+        skirt.scale.set(0.08, height * 0.72, length * 0.95);
         skirt.position.set(skirtX, height * 0.62, 0);
         skirt.castShadow = true;
         trackGroup.add(skirt);
 
-        // Rubber mud flaps front and rear
-        const flapFront = new THREE.Mesh(new THREE.BoxGeometry(treadWidth + 0.1, height * 0.4, 0.08), matDarkMetal);
+        const flapFront = new THREE.Mesh(_unitTrackBoxGeo, matDarkMetal);
+        flapFront.scale.set(treadWidth + 0.1, height * 0.4, 0.08);
         flapFront.position.set(xOffset, height * 0.42, length * 0.52);
         trackGroup.add(flapFront);
 
-        const flapRear = new THREE.Mesh(new THREE.BoxGeometry(treadWidth + 0.1, height * 0.4, 0.08), matDarkMetal);
+        const flapRear = new THREE.Mesh(_unitTrackBoxGeo, matDarkMetal);
+        flapRear.scale.set(treadWidth + 0.1, height * 0.4, 0.08);
         flapRear.position.set(xOffset, height * 0.42, -length * 0.52);
         trackGroup.add(flapRear);
 
-        // Front drive sprocket (toothed) & rear idler with tensioner
-        const sprocket = new THREE.Mesh(new THREE.CylinderGeometry(wheelRadius * 0.92, wheelRadius * 0.92, treadWidth + 0.06, 12), matDarkMetal);
+        const spR = wheelRadius * 0.92;
+        const sprocket = new THREE.Mesh(_unitTrackCyl12Geo, matDarkMetal);
+        sprocket.scale.set(spR, treadWidth + 0.06, spR);
         sprocket.rotation.z = Math.PI / 2;
         sprocket.position.set(xOffset, height * 0.55, length * 0.46);
         trackGroup.add(sprocket);
 
-        const idler = new THREE.Mesh(new THREE.CylinderGeometry(wheelRadius * 0.88, wheelRadius * 0.88, treadWidth + 0.06, 12), matDarkMetal);
+        const idR = wheelRadius * 0.88;
+        const idler = new THREE.Mesh(_unitTrackCyl12Geo, matDarkMetal);
+        idler.scale.set(idR, treadWidth + 0.06, idR);
         idler.rotation.z = Math.PI / 2;
         idler.position.set(xOffset, height * 0.55, -length * 0.46);
         trackGroup.add(idler);
 
-        // Dual Road Wheels with stamped hub caps
         const spacing = (length * 0.68) / (numRoadWheels - 1);
+        const wR = wheelRadius * 0.82;
+        const hR = wheelRadius * 0.28;
         for (let i = 0; i < numRoadWheels; i++) {
             const zWheel = -length * 0.34 + i * spacing;
-            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(wheelRadius * 0.82, wheelRadius * 0.82, treadWidth + 0.05, 12), matGunmetal);
+            const wheel = new THREE.Mesh(_unitTrackCyl12Geo, matGunmetal);
+            wheel.scale.set(wR, treadWidth + 0.05, wR);
             wheel.rotation.z = Math.PI / 2;
             wheel.position.set(xOffset, wheelRadius * 0.9, zWheel);
             trackGroup.add(wheel);
 
-            // Hub cap
-            const hub = new THREE.Mesh(new THREE.CylinderGeometry(wheelRadius * 0.28, wheelRadius * 0.28, treadWidth + 0.09, 8), matDarkMetal);
+            const hub = new THREE.Mesh(_unitTrackCyl8Geo, matDarkMetal);
+            hub.scale.set(hR, treadWidth + 0.09, hR);
             hub.rotation.z = Math.PI / 2;
             hub.position.set(xOffset, wheelRadius * 0.9, zWheel);
             trackGroup.add(hub);
         }
 
-        // Return rollers supporting upper track
+        const rR = wheelRadius * 0.35;
         [-length * 0.2, length * 0.2].forEach(zRoller => {
-            const roller = new THREE.Mesh(new THREE.CylinderGeometry(wheelRadius * 0.35, wheelRadius * 0.35, treadWidth + 0.04, 8), matDarkMetal);
+            const roller = new THREE.Mesh(_unitTrackCyl8Geo, matDarkMetal);
+            roller.scale.set(rR, treadWidth + 0.04, rR);
             roller.rotation.z = Math.PI / 2;
             roller.position.set(xOffset, height * 0.82, zRoller);
             trackGroup.add(roller);
@@ -82,17 +94,13 @@ function createTrackAssembly(width, height, length, matHull, isEnemy = false) {
     return trackGroup;
 }
 
-
-        // Module: Enhanced USA Units
-// High visual fidelity, composite armor plates, FLIR pods, antennae, cupolas, weapon systems
-
 function createCrusaderTankMesh(isEnemy = false) {
     if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['crusader']) {
         return createW3DVehicleMesh('crusader', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matUSA;
-    const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matUSAColor;
+    const hullMat = isEnemy ? matEnemyHull : matUSA;
+    const accentMat = isEnemy ? matEnemyDark : matUSAColor;
 
     // Upgraded track assembly
     g.add(createTrackAssembly(2.4, 0.58, 3.6, hullMat, isEnemy));
@@ -194,8 +202,8 @@ function createPaladinTankMesh(isEnemy = false) {
         return createW3DVehicleMesh('paladin', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matUSA;
-    const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matUSAColor;
+    const hullMat = isEnemy ? matEnemyHull : matUSA;
+    const accentMat = isEnemy ? matEnemyDark : matUSAColor;
 
     g.add(createTrackAssembly(2.5, 0.6, 3.7, hullMat, isEnemy));
 
@@ -250,8 +258,8 @@ function createHumveeMesh(isEnemy = false) {
         return createW3DVehicleMesh('humvee', isEnemy);
     }
     const g = new THREE.Group();
-    const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matUSA;
-    const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matUSAColor;
+    const bodyMat = isEnemy ? matEnemyHull : matUSA;
+    const accentMat = isEnemy ? matEnemyDark : matUSAColor;
 
     // Chassis frame
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.2, 3.2), matDarkMetal);
@@ -382,8 +390,8 @@ function createTomahawkMesh(isEnemy = false) {
         return createW3DVehicleMesh('tomahawk', isEnemy);
     }
     const g = new THREE.Group();
-    const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matUSA;
-    const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x333, roughness: 0.5 }) : matUSAColor;
+    const cabMat = isEnemy ? matEnemyHull : matUSA;
+    const bodyMat = isEnemy ? matEnemyDark : matUSAColor;
 
     // 6x6 Heavy Tactical Launcher Truck Chassis
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.28, 4.4), matDarkMetal);
@@ -894,9 +902,9 @@ function createBattlemasterTankMesh(isEnemy = false) {
         return createW3DVehicleMesh('battlemaster', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
-    const accentMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matChinaColor;
-    const redStarMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.5 }) : matRedStar;
+    const hullMat = isEnemy ? matEnemyHull : matChina;
+    const accentMat = isEnemy ? matEnemyDark : matChinaColor;
+    const redStarMat = isEnemy ? matEnemyDark : matRedStar;
 
     // Upgraded track assembly
     g.add(createTrackAssembly(2.4, 0.56, 3.5, hullMat, isEnemy));
@@ -974,8 +982,8 @@ function createOverlordTankMesh(isEnemy = false) {
         return createW3DVehicleMesh('overlord', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
-    const trimMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matChinaColor;
+    const hullMat = isEnemy ? matEnemyHull : matChina;
+    const trimMat = isEnemy ? matEnemyDark : matChinaColor;
 
     // Massive quad-track undercarriage (two separate track assemblies per side!)
     [-1.5, 1.5].forEach(xSide => {
@@ -1045,8 +1053,8 @@ function createGatlingTankMesh(isEnemy = false) {
         return createW3DVehicleMesh('gatling', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
-    const darkMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matDarkMetal;
+    const hullMat = isEnemy ? matEnemyHull : matChina;
+    const darkMat = isEnemy ? matEnemyDark : matDarkMetal;
 
     g.add(createTrackAssembly(2.35, 0.55, 3.4, hullMat, isEnemy));
 
@@ -1097,7 +1105,7 @@ function createDragonTankMesh(isEnemy = false) {
         return createW3DVehicleMesh('dragon', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matChina;
+    const hullMat = isEnemy ? matEnemyHull : matChina;
 
     g.add(createTrackAssembly(2.4, 0.58, 3.4, hullMat, isEnemy));
 
@@ -1439,8 +1447,8 @@ function createTechnicalMesh(isEnemy = false) {
         return createW3DVehicleMesh('technical', isEnemy);
     }
     const g = new THREE.Group();
-    const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
-    const rustMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x333, roughness: 0.7 }) : matCorrugated;
+    const cabMat = isEnemy ? matEnemyHull : matGLA;
+    const rustMat = isEnemy ? matEnemyDark : matCorrugated;
 
     // Civilian 4x4 pickup truck chassis
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.2, 3.4), matDarkMetal);
@@ -1502,7 +1510,7 @@ function createScorpionTankMesh(isEnemy = false) {
         return createW3DVehicleMesh('scorpion', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matGLA;
+    const hullMat = isEnemy ? matEnemyHull : matGLA;
 
     g.add(createTrackAssembly(2.25, 0.52, 3.2, hullMat, isEnemy));
 
@@ -1541,8 +1549,8 @@ function createMarauderTankMesh(isEnemy = false) {
         return createW3DVehicleMesh('marauder', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 }) : matGLA;
-    const plateMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matCorrugated;
+    const hullMat = isEnemy ? matEnemyHull : matGLA;
+    const plateMat = isEnemy ? matEnemyDark : matCorrugated;
 
     g.add(createTrackAssembly(2.5, 0.6, 3.6, hullMat, isEnemy));
 
@@ -1586,8 +1594,8 @@ function createRocketBuggyMesh(isEnemy = false) {
         return createW3DVehicleMesh('buggy', isEnemy);
     }
     const g = new THREE.Group();
-    const frameMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matDarkMetal;
-    const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5 }) : matGLA;
+    const frameMat = isEnemy ? matEnemyHull : matDarkMetal;
+    const bodyMat = isEnemy ? matEnemyDark : matGLA;
 
     // Lightweight tubular dune buggy spaceframe
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.55, 2.8), frameMat);
@@ -1638,7 +1646,7 @@ function createQuadCannonMesh(isEnemy = false) {
         return createW3DVehicleMesh('quad', isEnemy);
     }
     const g = new THREE.Group();
-    const hullMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
+    const hullMat = isEnemy ? matEnemyHull : matGLA;
 
     g.add(createTrackAssembly(2.3, 0.54, 3.3, hullMat, isEnemy));
 
@@ -1677,7 +1685,7 @@ function createToxinTractorMesh(isEnemy = false) {
         return createW3DVehicleMesh('toxintractor', isEnemy);
     }
     const g = new THREE.Group();
-    const bodyMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
+    const bodyMat = isEnemy ? matEnemyHull : matGLA;
 
     // Tracked tractor chassis
     g.add(createTrackAssembly(2.35, 0.6, 3.2, bodyMat, isEnemy));
@@ -1718,7 +1726,7 @@ function createBombTruckMesh(isEnemy = false) {
         return createW3DVehicleMesh('bombtruck', isEnemy);
     }
     const g = new THREE.Group();
-    const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matCorrugated;
+    const cabMat = isEnemy ? matEnemyHull : matCorrugated;
 
     // Delivery truck chassis
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.25, 4.0), matDarkMetal);
@@ -1754,7 +1762,7 @@ function createScudLauncherMesh(isEnemy = false) {
         return createW3DVehicleMesh('scud', isEnemy);
     }
     const g = new THREE.Group();
-    const cabMat = isEnemy ? new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5 }) : matGLA;
+    const cabMat = isEnemy ? matEnemyHull : matGLA;
 
     // 8x8 Mobile Transporter Erector Launcher chassis
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.32, 4.8), matDarkMetal);

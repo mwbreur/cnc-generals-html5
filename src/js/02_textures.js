@@ -574,7 +574,12 @@ function initSharedMaterials() {
     matWindowGlow = new THREE.MeshStandardMaterial({ color: 0xfffa65, emissive: 0xfffa65, emissiveIntensity: 0.85 });
     matChrome = new THREE.MeshStandardMaterial({ color: 0xdcdde1, roughness: 0.15, metalness: 0.95 });
     matExhaust = new THREE.MeshStandardMaterial({ color: 0x2f3640, roughness: 0.65, metalness: 0.6 });
+
+    window.matEnemyHull = matEnemyHull = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 });
+    window.matEnemySkirt = matEnemySkirt = new THREE.MeshStandardMaterial({ color: 0x992d22, roughness: 0.6 });
+    window.matEnemyDark = matEnemyDark = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
 }
+let matEnemyHull, matEnemySkirt, matEnemyDark;
 
 
         // Module: Enhanced Caterpillar Track Assembly
