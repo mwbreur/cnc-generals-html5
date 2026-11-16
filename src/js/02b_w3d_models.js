@@ -679,6 +679,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 const grp = new THREE.Group();
                 grp.name = pname;
                 grp.position.set(tx, ty, tz);
+                if (pname === 'LINE01' && grp.quaternion) grp.quaternion.set(0.5, -0.5, 0.5, -0.5);
                 upgPivots.push({ grp, parentIdx });
             });
             const upgRoot = new THREE.Group();
@@ -720,7 +721,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
 
         const glow1 = new THREE.PointLight(0xb8ff00, 0, 38);
         glow1.name = 'coldFusionGlowLight';
-        glow1.position.set(-8.45, 29.5, -12.16);
+        glow1.position.set(-7.5, 29.5, -7.2);
         glow1.visible = false;
         root.add(glow1);
 
