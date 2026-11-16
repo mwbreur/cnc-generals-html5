@@ -21,7 +21,7 @@ let isSellMode = false;
 let radarCanvas = null;
 let radarCtx = null;
 let radarSweepAngle = 0;
-const GRID_HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H'];
+const GRID_HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'A', 'S', 'D', 'F', 'G', 'H', 'J'];
 let currentGridSlots = [];
 
 // 1. RADAR MINIMAP ENGINE
@@ -902,12 +902,12 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             </div>
         `;
 
-        // 3x4 / 2x6 Grid Slots for Single Unit
+        // 2x7 Grid Slots for Single Unit
         if (u.type === 'dozer' || u.type === 'worker') {
             // Direct building blueprints on command bar grid for builder units!
             const allBuildings = factionBuildings[selectedFaction] || [];
-            currentGridSlots = new Array(12).fill(null);
-            allBuildings.slice(0, 10).forEach(([bType, bName, bCost], bIdx) => {
+            currentGridSlots = new Array(14).fill(null);
+            allBuildings.slice(0, 12).forEach(([bType, bName, bCost], bIdx) => {
                 const structReq = getStructureTechPrerequisite(bType);
                 const hasTech = !structReq || hasCompletedStructure(structReq.building, structReq.altBuilding);
                 const canAfford = playerResources >= bCost;
@@ -922,7 +922,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                 };
             });
             if (u.type === 'worker') {
-                currentGridSlots[9] = {
+                currentGridSlots[11] = {
                     id: 'harvest',
                     name: 'HARVEST',
                     badge: 'GATHER',
@@ -931,7 +931,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                     desc: 'Dispatch Worker to gather supplies from Supply Stash / Dock'
                 };
             }
-            currentGridSlots[10] = {
+            currentGridSlots[12] = {
                 id: 'stop',
                 name: 'STOP',
                 badge: 'HALT',
@@ -939,7 +939,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                 action: () => orderUnitsHalt(),
                 desc: 'Halt builder actions'
             };
-            currentGridSlots[11] = {
+            currentGridSlots[13] = {
                 id: 'guard',
                 name: 'GUARD',
                 badge: 'DEF',
@@ -1145,7 +1145,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
                 </div>
             </div>
         `;
-        currentGridSlots = new Array(12).fill(null);
+        currentGridSlots = new Array(14).fill(null);
         return;
     }
 
@@ -1207,8 +1207,8 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         </div>
     `;
 
-    // 2-Row Production Grid (strictly units built by this structure + upgrades + rally + sell)
-    currentGridSlots = new Array(12).fill(null);
+    // 2-Row Production Grid (2x7: strictly units built by this structure + upgrades + rally + sell)
+    currentGridSlots = new Array(14).fill(null);
 
     const productionType = structure.type === 'center' ? 'commandCenter' : structure.type;
     const producers = Object.entries(unitRoster).filter(([type, spec]) => {
@@ -1221,8 +1221,8 @@ function renderStructureInspectorAndGrid(inspector, structure) {
 
     if (producers.length > 0) {
         let uIdx = 0;
-        // Populate first 5 units into Row 1 (slots 0..4)
-        for (; uIdx < Math.min(5, producers.length); uIdx++) {
+        // Populate first 6 units into Row 1 (slots 0..5)
+        for (; uIdx < Math.min(6, producers.length); uIdx++) {
             const [type, spec] = producers[uIdx];
             const techReq = getUnitTechPrerequisite(type);
             const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
@@ -1240,8 +1240,8 @@ function renderStructureInspectorAndGrid(inspector, structure) {
             };
         }
 
-        // Slot 5 (Top-Right): RALLY POINT
-        currentGridSlots[5] = {
+        // Slot 6 (Top-Right): RALLY POINT
+        currentGridSlots[6] = {
             id: 'rally',
             name: 'SET RALLY',
             cost: '',
@@ -1251,9 +1251,9 @@ function renderStructureInspectorAndGrid(inspector, structure) {
             desc: 'Set unit deployment rally point'
         };
 
-        // Row 2 (slots 6..10): Overflow units from index 5 onward + building upgrades
-        let slotPos = 6;
-        for (; uIdx < producers.length && slotPos < 11; uIdx++, slotPos++) {
+        // Row 2 (slots 7..12): Overflow units from index 6 onward + building upgrades
+        let slotPos = 7;
+        for (; uIdx < producers.length && slotPos < 13; uIdx++, slotPos++) {
             const [type, spec] = producers[uIdx];
             const techReq = getUnitTechPrerequisite(type);
             const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
@@ -1273,18 +1273,18 @@ function renderStructureInspectorAndGrid(inspector, structure) {
 
         // Upgrades for this unit-producing building in remaining slots on Row 2
         let upgIdx = 0;
-        for (; slotPos < 11 && upgIdx < factionUpgs.length; slotPos++, upgIdx++) {
+        for (; slotPos < 13 && upgIdx < factionUpgs.length; slotPos++, upgIdx++) {
             assignUpgradeToSlot(slotPos, factionUpgs[upgIdx], structure, isConstructing);
         }
     } else {
-        // Non-unit producing structure: All slots 0..10 available for upgrades, stances, and abilities!
-        factionUpgs.slice(0, 11).forEach((upg, idx) => {
+        // Non-unit producing structure: All slots 0..12 available for upgrades, stances, and abilities!
+        factionUpgs.slice(0, 13).forEach((upg, idx) => {
             assignUpgradeToSlot(idx, upg, structure, isConstructing);
         });
     }
 
-    // Slot 11 (Bottom-Right): SELL STRUCTURE
-    currentGridSlots[11] = {
+    // Slot 13 (Bottom-Right): SELL STRUCTURE
+    currentGridSlots[13] = {
         id: 'sell',
         name: 'SELL ($)',
         cost: '',
@@ -1477,7 +1477,7 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
         });
     } else if (activeGridCategory === 'units') {
         // Quick Units production across operational facilities
-        currentGridSlots = Object.entries(unitRoster).slice(0, 12).map(([type, spec]) => {
+        currentGridSlots = Object.entries(unitRoster).slice(0, 14).map(([type, spec]) => {
             const canAfford = playerResources >= spec.cost;
             return {
                 id: type,
@@ -2200,7 +2200,7 @@ window.handleGridSlotClick = handleGridSlotClick;
 function renderCommandGrid(container, slots) {
     if (!container) return;
     let html = '';
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 14; i++) {
         const s = slots[i];
         if (s) {
             const isRally = s.badge && s.badge.includes('RALLY');

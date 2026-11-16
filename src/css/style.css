@@ -1248,14 +1248,14 @@ body.control-bar-collapsed #generals-command-bar {
 .cb-util-btn .util-icon { font-size: 15px; line-height: 1.1; }
 .cb-util-btn .util-tag { font-size: 7px; font-weight: bold; letter-spacing: .2px; color: #8ba5b8; }
 
-/* 2-Row Production Grid (2x6) */
+/* 2-Row Production Grid (2x7 matching Zero Hour Control Bar) */
 .cb-production-grid {
     flex: 1;
     height: 100%;
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     grid-template-rows: repeat(2, 1fr);
-    gap: 6px;
+    gap: 5px;
 }
 
 .cb-production-grid .grid-slot-btn {
