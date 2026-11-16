@@ -123,8 +123,15 @@
                         return false;
                     }
 
+                    if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
+                        this.toPos.copy(this.metadata.target.mesh.position);
+                        this.toPos.y += this.metadata.target.isAir ? 0.3 : 0.5;
+                        this.distTotal = Math.max(1, fromPos.distanceTo(this.toPos));
+                        this.group.lookAt(this.toPos);
+                    }
+
                     this.distTraveled += this.speed;
-                    const alpha = Math.min(1.0, this.distTraveled / this.distTotal);
+                    const alpha = Math.min(1.0, this.distTraveled / Math.max(0.1, this.distTotal));
                     this.curPos.lerpVectors(fromPos, this.toPos, alpha);
 
                     if (this.isHeavy) {
@@ -219,8 +226,15 @@
                 speed: speed,
                 isFuelAir: isFuelAir,
                 update() {
+                    if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
+                        this.toPos.copy(this.metadata.target.mesh.position);
+                        this.toPos.y += this.metadata.target.isAir ? 0.3 : 0.5;
+                        this.distTotal = Math.max(1, fromPos.distanceTo(this.toPos));
+                        this.group.lookAt(this.toPos);
+                    }
+
                     this.distTraveled += this.speed;
-                    const alpha = Math.min(1.0, this.distTraveled / this.distTotal);
+                    const alpha = Math.min(1.0, this.distTraveled / Math.max(0.1, this.distTotal));
                     this.mesh.position.lerpVectors(this.fromPos, this.toPos, alpha);
 
                     if (Math.random() < 0.6) {

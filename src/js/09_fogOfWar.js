@@ -495,7 +495,7 @@
                 ['power', 'Cold Fusion Reactor', 300], ['barracks', 'Barracks', 400], ['factory', 'War Factory', 700],
                 ['supplyCenter', 'Supply Center', 500], ['supplyDrop', 'Supply Drop Zone', 2500], ['airfield', 'Air Field', 1000],
                 ['strategyCenter', 'Strategy Center', 1500], ['detentionCamp', 'Detention Camp', 900],
-                ['patriot', 'Patriot Missile System', 800], ['particleCannon', 'Particle Cannon', 2500]
+                ['patriot', 'Patriot Missile System', 1000], ['particleCannon', 'Particle Cannon', 2500]
             ],
             china: [
                 ['barracks', 'Barracks', 400], ['factory', 'War Factory', 700], ['supplyCenter', 'Supply Center', 500],

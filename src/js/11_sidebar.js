@@ -3263,24 +3263,83 @@ function updateHUD() {
                 }
 
                 if (['patriot', 'gatlingCannon', 'stingerSite'].includes(structure.type) && buildingTick % 45 === 0) {
-                    const target = enemyUnits.find(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(structure.position) < 45);
-                    if (target) {
-                        const targetPos = target.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0));
-                        if (structure.type === 'patriot') {
-                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
-                            spawnMuzzleFlash(mPos, 0xff9f43, 0.6);
-                            spawnRocketProjectile(mPos, targetPos, false, false);
-                            target.health -= 45;
-                        } else if (structure.type === 'gatlingCannon') {
-                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.8, 0));
-                            spawnMuzzleFlash(mPos, 0xffa502, 0.5);
-                            spawnBulletTracer(mPos, targetPos, 0xf1c40f, 3);
-                            target.health -= 28;
-                        } else if (structure.type === 'stingerSite') {
-                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 1.4, 0));
-                            spawnMuzzleFlash(mPos, 0x2ed573, 0.5);
-                            spawnRocketProjectile(mPos, targetPos, false, true);
-                            target.health -= 38;
+                    const isEmpDisabled = structure.disabledUntil && buildingTick < structure.disabledUntil;
+                    const powerDependent = (structure.type === 'patriot' || structure.type === 'gatlingCannon');
+                    if (isEmpDisabled || (powerDependent && isPlayerLowPower)) {
+                        structure._sharedTarget = null;
+                    } else {
+                        // Ballistic Missile Interception (SCUD / Tomahawk) by operational Patriot Missile Systems
+                        if (structure.type === 'patriot' && typeof activeMissiles !== 'undefined' && activeMissiles.length > 0) {
+                            const incoming = activeMissiles.find(m =>
+                                m && !m.intercepted && m.isHeavy && m.group &&
+                                m.metadata && m.metadata.attacker && !isFriendly(structure, m.metadata.attacker) &&
+                                m.group.position.distanceTo(structure.position) <= 48
+                            );
+                            if (incoming) {
+                                incoming.intercepted = true;
+                                const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
+                                spawnMuzzleFlash(mPos, 0x00d2ff, 0.8);
+                                spawnRocketProjectile(mPos, incoming.group.position.clone(), false, false);
+                                if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                            }
+                        }
+
+                        // Patriot Network Linking: share target lock & extended range (62u) with nearby Patriots (<=55u)
+                        let target = null;
+                        if (structure.type === 'patriot' && structure._sharedTarget && structure._sharedTarget.health > 0 && structure._sharedTarget.mesh) {
+                            if (structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 62) {
+                                target = structure._sharedTarget;
+                            }
+                        }
+                        if (!target) {
+                            const range = 45;
+                            // Patriots prioritize aircraft & vehicles; less effective against small infantry
+                            const inRange = enemyUnits.filter(enemy => enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(structure.position) < range);
+                            target = inRange.find(e => e.isAir) ||
+                                     inRange.find(e => typeof getArmorCategory !== 'function' || getArmorCategory(e) !== 'infantry') ||
+                                     inRange[0] || null;
+                        }
+
+                        if (target) {
+                            if (structure.type === 'patriot') {
+                                structures.forEach(other => {
+                                    if (other !== structure && other.type === 'patriot' && !other.isBuilding && other.health > 0 && other.position.distanceTo(structure.position) <= 55) {
+                                        other._sharedTarget = target;
+                                    }
+                                });
+                            }
+                            const targetPos = target.mesh.position.clone().add(new THREE.Vector3(0, target.isAir ? 0.3 : 0.5, 0));
+                            if (structure.type === 'patriot') {
+                                const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
+                                const isInfTarget = typeof getArmorCategory === 'function' && getArmorCategory(target) === 'infantry';
+                                spawnMuzzleFlash(mPos, 0xff9f43, 0.7);
+                                spawnRocketProjectile(mPos, targetPos, false, false, {
+                                    attacker: structure,
+                                    target: target,
+                                    isGuided: true,
+                                    damage: isInfTarget ? 22 : 68,
+                                    damageType: 'EXPLOSIVE',
+                                    splashRadius: isInfTarget ? 1.0 : 2.5
+                                });
+                                if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                            } else if (structure.type === 'gatlingCannon') {
+                                const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.8, 0));
+                                spawnMuzzleFlash(mPos, 0xffa502, 0.5);
+                                spawnBulletTracer(mPos, targetPos, 0xf1c40f, 3);
+                                playAudio('gatling_fire', {}, 'china');
+                                target.health -= 28;
+                            } else if (structure.type === 'stingerSite') {
+                                const mPos = structure.position.clone().add(new THREE.Vector3(0, 1.4, 0));
+                                spawnMuzzleFlash(mPos, 0x2ed573, 0.5);
+                                spawnRocketProjectile(mPos, targetPos, false, true, {
+                                    attacker: structure,
+                                    target: target,
+                                    isGuided: true,
+                                    damage: 42,
+                                    damageType: 'EXPLOSIVE',
+                                    splashRadius: 1.5
+                                });
+                            }
                         }
                     }
                 }
