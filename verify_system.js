@@ -194,6 +194,7 @@ const sandbox = {
         requestAnimationFrame: () => 1
     },
     document: {
+        baseURI: 'http://127.0.0.1/',
         getElementById: () => domElementStub(),
         createElement: () => domElementStub(),
         body: domElementStub(),
