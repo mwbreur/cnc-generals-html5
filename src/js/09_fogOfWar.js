@@ -113,7 +113,7 @@
         function updateFogOfWar() {
             if (!fogCanvas || !fogCtx || !fogMesh) return;
             fogUpdateTick++;
-            if (fogUpdateTick % 4 !== 0) return; // Smooth 60fps pacing
+            if (fogUpdateTick % 6 !== 0) return; // Smooth ~10Hz fog-of-war updates
 
             const mapSize = currentMapSize;
             const halfMap = mapSize * 0.5;
@@ -207,21 +207,23 @@
                 }
             });
 
-            // 3. Render Shroud & Fog at 512x512 with Gaussian blur to eliminate staircase pixels
+            // 3. Render Shroud & Fog at 512x512 with ImageData pixel buffer (avoids 16k fillRect calls/frame)
             if (_fogRawCtx) {
-                _fogRawCtx.clearRect(0, 0, FOG_RES, FOG_RES);
-                _fogRawCtx.fillStyle = 'rgba(10, 14, 18, 0.62)'; // Explored fog
-                _fogRawCtx.fillRect(0, 0, FOG_RES, FOG_RES);
-
-                _fogRawCtx.fillStyle = 'rgba(5, 7, 10, 1.0)'; // Unexplored pitch shroud
-                for (let y = 0; y < FOG_RES; y++) {
-                    const idxRow = y * FOG_RES;
-                    for (let x = 0; x < FOG_RES; x++) {
-                        if (fogGrid[idxRow + x] === 0) {
-                            _fogRawCtx.fillRect(x, y, 1, 1);
-                        }
+                if (!_fogRawCtx._imgData || _fogRawCtx._imgData.width !== FOG_RES) {
+                    _fogRawCtx._imgData = _fogRawCtx.createImageData(FOG_RES, FOG_RES);
+                }
+                const imgData = _fogRawCtx._imgData;
+                const d = imgData.data;
+                const total = FOG_RES * FOG_RES;
+                for (let idx = 0; idx < total; idx++) {
+                    const p = idx << 2;
+                    if (fogGrid[idx] === 0) {
+                        d[p] = 5; d[p + 1] = 7; d[p + 2] = 10; d[p + 3] = 255;
+                    } else {
+                        d[p] = 10; d[p + 1] = 14; d[p + 2] = 18; d[p + 3] = 158;
                     }
                 }
+                _fogRawCtx.putImageData(imgData, 0, 0);
                 fogCtx.clearRect(0, 0, FOG_TEX_RES, FOG_TEX_RES);
                 if ('filter' in fogCtx) fogCtx.filter = 'blur(6px)';
                 fogCtx.drawImage(_fogRawCanvas, 0, 0, FOG_TEX_RES, FOG_TEX_RES);

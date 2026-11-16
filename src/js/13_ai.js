@@ -124,21 +124,101 @@ function rebuildPathfindGrid() {
     // Keep navigation coverage aligned with the actual map, with roughly 10 world units per cell.
     const gridDim = Math.min(300, Math.max(100, Math.ceil(mapSize / 10)));
     const cellSize = (halfExtent * 2) / gridDim;
-    if (!_pathfindGridState.cells || _pathfindGridState.cells.length !== gridDim * gridDim) {
-        _pathfindGridState.cells = new Uint8Array(gridDim * gridDim);
+    const totalCells = gridDim * gridDim;
+    if (!_pathfindGridState.cells || _pathfindGridState.cells.length !== totalCells) {
+        _pathfindGridState.cells = new Uint8Array(totalCells);
     }
     _pathfindGridState.gridDim = gridDim;
     _pathfindGridState.cellSize = cellSize;
     _pathfindGridState.halfExtent = halfExtent;
 
     const cells = _pathfindGridState.cells;
-    for (let gz = 0; gz < gridDim; gz++) {
-        const wz = -halfExtent + (gz + 0.5) * cellSize;
-        for (let gx = 0; gx < gridDim; gx++) {
-            const wx = -halfExtent + (gx + 0.5) * cellSize;
-            cells[gz * gridDim + gx] = classifyPathfindPosition(wx, wz, null, 1.5);
+    const hasBridges = (typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0 && typeof isPointOnBridge === 'function');
+    const waterLvl = (typeof currentWaterLevel !== 'undefined') ? currentWaterLevel : -10;
+    const hasHeight = (typeof getTerrainHeight === 'function');
+    const mapKey = (typeof currentMapType !== 'undefined' ? currentMapType : '') + ':' + mapSize + ':' + waterLvl + ':' + (hasBridges ? mapBridges.length : 0);
+
+    // 1. Base terrain/water/cliff/bridge layer (cached per map+size so building changes skip 22,500+ terrain checks)
+    if (!_pathfindGridState._baseCells || _pathfindGridState._baseKey !== mapKey || _pathfindGridState._baseCells.length !== totalCells) {
+        const base = new Uint8Array(totalCells);
+        const d = 2.5;
+        for (let gz = 0; gz < gridDim; gz++) {
+            const wz = -halfExtent + (gz + 0.5) * cellSize;
+            const rowOff = gz * gridDim;
+            for (let gx = 0; gx < gridDim; gx++) {
+                const wx = -halfExtent + (gx + 0.5) * cellSize;
+                let cellType = PATHFIND_CELL_TYPES.CLEAR;
+                let onBridge = false;
+                if (hasBridges) {
+                    for (let bi = 0; bi < mapBridges.length; bi++) {
+                        if (isPointOnBridge(wx, wz, mapBridges[bi])) { onBridge = true; break; }
+                    }
+                }
+                if (onBridge) {
+                    cellType = PATHFIND_CELL_TYPES.BRIDGE;
+                } else if (hasHeight) {
+                    const h = getTerrainHeight(wx, wz);
+                    if (h < waterLvl + 0.15) {
+                        cellType = PATHFIND_CELL_TYPES.WATER;
+                    } else {
+                        const hXp = getTerrainHeight(wx + d, wz);
+                        const hXm = getTerrainHeight(wx - d, wz);
+                        const hZp = getTerrainHeight(wx, wz + d);
+                        const hZm = getTerrainHeight(wx, wz - d);
+                        if (Math.abs(hXp - h) / d > 1.35 || Math.abs(hXm - h) / d > 1.35 || Math.abs(hZp - h) / d > 1.35 || Math.abs(hZm - h) / d > 1.35) {
+                            cellType = PATHFIND_CELL_TYPES.CLIFF;
+                        }
+                    }
+                }
+                base[rowOff + gx] = cellType;
+            }
+        }
+        _pathfindGridState._baseCells = base;
+        _pathfindGridState._baseKey = mapKey;
+    }
+    cells.set(_pathfindGridState._baseCells);
+
+    // 2. Stamp structures & mapObstacles only across their bounding boxes (O(K) instead of O(N*K))
+    const stampCircle = (cx, cz, r) => {
+        const minX = Math.max(0, Math.floor((cx - r + halfExtent) / cellSize));
+        const maxX = Math.min(gridDim - 1, Math.floor((cx + r + halfExtent) / cellSize));
+        const minZ = Math.max(0, Math.floor((cz - r + halfExtent) / cellSize));
+        const maxZ = Math.min(gridDim - 1, Math.floor((cz + r + halfExtent) / cellSize));
+        const r2 = r * r;
+        for (let gz = minZ; gz <= maxZ; gz++) {
+            const wz = -halfExtent + (gz + 0.5) * cellSize;
+            const dz = wz - cz;
+            const rowOff = gz * gridDim;
+            for (let gx = minX; gx <= maxX; gx++) {
+                if (cells[rowOff + gx] === PATHFIND_CELL_TYPES.OBSTACLE) continue;
+                const wx = -halfExtent + (gx + 0.5) * cellSize;
+                const dx = wx - cx;
+                if (dx * dx + dz * dz < r2) {
+                    cells[rowOff + gx] = PATHFIND_CELL_TYPES.OBSTACLE;
+                }
+            }
+        }
+    };
+    const stampStructList = (list) => {
+        if (!list) return;
+        for (let i = 0; i < list.length; i++) {
+            const s = list[i];
+            if (!s || s.health <= 0) continue;
+            const sp = s.position || (s.mesh && s.mesh.position);
+            if (!sp) continue;
+            stampCircle(sp.x, sp.z, (s.radius || 6.0) + 1.5);
+        }
+    };
+    if (typeof structures !== 'undefined') stampStructList(structures);
+    if (typeof enemyStructures !== 'undefined') stampStructList(enemyStructures);
+    if (typeof mapObstacles !== 'undefined' && mapObstacles) {
+        for (let i = 0; i < mapObstacles.length; i++) {
+            const obs = mapObstacles[i];
+            if (!obs || !obs.position) continue;
+            stampCircle(obs.position.x, obs.position.z, (obs.radius || 2.5) + 1.2);
         }
     }
+
     _pathfindGridState.dirty = false;
     _pathfindGridState.lastStructCount = (typeof structures !== 'undefined' && structures) ? structures.length : 0;
     _pathfindGridState.lastEnemyStructCount = (typeof enemyStructures !== 'undefined' && enemyStructures) ? enemyStructures.length : 0;
