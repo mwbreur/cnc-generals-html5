@@ -1025,4 +1025,66 @@ console.log("✓ Verified Veterancy Kill Counter, Passenger Fireports, USA Vehic
 console.log("✓ Verified China Overlord W3D Upgrades (Bunker, Gatling, Speaker), Dual Muzzles, China Dozer Skin & Voices, Propaganda Center W3D & Textures, and Stutter-Free Group Move.");
 console.log("✓ Verified Generals' Promotions & Powers Tree (USA, China, GLA - Level 1 / 3 / 5 unlocks, XP rank-ups, and active strikes).");
 
+// 17. Headless Multi-Tick Skirmish Simulation Regression Test (350 ticks)
+vm.runInContext(`
+    {
+        setSimSeed(1337);
+        const r1 = simRandom(), r2 = simRandom();
+        setSimSeed(1337);
+        if (simRandom() !== r1 || simRandom() !== r2) {
+            throw new Error("Seeded PRNG simRandom() is not deterministic!");
+        }
+
+        resetEntireBattlefieldState();
+        setupMapEnvironment('tournament_desert', 1500);
+        const aiBasePos = new THREE.Vector3(240, 0, -240);
+        const aiDozer = spawnEnemyUnit('dozer', aiBasePos.clone().add(new THREE.Vector3(24, 0, 24)), null, 'china');
+        aiDozer.ownerId = 2;
+        aiDozer.teamId = 2;
+        aiDozer.faction = 'china';
+        aiDozer.isAI = true;
+        const aiCC = spawnAIStructure({ ownerId: 2, teamId: 2, faction: 'china', resources: 5000 }, 'center', aiBasePos, aiDozer);
+        if (!aiCC) throw new Error("Failed to spawn AI Command Center in headless Skirmish test!");
+        aiCC.isBuilding = false;
+        aiCC.buildProgress = 100;
+        aiCC.dozerRef = null;
+        aiDozer.taskState = 'Idle';
+        aiDozer.targetStructure = null;
+        aiCommanders = [{
+            ownerId: 2, teamId: 2, faction: 'china', difficulty: 'hard',
+            basePos: aiBasePos.clone(), rallyPoint: aiBasePos.clone().add(new THREE.Vector3(-25, 0, 25)),
+            resources: 5000, prodTimer: 0, structureTimer: 0,
+            discoveredEnemyBases: [], discoveredEnemyTargets: [], stagingTeam: [], scoutNetIds: new Set()
+        }];
+
+        combatDeltaScale = 1.0;
+        isMatchActive = true;
+        aiDifficultyLevel = 'hard';
+        const startDist = aiDozer.mesh.position.clone();
+        for (let tick = 0; tick < 350; tick++) {
+            buildingTick++;
+            processEnemyAIEngine();
+            processBuildingFunctions();
+            processEnemyMovement();
+            processEnemyCombat();
+            enemyUnits.forEach(eu => {
+                if (!eu.mesh || !Number.isFinite(eu.mesh.position.x) || !Number.isFinite(eu.mesh.position.z)) {
+                    throw new Error("NaN coordinates detected in headless Skirmish simulation at tick " + tick);
+                }
+            });
+        }
+        if (enemyStructures.length < 2) {
+            throw new Error("Expected AI Dozer to place at least 1 additional base structure within 350 ticks, got " + enemyStructures.length);
+        }
+        const foundation = enemyStructures.find(s => s !== aiCC);
+        if (!foundation || !aiDozer.targetStructure) {
+            throw new Error("Expected AI Dozer to be assigned to construct new foundation!");
+        }
+        if (aiDozer.mesh.position.distanceTo(startDist) < 1.0) {
+            throw new Error("AI Dozer failed to move toward foundation during 350-tick simulation!");
+        }
+    }
+`, sandbox);
+console.log("✓ Verified 350-tick headless Skirmish simulation (deterministic PRNG, AI base placement, Dozer navigation & construction, zero NaNs).");
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

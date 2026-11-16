@@ -54,4 +54,18 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
+        // Deterministic Seeded PRNG (Mulberry32) for Skirmish / Multiplayer simulation consistency
+        let _simRngState = 0x6D2B79F5;
+        function setSimSeed(seed) {
+            _simRngState = (Number(seed) >>> 0) || 0x6D2B79F5;
+        }
+        function simRandom() {
+            let t = _simRngState += 0x6D2B79F5;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        }
+        const SIM_FIXED_HZ = 30;
+        const SIM_FIXED_DT = 1 / SIM_FIXED_HZ;
+
         
