@@ -241,11 +241,17 @@ function findNavigationPath(startPos, endPos, options = {}) {
     }
 
     const totalCells = gridDim * gridDim;
-    const gScore = new Float32Array(totalCells);
+    if (!_pathfindGridState._gScore || _pathfindGridState._gScore.length !== totalCells) {
+        _pathfindGridState._gScore = new Float32Array(totalCells);
+        _pathfindGridState._parent = new Int32Array(totalCells);
+        _pathfindGridState._closed = new Uint8Array(totalCells);
+    }
+    const gScore = _pathfindGridState._gScore;
+    const parent = _pathfindGridState._parent;
+    const closed = _pathfindGridState._closed;
     gScore.fill(Infinity);
-    const parent = new Int32Array(totalCells);
     parent.fill(-1);
-    const closed = new Uint8Array(totalCells);
+    closed.fill(0);
 
     const startIdx = sz * gridDim + sx;
     const goalIdx = gz * gridDim + gx;
@@ -390,7 +396,7 @@ function getSupplyDockSlotPosition(dockObj, harvester, isCenter = false) {
         dockObj._dockSlots = [null, null, null, null];
     }
     const unitId = (harvester && (harvester.netId || harvester._dockUnitId)) ||
-        (harvester ? (harvester._dockUnitId = 'harv_' + Math.floor(Math.random() * 1000000)) : 'harv_0');
+        (harvester ? (harvester._dockUnitId = 'harv_' + Math.floor(simRandom() * 1000000)) : 'harv_0');
 
     let slotIdx = dockObj._dockSlots.indexOf(unitId);
     if (slotIdx === -1) {
@@ -444,7 +450,7 @@ function clearFoundationFootprint(structure) {
             const dist = Math.hypot(dx, dz);
             if (dist < clearanceDist) {
                 let angle = Math.atan2(dz, dx);
-                if (dist < 0.05) angle = Math.random() * Math.PI * 2;
+                if (dist < 0.05) angle = simRandom() * Math.PI * 2;
                 const safeRadius = sRadius + uRadius + 3.5;
                 let exitX = sPos.x + Math.cos(angle) * safeRadius;
                 let exitZ = sPos.z + Math.sin(angle) * safeRadius;
@@ -521,7 +527,7 @@ function initAICommanders() {
             );
         }
         for (let i = candidateWaypoints.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
+            const j = Math.floor(simRandom() * (i + 1));
             const tmp = candidateWaypoints[i]; candidateWaypoints[i] = candidateWaypoints[j]; candidateWaypoints[j] = tmp;
         }
 
@@ -660,34 +666,34 @@ function chooseAICounterUnitType(cmd, facilityType) {
     if (facilityType === 'barracks') {
         if (f === 'china') {
             if (counter === 'anti_air' || counter === 'anti_armor') return 'tankhunter';
-            return Math.random() < 0.45 ? 'tankhunter' : 'redguard';
+            return simRandom() < 0.45 ? 'tankhunter' : 'redguard';
         } else if (f === 'gla') {
             if (counter === 'anti_air' || counter === 'anti_armor') return 'rpg';
-            return Math.random() < 0.45 ? 'rpg' : 'rebel';
+            return simRandom() < 0.45 ? 'rpg' : 'rebel';
         } else {
             if (counter === 'anti_air' || counter === 'anti_armor') return 'missiledefender';
-            return Math.random() < 0.45 ? 'missiledefender' : 'ranger';
+            return simRandom() < 0.45 ? 'missiledefender' : 'ranger';
         }
     }
 
     // War Factory / Arms Dealer vehicles
     if (f === 'china') {
-        if (counter === 'anti_air' || counter === 'anti_infantry') return Math.random() < 0.7 ? 'gatling' : 'battlemaster';
-        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.55) ? 'overlord' : 'battlemaster';
-        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'nukecannon';
-        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'overlord' : (Math.random() < 0.35 ? 'gatling' : 'battlemaster');
+        if (counter === 'anti_air' || counter === 'anti_infantry') return simRandom() < 0.7 ? 'gatling' : 'battlemaster';
+        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && simRandom() < 0.55) ? 'overlord' : 'battlemaster';
+        if (cmd.difficulty === 'hard' && simRandom() < 0.22) return 'nukecannon';
+        return (cmd.difficulty === 'hard' && simRandom() < 0.4) ? 'overlord' : (simRandom() < 0.35 ? 'gatling' : 'battlemaster');
     } else if (f === 'gla') {
-        if (counter === 'anti_air') return Math.random() < 0.75 ? 'quad' : 'scorpion';
-        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'quad' : 'buggy';
-        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.5) ? 'marauder' : 'scorpion';
-        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'scud';
-        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'marauder' : (Math.random() < 0.35 ? 'quad' : 'scorpion');
+        if (counter === 'anti_air') return simRandom() < 0.75 ? 'quad' : 'scorpion';
+        if (counter === 'anti_infantry') return simRandom() < 0.65 ? 'quad' : 'buggy';
+        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && simRandom() < 0.5) ? 'marauder' : 'scorpion';
+        if (cmd.difficulty === 'hard' && simRandom() < 0.22) return 'scud';
+        return (cmd.difficulty === 'hard' && simRandom() < 0.4) ? 'marauder' : (simRandom() < 0.35 ? 'quad' : 'scorpion');
     } else {
-        if (counter === 'anti_air') return Math.random() < 0.75 ? 'humvee' : 'paladin';
-        if (counter === 'anti_infantry') return Math.random() < 0.65 ? 'humvee' : 'tank';
-        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && Math.random() < 0.55) ? 'paladin' : 'tank';
-        if (cmd.difficulty === 'hard' && Math.random() < 0.22) return 'tomahawk';
-        return (cmd.difficulty === 'hard' && Math.random() < 0.4) ? 'paladin' : (Math.random() < 0.35 ? 'humvee' : 'tank');
+        if (counter === 'anti_air') return simRandom() < 0.75 ? 'humvee' : 'paladin';
+        if (counter === 'anti_infantry') return simRandom() < 0.65 ? 'humvee' : 'tank';
+        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && simRandom() < 0.55) ? 'paladin' : 'tank';
+        if (cmd.difficulty === 'hard' && simRandom() < 0.22) return 'tomahawk';
+        return (cmd.difficulty === 'hard' && simRandom() < 0.4) ? 'paladin' : (simRandom() < 0.35 ? 'humvee' : 'tank');
     }
 }
 
@@ -922,9 +928,9 @@ function processEnemyAIEngine() {
             const fac = myStructures.find(es => !es.isBuilding && es.type === 'factory' && es.health > 0);
             const bar = myStructures.find(es => !es.isBuilding && es.type === 'barracks' && es.health > 0);
             // Combined arms: mix 70% armor/vehicles + 30% counter infantry when both facilities exist
-            const chosenFacility = (fac && bar) ? (Math.random() < 0.72 ? fac : bar) : (fac || bar);
+            const chosenFacility = (fac && bar) ? (simRandom() < 0.72 ? fac : bar) : (fac || bar);
             if (chosenFacility) {
-                const rawSpawn = chosenFacility.position.clone().add(new THREE.Vector3(10 + Math.random() * 4, 0, 8 + Math.random() * 4));
+                const rawSpawn = chosenFacility.position.clone().add(new THREE.Vector3(10 + simRandom() * 4, 0, 8 + simRandom() * 4));
                 const spawnPos = adjustToPossibleDestination(rawSpawn, chosenFacility);
                 spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
                 const uType = chooseAICounterUnitType(cmd, chosenFacility.type);
@@ -973,8 +979,8 @@ function processEnemyAIEngine() {
                     scout.targetPosition.copy(nextWp);
                 } else {
                     const half = mapSize * 0.35;
-                    const rx = (Math.random() * 2 - 1) * half;
-                    const rz = (Math.random() * 2 - 1) * half;
+                    const rx = (simRandom() * 2 - 1) * half;
+                    const rz = (simRandom() * 2 - 1) * half;
                     scout.targetPosition.set(rx, typeof getTerrainHeight === 'function' ? getTerrainHeight(rx, rz) : 0, rz);
                 }
             }
