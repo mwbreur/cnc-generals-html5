@@ -695,7 +695,7 @@
 
         function getUnitTechPrerequisite(type) {
             if (selectedFaction === 'usa') {
-                if (['paladin', 'tomahawk', 'pathfinder', 'burton', 'stealthfighter', 'aurora'].includes(type)) {
+                if (['tomahawk', 'pathfinder', 'burton', 'stealthfighter', 'aurora'].includes(type)) {
                     return { building: 'strategyCenter', name: 'Strategy Center' };
                 }
             } else if (selectedFaction === 'china') {

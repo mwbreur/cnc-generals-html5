@@ -2755,7 +2755,10 @@ function produceUnit(type) {
     }
 
     if (typeof isUnitUnlockedByGeneralsPower === 'function' && !isUnitUnlockedByGeneralsPower(type)) {
-        showNotification(`Unlock ${spec.name} in the Generals' Promotions tree (click RANK bar or press P).`, 'error');
+        showNotification(`Unlock ${spec.name} in the Generals' Promotions tree (click ★ RANK button or press P).`, 'error');
+        if (typeof generalsPoints !== 'undefined' && generalsPoints > 0 && typeof openGeneralsPowersModal === 'function') {
+            openGeneralsPowersModal();
+        }
         return;
     }
 

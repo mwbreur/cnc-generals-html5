@@ -12779,7 +12779,7 @@ function resolveObstacleCollisions(unit) {
 
         function getUnitTechPrerequisite(type) {
             if (selectedFaction === 'usa') {
-                if (['paladin', 'tomahawk', 'pathfinder', 'burton', 'stealthfighter', 'aurora'].includes(type)) {
+                if (['tomahawk', 'pathfinder', 'burton', 'stealthfighter', 'aurora'].includes(type)) {
                     return { building: 'strategyCenter', name: 'Strategy Center' };
                 }
             } else if (selectedFaction === 'china') {
@@ -17429,7 +17429,10 @@ function produceUnit(type) {
     }
 
     if (typeof isUnitUnlockedByGeneralsPower === 'function' && !isUnitUnlockedByGeneralsPower(type)) {
-        showNotification(`Unlock ${spec.name} in the Generals' Promotions tree (click RANK bar or press P).`, 'error');
+        showNotification(`Unlock ${spec.name} in the Generals' Promotions tree (click ★ RANK button or press P).`, 'error');
+        if (typeof generalsPoints !== 'undefined' && generalsPoints > 0 && typeof openGeneralsPowersModal === 'function') {
+            openGeneralsPowersModal();
+        }
         return;
     }
 
