@@ -551,7 +551,21 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const glow2 = new THREE.PointLight(0x00d2ff, 2.5, 35);
         glow2.position.set(-17.54, 18.0, -13.16);
         root.add(glow2);
+    } else if (buildingKey === 'usa_commandCenter') {
+        // Fix sideways W3D flag orientation (flat in X-Z) -> hang vertically from flagpole
+        const hc4 = root.getObjectByName('HOUSECOLOR04');
+        if (hc4) hc4.rotation.z = Math.PI / 2;
+        // Team-colored trim stripes along the main Command Center hall under the curved roof
+        const stripeFront = new THREE.Mesh(new THREE.BoxGeometry(58, 2.2, 1.4), accentMat);
+        stripeFront.position.set(-8, 21.8, 34.4);
+        const stripeSideL = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 74), accentMat);
+        stripeSideL.position.set(-37.2, 21.8, -2);
+        const stripeSideR = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 74), accentMat);
+        stripeSideR.position.set(21.2, 21.8, -2);
+        root.add(stripeFront, stripeSideL, stripeSideR);
     } else if (buildingKey === 'usa_barracks') {
+        const hc4b = root.getObjectByName('HOUSECOLOR04');
+        if (hc4b) hc4b.visible = false;
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.55, 44, 8), metalMat);
         pole.position.set(28.74, 22, 38.25);
         const flag = new THREE.Mesh(new THREE.BoxGeometry(0.35, 7.5, 12.0), accentMat);
