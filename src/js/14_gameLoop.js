@@ -702,24 +702,9 @@ function animate() {
                         }
                     }
 
-                    // Overlord Gatling Cannon: Rapid anti-air and anti-infantry turret + stealth detection
+                    // Overlord Gatling Cannon: Stealth detection (firing handled by processCombatScanning)
                     if (unit.overlordUpgrade === 'gatling') {
                         unit.detectsStealth = true;
-                        if (unit.upgTimer % 15 === 0) {
-                            const maxDistSq = 22.0 * 22.0;
-                            const target = getLivingUnits().find(e => {
-                                if (e.health <= 0 || isFriendly(unit, e)) return false;
-                                const dx = e.mesh.position.x - uX;
-                                const dz = e.mesh.position.z - uZ;
-                                return (dx * dx + dz * dz) <= maxDistSq;
-                            });
-                            if (target) {
-                                spawnMuzzleFlash(unit.mesh.position, 0xffa502, 0.4);
-                                spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf1c40f, 3.5);
-                                playAudio('gatling_fire', {}, 'china');
-                                applyCalculatedDamage(unit, target, 18, 'GATLING');
-                            }
-                        }
                     }
 
                     // Overlord Propaganda / Speaker Tower: Heals nearby allies (+4 HP/s, +6 HP/s with Subliminal Messaging) and grants Horde fire-rate buff (+25%)

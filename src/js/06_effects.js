@@ -871,8 +871,8 @@
                 const q = (typeof turret.getWorldQuaternion === 'function')
                     ? turret.getWorldQuaternion(new THREE.Quaternion())
                     : (attacker.mesh.quaternion ? attacker.mesh.quaternion.clone() : new THREE.Quaternion());
-                const latOffset = (xOffset < 0) ? -0.94 : (xOffset > 0 ? 0.94 : 0);
-                const forward = new THREE.Vector3(latOffset, 0.86, 11.62).applyQuaternion(q);
+                const latOffset = (xOffset < 0) ? -2.62 : (xOffset > 0 ? 2.62 : 0);
+                const forward = new THREE.Vector3(latOffset, 0.85, 11.62).applyQuaternion(q);
                 return wp.add(forward);
             }
 

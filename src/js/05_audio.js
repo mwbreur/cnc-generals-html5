@@ -208,6 +208,7 @@ function playAudio(type, options = {}, faction = null) {
             }
 
             // --- CHINA SOUNDS ---
+            case 'overlord_cannon':
             case 'china_cannon': {
                 const bSize = Math.floor(ctx.sampleRate * 0.45);
                 const buf = ctx.createBuffer(1, bSize, ctx.sampleRate);
@@ -226,6 +227,7 @@ function playAudio(type, options = {}, faction = null) {
                 osc.start(t); osc.stop(t + 0.31);
                 break;
             }
+            case 'gatling':
             case 'gatling_fire': {
                 for (let i = 0; i < 4; i++) {
                     const st = t + i * 0.045;

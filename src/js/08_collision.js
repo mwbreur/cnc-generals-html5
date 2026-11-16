@@ -383,7 +383,7 @@ function resolveObstacleCollisions(unit) {
             // China Forces
             else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(true); radius = 3.4; speed = 0.15; health = 460; scanRange = 24; }
             else if (type === 'overlord') { mesh = createOverlordTankMesh(true); radius = 5.2; speed = 0.09; health = 1100; scanRange = 28; }
-            else if (type === 'gatling') { mesh = createGatlingTankMesh(true); radius = 3.4; speed = 0.16; health = 400; scanRange = 22; }
+            else if (type === 'gatling') { mesh = createGatlingTankMesh(true); radius = 3.4; speed = 0.16; health = 400; scanRange = 26; }
             else if (type === 'dragon') { mesh = createDragonTankMesh(true); radius = 3.4; speed = 0.15; health = 450; scanRange = 18; }
             else if (type === 'crawler') { mesh = createTroopCrawlerMesh(true); radius = 3.8; speed = 0.15; health = 480; scanRange = 20; }
             else if (type === 'inferno') { mesh = createInfernoCannonMesh(true); radius = 3.6; speed = 0.10; health = 220; scanRange = 36; }

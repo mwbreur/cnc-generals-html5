@@ -65,7 +65,7 @@ function processCombatScanning() {
                             const hPos = h && (h.position || (h.mesh && h.mesh.position));
                             if (!h || h.health <= 0 || !hPos || isFriendly(unit, h)) continue;
                             const d = unit.mesh.position.distanceTo(hPos);
-                            if (d <= 36) {
+                            if (d <= 26) {
                                 let score = 100 - d;
                                 if (h.isAir) score += 60; // Prioritize airborne aircraft!
                                 if (getArmorCategory(h) === 'infantry') score += 30;
@@ -75,20 +75,29 @@ function processCombatScanning() {
                         if (bestTarget) {
                             unit.overlordGatCooldown = 18; // ~0.3s rapid fire!
                             const upgMesh = unit.overlordUpgradeMesh || getCachedNode(unit.mesh, "overlordUpgrade");
-                            const muzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
                             const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
                             tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
                             if (upgMesh) {
-                                const gatTurret = getCachedNode(upgMesh, "turretSystem");
+                                const gatTurret = getCachedNode(upgMesh, "turretSystem") || upgMesh.getObjectByName("TURRET01");
                                 if (gatTurret && gatTurret.parent) {
                                     const localT = gatTurret.parent.worldToLocal(tPos.clone());
                                     gatTurret.rotation.y = Math.atan2(localT.x, localT.z);
                                 }
-                                upgMesh.traverse(c => { if (c.name === "gatlingBarrels") c.rotation.z += 1.6; });
+                                upgMesh.traverse(c => { if (c.name === "gatlingBarrels" || c.name === "gatlingBarrels2") c.rotation.z += 1.6; });
+                                upgMesh.updateMatrixWorld(true);
                             }
-                            spawnMuzzleFlash(muzzle, 0xffa502, 0.4);
-                            spawnBulletTracer(muzzle, tPos, 0xf1c40f, 2.8);
-                            if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling', {}, 'china');
+                            const m1 = upgMesh && upgMesh.getObjectByName("MUZZLE01");
+                            const m2 = upgMesh && upgMesh.getObjectByName("MUZZLE02");
+                            const fallbackMuzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+                            const muzzleL = m1 ? m1.getWorldPosition(new THREE.Vector3()) : fallbackMuzzle;
+                            const muzzleR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : null;
+                            spawnMuzzleFlash(muzzleL, 0xffa502, 0.4);
+                            spawnBulletTracer(muzzleL, tPos, 0xf1c40f, 2.8);
+                            if (muzzleR) {
+                                spawnMuzzleFlash(muzzleR, 0xffa502, 0.4);
+                                spawnBulletTracer(muzzleR, tPos, 0xf1c40f, 2.8);
+                            }
+                            if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
                             applyCalculatedDamage(unit, bestTarget, 16, 'GATLING');
                         }
                     }
@@ -502,16 +511,27 @@ function executeWeaponFire(attacker, target) {
         // Overlord Gatling Cannon Upgrade Firing!
         if (attacker.overlordUpgrade === 'gatling') {
             const upgMesh = attacker.overlordUpgradeMesh || getCachedNode(attacker.mesh, "overlordUpgrade");
-            const gatPos = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : muzzleL;
-            const barrels = getCachedNode(attacker.mesh, "gatlingBarrels") || (upgMesh && getCachedNode(upgMesh, "gatlingBarrels"));
-            if (barrels) barrels.rotation.z += 1.8;
+            if (upgMesh) {
+                const gatTurret = getCachedNode(upgMesh, "turretSystem") || upgMesh.getObjectByName("TURRET01");
+                if (gatTurret && gatTurret.parent) {
+                    const localT = gatTurret.parent.worldToLocal(targetPos.clone());
+                    gatTurret.rotation.y = Math.atan2(localT.x, localT.z);
+                }
+                upgMesh.traverse(c => { if (c.name === "gatlingBarrels" || c.name === "gatlingBarrels2") c.rotation.z += 1.8; });
+                upgMesh.updateMatrixWorld(true);
+            }
+            const m1 = upgMesh && upgMesh.getObjectByName("MUZZLE01");
+            const m2 = upgMesh && upgMesh.getObjectByName("MUZZLE02");
+            const gatPosL = m1 ? m1.getWorldPosition(new THREE.Vector3()) : (upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : muzzleL);
+            const gatPosR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : gatPosL;
             for (let b = 0; b < 3; b++) {
                 setTimeout(() => {
-                    spawnMuzzleFlash(gatPos, 0xffa502, 0.35);
-                    spawnBulletTracer(gatPos, targetPos, 0xf1c40f, 2.8);
+                    const gPos = (b % 2 === 0) ? gatPosL : gatPosR;
+                    spawnMuzzleFlash(gPos, 0xffa502, 0.35);
+                    spawnBulletTracer(gPos, targetPos, 0xf1c40f, 2.8);
                 }, b * 50);
             }
-            if (typeof playAudio === 'function') playAudio('gatling', {}, 'china');
+            if (typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
             applyCalculatedDamage(attacker, target, 24, 'GATLING');
         }
     } else if (attacker.type === 'dragon') {
