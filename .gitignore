@@ -1,4 +1,7 @@
 # Build outputs & backups
+index.html
+assets/data/
+_site/
 *.bak*
 *.backup*
 node_modules/
