@@ -2369,31 +2369,34 @@ function processScrapCrateCollection() {
         const crate = activeScrapCrates[cIdx];
         if (!crate || !crate.mesh) continue;
 
+        const weaponSalvagers = ['technical', 'scorpion', 'marauder', 'quad', 'buggy', 'toxintractor'];
+        const glaSalvagers = [...weaponSalvagers, 'scud', 'bombtruck', 'radarvan'];
         for (let u of allLivingUnits) {
-            if (u.health > 0 && u.mesh && ['technical', 'scorpion', 'marauder'].includes(u.type)) {
+            if (u.health > 0 && u.mesh && glaSalvagers.includes(u.type)) {
                 const d = Math.hypot(u.mesh.position.x - crate.position.x, u.mesh.position.z - crate.position.z);
-                if (d <= (u.radius || 1.5) + 1.2) {
+                if (d <= (u.radius || 1.5) + 1.5) {
                     // Pick up crate!
                     scene.remove(crate.mesh);
                     crate.mesh.traverse(child => {
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) child.material.dispose();
+                        if (child.geometry && !(child.geometry.userData && child.geometry.userData._shared)) child.geometry.dispose();
+                        if (child.material && !(child.material.userData && child.material.userData._shared)) child.material.dispose();
                     });
                     activeScrapCrates.splice(cIdx, 1);
                     playAudio('scrap_pickup', {}, 'gla');
                     if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(u.mesh.position, 0x2ed573, 1.2);
 
-                    u.salvageLevel = (u.salvageLevel || 0) + 1;
-                    if (u.salvageLevel === 1) {
-                        if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
-                            showNotification(`★ ${u.type.toUpperCase()} salvaged scrap: WEAPONS UPGRADED!`, 'success');
-                        }
-                    } else if (u.salvageLevel === 2) {
-                        const oldMax = u.maxHealth;
-                        u.maxHealth = Math.floor(u.maxHealth * 1.3);
-                        u.health = u.maxHealth;
-                        if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
-                            showNotification(`★★ ${u.type.toUpperCase()} salvaged scrap: HEAVY ARMOR MAXED!`, 'success');
+                    if (weaponSalvagers.includes(u.type) && (u.salvageLevel || 0) < 2) {
+                        u.salvageLevel = (u.salvageLevel || 0) + 1;
+                        if (u.salvageLevel === 1) {
+                            if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
+                                showNotification(`★ ${u.type.toUpperCase()} salvaged scrap: WEAPONS UPGRADED!`, 'success');
+                            }
+                        } else if (u.salvageLevel === 2) {
+                            u.maxHealth = Math.floor(u.maxHealth * 1.3);
+                            u.health = u.maxHealth;
+                            if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
+                                showNotification(`★★ ${u.type.toUpperCase()} salvaged scrap: HEAVY ARMOR MAXED!`, 'success');
+                            }
                         }
                     } else {
                         u.health = u.maxHealth;

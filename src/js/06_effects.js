@@ -710,35 +710,29 @@
             });
         }
 
-        // Authentic GLA Salvage Scrap Crate (SalvageCrateCollide.cpp)
+        // Authentic GLA Salvage Scrap Crate (SalvageCrateCollide.cpp / PMJnkCrate.W3D)
         function spawnScrapCrate(pos) {
             const group = new THREE.Group();
             const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
-            group.position.set(pos.x, groundY + 0.45, pos.z);
+            group.position.set(pos.x, groundY + 0.05, pos.z);
 
-            // Crate Box
-            const crateGeo = new THREE.BoxGeometry(1.3, 0.8, 1.3);
-            const crateMat = new THREE.MeshStandardMaterial({
-                color: 0x5c4033, // rusted bronze/scrap
-                roughness: 0.65,
-                metalness: 0.75
-            });
-            const crate = new THREE.Mesh(crateGeo, crateMat);
-            group.add(crate);
-
-            // Green salvage scrap beacon icon
-            const scrapGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 6);
-            const scrapMat = new THREE.MeshBasicMaterial({
-                color: 0x2ed573,
-                transparent: true,
-                opacity: 0.95
-            });
-            const scrapIcon = new THREE.Mesh(scrapGeo, scrapMat);
-            scrapIcon.position.y = 0.55;
-            group.add(scrapIcon);
+            if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['salvage_crate']) {
+                const w3dCrate = createW3DVehicleMesh('salvage_crate', false);
+                group.add(w3dCrate);
+            } else {
+                const crateGeo = new THREE.BoxGeometry(1.3, 0.8, 1.3);
+                const crateMat = new THREE.MeshStandardMaterial({
+                    color: 0x5c4033,
+                    roughness: 0.65,
+                    metalness: 0.75
+                });
+                const crate = new THREE.Mesh(crateGeo, crateMat);
+                crate.position.y = 0.4;
+                group.add(crate);
+            }
 
             // Ground pulse aura
-            const ringGeo = new THREE.RingGeometry(0.8, 1.3, 16);
+            const ringGeo = new THREE.RingGeometry(0.9, 1.4, 16);
             ringGeo.rotateX(-Math.PI / 2);
             const ringMat = new THREE.MeshBasicMaterial({
                 color: 0x2ed573,
@@ -747,8 +741,12 @@
                 opacity: 0.55
             });
             const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.position.y = -0.4;
+            ring.position.y = 0.08;
             group.add(ring);
+
+            // RequiredScience = SCIENCE_GLA: Only visible to GLA player (still exists for GLA AI)
+            const isPlayerGLA = (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla');
+            group.visible = isPlayerGLA;
 
             scene.add(group);
 
@@ -759,14 +757,15 @@
                 life: 2400, // ~40 seconds
                 update() {
                     this.life--;
-                    this.mesh.rotation.y += 0.02;
+                    this.mesh.visible = (typeof selectedFaction !== 'undefined' && selectedFaction === 'gla');
+                    this.mesh.rotation.y += 0.015;
                     const pulse = 0.35 + Math.sin(Date.now() * 0.005) * 0.25;
                     this.ringMat.opacity = pulse;
                     if (this.life <= 0) {
                         scene.remove(this.mesh);
                         this.mesh.traverse(c => {
-                            if (c.geometry) c.geometry.dispose();
-                            if (c.material) c.material.dispose();
+                            if (c.geometry && !(c.geometry.userData && c.geometry.userData._shared)) c.geometry.dispose();
+                            if (c.material && !(c.material.userData && c.material.userData._shared)) c.material.dispose();
                         });
                         return false;
                     }

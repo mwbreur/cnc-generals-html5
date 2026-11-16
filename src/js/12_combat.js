@@ -499,10 +499,13 @@ function executeWeaponFire(attacker, target) {
     } else if (attacker.type === 'toxintractor') {
         // Toxin Tractor CHEMICAL ANTHRAX SPRAY!
         spawnToxinSprayBurst(muzzlePos, targetPos);
-        applyCalculatedDamage(attacker, target, 32, 'TOXIN');
+        let toxDmg = 32;
+        if (attacker.salvageLevel >= 1) toxDmg = Math.round(toxDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
+        applyCalculatedDamage(attacker, target, toxDmg, 'TOXIN');
     } else if (attacker.type === 'buggy') {
         // Rocket Buggy RIPPLE VOLLEY! (8 rockets with Buggy Ammo Chains)
-        const rDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets')) ? 15 : 12;
+        let rDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets')) ? 15 : 12;
+        if (attacker.salvageLevel >= 1) rDmg = Math.round(rDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
         const rCount = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('buggyAmmo')) ? 8 : 4;
         for (let r = 0; r < rCount; r++) {
             setTimeout(() => {
@@ -695,7 +698,8 @@ function executeWeaponFire(attacker, target) {
             spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
             spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.5);
         });
-        const qDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 40 : 32;
+        let qDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 40 : 32;
+        if (attacker.salvageLevel >= 1) qDmg = Math.round(qDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
         applyCalculatedDamage(attacker, target, qDmg, 'GATLING');
     } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
         // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry, Jarmen Kell also snipes vehicle drivers!)

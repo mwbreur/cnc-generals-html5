@@ -47,7 +47,8 @@ const VEHICLE_CONFIG = {
     'toxintractor':   { file: 'UVToxinTrk.W3D',   tex: 'uvtoxintrk.dds',   scale: 0.290, faction: 'gla' },
     'bombtruck':      { file: 'UVBmbtruk.W3D',    tex: 'uvbmbtruk.dds',    scale: 0.290, faction: 'gla' },
     'scud':           { file: 'UVScudLchr.W3D',   tex: 'uvscudlchr.dds',   scale: 0.340, faction: 'gla' },
-    'radarvan':       { file: 'UVRadarVan.W3D',   tex: 'uvradarvan.dds',   scale: 0.290, faction: 'gla' }
+    'radarvan':       { file: 'UVRadarVan.W3D',   tex: 'uvradarvan.dds',   scale: 0.290, faction: 'gla' },
+    'salvage_crate':  { file: 'PMJnkCrate.W3D',   tex: 'pmcrates04.dds',   scale: 0.160, faction: 'gla' }
 };
 
 // Buildings: calibrated scale (0.26-0.27) so Command Centers are ~34 units, War Factories ~32 units, Power Plants ~16.5 units
