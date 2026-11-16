@@ -563,6 +563,38 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const stripeSideR = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 74), accentMat);
         stripeSideR.position.set(21.2, 21.8, -2);
         root.add(stripeFront, stripeSideL, stripeSideR);
+        // USA Command Center Radar Lattice Tower + Rotating Parabolic Dish at OBJECT22 pad
+        const towerGrp = new THREE.Group();
+        towerGrp.position.set(49.03, 0.89, 19.94);
+        const padBase = new THREE.Mesh(new THREE.BoxGeometry(13, 3.2, 13), concreteMat);
+        padBase.position.y = 1.6;
+        towerGrp.add(padBase);
+        const strutMat = metalMat;
+        [[-4.2, -4.2], [4.2, -4.2], [-4.2, 4.2], [4.2, 4.2]].forEach(([sx, sz]) => {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, 34, 6), strutMat);
+            leg.position.set(sx * 0.72, 19, sz * 0.72);
+            leg.rotation.z = sx > 0 ? 0.08 : -0.08;
+            leg.rotation.x = sz > 0 ? -0.08 : 0.08;
+            towerGrp.add(leg);
+        });
+        [10, 19, 28, 35].forEach((ry, idx) => {
+            const w = 9.2 - idx * 1.3;
+            const ring = new THREE.Mesh(new THREE.BoxGeometry(w, 0.7, w), strutMat);
+            ring.position.y = ry;
+            towerGrp.add(ring);
+        });
+        const dishPivot = new THREE.Group();
+        dishPivot.name = 'radarDish';
+        dishPivot.position.set(0, 38.5, 0);
+        const dishMat = new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.45, metalness: 0.3, side: THREE.DoubleSide });
+        const dish = new THREE.Mesh(new THREE.SphereGeometry(7.2, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), dishMat);
+        dish.rotation.x = Math.PI * 0.68;
+        const feedHorn = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 7.5, 6), strutMat);
+        feedHorn.position.set(0, 2.2, 4.2);
+        feedHorn.rotation.x = Math.PI * 0.35;
+        dishPivot.add(dish, feedHorn);
+        towerGrp.add(dishPivot);
+        root.add(towerGrp);
     } else if (buildingKey === 'usa_barracks') {
         const hc4b = root.getObjectByName('HOUSECOLOR04');
         if (hc4b) hc4b.visible = false;
