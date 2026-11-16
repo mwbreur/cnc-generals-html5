@@ -102,7 +102,7 @@ The JavaScript filenames are numbered to make their concatenation order explicit
 
 ### Requirements
 
-- Node.js 20 or newer is recommended (the CI workflow uses Node.js 20).
+- Node.js 20 or newer is recommended (the CI workflow uses Node.js 24).
 - A modern browser with WebGL support.
 
 ### Build
