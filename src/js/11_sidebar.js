@@ -3029,9 +3029,12 @@ function attachControlRodsVisual(structure) {
         structure.mesh.traverse(child => {
             if (child.name === 'CYLINDER01' || child.name === 'CYLINDER02') {
                 child.visible = true;
+                if (child.userData.baseY === undefined) child.userData.baseY = child.position.y;
+                child.position.y = child.userData.baseY + 11.5;
             } else if (child.name === 'coldFusionGlowLight' && child.isPointLight) {
                 child.visible = true;
-                child.intensity = 2.5;
+                child.intensity = 2.8;
+                child.position.y = 26.5;
             } else if (child.isMesh && child.userData && child.userData.isColdFusionConduit && child.material) {
                 child.material.color.setHex(0x00d2ff);
                 if (child.material.emissive) child.material.emissive.setHex(0x0088ff);
