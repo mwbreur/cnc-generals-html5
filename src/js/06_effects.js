@@ -126,8 +126,8 @@
                     if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
                         this.toPos.copy(this.metadata.target.mesh.position);
                         this.toPos.y += this.metadata.target.isAir ? 0.3 : 0.5;
-                        this.distTotal = Math.max(1, this.fromPos.distanceTo(this.toPos));
-                        this.mesh.lookAt(this.toPos);
+                        this.distTotal = Math.max(1, (this.fromPos || fromPos).distanceTo(this.toPos));
+                        (this.mesh || this.group).lookAt(this.toPos);
                     }
 
                     this.distTraveled += this.speed;
@@ -229,8 +229,8 @@
                     if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
                         this.toPos.copy(this.metadata.target.mesh.position);
                         this.toPos.y += this.metadata.target.isAir ? 0.3 : 0.5;
-                        this.distTotal = Math.max(1, this.fromPos.distanceTo(this.toPos));
-                        this.mesh.lookAt(this.toPos);
+                        this.distTotal = Math.max(1, (this.fromPos || fromPos).distanceTo(this.toPos));
+                        (this.mesh || this.group).lookAt(this.toPos);
                     }
 
                     this.distTraveled += this.speed;
