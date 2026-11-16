@@ -1128,7 +1128,7 @@
             });
         }
 
-        function animateParticleCannonStrike(targetPos, duration = 260, uplinkPos = null, isPlayerOwned = false) {
+        function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null, isPlayerOwned = false) {
             if (typeof playSuperweaponEvaAlert === 'function') {
                 playSuperweaponEvaAlert('particleCannon', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
             }

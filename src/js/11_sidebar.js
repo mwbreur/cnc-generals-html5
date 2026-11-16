@@ -3345,7 +3345,7 @@ function strikeWithSuperweapon(structure, targetPosition) {
             pitOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), structure.rotationY || 0);
             uplinkPos = structure.position.clone().add(pitOffset);
         }
-        animateParticleCannonStrike(targetPosition, 260, uplinkPos, !structure.isAI);
+        animateParticleCannonStrike(targetPosition, 600, uplinkPos, !structure.isAI);
     } else if (sType === 'nukeSilo') {
         animateNukeStrike(structure.position, targetPosition);
     } else if (sType === 'scudStorm') {
