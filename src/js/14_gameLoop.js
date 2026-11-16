@@ -236,7 +236,7 @@ function separateGroundUnits(list) {
 }
 
 const CRUSHER_TANK_SET = new Set(['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank']);
-const INFANTRY_TYPE_SET = new Set(['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'blacklotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'hijacker', 'worker', 'infantry', 'rocket']);
+const INFANTRY_TYPE_SET = new Set(['ranger', 'missiledefender', 'pathfinder', 'burton', 'pilot', 'redguard', 'tankhunter', 'hacker', 'lotus', 'blacklotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'hijacker', 'worker', 'infantry', 'rocket']);
 
 function animate() {
             requestAnimationFrame(animate);
@@ -1839,6 +1839,37 @@ function animate() {
                     }
                 }
 
+                // --- VETERAN PILOT BOARDING VEHICLE/AIRCRAFT ---
+                if (unit.type === 'pilot' && unit.pilotTarget) {
+                    const pv = unit.pilotTarget;
+                    if (!pv || pv.health <= 0 || !pv.mesh) {
+                        unit.pilotTarget = null;
+                        unit.taskState = 'Idle';
+                    } else {
+                        unit.targetPosition.set(pv.mesh.position.x, getTerrainHeight(pv.mesh.position.x, pv.mesh.position.z), pv.mesh.position.z);
+                        const dPilot = Math.hypot(pv.mesh.position.x - unit.mesh.position.x, pv.mesh.position.z - unit.mesh.position.z);
+                        if (dPilot <= (pv.radius || 3.0) + 3.5) {
+                            const pVet = unit.veterancy || 1;
+                            if ((pv.veterancy || 0) < pVet) {
+                                const prevMult = pv.veterancy === 3 ? 1.6 : (pv.veterancy === 2 ? 1.4 : (pv.veterancy === 1 ? 1.2 : 1.0));
+                                const nextMult = pVet === 3 ? 1.6 : (pVet === 2 ? 1.4 : 1.2);
+                                const oldMax = pv.maxHealth;
+                                pv.maxHealth = Math.floor(pv.maxHealth * (nextMult / prevMult));
+                                pv.health = Math.min(pv.maxHealth, pv.health + Math.max(0, pv.maxHealth - oldMax));
+                                pv.veterancy = pVet;
+                                pv.kills = Math.max(pv.kills || 0, unit.kills || 0);
+                                if (typeof showNotification === 'function') {
+                                    showNotification(`★ Pilot boarded ${pv.type.toUpperCase()} — Veterancy Rank ${pVet} transferred!`, 'success');
+                                }
+                            }
+                            unit.health = 0;
+                            unit._silentRemove = true;
+                            unit.pilotTarget = null;
+                            return;
+                        }
+                    }
+                }
+
                 // --- CAPTURING NEUTRAL STRUCTURE CHANNELS ---
                 if (unit.taskState === 'Capturing' && unit.captureTarget && unit.captureTarget.health > 0) {
                     const targetTech = unit.captureTarget;
@@ -2201,6 +2232,25 @@ function animate() {
                         unit.drone = null;
                     }
                     scene.remove(unit.mesh);
+                    // USA Ejection Seat: Manned USA vehicles/aircraft at Veteran+ eject a pilot retaining veterancy
+                    const USA_PILOT_EJECT_SET = new Set(['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'chinook']);
+                    const isUsaOwned = unit.faction === 'usa' || (!unit.faction && typeof selectedFaction !== 'undefined' && selectedFaction === 'usa');
+                    if (!unit._silentRemove && isUsaOwned && !unit.isUnmanned && (unit.veterancy || 0) >= 1 && USA_PILOT_EJECT_SET.has(unit.type) && typeof spawnUnit === 'function') {
+                        const ejectPos = unit.mesh.position.clone();
+                        ejectPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(ejectPos.x, ejectPos.z) : 0;
+                        const pilot = spawnUnit('pilot', ejectPos, 'usa');
+                        if (pilot) {
+                            const vRank = Math.min(3, unit.veterancy);
+                            const vMult = vRank === 3 ? 1.6 : (vRank === 2 ? 1.4 : 1.2);
+                            pilot.veterancy = vRank;
+                            pilot.kills = unit.kills || 0;
+                            pilot.maxHealth = Math.floor(pilot.maxHealth * vMult);
+                            pilot.health = pilot.maxHealth;
+                            if (typeof showNotification === 'function') {
+                                showNotification(`🪂 Veteran Pilot ejected (Rank ${'★'.repeat(vRank)}) — right-click a friendly vehicle or aircraft to transfer veterancy!`, 'info');
+                            }
+                        }
+                    }
                     // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
                     if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(unit.type))) {
                         if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);

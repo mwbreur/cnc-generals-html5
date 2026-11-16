@@ -222,7 +222,7 @@ const ARMOR_COEFFICIENTS = {
 };
 
 const _ARMOR_BLD_TYPES = new Set(['center', 'commandCenter', 'power', 'nuclearReactor', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot', 'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon', 'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter', 'blackMarket', 'derrick', 'tunnel', 'demoTrap']);
-const _ARMOR_INF_TYPES = new Set(['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'missiledefender', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker', 'burton', 'blacklotus', 'hacker', 'hijacker', 'terrorist', 'mob']);
+const _ARMOR_INF_TYPES = new Set(['ranger', 'infantry', 'redguard', 'rebel', 'rocket', 'missiledefender', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'worker', 'burton', 'blacklotus', 'hacker', 'hijacker', 'terrorist', 'mob', 'pilot']);
 const _ARMOR_LV_TYPES = new Set(['humvee', 'technical', 'buggy', 'dragon', 'dragonTank', 'toxintractor', 'truck', 'dozer', 'quad', 'ambulance', 'radarvan', 'bombtruck', 'crawler', 'battlebus']);
 
 function getArmorCategory(target) {
@@ -322,6 +322,11 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     }
     if (attacker && attacker.frenzyUntil && Date.now() < attacker.frenzyUntil) {
         finalDmg = Math.round(finalDmg * 1.30);
+    }
+    // Veterancy Damage Bonus: +10% (Veteran), +20% (Elite), +30% (Heroic)
+    if (attacker && attacker.veterancy >= 1) {
+        const vetDmgMult = attacker.veterancy >= 3 ? 1.30 : (attacker.veterancy === 2 ? 1.20 : 1.10);
+        finalDmg = Math.round(finalDmg * vetDmgMult);
     }
 
     // Target defensive upgrade buffs (USA Strategy Center Hold the Line: +20% armor / -20% damage taken)
@@ -458,7 +463,7 @@ function executeWeaponFire(attacker, target) {
     if (attacker.isUnmanned || (attacker.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < attacker.disabledUntil)) {
         return;
     }
-    if (['ambulance', 'chinook', 'truck', 'dozer', 'worker', 'radarvan', 'crawler'].includes(attacker.type)) {
+    if (['ambulance', 'chinook', 'truck', 'dozer', 'worker', 'radarvan', 'crawler', 'pilot'].includes(attacker.type)) {
         attacker.combatTarget = null;
         return;
     }
@@ -495,7 +500,9 @@ function executeWeaponFire(attacker, target) {
     }
 
     // Authentic Veterancy Fire Rate Bonus (ExperienceTracker.cpp)
-    if (attacker.veterancy === 2) {
+    if (attacker.veterancy === 1) {
+        baseCooldown = Math.floor(baseCooldown * 0.91); // Veteran: +10% ROF
+    } else if (attacker.veterancy === 2) {
         baseCooldown = Math.floor(baseCooldown * 0.80); // Elite: 1.25x ROF
     } else if (attacker.veterancy === 3) {
         baseCooldown = Math.floor(baseCooldown * 0.65); // Heroic: 1.50x ROF

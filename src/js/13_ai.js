@@ -1900,7 +1900,29 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // 1b. Check if right-clicking on a friendly transport vehicle or Internet Center to embark!
+            // 1b. Check if right-clicking a friendly vehicle/aircraft with ejected Veteran Pilot(s), or transport/Internet Center to embark!
+            const selectedPilots = units.filter(u => u.selected && u.type === 'pilot');
+            if (selectedPilots.length > 0) {
+                const boardableMeshes = units.filter(u => !u.garrisonedIn && u.health > 0 && u.type !== 'pilot' && !isInfantryType(u.type) && !u.isUnmanned && u.mesh).map(u => u.mesh);
+                const pilotHits = boardableMeshes.length ? raycaster.intersectObjects(boardableMeshes, true) : [];
+                if (pilotHits.length > 0) {
+                    let hitObj = pilotHits[0].object;
+                    while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
+                    const targetVehicle = units.find(u => u.mesh === hitObj);
+                    if (targetVehicle) {
+                        selectedPilots.forEach(p => {
+                            p.pilotTarget = targetVehicle;
+                            p.taskState = 'Moving';
+                            p.combatTarget = null;
+                            p.targetPosition.set(targetVehicle.mesh.position.x, getTerrainHeight(targetVehicle.mesh.position.x, targetVehicle.mesh.position.z), targetVehicle.mesh.position.z);
+                        });
+                        showNotification(`Pilot ordered to board ${targetVehicle.type.toUpperCase()} and transfer veterancy!`, 'info');
+                        updateSidebar();
+                        return;
+                    }
+                }
+            }
+
             const friendlyMeshes = units.filter(u => u.capacity > 0 && !u.garrisonedIn).map(u => u.mesh);
             const selectedHackers = units.filter(u => u.selected && u.type === 'hacker');
             const icStructures = (selectedHackers.length > 0 && typeof structures !== 'undefined')

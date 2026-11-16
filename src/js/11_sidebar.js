@@ -3719,6 +3719,7 @@ function updateHUD() {
             else if (type === 'rocket') { mesh = createMissileDefenderMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 24; }
             else if (type === 'pathfinder') { mesh = createPathfinderMesh(); radius = 0.8; speed = 0.09; health = 120; scanRange = 32; }
             else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.9; speed = 0.10; health = 350; scanRange = 24; }
+            else if (type === 'pilot') { mesh = typeof createPilotMesh === 'function' ? createPilotMesh(false) : createRangerMesh(); radius = 0.7; speed = 0.095; health = 100; scanRange = 0; }
 
             // China Forces
             else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(false); radius = 3.4; speed = 0.15; health = 460; scanRange = 26; }

@@ -785,6 +785,25 @@ function createAuroraMesh(isEnemy = false) {
     return g;
 }
 
+function createPilotMesh(isEnemy = false) {
+    const g = new THREE.Group();
+    g.scale.set(0.50, 0.50, 0.50);
+    const suitMat = isEnemy ? matEnemyDark : matUSAColor;
+    const boots = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.38), matDarkMetal);
+    boots.position.y = 0.14; g.add(boots);
+    const legs = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.55, 0.30), suitMat);
+    legs.position.y = 0.45; g.add(legs);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.58, 0.34), suitMat);
+    torso.position.y = 0.85; torso.castShadow = true; g.add(torso);
+    const vest = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.46, 0.38), matTarp);
+    vest.position.y = 0.88; g.add(vest);
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.35, metalness: 0.2 }));
+    helmet.position.set(0, 1.38, -0.02); helmet.castShadow = true; g.add(helmet);
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.14), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.15, metalness: 0.85 }));
+    visor.position.set(0, 1.38, 0.18); g.add(visor);
+    return g;
+}
+
 function createRangerMesh(isEnemy = false) {
     if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['ranger']) {
         return createW3DInfantryMesh('ranger', isEnemy);
