@@ -440,7 +440,34 @@ function createChinaDozerMesh(isEnemy = false) {
     if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['dozer_china']) {
         return createW3DVehicleMesh('dozer_china', isEnemy);
     }
-    return createUSADozerMesh(isEnemy);
+    const g = new THREE.Group();
+    const hullMat = isEnemy
+        ? new THREE.MeshStandardMaterial({ color: 0x7a2924, roughness: 0.7, metalness: 0.25 })
+        : matChina;
+    const trimMat = isEnemy
+        ? new THREE.MeshStandardMaterial({ color: 0x992d22, roughness: 0.6 })
+        : matChinaColor;
+    g.add(createTrackAssembly(2.5, 0.65, 3.2, hullMat, isEnemy));
+
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.62, 2.8), hullMat);
+    hull.position.set(0, 0.72, -0.05);
+    hull.castShadow = true;
+    g.add(hull);
+
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.95, 1.55), trimMat);
+    cab.position.set(0, 1.43, -0.2);
+    cab.castShadow = true;
+    g.add(cab);
+
+    const windows = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.46, 0.07), matBlueGlass);
+    windows.position.set(0, 1.55, 0.59);
+    g.add(windows);
+
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.72, 0.22), isEnemy ? hullMat : matRedStar);
+    blade.position.set(0, 0.56, 2.1);
+    blade.castShadow = true;
+    g.add(blade);
+    return g;
 }
 window.createChinaDozerMesh = createChinaDozerMesh;
 

@@ -161,11 +161,15 @@ const THREE = {
 
 const domElementStub = () => ({
     style: {},
+    dataset: {},
+    children: [],
     classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
     setAttribute: () => {},
     getAttribute: () => null,
     appendChild: () => {},
     removeChild: () => {},
+    replaceChildren: () => {},
+    remove: () => {},
     addEventListener: () => {},
     removeEventListener: () => {},
     querySelector: () => null,

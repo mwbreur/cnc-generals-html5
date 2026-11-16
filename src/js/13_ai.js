@@ -1447,17 +1447,20 @@ function processEnemyAIEngine() {
                     activeBlueprintType = null;
                     return;
                 }
-                playerResources -= cost;
-                const resEl = document.getElementById('resource-display');
-                if (resEl) resEl.innerText = `$${playerResources}`;
-                
                 const placementPosition = blueprintPlacementPos.clone();
                 placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
                 const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
-                playUSASound('construction');
                 scene.remove(blueprintMesh);
                 blueprintMesh = null;
                 activeBlueprintType = null;
+                if (!newStruct) {
+                    showNotification('Structure not available for this faction!', 'error');
+                    return;
+                }
+                playerResources -= cost;
+                const resEl = document.getElementById('resource-display');
+                if (resEl) resEl.innerText = `$${playerResources}`;
+                playUSASound('construction');
 
                 const builderCandidates = units.filter(u => (u.type === 'dozer' || u.type === 'worker') && u.health > 0);
                 let assignedBuilder = builderCandidates.find(u => u.selected);

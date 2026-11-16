@@ -4531,7 +4531,34 @@ function createChinaDozerMesh(isEnemy = false) {
     if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['dozer_china']) {
         return createW3DVehicleMesh('dozer_china', isEnemy);
     }
-    return createUSADozerMesh(isEnemy);
+    const g = new THREE.Group();
+    const hullMat = isEnemy
+        ? new THREE.MeshStandardMaterial({ color: 0x7a2924, roughness: 0.7, metalness: 0.25 })
+        : matChina;
+    const trimMat = isEnemy
+        ? new THREE.MeshStandardMaterial({ color: 0x992d22, roughness: 0.6 })
+        : matChinaColor;
+    g.add(createTrackAssembly(2.5, 0.65, 3.2, hullMat, isEnemy));
+
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.62, 2.8), hullMat);
+    hull.position.set(0, 0.72, -0.05);
+    hull.castShadow = true;
+    g.add(hull);
+
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.95, 1.55), trimMat);
+    cab.position.set(0, 1.43, -0.2);
+    cab.castShadow = true;
+    g.add(cab);
+
+    const windows = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.46, 0.07), matBlueGlass);
+    windows.position.set(0, 1.55, 0.59);
+    g.add(windows);
+
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.72, 0.22), isEnemy ? hullMat : matRedStar);
+    blade.position.set(0, 0.56, 2.1);
+    blade.castShadow = true;
+    g.add(blade);
+    return g;
 }
 window.createChinaDozerMesh = createChinaDozerMesh;
 
@@ -11284,8 +11311,13 @@ function resolveObstacleCollisions(unit) {
         window.createStructureMeshForFaction = createStructureMeshForFaction;
 
         function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
-            const f = selectedFaction;
+            const f = (selectedFaction || 'usa').toLowerCase();
+            if (typeof isBuildingAvailableForFaction === 'function' && !isBuildingAvailableForFaction(type, f)) {
+                console.warn(`Blocked ${type} construction for ${f}: structure is not in that faction's build list.`);
+                return null;
+            }
             const group = createStructureMeshForFaction(type, f);
+            if (!group) return null;
             if (!group.userData || !group.userData.isW3D) {
                 group.scale.set(1.35, 1.35, 1.35);
             }
@@ -11514,6 +11546,7 @@ function resolveObstacleCollisions(unit) {
 
         // =========================================================================
         
+
 
 // --- MODULE: 09_fogOfWar.js ---
 // FOG OF WAR (COMMAND & CONQUER SHROUD & DYNAMIC VISION ENGINE)
@@ -11815,7 +11848,7 @@ function resolveObstacleCollisions(unit) {
                     nukecannon: ['Nuke Tank (Nuke Cannon)', 1800, 'Mobile tactical nuclear siege tank firing atomic shells.']
                 },
                 airfield: {
-                    raptor: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
+                    mig: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
                 },
                 supplyCenter: {
                     truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
@@ -12032,6 +12065,7 @@ function resolveObstacleCollisions(unit) {
 
         function selectFaction(faction, button) {
             selectedFaction = faction;
+            refreshFactionRoster();
             // Synchronize the top 3 big faction buttons
             document.querySelectorAll('.faction-card').forEach(card => {
                 card.classList.toggle('active', card.getAttribute('data-faction') === faction);
@@ -12074,8 +12108,14 @@ function resolveObstacleCollisions(unit) {
 
 
 
-        function getStructureCost(type) {
-            const entry = factionBuildings[selectedFaction].find(building => building[0] === type);
+        function isBuildingAvailableForFaction(type, faction = selectedFaction) {
+            if (type === 'center' || type === 'commandCenter') return true;
+            return (factionBuildings[faction] || []).some(building => building[0] === type);
+        }
+        window.isBuildingAvailableForFaction = isBuildingAvailableForFaction;
+
+        function getStructureCost(type, faction = selectedFaction) {
+            const entry = (factionBuildings[faction] || []).find(building => building[0] === type);
             return entry ? entry[2] : 0;
         }
 
@@ -20437,17 +20477,20 @@ function processEnemyAIEngine() {
                     activeBlueprintType = null;
                     return;
                 }
-                playerResources -= cost;
-                const resEl = document.getElementById('resource-display');
-                if (resEl) resEl.innerText = `$${playerResources}`;
-                
                 const placementPosition = blueprintPlacementPos.clone();
                 placementPosition.y = getTerrainHeight(placementPosition.x, placementPosition.z);
                 const newStruct = buildStructureMesh(activeBlueprintType, placementPosition, false, blueprintRotationY);
-                playUSASound('construction');
                 scene.remove(blueprintMesh);
                 blueprintMesh = null;
                 activeBlueprintType = null;
+                if (!newStruct) {
+                    showNotification('Structure not available for this faction!', 'error');
+                    return;
+                }
+                playerResources -= cost;
+                const resEl = document.getElementById('resource-display');
+                if (resEl) resEl.innerText = `$${playerResources}`;
+                playUSASound('construction');
 
                 const builderCandidates = units.filter(u => (u.type === 'dozer' || u.type === 'worker') && u.health > 0);
                 let assignedBuilder = builderCandidates.find(u => u.selected);

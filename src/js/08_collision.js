@@ -256,8 +256,13 @@ function resolveObstacleCollisions(unit) {
         window.createStructureMeshForFaction = createStructureMeshForFaction;
 
         function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
-            const f = selectedFaction;
+            const f = (selectedFaction || 'usa').toLowerCase();
+            if (typeof isBuildingAvailableForFaction === 'function' && !isBuildingAvailableForFaction(type, f)) {
+                console.warn(`Blocked ${type} construction for ${f}: structure is not in that faction's build list.`);
+                return null;
+            }
             const group = createStructureMeshForFaction(type, f);
+            if (!group) return null;
             if (!group.userData || !group.userData.isW3D) {
                 group.scale.set(1.35, 1.35, 1.35);
             }

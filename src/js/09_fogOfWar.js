@@ -297,7 +297,7 @@
                     nukecannon: ['Nuke Tank (Nuke Cannon)', 1800, 'Mobile tactical nuclear siege tank firing atomic shells.']
                 },
                 airfield: {
-                    raptor: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
+                    mig: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
                 },
                 supplyCenter: {
                     truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
@@ -514,6 +514,7 @@
 
         function selectFaction(faction, button) {
             selectedFaction = faction;
+            refreshFactionRoster();
             // Synchronize the top 3 big faction buttons
             document.querySelectorAll('.faction-card').forEach(card => {
                 card.classList.toggle('active', card.getAttribute('data-faction') === faction);
@@ -556,8 +557,14 @@
 
 
 
-        function getStructureCost(type) {
-            const entry = factionBuildings[selectedFaction].find(building => building[0] === type);
+        function isBuildingAvailableForFaction(type, faction = selectedFaction) {
+            if (type === 'center' || type === 'commandCenter') return true;
+            return (factionBuildings[faction] || []).some(building => building[0] === type);
+        }
+        window.isBuildingAvailableForFaction = isBuildingAvailableForFaction;
+
+        function getStructureCost(type, faction = selectedFaction) {
+            const entry = (factionBuildings[faction] || []).find(building => building[0] === type);
             return entry ? entry[2] : 0;
         }
 
