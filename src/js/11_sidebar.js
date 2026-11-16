@@ -3508,13 +3508,13 @@ function updateHUD() {
             else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.9; speed = 0.10; health = 350; scanRange = 24; }
 
             // China Forces
-            else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(false); radius = 3.4; speed = 0.15; health = 460; scanRange = 24; }
-            else if (type === 'overlord') { mesh = createOverlordTankMesh(false); radius = 5.2; speed = 0.09; health = 1100; scanRange = 28; capacity = 5; garrisoned = []; }
-            else if (type === 'gatling') { mesh = createGatlingTankMesh(false); radius = 3.4; speed = 0.16; health = 400; scanRange = 22; }
-            else if (type === 'dragon') { mesh = createDragonTankMesh(false); radius = 3.4; speed = 0.15; health = 450; scanRange = 18; }
-            else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 3.8; speed = 0.15; health = 480; scanRange = 20; capacity = 8; garrisoned = []; }
-            else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 3.6; speed = 0.10; health = 220; scanRange = 36; }
-            else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(); radius = 4.0; speed = 0.08; health = 260; scanRange = 42; }
+            else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(false); radius = 3.4; speed = 0.15; health = 460; scanRange = 26; }
+            else if (type === 'overlord') { mesh = createOverlordTankMesh(false); radius = 4.6; speed = 0.09; health = 1100; scanRange = 36; capacity = 5; garrisoned = []; }
+            else if (type === 'gatling') { mesh = createGatlingTankMesh(false); radius = 3.2; speed = 0.16; health = 400; scanRange = 26; }
+            else if (type === 'dragon') { mesh = createDragonTankMesh(false); radius = 3.2; speed = 0.15; health = 450; scanRange = 20; }
+            else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 3.6; speed = 0.15; health = 480; scanRange = 20; capacity = 8; garrisoned = []; }
+            else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 3.2; speed = 0.10; health = 220; scanRange = 48; }
+            else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(); radius = 2.6; speed = 0.08; health = 260; scanRange = 52; }
             else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 16; }
             else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 24; }
             else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.8; speed = 0.07; health = 100; }

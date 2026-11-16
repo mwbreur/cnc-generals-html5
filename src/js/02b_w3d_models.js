@@ -258,7 +258,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const texKey = mdata.tex ? mdata.tex.replace(/\.(dds|tga)$/i, '').toLowerCase() : '';
         let mat = hullMat;
         if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
-            if (texKey === 'housecolor2' || texKey === 'housecolor') {
+            if (modelKey === 'crusader' && texKey === 'housecolor2' && upper.includes('HOUSECOLOR02')) {
                 const hcTex = getW3dTexture(texKey);
                 if (hcTex) {
                     const hcHex = (houseMat && houseMat.color && typeof houseMat.color.getHex === 'function')
@@ -343,6 +343,20 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const stripeR = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.35, 3.2), houseMat);
         stripeR.position.set(10.5, 0.6, -4.0);
         root.add(stripeL, stripeR);
+    } else if (modelKey === 'dragon') {
+        const ch = root.getObjectByName('CHASSIS');
+        if (ch) { ch.rotation.z = -Math.PI / 2; ch.position.y += 2.2; }
+    } else if (modelKey === 'nukecannon') {
+        const eb = root.getObjectByName('ELEVATIONBARREL');
+        if (eb) eb.rotation.x = Math.PI / 2;
+    } else if (modelKey === 'inferno') {
+        const hc1 = root.getObjectByName('nvinferno.housecolor01');
+        if (hc1) hc1.visible = false;
+    } else if (modelKey === 'overlord_gatling') {
+        ['nvovrlrd_g.housecolorup01', 'nvovrlrd_g.housecolorup02'].forEach(n => {
+            const m = root.getObjectByName(n);
+            if (m) m.visible = false;
+        });
     }
 
     const isAirUnit = ['comanche', 'chinook', 'raptor', 'aurora', 'stealthfighter', 'mig', 'drone_battle', 'drone_scout', 'drone_hellfire', 'overlord_bunker', 'overlord_gatling', 'overlord_speaker'].includes(modelKey);

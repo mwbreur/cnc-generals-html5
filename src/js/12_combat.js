@@ -11,6 +11,18 @@ function processCombatScanning() {
                     unit.mesh.position.copy(tr.mesh.position);
                     if (tr.combatTarget && tr.combatTarget.health > 0) {
                         unit.combatTarget = tr.combatTarget;
+                    } else if (!unit.combatTarget || unit.combatTarget.health <= 0) {
+                        const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+                        let bestGTarget = null, bestGD = (unit.scanRange || 22) + 8;
+                        for (let hi = 0; hi < hostiles.length; hi++) {
+                            const h = hostiles[hi];
+                            if (!h || h.health <= 0 || isFriendly(unit, h)) continue;
+                            const hp = h.position || (h.mesh && h.mesh.position);
+                            if (!hp) continue;
+                            const d = tr.mesh.position.distanceTo(hp);
+                            if (d < bestGD) { bestGD = d; bestGTarget = h; }
+                        }
+                        if (bestGTarget) unit.combatTarget = bestGTarget;
                     }
                 }
 				// Manage weapon assembly cooldown timers
@@ -45,14 +57,15 @@ function processCombatScanning() {
                     if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
                     if (unit.overlordGatCooldown > 0) unit.overlordGatCooldown = Math.max(0, unit.overlordGatCooldown - combatDeltaScale);
                     if (unit.overlordGatCooldown === 0) {
-                        const hostiles = (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
+                        const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
                         let bestTarget = null;
                         let bestScore = -Infinity;
                         for (let hi = 0; hi < hostiles.length; hi++) {
                             const h = hostiles[hi];
-                            if (h.health <= 0 || !h.mesh || isFriendly(unit, h)) continue;
-                            const d = unit.mesh.position.distanceTo(h.mesh.position);
-                            if (d <= 28) {
+                            const hPos = h && (h.position || (h.mesh && h.mesh.position));
+                            if (!h || h.health <= 0 || !hPos || isFriendly(unit, h)) continue;
+                            const d = unit.mesh.position.distanceTo(hPos);
+                            if (d <= 36) {
                                 let score = 100 - d;
                                 if (h.isAir) score += 60; // Prioritize airborne aircraft!
                                 if (getArmorCategory(h) === 'infantry') score += 30;
@@ -65,8 +78,14 @@ function processCombatScanning() {
                             const muzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
                             const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
                             tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
-                            const barrels = getCachedNode(unit.mesh, "gatlingBarrels") || (upgMesh && getCachedNode(upgMesh, "gatlingBarrels"));
-                            if (barrels) barrels.rotation.z += 1.6;
+                            if (upgMesh) {
+                                const gatTurret = getCachedNode(upgMesh, "turretSystem");
+                                if (gatTurret && gatTurret.parent) {
+                                    const localT = gatTurret.parent.worldToLocal(tPos.clone());
+                                    gatTurret.rotation.y = Math.atan2(localT.x, localT.z);
+                                }
+                                upgMesh.traverse(c => { if (c.name === "gatlingBarrels") c.rotation.z += 1.6; });
+                            }
                             spawnMuzzleFlash(muzzle, 0xffa502, 0.4);
                             spawnBulletTracer(muzzle, tPos, 0xf1c40f, 2.8);
                             if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling', {}, 'china');
@@ -321,6 +340,9 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     target.health = Math.max(0, target.health - finalDmg);
     target._lastAttackedTime = Date.now();
     target._lastAttacker = attacker || null;
+    if (target.health > 0 && target.scanRange > 0 && !target.combatTarget && target.taskState !== 'Moving' && attacker && attacker.health > 0 && !isFriendly(target, attacker)) {
+        target.combatTarget = attacker;
+    }
 
     // Sync damage dealt over WebRTC DataChannel
     if (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive && typeof netConn !== 'undefined' && netConn && netConn.open && typeof units !== 'undefined' && units.includes(attacker) && target && target.netId) {
@@ -550,12 +572,23 @@ function executeWeaponFire(attacker, target) {
         if (attacker.type === 'tomahawk') playUSASound('missile_launch');
         if (attacker.type === 'scud') playAudio('scud_launch', {}, 'gla');
     } else if (attacker.type === 'inferno') {
-        // Inferno Cannon Napalm Artillery
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff5252, 1.0);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5);
+        // Inferno Cannon Long-Range Incendiary Napalm Artillery
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff5252, 1.2);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5.5);
         playAudio('china_cannon', {}, 'china');
-        setTimeout(() => spawnNapalmScorchPool(targetPos), 300);
-        applyCalculatedDamage(attacker, target, 65, 'FLAME');
+        const impactPos = targetPos.clone();
+        setTimeout(() => {
+            if (typeof spawnExplosion === 'function') spawnExplosion(impactPos, 0xff5500);
+            if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(impactPos);
+            const allHostile = [...((attacker.isAI ? units : enemyUnits) || []), ...((attacker.isAI ? structures : enemyStructures) || [])];
+            allHostile.forEach(h => {
+                if (!h || h.health <= 0 || isFriendly(attacker, h)) return;
+                const hp = h.position || (h.mesh && h.mesh.position);
+                if (hp && hp.distanceTo(impactPos) <= 8.5) {
+                    applyCalculatedDamage(attacker, h, h === target ? 75 : 40, 'FLAME');
+                }
+            });
+        }, 280);
     } else if (attacker.type === 'nukecannon' || attacker.type === 'nuketank') {
         // China Nuke Cannon: Hydraulic Outrigger Siege Deployment + Nuclear vs Neutron Shells!
         deployNukeCannonOutriggers(attacker);
