@@ -14026,13 +14026,37 @@ function resolveObstacleCollisions(unit) {
         }
 
         function spawnSupplyCacheNearBase(basePos) {
-            const angle = Math.atan2(basePos.z, basePos.x) + Math.PI; // Offset slightly toward map center
-            const sx = basePos.x + Math.cos(angle) * 25;
-            const sz = basePos.z + Math.sin(angle) * 25;
+            // Ensure no existing map supply dock overlaps the Command Center footprint
+            const minClearance = 44;
+            if (typeof supplyPoints !== 'undefined') {
+                for (let i = 0; i < supplyPoints.length; i++) {
+                    const sp = supplyPoints[i];
+                    if (!sp || !sp.position) continue;
+                    const dist = sp.position.distanceTo(basePos);
+                    if (dist < minClearance) {
+                        const pushAngle = dist > 0.5
+                            ? Math.atan2(sp.position.z - basePos.z, sp.position.x - basePos.x)
+                            : (Math.atan2(basePos.z, basePos.x) + Math.PI);
+                        const nx = basePos.x + Math.cos(pushAngle) * 52;
+                        const nz = basePos.z + Math.sin(pushAngle) * 52;
+                        const ny = getTerrainHeight(nx, nz);
+                        sp.position.set(nx, ny, nz);
+                        if (sp.mesh) sp.mesh.position.set(nx, ny, nz);
+                    }
+                }
+                // If the map already provides a supply dock within 95 units, no need to add a duplicate
+                if (supplyPoints.some(sp => sp && sp.position && sp.position.distanceTo(basePos) < 95)) {
+                    return;
+                }
+            }
+
+            const angle = Math.atan2(basePos.z, basePos.x) + Math.PI; // Offset toward map center with clear build space
+            const sx = basePos.x + Math.cos(angle) * 52;
+            const sz = basePos.z + Math.sin(angle) * 52;
             const sy = getTerrainHeight(sx, sz);
             const supplyV = new THREE.Vector3(sx, sy, sz);
 
-            const tooClose = supplyPoints.some(sp => sp.position.distanceTo(supplyV) < 18);
+            const tooClose = supplyPoints.some(sp => sp.position.distanceTo(supplyV) < 24);
             if (!tooClose) {
                 createSingleSupplyDock(supplyV);
             }
