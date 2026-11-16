@@ -3261,10 +3261,16 @@ function updateHUD() {
                 }
 
                 if (structure.type === 'supplyDrop') {
-                    // Red smoke beacon on Supply Drop Zone
-                    if (buildingTick % 120 === 0 && typeof spawnSmokePuff === 'function') {
-                        const smokePos = structure.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-                        spawnSmokePuff(smokePos, 0xff2e2e);
+                    // Bold rising red smoke signal beacon on Supply Drop Zone
+                    if (typeof spawnSmokePuff === 'function') {
+                        for (let sp = 0; sp < 3; sp++) {
+                            const smokePos = structure.position.clone().add(new THREE.Vector3(
+                                (Math.random() - 0.5) * 1.4,
+                                1.2 + sp * 1.8,
+                                (Math.random() - 0.5) * 1.4
+                            ));
+                            spawnSmokePuff(smokePos, 0xff2e2e);
+                        }
                     }
                     // Continues timer & functions even during Low Power or EMP (2-minute = 7200 ticks cycle)
                     structure.dropTicks = (structure.dropTicks || 0) + 60;

@@ -1791,18 +1791,27 @@
             const dropCenter = structure.position.clone();
             const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
-            // 1. C-130 Hercules Flyover Mesh
-            const plane = new THREE.Group();
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6c7a89, roughness: 0.55, metalness: 0.35 });
-            const wingMat = new THREE.MeshStandardMaterial({ color: 0x56616e, roughness: 0.6, metalness: 0.3 });
-            const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.5, 9.0), bodyMat);
-            const wings = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.25, 2.2), wingMat);
-            wings.position.set(0, 0.35, 0.5);
-            const tail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.4, 1.6), wingMat);
-            tail.position.set(0, 1.4, -3.8);
-            const hStab = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.2, 1.2), wingMat);
-            hStab.position.set(0, 0.7, -3.9);
-            plane.add(fuselage, wings, tail, hStab);
+            // 1. Official W3D C-130 Hercules Flyover Mesh (AvCargoPln.W3D)
+            let plane = null;
+            if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['c130']) {
+                plane = createW3DVehicleMesh('c130', false);
+            } else {
+                plane = new THREE.Group();
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6c7a89, roughness: 0.55, metalness: 0.35 });
+                const wingMat = new THREE.MeshStandardMaterial({ color: 0x56616e, roughness: 0.6, metalness: 0.3 });
+                const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.5, 9.0), bodyMat);
+                const wings = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.25, 2.2), wingMat);
+                wings.position.set(0, 0.35, 0.5);
+                const tail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.4, 1.6), wingMat);
+                tail.position.set(0, 1.4, -3.8);
+                const hStab = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.2, 1.2), wingMat);
+                hStab.position.set(0, 0.7, -3.9);
+                plane.add(fuselage, wings, tail, hStab);
+            }
+            const c130Props = [];
+            plane.traverse(c => {
+                if (c.name && c.name.toUpperCase().startsWith('PROPELLER')) c130Props.push(c);
+            });
 
             const startPos = new THREE.Vector3(dropCenter.x - 85, groundY + 28, dropCenter.z - 35);
             const endPos = new THREE.Vector3(dropCenter.x + 85, groundY + 28, dropCenter.z + 35);
@@ -1897,6 +1906,7 @@
                     planeTick++;
                     const t = planeTick / planeDuration;
                     plane.position.lerpVectors(startPos, endPos, t);
+                    for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.65;
                     if (!crateDropped && t >= 0.5) {
                         crateDropped = true;
                         spawnParachuteCrate();
