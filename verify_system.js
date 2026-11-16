@@ -240,7 +240,9 @@ const sandbox = {
     spawnBulletTracer: () => {},
     spawnMuzzleFlash: () => {},
     spawnRocketProjectile: () => {},
-    getTerrainHeight: (x, z) => 0
+    getTerrainHeight: (x, z) => 0,
+    URL: URL,
+    fetch: () => Promise.resolve({ ok: false })
 };
 
 vm.createContext(sandbox);
