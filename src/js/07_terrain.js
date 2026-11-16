@@ -107,8 +107,42 @@
                 flag.position.set(r * 0.45 + 0.9, 6.2, r * 0.45);
                 grp.add(pole, flag);
 
+                // Subtle garrison glow + viewing/firing range ring on the ground
+                if (typeof THREE.PointLight === 'function') {
+                    const gLight = new THREE.PointLight(flagColor, 1.6, 20);
+                    gLight.position.set(0, 4.2, 0);
+                    grp.add(gLight);
+                }
+                let viewRange = 30;
+                for (let gi = 0; gi < bld.garrisoned.length; gi++) {
+                    const gu = bld.garrisoned[gi];
+                    if (gu && gu.health > 0) viewRange = Math.max(viewRange, (gu.scanRange || 20) * 1.5);
+                }
+                if (typeof THREE.RingGeometry === 'function') {
+                    const rangeRing = new THREE.Mesh(
+                        new THREE.RingGeometry(viewRange - 0.35, viewRange, 48),
+                        new THREE.MeshBasicMaterial({ color: flagColor, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+                    );
+                    rangeRing.rotation.x = -Math.PI / 2;
+                    rangeRing.position.y = 0.18;
+                    rangeRing.name = 'garrisonRangeRing';
+                    grp.add(rangeRing);
+                }
+
                 bld.mesh.add(grp);
                 bld._garrisonVisual = grp;
+            } else if (bld._garrisonVisual) {
+                // Update range ring if a unit with longer scanRange enters
+                const existingRing = bld._garrisonVisual.getObjectByName && bld._garrisonVisual.getObjectByName('garrisonRangeRing');
+                if (existingRing && existingRing.geometry && typeof THREE.RingGeometry === 'function') {
+                    let viewRange = 30;
+                    for (let gi = 0; gi < bld.garrisoned.length; gi++) {
+                        const gu = bld.garrisoned[gi];
+                        if (gu && gu.health > 0) viewRange = Math.max(viewRange, (gu.scanRange || 20) * 1.5);
+                    }
+                    existingRing.geometry.dispose();
+                    existingRing.geometry = new THREE.RingGeometry(viewRange - 0.35, viewRange, 48);
+                }
             }
         }
         window.updateWorldBuildingGarrisonVisual = updateWorldBuildingGarrisonVisual;

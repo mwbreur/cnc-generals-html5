@@ -129,6 +129,22 @@
                 ...units.filter(u => u.health > 0 && !u.garrisonedIn),
                 ...structures.filter(s => s.health > 0 && !s.isBuilding)
             ];
+            if (typeof worldBuildings !== 'undefined' && worldBuildings.length > 0) {
+                for (let wi = 0; wi < worldBuildings.length; wi++) {
+                    const wb = worldBuildings[wi];
+                    if (wb && wb.health > 0 && wb.garrisoned && wb.garrisoned.length > 0 &&
+                        (wb.teamId === playerTeamId || (typeof isFriendly === 'function' && isFriendly({ teamId: playerTeamId }, wb)))) {
+                        let maxGarrisonRange = 28;
+                        for (let gi = 0; gi < wb.garrisoned.length; gi++) {
+                            const gu = wb.garrisoned[gi];
+                            if (gu && gu.health > 0) {
+                                maxGarrisonRange = Math.max(maxGarrisonRange, (gu.scanRange || 20) * 1.5);
+                            }
+                        }
+                        visionSources.push({ position: wb.position, scanRange: maxGarrisonRange });
+                    }
+                }
+            }
 
             // Friendly players can watch each other's units when they have radar!
             if (radarActive) {
