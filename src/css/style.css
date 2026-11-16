@@ -40,60 +40,34 @@ body {
         #start-setup-screen[hidden], .zh-main-menu-screen[hidden] { display: none !important; }
         .zh-main-menu-screen {
             position: absolute; inset: 0; overflow: hidden; color: #f0f2f3;
-            background: linear-gradient(90deg, rgba(2, 8, 14, .10) 0%, rgba(2, 8, 14, .02) 45%, rgba(2, 8, 14, .68) 100%);
+            background: radial-gradient(circle at 38% 50%, transparent 45%, rgba(0, 0, 0, 0.35) 100%);
             font-family: 'Segoe UI', Arial, sans-serif;
         }
-        .zh-menu-scanlines {
-            position: absolute; inset: 0; pointer-events: none; z-index: 1;
-            background: repeating-linear-gradient(180deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 3px);
-        }
-        /* Animated Zero Hour MainMenuRuler */
-        .zh-ruler-bar {
-            position: absolute; top: 34%; left: 0; right: 0; height: 28px;
-            overflow: hidden; pointer-events: none; z-index: 2;
-            border-top: 1px solid rgba(155, 195, 224, 0.25);
-            border-bottom: 1px solid rgba(155, 195, 224, 0.22);
-            background: linear-gradient(90deg, rgba(8, 22, 34, 0.15), rgba(16, 40, 60, 0.42), rgba(8, 22, 34, 0.18));
-        }
-        .zh-ruler-track {
-            display: flex; width: 200%; height: 100%;
-            animation: zhRulerScroll 36s linear infinite;
-            opacity: 0.72;
-        }
-        .zh-ruler-img { width: 50%; height: 100%; object-fit: cover; object-position: left center; filter: brightness(1.15) contrast(1.1); }
-        .zh-ruler-scan {
-            position: absolute; top: 0; bottom: 0; width: 140px;
-            background: linear-gradient(90deg, transparent, rgba(120, 215, 255, 0.45), transparent);
-            animation: zhRulerSweep 5.5s ease-in-out infinite;
-        }
-        @keyframes zhRulerScroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-        }
-        @keyframes zhRulerSweep {
-            0% { left: -160px; opacity: 0.2; }
-            50% { opacity: 0.9; }
-            100% { left: 100%; opacity: 0.2; }
+        /* Classic C&C Generals Thin Gold Perimeter Frame */
+        .zh-menu-outer-frame {
+            position: absolute; inset: 24px 28px; pointer-events: none; z-index: 2;
+            border: 1.5px solid rgba(212, 175, 55, 0.72);
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 12px rgba(0, 0, 0, 0.45);
         }
         .zh-main-menu-brand {
-            position: absolute; top: 6.5%; right: 6.5%; width: min(47vw, 620px); z-index: 4;
-            text-align: right; text-shadow: 0 3px 10px #000, 0 0 24px rgba(0,0,0,.85);
+            position: absolute; top: 14px; right: 44px; width: min(44vw, 520px); z-index: 4;
+            text-align: right; text-shadow: 0 3px 10px #000, 0 0 24px rgba(0,0,0,.95);
             animation: zhBrandEnter 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
         }
         @keyframes zhBrandEnter {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .zh-main-menu-emblem { display: block; width: min(100%, 500px); max-height: 140px; object-fit: contain; object-position: right center; margin: 0 0 8px auto; filter: drop-shadow(0 4px 10px #000); }
-        .zh-main-menu-title { color: #edf3f6; font-size: clamp(17px, 2.1vw, 28px); font-weight: 800; letter-spacing: .19em; }
+        .zh-main-menu-emblem { display: block; width: min(100%, 420px); max-height: 115px; object-fit: contain; object-position: right center; margin: 0 0 4px auto; filter: drop-shadow(0 4px 10px #000); }
+        .zh-main-menu-title { color: #d8c98a; font-size: clamp(14px, 1.8vw, 22px); font-weight: 800; letter-spacing: .22em; }
         .zh-main-menu-subtitle {
             position: relative; display: inline-block; overflow: hidden;
-            color: #f1f2e9; font-size: clamp(29px, 4.6vw, 64px); font-weight: 900; line-height: .94; letter-spacing: .035em;
+            color: #f4c430; font-size: clamp(28px, 4.2vw, 56px); font-weight: 900; line-height: .94; letter-spacing: .04em;
         }
-        .zh-main-menu-subtitle span { color: #d9e7f3; }
+        .zh-main-menu-subtitle span { color: #e8e2c4; font-size: 0.46em; letter-spacing: .12em; vertical-align: middle; }
         .zh-main-menu-subtitle::after {
             content: ''; position: absolute; inset: 0; pointer-events: none;
-            background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+            background: linear-gradient(110deg, transparent 35%, rgba(255, 240, 170, 0.38) 50%, transparent 65%);
             transform: translateX(-120%);
             animation: zhTitleSheen 6.5s ease-in-out infinite;
         }
@@ -101,107 +75,49 @@ body {
             0%, 62% { transform: translateX(-120%); }
             85%, 100% { transform: translateX(130%); }
         }
-        /* Zero Hour MapBorder2 / EarthMap2 Right-Hand Command Frame */
+        /* Classic C&C Generals Gold-Bordered Right Menu Box */
         .zh-earth-panel {
-            position: absolute; top: 44%; right: 6.5%; width: min(365px, 40vw); z-index: 4;
-            padding: 12px 14px 14px;
-            background: linear-gradient(160deg, rgba(13, 27, 40, 0.84), rgba(6, 15, 24, 0.88));
-            border: 1px solid rgba(132, 174, 206, 0.48);
-            border-top: 2px solid #8ec5eb;
-            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.65), inset 0 0 24px rgba(56, 128, 184, 0.16);
-            clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
-            overflow: hidden;
+            position: absolute; top: 34%; right: 44px; width: min(330px, 34vw); z-index: 4;
+            padding: 10px;
+            background: rgba(8, 12, 10, 0.72);
+            border: 1.5px solid rgba(212, 175, 55, 0.75);
+            box-shadow: 0 10px 32px rgba(0, 0, 0, 0.75), inset 0 0 18px rgba(0, 0, 0, 0.55);
         }
-        .zh-earth-radar {
-            position: absolute; inset: 0; pointer-events: none; overflow: hidden; opacity: 0.48;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 360 180'%3E%3Cg fill='%235ba4d6' fill-opacity='0.28'%3E%3Cpath d='M38 35l28-8 22 10-8 18-18 8-12 18 12 22-8 24-14-12-4-26-14-16 6-22z'/%3E%3Cpath d='M138 32l36-6 26 8 18 14-10 14-24 4-16-12-18 6-14-12z'/%3E%3Cpath d='M148 70l26-4 18 16-4 32-16 26-12-14-4-26-14-12z'/%3E%3Cpath d='M196 34l58-8 44 12 14 22-18 18-24-4-16 14-22-4-16 12-16-18-12-22z'/%3E%3Cpath d='M264 108l26-6 14 14-8 18-22-4-12-10z'/%3E%3C/g%3E%3C/svg%3E");
-            background-size: cover;
-            background-position: center;
-        }
-        .zh-earth-grid {
-            position: absolute; inset: 0;
-            background-image:
-                linear-gradient(rgba(110, 180, 230, 0.14) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(110, 180, 230, 0.14) 1px, transparent 1px);
-            background-size: 28px 28px;
-        }
-        .zh-earth-sweep {
-            position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-            background: conic-gradient(from 0deg, rgba(90, 200, 255, 0.24) 0deg, transparent 48deg, transparent 360deg);
-            animation: zhRadarSweep 8s linear infinite;
-        }
-        @keyframes zhRadarSweep {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        .zh-radar-blip {
-            position: absolute; width: 5px; height: 5px; border-radius: 50%;
-            background: #55efc4; box-shadow: 0 0 8px #55efc4;
-            animation: zhBlipPulse 2.8s ease-in-out infinite;
-        }
-        .zh-blip-1 { top: 24%; left: 18%; animation-delay: 0s; }
-        .zh-blip-2 { top: 58%; left: 74%; animation-delay: 0.9s; }
-        .zh-blip-3 { top: 76%; left: 32%; animation-delay: 1.8s; }
-        @keyframes zhBlipPulse {
-            0%, 100% { opacity: 0.25; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.35); }
-        }
-        .zh-earth-header {
-            position: relative; z-index: 2; display: flex; align-items: center; gap: 8px;
-            margin-bottom: 10px; padding-bottom: 7px;
-            border-bottom: 1px solid rgba(132, 174, 206, 0.28);
-            font: 700 10px/1 Consolas, monospace; letter-spacing: .12em; color: #9fc2dc;
-        }
-        .zh-green-dot {
-            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-            background: #2ed573; box-shadow: 0 0 8px #2ed573;
-            animation: zhGreenDotPulse 1.6s ease-in-out infinite;
-        }
-        @keyframes zhGreenDotPulse {
-            0%, 100% { opacity: 0.45; transform: scale(0.85); }
-            50% { opacity: 1; transform: scale(1.15); }
-        }
-        .zh-earth-status { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .zh-menu-clock { color: #e6f2fa; font-weight: bold; letter-spacing: .08em; }
-        .zh-main-menu-actions { position: relative; z-index: 2; display: grid; gap: 7px; width: 100%; }
+        .zh-main-menu-actions { position: relative; z-index: 2; display: grid; gap: 8px; width: 100%; }
         .zh-main-menu-button {
             position: relative; overflow: hidden;
-            min-height: 60px; padding: 9px 17px; text-align: left; color: #f0f1ee; cursor: pointer;
-            border: 1px solid rgba(175, 199, 213, .45); border-left: 4px solid #8aa0b2;
-            background: linear-gradient(90deg, rgba(17, 33, 47, .90), rgba(14, 26, 38, .72));
-            box-shadow: 0 3px 10px rgba(0, 0, 0, .45); text-shadow: 0 1px 3px #000;
-            transition: background .16s, border-color .16s, transform .16s, box-shadow .16s;
-            animation: zhButtonSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) calc(0.12s + var(--btn-i, 0) * 0.09s) both;
+            min-height: 46px; padding: 10px 14px; text-align: center; color: #c79a2b; cursor: pointer;
+            border: 1px solid rgba(212, 175, 55, 0.78);
+            background: linear-gradient(180deg, rgba(16, 20, 16, 0.86), rgba(8, 11, 9, 0.92));
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.7); text-shadow: 0 1px 3px #000;
+            transition: background .16s, border-color .16s, color .16s, box-shadow .16s;
+            animation: zhButtonSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) calc(0.1s + var(--btn-i, 0) * 0.08s) both;
         }
         @keyframes zhButtonSlideIn {
-            from { opacity: 0; transform: translateX(34px); }
+            from { opacity: 0; transform: translateX(24px); }
             to { opacity: 1; transform: translateX(0); }
         }
         .zh-main-menu-button::after {
             content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 45%; pointer-events: none;
-            background: linear-gradient(90deg, transparent, rgba(165, 225, 255, 0.22), transparent);
+            background: linear-gradient(90deg, transparent, rgba(244, 196, 48, 0.22), transparent);
             transform: skewX(-20deg); transition: left 0.42s ease;
         }
         .zh-main-menu-button:hover::after, .zh-main-menu-button:focus-visible::after { left: 125%; }
-        .zh-main-menu-button span { display: block; font-weight: 800; font-size: 15px; letter-spacing: .14em; }
-        .zh-main-menu-button small { display: block; margin-top: 3px; color: #bdc8ce; font-size: 11px; letter-spacing: .035em; }
+        .zh-main-menu-button span { display: block; font-weight: 800; font-size: 16px; letter-spacing: .16em; }
         .zh-main-menu-button:hover, .zh-main-menu-button:focus-visible {
-            outline: none; border-color: #d3e2ec; border-left-color: #6bc6ff;
-            background: linear-gradient(90deg, rgba(56, 86, 108, .96), rgba(25, 48, 66, .88));
-            box-shadow: 0 4px 16px rgba(60, 165, 230, 0.28); transform: translateX(-4px);
+            outline: none; border-color: #ffd866; color: #ffe388;
+            background: linear-gradient(180deg, rgba(64, 48, 14, 0.92), rgba(28, 22, 8, 0.95));
+            box-shadow: 0 0 14px rgba(244, 196, 48, 0.32), inset 0 0 12px rgba(244, 196, 48, 0.16);
         }
-        .zh-main-menu-footer { position: absolute; right: 6.5%; bottom: 4.5%; z-index: 4; color: rgba(230, 237, 240, .78); font: 700 9px/1.3 Consolas, monospace; letter-spacing: .22em; }
-        .zh-main-menu-footer span { padding: 0 5px; color: #e6c86c; }
         .return-main-menu-btn { margin: 0 0 12px; padding: 6px 10px; font-size: 10px; }
         @media (max-width: 700px) {
-            .zh-ruler-bar { top: 31%; height: 22px; }
-            .zh-main-menu-brand { top: 8%; right: 5%; width: 90%; }
-            .zh-main-menu-emblem { max-height: 96px; }
-            .zh-main-menu-title { font-size: 15px; }
-            .zh-main-menu-subtitle { font-size: clamp(32px, 9vw, 54px); }
-            .zh-earth-panel { top: 44%; right: 5%; width: min(340px, 90vw); }
-            .zh-main-menu-button { min-height: 54px; }
-            .zh-main-menu-footer { right: 5%; bottom: 3%; font-size: 8px; }
+            .zh-menu-outer-frame { inset: 10px; }
+            .zh-main-menu-brand { top: 14px; right: 20px; width: 90%; }
+            .zh-main-menu-emblem { max-height: 82px; }
+            .zh-main-menu-title { font-size: 13px; }
+            .zh-main-menu-subtitle { font-size: clamp(28px, 8vw, 44px); }
+            .zh-earth-panel { top: 38%; right: 20px; width: min(320px, 88vw); }
+            .zh-main-menu-button { min-height: 44px; }
         }
         /* Skirmish & Multiplayer 2-Column Grid Layout */
         .setup-columns-grid {
