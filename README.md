@@ -193,14 +193,33 @@ These check catalog grouping, lazy loading, faction voice selection, and caching
 
 ## Controls
 
-- **WASD / Arrow keys:** Move the camera.
-- **Mouse wheel:** Zoom.
+### Camera & Mouse
+- **Arrow keys:** Pan the camera.
+- **Mouse wheel:** Zoom the camera (or rotate a building blueprint during placement).
 - **Middle mouse drag:** Rotate the camera.
-- **Left click and drag:** Select units.
-- **Right click:** Issue movement, attack, harvesting or waypoint orders.
-- **Minimap:** Click to move the camera; right-click to issue orders.
-- **Command grid:** `Q W E R`, `A S D F`, `Z X C V`.
-- **Space:** Recenter on the base Command Center.
+- **Left click / drag:** Select units or buildings, or drag-box select multiple units.
+- **Right click:** Issue move, attack, harvest, capture, garrison, or rally-point orders (`Shift` + Right click queues waypoints).
+- **Minimap:** Left-click or drag to move the camera; right-click to issue orders.
+- **Space / `H`:** Jump camera to your Command Center (`Space` also jumps to the last radar alert).
+- **`Ctrl + H`:** Select and jump camera to your Hero unit.
+
+### Selection & Control Groups
+- **`Q`:** Select all on-screen combat units (double-tap to select all on map).
+- **`Ctrl + W`:** Select all on-screen air units (double-tap to select all on map).
+- **`E`:** Select all on-screen units of the same type as the current selection (double-tap for all on map).
+- **`D` or `Ctrl + Up / Down`:** Cycle through your Dozers / Workers.
+- **`Ctrl + Left / Right`:** Cycle the active unit in a multi-unit selection.
+- **`1`–`9`:** Select control group (double-tap to center camera); **`Ctrl + 1`–`9`** assigns group; **`Alt + 1`–`9`** views group without selecting.
+
+### Combat, Building & UI
+- **`A` + Right click:** Attack-Move.
+- **`G` + Right click:** Guard mode.
+- **`S`:** Stop selected units.
+- **`X`:** Scatter selected units.
+- **`Q` / `E` / `R` (while placing a building):** Rotate building blueprint.
+- **`Tab`:** Toggle Diplomacy & Match Objectives screen.
+- **`F9`:** Toggle HUD command bar.
+- **`Esc`:** Cancel active placement/targeting/command mode, or open the Options menu.
 
 Controls and bindings may change as development continues.
 
