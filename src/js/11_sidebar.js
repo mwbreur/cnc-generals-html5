@@ -1019,6 +1019,10 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             currentGridSlots.push(
                 { name: 'CYBER HACK', badge: 'HACK', action: () => triggerHeroOrUnitAbility(u, 'lotusHack'), desc: 'Capture building, steal $1000 from Supply Center, or disable enemy vehicle' }
             );
+        } else if (u.type === 'hacker') {
+            currentGridSlots.push(
+                { name: u._isHacking ? 'HACKING ($)' : 'HACK INTERNET', badge: u._isHacking ? 'ACTIVE' : 'CASH', action: () => { u.combatTarget = null; u.targetPosition.copy(u.mesh.position); u.taskState = 'Idle'; u._isHacking = true; u._hackTimer = 90; showNotification('Hacker deployed field terminal — siphoning $6+ every 2s!', 'success'); updateSidebar(); }, desc: 'Deploy laptop terminal to continuously siphon cash from the Internet' }
+            );
         } else if (u.type === 'terrorist' || u.type === 'bombtruck') {
             currentGridSlots.push(
                 { name: 'DETONATE', badge: 'BOOM', action: () => triggerHeroOrUnitAbility(u, 'detonate'), desc: 'Detonate explosive payload immediately' }
@@ -2603,7 +2607,7 @@ window.addEventListener('keydown', e => {
 });
 
 function isInfantryType(type) {
-    return ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'mob'].includes(type);
+    return ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'blacklotus', 'lotus', 'hijacker', 'mob'].includes(type);
 }
 
 function orderSelectedTransportsToUnload() {
@@ -2997,21 +3001,27 @@ function attachControlRodsVisual(structure) {
 
 function attachPerimeterMinesVisual(structure, isNeutron = false) {
     if (!structure || !structure.mesh) return;
+    const prev = structure.mesh.getObjectByName('perimeterMinesAttachment');
+    if (prev) structure.mesh.remove(prev);
     const mineGroup = new THREE.Group();
     mineGroup.name = "perimeterMinesAttachment";
     const stakeMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+    const discMat = new THREE.MeshStandardMaterial({ color: isNeutron ? 0x00bcd4 : 0x555555, metalness: 0.7, roughness: 0.4 });
     const flagMat = new THREE.MeshBasicMaterial({ color: isNeutron ? 0x00ffff : 0xff4757 });
-    const r = (structure.radius || 4.0) + 1.2;
-    for (let i = 0; i < 8; i++) {
-        const angle = (i / 8) * Math.PI * 2;
+    const r = (structure.radius || 4.0) + 1.4;
+    for (let i = 0; i < 10; i++) {
+        const angle = (i / 10) * Math.PI * 2;
         const mx = Math.cos(angle) * r;
         const mz = Math.sin(angle) * r;
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.52, 0.16, 10), discMat);
+        disc.position.set(mx, 0.08, mz);
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 8), flagMat);
+        cap.position.set(mx, 0.18, mz);
         const stake = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), stakeMat);
-        stake.position.set(mx, 0.45, mz);
+        stake.position.set(mx + 0.35, 0.45, mz);
         const flag = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.02), flagMat);
-        flag.position.set(mx + 0.12, 0.8, mz);
-        mineGroup.add(stake);
-        mineGroup.add(flag);
+        flag.position.set(mx + 0.47, 0.8, mz);
+        mineGroup.add(disc, cap, stake, flag);
     }
     structure.mesh.add(mineGroup);
 }
@@ -3289,17 +3299,19 @@ function updateHUD() {
                 if (structure.type === 'nuclearReactor' && structure.overcharged) structure.health -= 8;
 
                 // Perimeter landmines installed on Chinese/defensive structures
-                if (structure.hasMines && buildingTick % 30 === 0) {
+                if (structure.hasMines && buildingTick % 30 === 0 && (!structure._mineCooldownUntil || buildingTick >= structure._mineCooldownUntil)) {
                     const triggerDist = (structure.radius || 4) + 4.5;
-                    const nearbyEnemies = enemyUnits.filter(e => e.health > 0 && e.mesh && e.mesh.position.distanceTo(structure.position) < triggerDist);
+                    const nearbyEnemies = enemyUnits.filter(e => e.health > 0 && !e.isAir && e.mesh && e.mesh.position.distanceTo(structure.position) < triggerDist);
                     if (nearbyEnemies.length > 0) {
+                        structure._mineCooldownUntil = buildingTick + 120;
                         nearbyEnemies.forEach(e => {
                             const isNeutron = !!structure.hasNeutronMines;
                             const dmg = isNeutron ? 320 : 180;
                             e.health = Math.max(0, e.health - dmg);
                             if (isNeutron && isInfantryType(e.type)) e.health = 0;
-                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(e.mesh.position, isNeutron ? 0x00f2fe : 0xff4757, 1.8, true);
+                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(e.mesh.position, isNeutron ? 0x00f2fe : 0xff4757, 2.2, true);
                         });
+                        if (typeof playAudio === 'function') playAudio('explosion');
                         showNotification(`Perimeter mine detonated around ${structure.type.toUpperCase()}!`, 'warning');
                     }
                 }
@@ -3443,13 +3455,18 @@ function updateHUD() {
 
             landmines.forEach(mine => {
                 if (!mine.active) return;
-                const trigger = enemyUnits.some(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(mine.position) < 3.5);
+                const triggerDist = mine.radius || 3.5;
+                const trigger = enemyUnits.some(enemy => enemy.health > 0 && !enemy.isAir && enemy.mesh && enemy.mesh.position.distanceTo(mine.position) < triggerDist);
                 if (trigger) {
                     mine.active = false;
+                    if (mine.mesh && typeof scene !== 'undefined') scene.remove(mine.mesh);
+                    const dmg = mine.damage || 180;
                     enemyUnits.forEach(enemy => {
-                        if (enemy.mesh.position.distanceTo(mine.position) < 9) enemy.health -= 180;
+                        if (enemy.health > 0 && !enemy.isAir && enemy.mesh && enemy.mesh.position.distanceTo(mine.position) < 9) enemy.health -= dmg;
                     });
-                    createImpactExplosion(mine.position);
+                    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(mine.position, 0xff4757, 2.0, true);
+                    else if (typeof createImpactExplosion === 'function') createImpactExplosion(mine.position);
+                    if (typeof playAudio === 'function') playAudio('explosion');
                 }
             });
 
@@ -4236,22 +4253,61 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'clusterMines') {
         playAudio('construction', {}, 'china');
-        for (let i = 0; i < 6; i++) {
-            const mPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 12, 0, (Math.random() - 0.5) * 12));
-            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(mPos, 0xff4757, 1.2);
-            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(mPos, 4.5, 110, 'EXPLOSIVE', pseudoAttacker);
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
+            const dist = 3.0 + Math.random() * 7.5;
+            const mPos = pos.clone().add(new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist));
+            mPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(mPos.x, mPos.z) : 0;
+            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(mPos, 0xff4757, 1.4);
+            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(mPos, 4.5, 90, 'EXPLOSIVE', pseudoAttacker);
+            if (typeof landmines !== 'undefined' && typeof scene !== 'undefined') {
+                const mineMesh = new THREE.Group();
+                const disc = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.55, 0.65, 0.18, 10),
+                    new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.7, roughness: 0.4 })
+                );
+                disc.position.y = 0.09;
+                const beacon = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.18, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: 0xff3838 })
+                );
+                beacon.position.y = 0.22;
+                mineMesh.add(disc, beacon);
+                mineMesh.position.copy(mPos);
+                scene.add(mineMesh);
+                landmines.push({ position: mPos.clone(), mesh: mineMesh, active: true, isAI: false, teamId: pseudoAttacker.teamId, radius: 4.0, damage: 150 });
+            }
         }
         showNotification('★ Cluster Minefield deployed at target zone!', 'success');
         return true;
     } else if (p === 'carpetBomber') {
         showNotification('★ PLA Carpet Bomber strike inbound!', 'warning');
-        playAudio('explosion');
+        playAudio('radio_chirp', {}, 'china');
+        if (typeof activeFX !== 'undefined' && typeof scene !== 'undefined') {
+            const bomber = (typeof createHelixMesh === 'function') ? createHelixMesh(false) : new THREE.Group();
+            const startPos = pos.clone().add(new THREE.Vector3(-42, 26, -24));
+            const endPos = pos.clone().add(new THREE.Vector3(42, 26, 24));
+            bomber.position.copy(startPos);
+            if (typeof bomber.lookAt === 'function') bomber.lookAt(endPos);
+            scene.add(bomber);
+            let f = 0;
+            activeFX.push({
+                life: 95,
+                update() {
+                    f++;
+                    bomber.position.lerpVectors(startPos, endPos, f / 90);
+                    if (f >= 90) { scene.remove(bomber); return false; }
+                    return true;
+                }
+            });
+        }
         for (let i = -3; i <= 3; i++) {
             setTimeout(() => {
                 const dropPos = pos.clone().add(new THREE.Vector3(i * 4.5, 0, i * 2.5));
                 if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropPos, 0xff6348, 3.8, true);
+                if (typeof playAudio === 'function') playAudio('explosion');
                 if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropPos, 9.0, 210, 'EXPLOSIVE', pseudoAttacker);
-            }, (i + 3) * 200);
+            }, 350 + (i + 3) * 180);
         }
         return true;
     } else if (p === 'artilleryBarrage') {
@@ -4290,7 +4346,27 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'empPulse') {
         playAudio('orbital_beam');
-        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00d2ff, 6.0);
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00d2ff, 7.0);
+        if (typeof activeFX !== 'undefined' && typeof scene !== 'undefined') {
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(1.0, 2.4, 36),
+                new THREE.MeshBasicMaterial({ color: 0x00e5ff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(pos.x, (typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : 0) + 0.5, pos.z);
+            scene.add(ring);
+            let ef = 0;
+            activeFX.push({
+                life: 32,
+                update() {
+                    ef++;
+                    ring.scale.setScalar(1 + ef * 0.45);
+                    ring.material.opacity = Math.max(0, 0.9 - ef / 32);
+                    if (ef >= 32) { scene.remove(ring); ring.geometry.dispose(); ring.material.dispose(); return false; }
+                    return true;
+                }
+            });
+        }
         let disabled = 0;
         const until = Date.now() + 12000;
         if (typeof enemyUnits !== 'undefined') {
@@ -4301,7 +4377,16 @@ function executeGeneralsPowerAt(pos) {
                 }
             });
         }
-        showNotification(`★ EMP Pulse disabled ${disabled} enemy vehicle(s) for 12s!`, 'success');
+        if (typeof enemyStructures !== 'undefined') {
+            const tickUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 720;
+            enemyStructures.forEach(s => {
+                if (s.health > 0 && s.position && s.position.distanceTo(pos) <= 22) {
+                    s.disabledUntil = Math.max(s.disabledUntil || 0, tickUntil);
+                    disabled++;
+                }
+            });
+        }
+        showNotification(`★ EMP Pulse disabled ${disabled} enemy target(s) for 12s!`, 'success');
         return true;
     } else if (p === 'rebelAmbush') {
         showNotification('★ Rebel Ambush cell surfacing from tunnels!', 'success');

@@ -236,7 +236,7 @@ function separateGroundUnits(list) {
 }
 
 const CRUSHER_TANK_SET = new Set(['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank']);
-const INFANTRY_TYPE_SET = new Set(['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket']);
+const INFANTRY_TYPE_SET = new Set(['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'blacklotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'hijacker', 'worker', 'infantry', 'rocket']);
 
 function animate() {
             requestAnimationFrame(animate);
@@ -346,7 +346,7 @@ function animate() {
                             ? getStructureFootprint(structure.type)
                             : { depth: (structure.radius || 8) * 2 };
                         const buildingDepth = footprint.depth * ((structure.mesh && structure.mesh.scale && structure.mesh.scale.z) || 1);
-                        const exitClearance = isInf ? 2.5 : 4.5;
+                        const exitClearance = isInf ? 4.5 : 6.5;
                         const spawnDist = Math.max((structure.radius || 0) + exitClearance, buildingDepth / 2 + exitClearance);
                         const spawnX = structure.position.x + Math.sin(exitAngle) * spawnDist;
                         const spawnZ = structure.position.z + Math.cos(exitAngle) * spawnDist;
@@ -376,20 +376,20 @@ function animate() {
                             // Assign distinct staged formation slot at rally point with bridge routing
                             const baseRally = structure.rallyPoint
                                 ? structure.rallyPoint.clone()
-                                : structure.position.clone().add(new THREE.Vector3(Math.sin(exitAngle), 0, Math.cos(exitAngle)).multiplyScalar(structure.radius + (isInf ? 8.0 : 14.0)));
+                                : structure.position.clone().add(new THREE.Vector3(Math.sin(exitAngle), 0, Math.cos(exitAngle)).multiplyScalar(spawnDist + (isInf ? 7.0 : 12.0)));
 
                             const slotPos = getUnoccupiedRallySlot(baseRally, newUnit.radius || 1.8, isInf, exitAngle);
                             newUnit.targetPosition.copy(slotPos);
                             newUnit.taskState = 'Moving';
                             newUnit.waypoints = [];
-                            if (typeof findBridgeCrossingsForPath === 'function') {
+                            if (structure.rallyPoint && typeof findBridgeCrossingsForPath === 'function') {
                                 const bridges = findBridgeCrossingsForPath(newUnit.mesh.position, slotPos, structure);
                                 if (bridges && bridges.length > 0) {
                                     newUnit.waypoints = [...bridges.filter(Boolean), slotPos.clone()];
                                     newUnit.targetPosition.copy(newUnit.waypoints.shift());
                                 }
                             }
-                            if (newUnit.waypoints.length === 0 && typeof findNavigationPath === 'function') {
+                            if (structure.rallyPoint && newUnit.waypoints.length === 0 && typeof findNavigationPath === 'function') {
                                 const navPath = findNavigationPath(newUnit.mesh.position, slotPos);
                                 if (navPath && navPath.length > 1) {
                                     newUnit.waypoints = navPath.slice(1);
@@ -1747,7 +1747,7 @@ function animate() {
                             unit.mesh.rotation.z = 0;
                             unit.mesh.rotation.x = 0;
                         }
-                    } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
+                    } else if (INFANTRY_TYPE_SET.has(unit.type)) {
                         unit.mesh.rotation.x = 0;
                         unit.mesh.rotation.z = 0;
                         unit._strideBob = 0;
@@ -1787,7 +1787,7 @@ function animate() {
                             // Unit is at destination! Settle aircraft banking and pitch to zero without spinning or flipping
                             unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
                             unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
-                        } else if (['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'worker', 'infantry', 'rocket'].includes(unit.type)) {
+                        } else if (INFANTRY_TYPE_SET.has(unit.type)) {
                             unit.mesh.rotation.x = 0;
                             unit.mesh.rotation.z = 0;
                             unit._strideBob = 0;

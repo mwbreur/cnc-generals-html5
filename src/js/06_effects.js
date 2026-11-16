@@ -1096,6 +1096,37 @@
                             playAudio('nuke_detonation');
                             if (typeof triggerScreenShake === 'function') triggerScreenShake(2.4);
                             spawnMushroomCloud(targetPos);
+                            // Lingering Nuclear Radiation Pool
+                            const radGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+                            const radPool = new THREE.Mesh(
+                                new THREE.CircleGeometry(14, 24),
+                                new THREE.MeshBasicMaterial({ color: 0x39ff14, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false })
+                            );
+                            radPool.rotation.x = -Math.PI / 2;
+                            radPool.position.set(targetPos.x, radGroundY + 0.16, targetPos.z);
+                            scene.add(radPool);
+                            let radTicks = 0;
+                            activeFX.push({
+                                life: 480,
+                                update() {
+                                    radTicks++;
+                                    radPool.material.opacity = 0.25 + 0.12 * Math.sin(radTicks * 0.15);
+                                    if (radTicks % 30 === 0 && typeof enemyUnits !== 'undefined') {
+                                        enemyUnits.forEach(eu => {
+                                            if (eu.health > 0 && eu.mesh && eu.mesh.position.distanceTo(targetPos) <= 14.5) {
+                                                eu.health -= 18;
+                                            }
+                                        });
+                                    }
+                                    if (radTicks >= 479) {
+                                        scene.remove(radPool);
+                                        radPool.geometry.dispose();
+                                        radPool.material.dispose();
+                                        return false;
+                                    }
+                                    return true;
+                                }
+                            });
 
                             // Apocalyptic damage: 850 to enemies within 28 units
                             enemyUnits.forEach(enemy => {
