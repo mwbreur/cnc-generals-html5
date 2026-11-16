@@ -12,7 +12,87 @@
         const _fxSphere8 = new THREE.SphereGeometry(1, 8, 8);
         const _fxSphere6 = new THREE.SphereGeometry(1, 6, 6);
         const _fxSparkGeo = new THREE.SphereGeometry(0.12, 4, 4);
+        const _fxTracerGeo = new THREE.CylinderGeometry(1, 0.5, 1, 6);
+        if (typeof _fxTracerGeo.rotateX === 'function') _fxTracerGeo.rotateX(Math.PI / 2);
         const _fxSparkMatCache = {};
+        const _fxSpriteTexCache = {};
+
+        function _getFxSpriteTex(kind) {
+            if (_fxSpriteTexCache[kind]) return _fxSpriteTexCache[kind];
+            if (typeof THREE === 'undefined' || !THREE.Sprite || !THREE.SpriteMaterial || typeof document === 'undefined' || !document.createElement) return null;
+            const c = document.createElement('canvas');
+            c.width = c.height = 128;
+            const ctx = c.getContext && c.getContext('2d');
+            if (!ctx) return null;
+            const cx = 64, cy = 64;
+            if (kind === 'flash') {
+                const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, 62);
+                g.addColorStop(0, 'rgba(255,255,255,1)');
+                g.addColorStop(0.25, 'rgba(255,235,160,0.95)');
+                g.addColorStop(0.55, 'rgba(255,140,30,0.55)');
+                g.addColorStop(1, 'rgba(255,80,0,0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 128, 128);
+                // Starburst spikes
+                ctx.fillStyle = 'rgba(255,255,230,0.75)';
+                for (let a = 0; a < 4; a++) {
+                    ctx.save();
+                    ctx.translate(cx, cy);
+                    ctx.rotate((a * Math.PI) / 4);
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 56, 4.5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            } else if (kind === 'fireball') {
+                const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, 60);
+                g.addColorStop(0, 'rgba(255,255,220,1)');
+                g.addColorStop(0.3, 'rgba(255,180,50,0.92)');
+                g.addColorStop(0.65, 'rgba(220,65,15,0.65)');
+                g.addColorStop(1, 'rgba(80,15,0,0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 128, 128);
+                for (let b = 0; b < 7; b++) {
+                    const ang = (b / 7) * Math.PI * 2;
+                    const bx = cx + Math.cos(ang) * 18;
+                    const by = cy + Math.sin(ang) * 18;
+                    const bg = ctx.createRadialGradient(bx, by, 2, bx, by, 28);
+                    bg.addColorStop(0, 'rgba(255,210,90,0.65)');
+                    bg.addColorStop(1, 'rgba(200,50,0,0)');
+                    ctx.fillStyle = bg;
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 28, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (kind === 'smoke') {
+                for (let b = 0; b < 9; b++) {
+                    const ang = (b / 9) * Math.PI * 2;
+                    const rad = b === 0 ? 0 : 18;
+                    const bx = cx + Math.cos(ang) * rad;
+                    const by = cy + Math.sin(ang) * rad;
+                    const bg = ctx.createRadialGradient(bx, by, 4, bx, by, 38);
+                    bg.addColorStop(0, 'rgba(255,255,255,0.55)');
+                    bg.addColorStop(0.55, 'rgba(210,210,210,0.28)');
+                    bg.addColorStop(1, 'rgba(150,150,150,0)');
+                    ctx.fillStyle = bg;
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 38, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (kind === 'shockwave') {
+                const g = ctx.createRadialGradient(cx, cy, 34, cx, cy, 62);
+                g.addColorStop(0, 'rgba(255,255,255,0)');
+                g.addColorStop(0.5, 'rgba(255,220,160,0.85)');
+                g.addColorStop(0.8, 'rgba(255,150,60,0.4)');
+                g.addColorStop(1, 'rgba(255,100,0,0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 128, 128);
+            }
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            _fxSpriteTexCache[kind] = tex;
+            return tex;
+        }
 
         // =========================================================================
         
@@ -20,21 +100,25 @@
         // =========================================================================
 
         function spawnMuzzleFlash(pos, color = 0xffa502, size = 0.65) {
-            const flashMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1.0 });
-            const flash = new THREE.Mesh(_fxSphere8, flashMat);
-            flash.scale.set(size, size, size);
+            const tex = _getFxSpriteTex('flash');
+            const flashMat = tex
+                ? new THREE.SpriteMaterial({ map: tex, color: color, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, depthWrite: false })
+                : new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1.0 });
+            const flash = tex ? new THREE.Sprite(flashMat) : new THREE.Mesh(_fxSphere8, flashMat);
+            const initS = size * (tex ? 2.4 : 1.0);
+            flash.scale.set(initS, initS, initS);
             flash.position.copy(pos);
             scene.add(flash);
 
             activeFX.push({
                 mesh: flash,
-                baseSize: size,
-                life: 4,
-                maxLife: 4,
+                baseSize: initS,
+                life: 5,
+                maxLife: 5,
                 update() {
                     this.life--;
                     const progress = this.life / this.maxLife;
-                    const s = this.baseSize * (1 + (1 - progress) * 0.8);
+                    const s = this.baseSize * (1 + (1 - progress) * 0.75);
                     this.mesh.scale.set(s, s, s);
                     this.mesh.material.opacity = progress;
                     if (this.life <= 0) {
@@ -48,23 +132,46 @@
         }
 
         function spawnBulletTracer(fromPos, toPos, color = 0xf1c40f, thickness = 2) {
-            const points = [fromPos.clone(), toPos.clone()];
-            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-            const lineMat = new THREE.LineBasicMaterial({ color: color, linewidth: thickness, transparent: true, opacity: 0.95 });
-            const line = new THREE.Line(lineGeo, lineMat);
-            scene.add(line);
+            const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y, dz = toPos.z - fromPos.z;
+            const totalDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (totalDist < 0.05) return;
+            const nx = dx / totalDist, ny = dy / totalDist, nz = dz / totalDist;
+            const boltLen = Math.min(totalDist, 2.2 + thickness * 0.85);
+            const boltRadius = Math.max(0.055, thickness * 0.048);
+
+            const mat = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.95,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const bolt = new THREE.Mesh(_fxTracerGeo, mat);
+            bolt.scale.set(boltRadius, boltRadius, boltLen);
+            bolt.position.set(fromPos.x + nx * boltLen * 0.5, fromPos.y + ny * boltLen * 0.5, fromPos.z + nz * boltLen * 0.5);
+            if (typeof bolt.lookAt === 'function') bolt.lookAt(toPos);
+            scene.add(bolt);
+
+            const steps = Math.max(2, Math.min(5, Math.round(totalDist / 10)));
+            let tick = 0;
 
             activeFX.push({
-                mesh: line,
-                life: 3,
-                maxLife: 3,
+                mesh: bolt,
+                life: steps,
+                maxLife: steps,
                 update() {
+                    tick++;
                     this.life--;
-                    this.mesh.material.opacity = this.life / this.maxLife;
+                    const t = tick / this.maxLife;
+                    const travel = Math.max(0, totalDist - boltLen) * t + boltLen * 0.5;
+                    this.mesh.position.set(fromPos.x + nx * travel, fromPos.y + ny * travel, fromPos.z + nz * travel);
+                    this.mesh.material.opacity = Math.max(0.15, (this.life / this.maxLife) * 0.95);
                     if (this.life <= 0) {
                         scene.remove(this.mesh);
-                        this.mesh.geometry.dispose();
                         this.mesh.material.dispose();
+                        if (thickness >= 3.0 && typeof spawnMuzzleFlash === 'function') {
+                            spawnMuzzleFlash(toPos, color, 0.35);
+                        }
                         return false;
                     }
                     return true;
@@ -303,29 +410,33 @@
         if (typeof window !== 'undefined') window.spawnFloatingCashNumber = spawnFloatingCashNumber;
 
         function spawnSmokePuff(pos, color = 0xdcdde1, initialSize = 0.3) {
-            if (activeFX.length > 260) return;
-            const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.75 });
-            const mesh = new THREE.Mesh(_fxSphere6, mat);
-            mesh.scale.set(initialSize, initialSize, initialSize);
+            if (activeFX.length > 280) return;
+            const tex = _getFxSpriteTex('smoke');
+            const mat = tex
+                ? new THREE.SpriteMaterial({ map: tex, color: color, transparent: true, opacity: 0.72, depthWrite: false })
+                : new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.75 });
+            const mesh = tex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
+            const startS = initialSize * (tex ? 2.6 : 1.0);
+            mesh.scale.set(startS, startS, startS);
             mesh.position.copy(pos);
             mesh.position.x += (Math.random() - 0.5) * 0.4;
             mesh.position.z += (Math.random() - 0.5) * 0.4;
             scene.add(mesh);
 
-            const growSpeed = (0.045 + Math.random() * 0.03) * initialSize;
-            const floatSpeed = 0.05 + Math.random() * 0.04;
+            const growSpeed = (0.045 + Math.random() * 0.03) * startS;
+            const floatSpeed = 0.055 + Math.random() * 0.04;
 
             activeFX.push({
                 mesh: mesh,
-                curScale: initialSize,
-                life: 30 + Math.floor(Math.random() * 15),
-                maxLife: 45,
+                curScale: startS,
+                life: 32 + Math.floor(Math.random() * 14),
+                maxLife: 46,
                 update() {
                     this.life--;
                     this.curScale += growSpeed;
                     this.mesh.scale.set(this.curScale, this.curScale, this.curScale);
                     this.mesh.position.y += floatSpeed;
-                    this.mesh.material.opacity = (this.life / this.maxLife) * 0.7;
+                    this.mesh.material.opacity = (this.life / this.maxLife) * 0.68;
                     if (this.life <= 0) {
                         scene.remove(this.mesh);
                         this.mesh.material.dispose();
@@ -431,56 +542,96 @@
         function spawnEnhancedExplosion(pos, color = 0xffa502, scale = 1.0, isHeavy = false) {
             playUSASound('explosion');
 
-            // 1. Core expanding fireball
-            const fireballGeo = new THREE.SphereGeometry(1.2 * scale, 12, 12);
-            const fireballMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1.0 });
-            const fireball = new THREE.Mesh(fireballGeo, fireballMat);
-            fireball.position.copy(pos);
-            scene.add(fireball);
+            const fireTex = _getFxSpriteTex('fireball');
+            const flashTex = _getFxSpriteTex('flash');
+            const waveTex = _getFxSpriteTex('shockwave');
+
+            // 1. Bright core flash + billowing fireball sprites
+            const fireballs = [];
+            const puffCount = isHeavy ? 5 : 3;
+            for (let f = 0; f < puffCount; f++) {
+                const useFlash = (f === 0 && flashTex);
+                const mat = (fireTex || useFlash)
+                    ? new THREE.SpriteMaterial({
+                        map: useFlash ? flashTex : fireTex,
+                        color: f === 0 ? 0xffffff : color,
+                        transparent: true,
+                        opacity: 1.0,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    })
+                    : new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1.0 });
+                const fb = (fireTex || useFlash) ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere8, mat);
+                const s0 = (f === 0 ? 2.4 : 1.8 + Math.random() * 1.1) * scale;
+                fb.scale.set(s0, s0, s0);
+                fb.position.copy(pos).add(new THREE.Vector3(
+                    f === 0 ? 0 : (Math.random() - 0.5) * 1.6 * scale,
+                    (0.4 + Math.random() * 0.9) * scale,
+                    f === 0 ? 0 : (Math.random() - 0.5) * 1.6 * scale
+                ));
+                scene.add(fb);
+                fireballs.push({
+                    mesh: fb,
+                    baseS: s0,
+                    vy: (0.04 + Math.random() * 0.06) * scale
+                });
+            }
 
             // 2. Outward ground shockwave ring
-            const ringGeo = new THREE.RingGeometry(0.5, 1.2 * scale, 24);
+            const ringGeo = new THREE.RingGeometry(0.5, 1.4 * scale, 24);
             ringGeo.rotateX(-Math.PI / 2);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+            const ringMat = new THREE.MeshBasicMaterial({
+                map: waveTex || null,
+                color: waveTex ? color : 0xffd28a,
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
             const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.position.set(pos.x, getTerrainHeight(pos.x, pos.z) + 0.06, pos.z);
+            ring.position.set(pos.x, getTerrainHeight(pos.x, pos.z) + 0.08, pos.z);
             scene.add(ring);
 
             // 3. Shrapnel & incandescent sparks
-            spawnSparks(pos, color, isHeavy ? 24 : 12);
+            spawnSparks(pos, color, isHeavy ? 26 : 14);
 
             // 4. Heavy billows of black smoke
-            for (let i = 0; i < (isHeavy ? 6 : 3); i++) {
+            for (let i = 0; i < (isHeavy ? 7 : 4); i++) {
                 setTimeout(() => {
-                    const offset = new THREE.Vector3((Math.random() - 0.5) * scale, Math.random() * scale * 0.8, (Math.random() - 0.5) * scale);
-                    spawnSmokePuff(pos.clone().add(offset), 0x2f3542, 0.6 * scale);
-                }, i * 60);
+                    const offset = new THREE.Vector3((Math.random() - 0.5) * 1.6 * scale, (0.4 + Math.random() * 0.9) * scale, (Math.random() - 0.5) * 1.6 * scale);
+                    spawnSmokePuff(pos.clone().add(offset), 0x262b33, (0.75 + Math.random() * 0.4) * scale);
+                }, i * 55);
             }
 
             activeFX.push({
-                fireball: fireball,
+                fireballs: fireballs,
                 ring: ring,
-                life: 18,
-                maxLife: 18,
+                life: isHeavy ? 24 : 18,
+                maxLife: isHeavy ? 24 : 18,
                 scale: scale,
                 update() {
                     this.life--;
                     const progress = 1 - (this.life / this.maxLife);
 
-                    // Expand and fade fireball
-                    this.fireball.scale.setScalar(1 + progress * 2.2);
-                    this.fireball.material.opacity = Math.max(0, 1 - progress * 1.3);
+                    for (let i = 0; i < this.fireballs.length; i++) {
+                        const fb = this.fireballs[i];
+                        const curS = fb.baseS * (1 + progress * (i === 0 ? 1.8 : 2.5));
+                        fb.mesh.scale.set(curS, curS, curS);
+                        fb.mesh.position.y += fb.vy;
+                        fb.mesh.material.opacity = Math.max(0, 1 - progress * 1.25);
+                    }
 
-                    // Expand ground shockwave ring
-                    const ringExpansion = 1 + progress * 4.5 * this.scale;
+                    const ringExpansion = 1 + progress * 4.8 * this.scale;
                     this.ring.scale.set(ringExpansion, ringExpansion, 1);
                     this.ring.material.opacity = Math.max(0, (1 - progress) * 0.85);
 
                     if (this.life <= 0) {
-                        scene.remove(this.fireball);
-                        this.fireball.geometry.dispose();
-                        this.fireball.material.dispose();
-
+                        for (let i = 0; i < this.fireballs.length; i++) {
+                            const fb = this.fireballs[i];
+                            scene.remove(fb.mesh);
+                            fb.mesh.material.dispose();
+                        }
                         scene.remove(this.ring);
                         this.ring.geometry.dispose();
                         this.ring.material.dispose();

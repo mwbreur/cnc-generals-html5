@@ -1377,6 +1377,53 @@ function animate() {
             units.forEach(u => syncGLASalvageMeshes(u, false));
             enemyUnits.forEach(u => syncGLASalvageMeshes(u, true));
 
+            // Authentic C&C Generals Damaged / Critical Visuals (charred armor/walls + rising smoke & fire)
+            const updateEntityDamageVisuals = (list, isStruct) => {
+                if (!list || list.length === 0) return;
+                for (let idx = 0; idx < list.length; idx++) {
+                    const ent = list[idx];
+                    if (!ent || ent.health <= 0 || !ent.mesh || !ent.maxHealth || ent.isBuilding) continue;
+                    if (ent.garrisonedIn) continue;
+                    const hpRatio = ent.health / ent.maxHealth;
+                    const tier = hpRatio < 0.35 ? 2 : (hpRatio < 0.65 ? 1 : 0);
+                    if (tier !== (ent._damageTier || 0)) {
+                        ent._damageTier = tier;
+                        ent.mesh.traverse(c => {
+                            if (!c.isMesh || !c.material || Array.isArray(c.material) || !c.material.color) return;
+                            if (!c._damageClonedMat && tier > 0) {
+                                c._origColorHex = c.material.color.getHex();
+                                c.material = c.material.clone();
+                                c._damageClonedMat = true;
+                            }
+                            if (c._damageClonedMat && c._origColorHex !== undefined) {
+                                c.material.color.setHex(c._origColorHex);
+                                if (tier === 1) c.material.color.multiplyScalar(0.65);
+                                else if (tier === 2) c.material.color.multiplyScalar(0.40);
+                            }
+                        });
+                    }
+                    if (tier > 0 && ((buildingTick + idx) % (tier === 2 ? 10 : 18) === 0)) {
+                        const basePos = ent.position || ent.mesh.position;
+                        const spread = isStruct ? (ent.radius || 4) * 0.45 : (ent.radius || 1.2) * 0.4;
+                        const smokePos = basePos.clone().add(new THREE.Vector3(
+                            (Math.random() - 0.5) * spread,
+                            isStruct ? (2.2 + Math.random() * 1.5) : (ent.isAir ? 0.3 : 1.0),
+                            (Math.random() - 0.5) * spread
+                        ));
+                        if (typeof spawnSmokePuff === 'function') {
+                            spawnSmokePuff(smokePos, tier === 2 ? 0x1e2229 : 0x4b525c, isStruct ? (tier === 2 ? 0.85 : 0.55) : (tier === 2 ? 0.5 : 0.32));
+                        }
+                        if (tier === 2 && Math.random() < 0.55 && typeof spawnMuzzleFlash === 'function') {
+                            spawnMuzzleFlash(smokePos, 0xff5500, isStruct ? 0.55 : 0.3);
+                        }
+                    }
+                }
+            };
+            updateEntityDamageVisuals(units, false);
+            updateEntityDamageVisuals(enemyUnits, false);
+            updateEntityDamageVisuals(structures, true);
+            updateEntityDamageVisuals(enemyStructures, true);
+
             // PERF: single ground-unit separation pass using a spatial hash grid
             // (was two full O(N^2) passes per frame that fought each other)
             separateGroundUnits(units);
