@@ -190,34 +190,34 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     let hullMat, houseMat;
     if (isEnemy) {
         hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => vTex 
-            ? new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 })
-            : new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.52, metalness: 0.35 }));
-        houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28 }));
+            ? new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25, side: THREE.DoubleSide })
+            : new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.52, metalness: 0.35, side: THREE.DoubleSide }));
+        houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28, side: THREE.DoubleSide }));
     } else {
         if (vTex) {
-            hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25 }));
+            hullMat = getCachedW3DMaterial(matPrefix + 'hull', () => new THREE.MeshStandardMaterial({ map: vTex, roughness: 0.6, metalness: 0.25, side: THREE.DoubleSide }));
         } else {
             if (faction === 'usa') {
-                hullMat = (typeof matUSA !== 'undefined') ? matUSA : getCachedW3DMaterial('veh:usa:hull', () => new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.5, metalness: 0.35 }));
+                hullMat = (typeof matUSA !== 'undefined') ? matUSA : getCachedW3DMaterial('veh:usa:hull', () => new THREE.MeshStandardMaterial({ color: 0x4a5d4e, roughness: 0.5, metalness: 0.35, side: THREE.DoubleSide }));
             } else if (faction === 'china') {
-                hullMat = (typeof matChina !== 'undefined') ? matChina : getCachedW3DMaterial('veh:china:hull', () => new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.55, metalness: 0.3 }));
+                hullMat = (typeof matChina !== 'undefined') ? matChina : getCachedW3DMaterial('veh:china:hull', () => new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.55, metalness: 0.3, side: THREE.DoubleSide }));
             } else {
-                hullMat = (typeof matGLA !== 'undefined') ? matGLA : getCachedW3DMaterial('veh:gla:hull', () => new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2 }));
+                hullMat = (typeof matGLA !== 'undefined') ? matGLA : getCachedW3DMaterial('veh:gla:hull', () => new THREE.MeshStandardMaterial({ color: 0x6e6347, roughness: 0.75, metalness: 0.2, side: THREE.DoubleSide }));
             }
         }
         if (activeHouseHex) {
-            houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28 }));
+            houseMat = getCachedW3DMaterial('veh:house:' + activeHouseHex.toString(16), () => new THREE.MeshStandardMaterial({ color: activeHouseHex, roughness: 0.55, metalness: 0.28, side: THREE.DoubleSide }));
         } else if (faction === 'usa') {
-            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : getCachedW3DMaterial('veh:usa:house', () => new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3 }));
+            houseMat = (typeof matUSAColor !== 'undefined') ? matUSAColor : getCachedW3DMaterial('veh:usa:house', () => new THREE.MeshStandardMaterial({ color: 0x1e3f66, roughness: 0.58, metalness: 0.3, side: THREE.DoubleSide }));
         } else if (faction === 'china') {
-            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : getCachedW3DMaterial('veh:china:house', () => new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32 }));
+            houseMat = (typeof matChinaColor !== 'undefined') ? matChinaColor : getCachedW3DMaterial('veh:china:house', () => new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.55, metalness: 0.32, side: THREE.DoubleSide }));
         } else {
-            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : getCachedW3DMaterial('veh:gla:house', () => new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.78, metalness: 0.2 }));
+            houseMat = (typeof matGLAColor !== 'undefined') ? matGLAColor : getCachedW3DMaterial('veh:gla:house', () => new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.78, metalness: 0.2, side: THREE.DoubleSide }));
         }
     }
 
-    const treadMat = (typeof matTread !== 'undefined') ? matTread : getCachedW3DMaterial('veh:tread', () => new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 }));
-    const metalMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : getCachedW3DMaterial('veh:metal', () => new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.7 }));
+    const treadMat = (typeof matTread !== 'undefined') ? matTread : getCachedW3DMaterial('veh:tread', () => new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1, side: THREE.DoubleSide }));
+    const metalMat = (typeof matDarkMetal !== 'undefined') ? matDarkMetal : getCachedW3DMaterial('veh:metal', () => new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.7, side: THREE.DoubleSide }));
     const glassMat = (typeof matBlueGlass !== 'undefined') ? matBlueGlass : getCachedW3DMaterial('veh:glass', () => new THREE.MeshStandardMaterial({ color: 0x00d2d3, roughness: 0.1, metalness: 0.85, transparent: true, opacity: 0.8 }));
 
     const pivotGroups = [];
@@ -254,9 +254,29 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const geom = getCachedW3DGeometry('veh:' + modelKey + ':' + meshName, mdata);
 
         const upper = meshName.toUpperCase();
+        const texKey = mdata.tex ? mdata.tex.replace(/\.(dds|tga)$/i, '').toLowerCase() : '';
         let mat = hullMat;
         if (upper.includes('HOUSECOLOR') || upper.includes('BANNER')) {
-            mat = houseMat;
+            if (texKey === 'housecolor2' || texKey === 'housecolor') {
+                const hcTex = getW3dTexture(texKey);
+                if (hcTex) {
+                    const hcHex = (houseMat && houseMat.color && typeof houseMat.color.getHex === 'function')
+                        ? houseMat.color.getHex()
+                        : (activeHouseHex || 0x2563eb);
+                    mat = getCachedW3DMaterial('veh:houseTex:' + texKey + ':' + hcHex.toString(16), () => new THREE.MeshStandardMaterial({
+                        map: hcTex,
+                        color: hcHex,
+                        alphaTest: 0.45,
+                        roughness: 0.55,
+                        metalness: 0.28,
+                        side: THREE.DoubleSide
+                    }));
+                } else {
+                    mat = houseMat;
+                }
+            } else {
+                mat = houseMat;
+            }
         } else if (upper.includes('TREAD') || upper.includes('TRACK') || upper.includes('WHEEL') || upper.includes('TIRE')) {
             mat = treadMat;
         } else if (upper.includes('BARREL') || upper.includes('GUN') || upper.includes('CANNON') || upper.includes('EXHAUST')) {

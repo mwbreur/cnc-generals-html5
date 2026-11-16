@@ -524,8 +524,8 @@ function initSharedMaterials() {
     matGLAColor = new THREE.MeshStandardMaterial({ color: 0x756149, bumpMap: texBumpPlate, bumpScale: 0.05, roughness: 0.82, metalness: 0.2 });
 
     matGunmetal = new THREE.MeshStandardMaterial({ color: 0x2e3338, bumpMap: texBumpPlate, bumpScale: 0.035, roughness: 0.38, metalness: 0.82 });
-    matDarkMetal = new THREE.MeshStandardMaterial({ color: 0x181a1d, roughness: 0.5, metalness: 0.75 });
-    matTread = new THREE.MeshStandardMaterial({ map: texTread, bumpMap: texBumpPlate, bumpScale: 0.08, roughness: 0.85, metalness: 0.45 });
+    matDarkMetal = new THREE.MeshStandardMaterial({ color: 0x181a1d, roughness: 0.5, metalness: 0.75, side: THREE.DoubleSide });
+    matTread = new THREE.MeshStandardMaterial({ map: texTread, bumpMap: texBumpPlate, bumpScale: 0.08, roughness: 0.85, metalness: 0.45, side: THREE.DoubleSide });
     matTire = new THREE.MeshStandardMaterial({ color: 0x141517, roughness: 0.92, metalness: 0.1 });
 
     matGlass = new THREE.MeshStandardMaterial({ color: 0x2ed573, roughness: 0.1, metalness: 0.9, transparent: true, opacity: 0.82 });
