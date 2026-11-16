@@ -126,8 +126,8 @@
                     if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
                         this.toPos.copy(this.metadata.target.mesh.position);
                         this.toPos.y += this.metadata.target.isAir ? 0.3 : 0.5;
-                        this.distTotal = Math.max(1, fromPos.distanceTo(this.toPos));
-                        this.group.lookAt(this.toPos);
+                        this.distTotal = Math.max(1, this.fromPos.distanceTo(this.toPos));
+                        this.mesh.lookAt(this.toPos);
                     }
 
                     this.distTraveled += this.speed;
@@ -229,8 +229,8 @@
                     if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
                         this.toPos.copy(this.metadata.target.mesh.position);
                         this.toPos.y += this.metadata.target.isAir ? 0.3 : 0.5;
-                        this.distTotal = Math.max(1, fromPos.distanceTo(this.toPos));
-                        this.group.lookAt(this.toPos);
+                        this.distTotal = Math.max(1, this.fromPos.distanceTo(this.toPos));
+                        this.mesh.lookAt(this.toPos);
                     }
 
                     this.distTraveled += this.speed;
@@ -504,9 +504,13 @@
                             }
                         });
                         units.forEach(unit => {
-                            if (unit.health > 0 && unit.mesh && !unit.isAir && unit.selectedFaction !== 'usa') {
+                            if (unit.health > 0 && unit.mesh && !unit.isAir) {
                                 if (unit.mesh.position.distanceTo(this.pos) <= this.radius) {
-                                    unit.health -= 5;
+                                    if (typeof applyCalculatedDamage === 'function') {
+                                        applyCalculatedDamage(null, unit, 5, 'FLAME');
+                                    } else {
+                                        unit.health -= 5;
+                                    }
                                 }
                             }
                         });
@@ -969,19 +973,19 @@
                         triggerScreenShake(0.35);
                     }
 
-                    // Continuous damage tick to hostile units & structures in beam path
+                    // Continuous damage tick to all units & structures in beam path (supports AI superweapons & friendly fire)
                     if (life % 10 === 0) {
                         const beamPos = group.position;
-                        enemyUnits.forEach(enemy => {
-                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(beamPos) <= 9.5) {
+                        [...units, ...enemyUnits].forEach(u => {
+                            if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(beamPos) <= 9.5) {
                                 if (typeof applyCalculatedDamage === 'function') {
-                                    applyCalculatedDamage(null, enemy, 45, 'LASER');
+                                    applyCalculatedDamage(null, u, 45, 'LASER');
                                 } else {
-                                    enemy.health -= 45;
+                                    u.health -= 45;
                                 }
                             }
                         });
-                        enemyStructures.forEach(struct => {
+                        [...structures, ...enemyStructures].forEach(struct => {
                             if (struct.health > 0 && struct.position && struct.position.distanceTo(beamPos) <= 12.5) {
                                 if (typeof applyCalculatedDamage === 'function') {
                                     applyCalculatedDamage(null, struct, 65, 'LASER');
