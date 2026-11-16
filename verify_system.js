@@ -253,6 +253,7 @@ const jsFiles = [
     '03_units.js',
     '04_buildings.js',
     '05_audio.js',
+    '05b_official_audio.js',
     '06_effects.js',
     '07_terrain.js',
     '07b_tournament_desert.js',
@@ -1093,7 +1094,8 @@ vm.runInContext(`
         resetEntireBattlefieldState();
         isMultiplayerActive = true;
         isMultiplayerHost = true;
-        netConn = { open: true, send: function() {} };
+        const sentPackets = [];
+        netConn = { open: true, send: function(pkt) { sentPackets.push(pkt); } };
 
         const gatling = {
             type: 'gatlingCannon', faction: 'china', ownerId: 1, teamId: 1,
@@ -1108,6 +1110,9 @@ vm.runInContext(`
         processBaseDefenseCombat();
         if (foe.health >= foe.maxHealth) {
             throw new Error("Expected Patriot base defense to damage hostile unit in multiplayer!");
+        }
+        if (!sentPackets.some(p => p.type === 'unit_damage' && p.targetNetId === 'mp_foe_1')) {
+            throw new Error("Expected host processBaseDefenseCombat() to broadcast unit_damage packet!");
         }
 
         // Verify client state_sync: (a) local unit within 2.5u drift avoids _mpNetTarget, (b) missing _mpSeenOnce unit is cleaned up
@@ -1129,5 +1134,49 @@ vm.runInContext(`
     }
 `, sandbox);
 console.log("✓ Verified multiplayer base defense combat & state_sync ghost-unit/rubber-band fixes.");
+
+// 19. Deterministic Replay Parity Test (120 ticks x 2 runs with setSimSeed(12345))
+vm.runInContext(`
+    {
+        function runDeterministicSample(seed) {
+            setSimSeed(seed);
+            resetEntireBattlefieldState();
+            setupMapEnvironment('tournament_desert', 1500);
+            const basePos = new THREE.Vector3(240, 0, -240);
+            const dozer = spawnEnemyUnit('dozer', basePos.clone().add(new THREE.Vector3(24, 0, 24)), null, 'china');
+            dozer.ownerId = 2; dozer.teamId = 2; dozer.faction = 'china'; dozer.isAI = true;
+            const cc = spawnAIStructure({ ownerId: 2, teamId: 2, faction: 'china', resources: 5000 }, 'center', basePos, dozer);
+            cc.isBuilding = false; cc.buildProgress = 100; cc.dozerRef = null;
+            dozer.taskState = 'Idle'; dozer.targetStructure = null;
+            aiCommanders = [{
+                ownerId: 2, teamId: 2, faction: 'china', difficulty: 'hard',
+                basePos: basePos.clone(), rallyPoint: basePos.clone().add(new THREE.Vector3(-25, 0, 25)),
+                resources: 5000, prodTimer: 0, structureTimer: 0,
+                discoveredEnemyBases: [], discoveredEnemyTargets: [], stagingTeam: [], scoutNetIds: new Set()
+            }];
+            combatDeltaScale = 1.0;
+            isMatchActive = true;
+            aiDifficultyLevel = 'hard';
+            for (let t = 0; t < 120; t++) {
+                buildingTick++;
+                processEnemyAIEngine();
+                processBuildingFunctions();
+                processEnemyMovement();
+            }
+            return {
+                structs: enemyStructures.length,
+                units: enemyUnits.length,
+                dx: Math.round(dozer.mesh.position.x * 1000) / 1000,
+                dz: Math.round(dozer.mesh.position.z * 1000) / 1000
+            };
+        }
+        const runA = runDeterministicSample(12345);
+        const runB = runDeterministicSample(12345);
+        if (JSON.stringify(runA) !== JSON.stringify(runB)) {
+            throw new Error("Deterministic replay parity failed! runA=" + JSON.stringify(runA) + " runB=" + JSON.stringify(runB));
+        }
+    }
+`, sandbox);
+console.log("✓ Verified deterministic replay parity across two seeded 120-tick Skirmish runs.");
 
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");
