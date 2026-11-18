@@ -120,6 +120,8 @@ function playUnitVoice(unitType, action = 'select', faction = null) {
     else if (t.includes('bombtruck')) norm = 'bombtruck';
     else if (t.includes('scud')) norm = 'scud';
     else if (t.includes('radar')) norm = 'radarvan';
+    else if (t === 'mob') norm = 'rebel';
+    else if (t === 'hijacker') norm = 'terrorist';
 
     let act = (action || 'select').toLowerCase();
     // Non-combat units re-route attack to move

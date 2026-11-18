@@ -413,6 +413,15 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
                     showNotification(isPlayerStruct ? '⚠ BASE UNDER ATTACK!' : '⚠ UNIT UNDER ATTACK!', 'error');
                 }
                 if (typeof playAudio === 'function') playAudio('radar_alert');
+                if (typeof window !== 'undefined' && window.speechSynthesis && typeof SpeechSynthesisUtterance === 'function' && !window.speechSynthesis.speaking) {
+                    try {
+                        const utt = new SpeechSynthesisUtterance(isPlayerStruct ? 'Our base is under attack.' : 'Unit under attack.');
+                        utt.rate = 1.05;
+                        utt.pitch = 0.9;
+                        utt.volume = 0.75;
+                        window.speechSynthesis.speak(utt);
+                    } catch (e) {}
+                }
             }
         }
     }

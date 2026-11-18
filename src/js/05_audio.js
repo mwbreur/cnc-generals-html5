@@ -61,6 +61,7 @@ function playAudio(type, options = {}, faction = null) {
             tomahawk_launch: 'sfx_missile_tomahawk',
             scud_launch: 'sfx_missile_tomahawk',
             missile_launch: 'sfx_missile_comanche',
+            aurora_bomb: 'sfx_explosion',
             explosion: 'sfx_explosion',
             nuke_artillery: 'sfx_nukecannon_fire',
             nukecannon_deploy: 'sfx_nukecannon_deploy',
