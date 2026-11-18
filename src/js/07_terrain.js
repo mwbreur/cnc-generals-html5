@@ -924,6 +924,7 @@
                     const pMesh = new THREE.Mesh(pGeo, waterMat);
                     pMesh.position.y = wp.waterY !== undefined ? wp.waterY : -0.8;
                     pMesh.receiveShadow = true;
+                    pMesh.userData.isWaterMesh = true;
                     mapPropsGroup.add(pMesh);
                 });
             }

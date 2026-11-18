@@ -154,10 +154,10 @@ function renderRadarMinimap() {
         ctx.drawImage(window._minimapTerrainCanvas, 0, 0, w, h);
     }
 
-    // 2. Subtle Fog of War tint so the full map terrain stays clearly visible while showing explored sectors
+    // 2. Fog of War shroud overlay on radar so unexplored sectors remain dark until discovered
     if (typeof fogCanvas !== 'undefined' && fogCanvas) {
         ctx.save();
-        ctx.globalAlpha = 0.24;
+        ctx.globalAlpha = 0.78;
         ctx.drawImage(fogCanvas, 0, 0, w, h);
         ctx.restore();
     }
@@ -165,17 +165,20 @@ function renderRadarMinimap() {
     // Transform world coord to minimap canvas coord
     const toRX = (x) => ((x + half) / mapSize) * w;
     const toRZ = (z) => ((z + half) / mapSize) * h;
+    const exploredCheck = (typeof isPositionExplored === 'function') ? isPositionExplored : () => true;
 
-    // 3. Draw Bridges
+    // 3. Draw Bridges (only once discovered)
     if (mapBridges && mapBridges.length > 0) {
         ctx.strokeStyle = '#d2dae2';
         ctx.lineWidth = 2.5;
         mapBridges.forEach(b => {
             if (b.position) {
+                if (!exploredCheck(b.position.x, b.position.z)) return;
                 const bx = toRX(b.position.x);
                 const bz = toRZ(b.position.z);
                 ctx.strokeRect(bx - 3, bz - 3, 6, 6);
             } else if (b.x1 !== undefined) {
+                if (!exploredCheck((b.x1 + b.x2) * 0.5, (b.z1 + b.z2) * 0.5)) return;
                 ctx.beginPath();
                 ctx.moveTo(toRX(b.x1), toRZ(b.z1));
                 ctx.lineTo(toRX(b.x2), toRZ(b.z2));
@@ -184,10 +187,10 @@ function renderRadarMinimap() {
         });
     }
 
-    // 4. Draw Neutral Tech Structures (Oil Derricks, Hospitals, Refineries)
+    // 4. Draw Neutral Tech Structures (Oil Derricks, Hospitals, Refineries — only once discovered)
     if (window.neutralStructures && window.neutralStructures.length > 0) {
         window.neutralStructures.forEach(ns => {
-            if (ns.health > 0 && ns.position) {
+            if (ns.health > 0 && ns.position && exploredCheck(ns.position.x, ns.position.z)) {
                 const rx = toRX(ns.position.x);
                 const rz = toRZ(ns.position.z);
                 ctx.fillStyle = '#000000';
@@ -198,10 +201,10 @@ function renderRadarMinimap() {
         });
     }
 
-    // 5. Draw Supply Docks (Crisp Gold/Green Supply Icons)
+    // 5. Draw Supply Docks (Crisp Gold/Green Supply Icons — only once discovered)
     if (supplyPoints && supplyPoints.length > 0) {
         supplyPoints.forEach(sp => {
-            if (sp.stock > 0) {
+            if (sp.stock > 0 && sp.position && exploredCheck(sp.position.x, sp.position.z)) {
                 const rx = toRX(sp.position.x);
                 const rz = toRZ(sp.position.z);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';

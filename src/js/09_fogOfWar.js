@@ -283,6 +283,56 @@
                     : false;
                 es.mesh.visible = isVisible;
             });
+
+            // 6. Hide unexplored resource points, neutral tech structures, civilian buildings, and map props under Shroud
+            if (typeof supplyPoints !== 'undefined' && Array.isArray(supplyPoints)) {
+                for (let i = 0; i < supplyPoints.length; i++) {
+                    const sp = supplyPoints[i];
+                    if (sp && sp.mesh && sp.position) sp.mesh.visible = isPositionExplored(sp.position.x, sp.position.z);
+                }
+            }
+            if (typeof window !== 'undefined' && Array.isArray(window.neutralStructures)) {
+                for (let i = 0; i < window.neutralStructures.length; i++) {
+                    const ns = window.neutralStructures[i];
+                    if (ns && ns.mesh && ns.position) ns.mesh.visible = isPositionExplored(ns.position.x, ns.position.z);
+                }
+            }
+            if (typeof worldBuildings !== 'undefined' && Array.isArray(worldBuildings)) {
+                for (let i = 0; i < worldBuildings.length; i++) {
+                    const wb = worldBuildings[i];
+                    if (wb && wb.mesh && wb.position) wb.mesh.visible = isPositionExplored(wb.position.x, wb.position.z);
+                }
+            }
+            if (typeof mapPropsGroup !== 'undefined' && mapPropsGroup && Array.isArray(mapPropsGroup.children)) {
+                for (let i = 0; i < mapPropsGroup.children.length; i++) {
+                    const ch = mapPropsGroup.children[i];
+                    if (!ch || (ch.userData && ch.userData.isWaterMesh)) continue;
+                    ch.visible = isPositionExplored(ch.position.x, ch.position.z);
+                }
+            }
+        }
+
+        function isPositionExplored(x, z) {
+            if (!fogGrid) return true;
+            const mapSize = currentMapSize || 1500;
+            const halfMap = mapSize * 0.5;
+            const cx = Math.floor(((x + halfMap) / mapSize) * FOG_RES);
+            const cy = Math.floor(((z + halfMap) / mapSize) * FOG_RES);
+            if (cx < 0 || cx >= FOG_RES || cy < 0 || cy >= FOG_RES) return false;
+            return fogGrid[cy * FOG_RES + cx] >= 1;
+        }
+        function isPositionVisible(x, z) {
+            if (!fogGrid) return true;
+            const mapSize = currentMapSize || 1500;
+            const halfMap = mapSize * 0.5;
+            const cx = Math.floor(((x + halfMap) / mapSize) * FOG_RES);
+            const cy = Math.floor(((z + halfMap) / mapSize) * FOG_RES);
+            if (cx < 0 || cx >= FOG_RES || cy < 0 || cy >= FOG_RES) return false;
+            return fogGrid[cy * FOG_RES + cx] === 2;
+        }
+        if (typeof window !== 'undefined') {
+            window.isPositionExplored = isPositionExplored;
+            window.isPositionVisible = isPositionVisible;
         }
 
                 const factionCatalog = {

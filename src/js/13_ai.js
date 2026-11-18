@@ -2561,6 +2561,11 @@ function processEnemyAIEngine() {
                 for (let ai = 0; ai < list.length; ai++) {
                     const asset = list[ai];
                     if (!(asset.health > 0 && !asset.garrisonedIn)) continue;
+                    if (asset.mesh && !asset.mesh.visible) {
+                        const hiddenBar = healthBarElements.get(asset);
+                        if (hiddenBar) hiddenBar.style.display = 'none';
+                        continue;
+                    }
                     const isSelected = !!asset.selected || (isStructure && asset === selStruct);
                     const showHealthBar = isSelected || asset.health < asset.maxHealth;
                     const vetRank = Math.min(3, Math.max(0, asset.veterancy || 0));
