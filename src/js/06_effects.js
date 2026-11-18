@@ -509,15 +509,60 @@ function spawnSparks(pos, color = 0xfff200, count = 12) {
     }
 }
 
-// Charred blast crater decal on ground
+// Charred blast crater decal on ground (cached procedural crater texture with ragged blast rays & feathered edge)
+let _craterTexCache = null;
+function _getCraterTexture() {
+    if (_craterTexCache) return _craterTexCache;
+    if (typeof document === 'undefined' || !THREE.CanvasTexture) return null;
+    const size = 128;
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const cx = size / 2, cy = size / 2;
+
+    // Soft outer soot falloff
+    const outerGrad = ctx.createRadialGradient(cx, cy, size * 0.08, cx, cy, size * 0.48);
+    outerGrad.addColorStop(0.0, 'rgba(12, 10, 9, 0.96)');
+    outerGrad.addColorStop(0.32, 'rgba(26, 20, 16, 0.88)');
+    outerGrad.addColorStop(0.55, 'rgba(54, 42, 30, 0.62)');
+    outerGrad.addColorStop(0.78, 'rgba(28, 22, 18, 0.28)');
+    outerGrad.addColorStop(1.0, 'rgba(15, 12, 10, 0.0)');
+    ctx.fillStyle = outerGrad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Jagged scorch rays & rim debris
+    for (let i = 0; i < 28; i++) {
+        const ang = (i / 28) * Math.PI * 2 + (i % 3) * 0.11;
+        const len = size * (0.30 + ((i * 37) % 19) * 0.009);
+        ctx.strokeStyle = (i % 2 === 0) ? 'rgba(14, 11, 9, 0.72)' : 'rgba(68, 52, 36, 0.50)';
+        ctx.lineWidth = 2 + (i % 3);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(ang) * 6, cy + Math.sin(ang) * 6);
+        ctx.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
+        ctx.stroke();
+    }
+
+    // Highlighted crater lip ridge
+    ctx.strokeStyle = 'rgba(92, 74, 54, 0.45)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.25, 0, Math.PI * 2);
+    ctx.stroke();
+
+    _craterTexCache = new THREE.CanvasTexture(c);
+    return _craterTexCache;
+}
+
 function spawnCraterDecal(pos, radius = 2.2, duration = 380) {
     const groundY = getTerrainHeight(pos.x, pos.z);
-    const geo = new THREE.CircleGeometry(radius, 16);
+    const tex = _getCraterTexture();
+    const geo = new THREE.PlaneGeometry(radius * 2.25, radius * 2.25);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
-            color: 0x111111,
+            map: tex || undefined,
+            color: tex ? 0xffffff : 0x1a1512,
             transparent: true,
-            opacity: 0.85,
+            opacity: 0.92,
             depthWrite: false,
             polygonOffset: true,
             polygonOffsetFactor: -2,
@@ -525,6 +570,7 @@ function spawnCraterDecal(pos, radius = 2.2, duration = 380) {
     });
     const crater = new THREE.Mesh(geo, mat);
     crater.position.set(pos.x, groundY + 0.18, pos.z);
+    crater.rotation.y = Math.random() * Math.PI * 2;
     crater.renderOrder = 2;
     scene.add(crater);
 
@@ -535,7 +581,7 @@ function spawnCraterDecal(pos, radius = 2.2, duration = 380) {
             update() {
                 this.life--;
                 if (this.life < 80) {
-                    this.mesh.material.opacity = (this.life / 80) * 0.85;
+                    this.mesh.material.opacity = (this.life / 80) * 0.92;
                 }
                 if (this.life <= 0) {
                     scene.remove(this.mesh);
