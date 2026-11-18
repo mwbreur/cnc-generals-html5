@@ -2230,6 +2230,7 @@ function createC130FlyoverPlane() {
     }
     const c130Props = [];
     plane.traverse(c => {
+            if (c.isMesh) c.castShadow = true;
             if (c.name && c.name.toUpperCase().startsWith('PROPELLER')) c130Props.push(c);
     });
     return { plane, c130Props };
@@ -2243,9 +2244,9 @@ function triggerSupplyDropZoneDelivery(structure) {
     // 1. Official W3D C-130 Hercules Flyover Mesh (AvCargoPln.W3D)
     const { plane, c130Props } = createC130FlyoverPlane();
 
-    const flightY = groundY + 15;
-    const startPos = new THREE.Vector3(dropCenter.x - 130, flightY, dropCenter.z - 60);
-    const endPos = new THREE.Vector3(dropCenter.x + 130, flightY, dropCenter.z + 60);
+    const flightY = groundY + 16.5;
+    const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 45);
+    const endPos = new THREE.Vector3(dropCenter.x + 95, flightY, dropCenter.z + 45);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
@@ -2261,7 +2262,7 @@ function triggerSupplyDropZoneDelivery(structure) {
     if (typeof showNotification === 'function') showNotification('✈ C-130 Supply Drop inbound!', 'info');
 
     let planeTick = 0;
-    const planeDuration = 360;
+    const planeDuration = 420;
     let crateDropped = false;
 
     // 2. Parachute Supply Crate
@@ -2283,7 +2284,7 @@ function triggerSupplyDropZoneDelivery(structure) {
         chute.position.y = 3.2;
         crateGrp.add(box, strap, chute);
 
-        crateGrp.position.set(landX, groundY + 24, landZ);
+        crateGrp.position.set(landX, flightY - 1.2, landZ);
         scene.add(crateGrp);
 
         let landed = false;
@@ -2382,9 +2383,9 @@ function triggerC130Paradrop(targetPos) {
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
     const { plane, c130Props } = createC130FlyoverPlane();
-    const flightY = groundY + 15;
-    const startPos = new THREE.Vector3(dropCenter.x - 130, flightY, dropCenter.z - 60);
-    const endPos = new THREE.Vector3(dropCenter.x + 130, flightY, dropCenter.z + 60);
+    const flightY = groundY + 16.5;
+    const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 45);
+    const endPos = new THREE.Vector3(dropCenter.x + 95, flightY, dropCenter.z + 45);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
@@ -2401,53 +2402,107 @@ function triggerC130Paradrop(targetPos) {
     }
 
     let frame = 0;
-    const totalFrames = 320;
+    const totalFrames = 380;
     let dropped = false;
-    const step = () => {
-        frame++;
-        const t = frame / totalFrames;
-        plane.position.lerpVectors(startPos, endPos, t);
-        c130Props.forEach(p => { p.rotation.z += 0.9; });
+    activeFX.push({
+        update() {
+            frame++;
+            const t = frame / totalFrames;
+            plane.position.lerpVectors(startPos, endPos, t);
+            for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.75;
 
-        if (!dropped && t >= 0.5) {
-            dropped = true;
-            for (let i = 0; i < 4; i++) {
-                const rPos = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
-                const rGround = typeof getTerrainHeight === 'function' ? getTerrainHeight(rPos.x, rPos.z) : groundY;
-                const chuteMat = new THREE.MeshBasicMaterial({ color: 0xe8e2cf, side: THREE.DoubleSide });
-                const chute = new THREE.Mesh(new THREE.SphereGeometry(1.1, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), chuteMat);
-                chute.position.set(rPos.x, flightY - 2, rPos.z);
-                scene.add(chute);
-                let dropTick = 0;
-                const dropStep = () => {
-                    dropTick++;
-                    const dt = Math.min(1, dropTick / 55);
-                    chute.position.y = (flightY - 2) * (1 - dt) + (rGround + 0.8) * dt;
-                    if (dt < 1) {
-                        requestAnimationFrame(dropStep);
-                    } else {
-                        scene.remove(chute);
-                        chute.geometry.dispose();
-                        chuteMat.dispose();
-                        if (typeof spawnUnit === 'function') spawnUnit('infantry', rPos);
-                    }
-                };
-                requestAnimationFrame(dropStep);
+            if (!dropped && t >= 0.5) {
+                dropped = true;
+                for (let i = 0; i < 4; i++) {
+                    const rPos = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
+                    const rGround = typeof getTerrainHeight === 'function' ? getTerrainHeight(rPos.x, rPos.z) : groundY;
+                    const chuteMat = new THREE.MeshBasicMaterial({ color: 0xe8e2cf, side: THREE.DoubleSide });
+                    const chute = new THREE.Mesh(new THREE.SphereGeometry(1.1, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), chuteMat);
+                    chute.position.set(rPos.x, flightY - 1.2, rPos.z);
+                    scene.add(chute);
+                    let dropTick = 0;
+                    activeFX.push({
+                        update() {
+                            dropTick++;
+                            const dt = Math.min(1, dropTick / 65);
+                            chute.position.y = (flightY - 1.2) * (1 - dt) + (rGround + 0.8) * dt;
+                            if (dt < 1) return true;
+                            scene.remove(chute);
+                            chute.geometry.dispose();
+                            chuteMat.dispose();
+                            if (typeof spawnUnit === 'function') spawnUnit('infantry', rPos);
+                            return false;
+                        }
+                    });
+                }
+                if (typeof spawnSmokePuff === 'function') spawnSmokePuff(dropCenter, 0xdddddd);
             }
-            if (typeof spawnSmokePuff === 'function') spawnSmokePuff(dropCenter, 0xdddddd);
-        }
 
-        if (frame < totalFrames) {
-            requestAnimationFrame(step);
-        } else {
+            if (frame < totalFrames) return true;
             planeTracker.alive = false;
             if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
                 const idx = window.activeSupplyPlanes.indexOf(planeTracker);
                 if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
             }
             scene.remove(plane);
+            return false;
         }
-    };
-    requestAnimationFrame(step);
+    });
 }
 window.triggerC130Paradrop = triggerC130Paradrop;
+
+function triggerSpectreGunship(targetPos, pseudoAttacker) {
+    if (!targetPos || !scene) return;
+    const dropCenter = targetPos.clone();
+    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+    const { plane, c130Props } = createC130FlyoverPlane();
+    const flightY = groundY + 18.0;
+    const orbitRadius = 22.0;
+    let angle = -Math.PI * 0.6;
+    const angularSpeed = 0.016;
+    const totalFrames = 600;
+    let frame = 0;
+
+    plane.position.set(dropCenter.x + Math.cos(angle) * orbitRadius, flightY, dropCenter.z + Math.sin(angle) * orbitRadius);
+    scene.add(plane);
+
+    const planeTracker = { mesh: plane, dirX: -Math.sin(angle), dirZ: Math.cos(angle) };
+    if (typeof window !== 'undefined') {
+        if (!window.activeSupplyPlanes) window.activeSupplyPlanes = [];
+        window.activeSupplyPlanes.push(planeTracker);
+    }
+
+    activeFX.push({
+        update() {
+            frame++;
+            angle += angularSpeed;
+            const px = dropCenter.x + Math.cos(angle) * orbitRadius;
+            const pz = dropCenter.z + Math.sin(angle) * orbitRadius;
+            const nx = dropCenter.x + Math.cos(angle + 0.05) * orbitRadius;
+            const nz = dropCenter.z + Math.sin(angle + 0.05) * orbitRadius;
+            plane.position.set(px, flightY, pz);
+            if (typeof plane.lookAt === 'function') plane.lookAt(nx, flightY, nz);
+            plane.rotateZ(0.28); // Bank inward toward target circle like official AC-130 Spectre
+            planeTracker.dirX = -Math.sin(angle);
+            planeTracker.dirZ = Math.cos(angle);
+            for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.75;
+
+            if (frame % 48 === 24 && frame <= 520) {
+                const scatter = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 14, 0, (Math.random() - 0.5) * 14));
+                scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : groundY;
+                if (typeof spawnBulletTracer === 'function') spawnBulletTracer(plane.position.clone(), scatter, 0xffbe76, 5);
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true);
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 7.5, 130, 'EXPLOSIVE', pseudoAttacker);
+            }
+
+            if (frame < totalFrames) return true;
+            if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+                const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+                if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+            }
+            scene.remove(plane);
+            return false;
+        }
+    });
+}
+window.triggerSpectreGunship = triggerSpectreGunship;

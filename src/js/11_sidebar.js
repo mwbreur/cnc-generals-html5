@@ -4583,12 +4583,16 @@ function executeGeneralsPowerAt(pos) {
     } else if (p === 'spectreGunship') {
         showNotification('★ AC-130 Spectre Gunship circling target area!', 'success');
         playAudio('radio_chirp');
-        for (let i = 0; i < 10; i++) {
-            setTimeout(() => {
-                    const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 14, 0, (Math.random() - 0.5) * 14));
-                    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true);
-                    if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 7.5, 130, 'EXPLOSIVE', pseudoAttacker);
-                }, i * 650);
+        if (typeof triggerSpectreGunship === 'function') {
+            triggerSpectreGunship(pos, pseudoAttacker);
+        } else {
+            for (let i = 0; i < 10; i++) {
+                setTimeout(() => {
+                        const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 14, 0, (Math.random() - 0.5) * 14));
+                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true);
+                        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 7.5, 130, 'EXPLOSIVE', pseudoAttacker);
+                    }, i * 650);
+            }
         }
         return true;
     } else if (p === 'clusterMines') {
