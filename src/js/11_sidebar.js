@@ -31,56 +31,90 @@ function initRadarMinimap() {
     radarCtx = radarCanvas.getContext('2d');
 
     let isRadarDragging = false;
+    function getRadarWorldCoords(e) {
+        const rect = radarCanvas.getBoundingClientRect();
+        const rw = rect.width || radarCanvas.width || 185;
+        const rh = rect.height || radarCanvas.height || 185;
+        const px = Math.max(0, Math.min(rw, e.clientX - rect.left));
+        const py = Math.max(0, Math.min(rh, e.clientY - rect.top));
+        const mapSize = currentMapSize || 1500;
+        const worldX = (px / rw - 0.5) * mapSize;
+        const worldZ = (py / rh - 0.5) * mapSize;
+        const worldY = typeof getTerrainHeight === 'function' ? getTerrainHeight(worldX, worldZ) : 0;
+        return new THREE.Vector3(worldX, worldY, worldZ);
+    }
+
+    function sendSelectedUnitsToRadarPos(targetPos) {
+        const selectedList = units.filter(u => u.selected && u.health > 0);
+        if (selectedList.length === 0) return false;
+        if (typeof applyGroupFormationMove === 'function') {
+            applyGroupFormationMove(selectedList, targetPos);
+        } else {
+            selectedList.forEach(u => {
+                u.targetPosition.copy(targetPos);
+                u.waypoints = [];
+                u.combatTarget = null;
+                u.taskState = 'Moving';
+            });
+        }
+        if (typeof playUnitVoice === 'function' && selectedList[0]) {
+            playUnitVoice(selectedList[0].type, 'move', selectedList[0].faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+        } else if (typeof playUSASound === 'function') {
+            playUSASound('acknowledge');
+        }
+        showNotification(`Tactical rally order to coordinates [${Math.round(targetPos.x)}, ${Math.round(targetPos.z)}]`, 'info');
+        if (typeof spawnPingEffect === 'function') spawnPingEffect(targetPos);
+        return true;
+    }
+
     function handleRadarPointer(e) {
         if (!radarCanvas) return;
         if (typeof isRadarOnline === 'function' && !isRadarOnline(selectedFaction)) return;
-        const rect = radarCanvas.getBoundingClientRect();
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-        const mapSize = currentMapSize || 1500;
-        const worldX = (px / radarCanvas.width - 0.5) * mapSize;
-        const worldZ = (py / radarCanvas.height - 0.5) * mapSize;
+        const targetPos = getRadarWorldCoords(e);
+
+        if (e.button === 2 || e.buttons === 2 || e.type === 'contextmenu') {
+            e.preventDefault();
+            e.stopPropagation();
+            sendSelectedUnitsToRadarPos(targetPos);
+            return;
+        }
 
         if (e.buttons === 1 || e.button === 0) {
+            e.stopPropagation();
             if (pendingSuperweapon) {
-                const targetPos = new THREE.Vector3(worldX, typeof getTerrainHeight === 'function' ? getTerrainHeight(worldX, worldZ) : 0, worldZ);
                 strikeWithSuperweapon(pendingSuperweapon, targetPos);
                 return;
             }
             if (typeof activeGeneralPower !== 'undefined' && activeGeneralPower) {
-                const targetPos = new THREE.Vector3(worldX, typeof getTerrainHeight === 'function' ? getTerrainHeight(worldX, worldZ) : 0, worldZ);
                 executeGeneralsPowerAt(targetPos);
                 return;
             }
-            // Left-click drag: Pan camera
-            cameraTarget.x = worldX;
-            cameraTarget.z = worldZ;
-            updateCameraPosition();
-        } else if (e.button === 2 || e.buttons === 2) { // Right-click: Move order to map coordinates!
-            e.preventDefault();
-            const selectedList = units.filter(u => u.selected);
-            if (selectedList.length > 0) {
-                const targetPos = new THREE.Vector3(worldX, getTerrainHeight(worldX, worldZ), worldZ);
-                if (typeof applyGroupFormationMove === 'function') {
-                    applyGroupFormationMove(selectedList, targetPos);
-                } else {
-                    selectedList.forEach(u => {
-                        u.targetPosition.copy(targetPos);
-                        u.waypoints = [];
-                        u.combatTarget = null;
-                        u.taskState = 'Idle';
-                    });
-                }
-                playUSASound('acknowledge');
-                showNotification(`Tactical rally order to coordinates [${Math.round(worldX)}, ${Math.round(worldZ)}]`, 'info');
-                spawnPingEffect(targetPos);
+            if (window.rallyPointPlacementStructure) {
+                window.rallyPointPlacementStructure.rallyPoint = targetPos.clone();
+                window.rallyPointPlacementStructure = null;
+                document.body.style.cursor = 'default';
+                if (typeof spawnPingEffect === 'function') spawnPingEffect(targetPos);
+                showNotification('Rally point set via radar.', 'success');
+                return;
             }
+            if (typeof attackMoveMode !== 'undefined' && attackMoveMode) {
+                attackMoveMode = false;
+                document.body.style.cursor = 'default';
+                sendSelectedUnitsToRadarPos(targetPos);
+                return;
+            }
+            // Left-click / drag: Pan camera
+            cameraTarget.x = targetPos.x;
+            cameraTarget.z = targetPos.z;
+            updateCameraPosition();
         }
     }
 
     radarCanvas.addEventListener('mousedown', e => {
-        if (e.button === 0) isRadarDragging = true;
-        handleRadarPointer(e);
+        if (e.button === 0) {
+            isRadarDragging = true;
+            handleRadarPointer(e);
+        }
     });
     window.addEventListener('mousemove', e => {
         if (isRadarDragging) handleRadarPointer(e);
@@ -89,7 +123,6 @@ function initRadarMinimap() {
         if (e.button === 0) isRadarDragging = false;
     });
     radarCanvas.addEventListener('contextmenu', e => {
-        e.preventDefault();
         handleRadarPointer(e);
     });
 }
@@ -4012,25 +4045,35 @@ function updateHUD() {
                     -((e.clientY - rect.top) / rect.height) * 2 + 1
                 );
                 raycaster.setFromCamera(ndc, camera);
-                const meshes = units.filter(u => u.health > 0 && u.mesh && (!u.ownerId || u.ownerId === 'player')).map(u => u.mesh);
-                const hits = raycaster.intersectObjects(meshes, true);
+                const meshes = units.filter(u => u.health > 0 && u.mesh && !u.garrisonedIn && (!u.ownerId || u.ownerId === 'player')).map(u => u.mesh);
+                const hits = meshes.length ? raycaster.intersectObjects(meshes, true) : [];
                 if (hits.length > 0) {
                     let hitObj = hits[0].object;
-                    while (hitObj && !hitObj.userData?.unitRef) hitObj = hitObj.parent;
-                    const clickedUnit = hitObj && hitObj.userData ? hitObj.userData.unitRef : units.find(u => u.mesh === hitObj);
+                    let clickedUnit = null;
+                    while (hitObj) {
+                        if (hitObj.userData && hitObj.userData.unitRef) { clickedUnit = hitObj.userData.unitRef; break; }
+                        clickedUnit = units.find(u => u.mesh === hitObj);
+                        if (clickedUnit) break;
+                        hitObj = hitObj.parent;
+                    }
                     if (clickedUnit && clickedUnit.type) {
                         if (typeof deselectAll === 'function') deselectAll();
                         let count = 0;
+                        const proj = new THREE.Vector3();
                         units.forEach(u => {
-                            if (u.health > 0 && u.type === clickedUnit.type && (!u.ownerId || u.ownerId === 'player')) {
-                                u.selected = true;
-                                if (typeof addSelectionCircle === 'function') addSelectionCircle(u);
-                                count++;
+                            if (u.health > 0 && u.mesh && !u.garrisonedIn && u.type === clickedUnit.type && (!u.ownerId || u.ownerId === 'player')) {
+                                proj.copy(u.mesh.position).project(camera);
+                                const onScreen = proj.z >= -1 && proj.z <= 1 && proj.x >= -1.02 && proj.x <= 1.02 && proj.y >= -1.02 && proj.y <= 1.02;
+                                if (onScreen) {
+                                    u.selected = true;
+                                    if (typeof addSelectionCircle === 'function') addSelectionCircle(u);
+                                    count++;
+                                }
                             }
                         });
                         if (typeof updateSidebar === 'function') updateSidebar();
                         if (count > 0 && typeof showNotification === 'function') {
-                            showNotification(`Selected ${count} × ${clickedUnit.type}`, 'info');
+                            showNotification(`Selected ${count} × ${clickedUnit.type} on screen`, 'info');
                         }
                     }
                 }

@@ -36,7 +36,11 @@ function processCombatScanning() {
 				if (unit.combatTarget) {
                     const targetPos = unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position);
                     const targetRadius = unit.combatTarget.radius || 0;
-                    const distance = targetPos ? unit.mesh.position.distanceTo(targetPos) : Infinity;
+                    const distance = targetPos
+                        ? (unit.isAir || unit.combatTarget.isAir
+                            ? unit.mesh.position.distanceTo(targetPos)
+                            : Math.hypot(unit.mesh.position.x - targetPos.x, unit.mesh.position.z - targetPos.z))
+                        : Infinity;
                     const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker')) ? 1.5 : 1.0;
                     const maxEffectiveRange = unit.scanRange * garrisonRangeMult + targetRadius;
                     const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
@@ -113,38 +117,44 @@ function processCombatScanning() {
                     unit.combatTarget = null;
                 }
 
-                // Auto-Scan fallback loop if completely idle (Only engage hostile targets!)
-                // PERF: staggered every 4 frames per unit and uses squared distance to avoid Math.sqrt per enemy
+                // Auto-Scan while Idle or Moving (Fire-on-the-move: engage nearest hostile in range without stopping)
+                // PERF: staggered every 2 frames when moving (4 when idle) using squared horizontal distance
                 const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker', 'pilot', 'drone_scout'].includes(unit.type);
-                if (!unit.combatTarget && ((_combatScanTick + ui) % 4 === 0) && !isNonCombatSupport) {
+                const scanMod = (unit.taskState === 'Moving') ? 2 : 4;
+                if (!unit.combatTarget && ((_combatScanTick + ui) % scanMod === 0) && !isNonCombatSupport) {
                     if (!(unit.isAir && unit.taskState === 'Moving')) {
                         const uPos = unit.mesh.position;
-                        const scanR2 = unit.scanRange * unit.scanRange;
-                        // 1. Scan for nearest hostile units (Skip friendly allies!)
+                        let bestUnitDist2 = Infinity;
+                        // 1. Scan for nearest hostile unit in range
                         for (let ei = 0; ei < enemyUnits.length; ei++) {
                             const enemy = enemyUnits[ei];
                             if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
+                                if (unit.type === 'tomahawk' && enemy.isAir) continue;
                                 const ep = enemy.mesh.position;
-                                const dx = uPos.x - ep.x, dy = uPos.y - ep.y, dz = uPos.z - ep.z;
-                                if (dx * dx + dy * dy + dz * dz <= scanR2) {
+                                const dx = uPos.x - ep.x, dz = uPos.z - ep.z;
+                                const effR = unit.scanRange + (enemy.radius || 0);
+                                const d2 = dx * dx + dz * dz;
+                                if (d2 <= effR * effR && d2 < bestUnitDist2) {
+                                    bestUnitDist2 = d2;
                                     unit.combatTarget = enemy;
                                     if (unit.isAir) unit.airState = 'attacking';
-                                    break;
                                 }
                             }
                         }
-                        // 2. If no hostile units in range, auto-target nearest hostile structures
+                        // 2. If no hostile units in range, auto-target nearest hostile structure
                         if (!unit.combatTarget && enemyStructures.length > 0) {
+                            let bestStructDist2 = Infinity;
                             for (let si = 0; si < enemyStructures.length; si++) {
                                 const struct = enemyStructures[si];
                                 if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
                                     const sPos = struct.position || struct.mesh.position;
                                     const effR = unit.scanRange + (struct.radius || 6);
-                                    const dx = uPos.x - sPos.x, dy = uPos.y - sPos.y, dz = uPos.z - sPos.z;
-                                    if (dx * dx + dy * dy + dz * dz <= effR * effR) {
+                                    const dx = uPos.x - sPos.x, dz = uPos.z - sPos.z;
+                                    const d2 = dx * dx + dz * dz;
+                                    if (d2 <= effR * effR && d2 < bestStructDist2) {
+                                        bestStructDist2 = d2;
                                         unit.combatTarget = struct;
                                         if (unit.isAir) unit.airState = 'attacking';
-                                        break;
                                     }
                                 }
                             }
