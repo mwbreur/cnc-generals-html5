@@ -42,18 +42,65 @@ function preloadSkirmishAudio(faction = null) {
     return Promise.all([loadOfficialAudioGroup('global'), loadOfficialAudioGroup(['usa','china','gla'].includes(playerFaction) ? playerFaction : 'usa')]);
 }
 
+function playOfficialAudioBuffer(ctx, buffer, volume) {
+    if (!ctx || !buffer) return false;
+    try {
+        if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(() => {});
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.value = volume;
+        src.connect(gain);
+        gain.connect(ctx.destination);
+        src.start(0);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function decodeOfficialAudioData(ctx, data) {
+    if (typeof data === 'string' && data.startsWith('data:')) {
+        const commaIdx = data.indexOf(',');
+        if (commaIdx !== -1) {
+            const b64 = data.slice(commaIdx + 1);
+            const bin = atob(b64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return ctx.decodeAudioData(bytes.buffer);
+        }
+    }
+    return fetch(data).then(r => r.arrayBuffer()).then(buf => ctx.decodeAudioData(buf));
+}
+
 function playOfficialSound(soundKey, volume = 0.85, faction = null) {
     if (!soundKey) return false;
+    const clampedVol = Math.max(0, Math.min(1, volume));
     const play = () => {
         const data = window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey];
         if (!data) return false;
-        try {
-            const audio = new Audio(data);
-            audio.volume = Math.max(0, Math.min(1, volume));
-            const result = audio.play();
-            if (result && result.catch) result.catch(() => {});
+        const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
+        if (ctx && typeof ctx.decodeAudioData === 'function') {
+            const cached = window.OFFICIAL_AUDIO_CACHE[soundKey];
+            if (cached && cached.duration !== undefined) {
+                return playOfficialAudioBuffer(ctx, cached, clampedVol);
+            }
+            if (cached && typeof cached.then === 'function') {
+                cached.then(buf => { if (buf) playOfficialAudioBuffer(ctx, buf, clampedVol); });
+                return true;
+            }
+            const decodePromise = decodeOfficialAudioData(ctx, data).then(buf => {
+                window.OFFICIAL_AUDIO_CACHE[soundKey] = buf;
+                playOfficialAudioBuffer(ctx, buf, clampedVol);
+                return buf;
+            }).catch(() => {
+                delete window.OFFICIAL_AUDIO_CACHE[soundKey];
+                return null;
+            });
+            window.OFFICIAL_AUDIO_CACHE[soundKey] = decodePromise;
             return true;
-        } catch (error) { return false; }
+        }
+        return false;
     };
     if (window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey]) return play();
     loadOfficialAudioGroup(getOfficialAudioGroup(soundKey, faction)).then(play);
