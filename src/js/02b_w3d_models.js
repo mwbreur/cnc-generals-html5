@@ -498,7 +498,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         }
     } else {
         root.userData.isAir = true;
-        root.userData.flightAltitude = (modelKey === 'chinook') ? 14.5 : (modelKey === 'comanche') ? 10.5 : (modelKey === 'raptor' || modelKey === 'aurora') ? 13.5 : 10.5;
+        root.userData.flightAltitude = (modelKey === 'chinook') ? 15.0 : (modelKey === 'comanche') ? 13.5 : (modelKey === 'aurora') ? 16.5 : 15.5;
     }
 
     root.userData.isW3D = true;

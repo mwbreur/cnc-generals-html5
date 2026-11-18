@@ -1715,6 +1715,8 @@ function animate() {
 
                 // 5. Commanded Flight Toward Destination
                 if (unit.airState === 'flying') {
+                    const targetCruiseY = groundY + cruiseAlt + Math.sin(animTime * 2.2 + unit.mesh.id) * 0.14;
+                    unit.mesh.position.y += (targetCruiseY - unit.mesh.position.y) * 0.08;
                     const dx = unit.targetPosition.x - unit.mesh.position.x;
                     const dz = unit.targetPosition.z - unit.mesh.position.z;
                     const dist2D = Math.hypot(dx, dz);
@@ -1768,6 +1770,8 @@ function animate() {
                         unit.airState = 'hovering';
                         unit.targetPosition.copy(unit.mesh.position);
                     } else {
+                        const targetOrbitY = groundY + cruiseAlt + Math.sin(animTime * 2.0 + unit.mesh.id) * 0.14;
+                        unit.mesh.position.y += (targetOrbitY - unit.mesh.position.y) * 0.08;
                         const orbitR = unit.circleRadius || 16.0;
                         const orbitSpeed = unit.speed * 0.75 * combatDeltaScale;
                         const angularSpeed = orbitSpeed / orbitR;
