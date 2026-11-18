@@ -1190,21 +1190,46 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
     beam.renderOrder = 5;
     group.add(beam);
 
-    // Ground impact plasma flare disc + inner white-hot core pool
-    const flareGeo = new THREE.CircleGeometry(4.8, 28);
+    // Ground impact radial blue plasma glow halo (matches official ParticleCannonUplink_HitFlare)
+    let glowTex = null;
+    if (typeof document !== 'undefined' && document.createElement) {
+        const gCan = document.createElement('canvas');
+        gCan.width = gCan.height = 128;
+        const gCtx = gCan.getContext('2d');
+        if (gCtx) {
+            const grad = gCtx.createRadialGradient(64, 64, 2, 64, 64, 64);
+            grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+            grad.addColorStop(0.22, 'rgba(110, 235, 255, 0.95)');
+            grad.addColorStop(0.55, 'rgba(0, 145, 255, 0.55)');
+            grad.addColorStop(1.0, 'rgba(0, 80, 255, 0.0)');
+            gCtx.fillStyle = grad;
+            gCtx.fillRect(0, 0, 128, 128);
+            glowTex = new THREE.CanvasTexture(gCan);
+        }
+    }
+    const flareGeo = new THREE.PlaneGeometry(22, 22);
     flareGeo.rotateX(-Math.PI / 2);
-    const flareMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, ...addBlend });
+    const flareMat = new THREE.MeshBasicMaterial({
+        color: 0x38d9ff,
+        map: glowTex,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest: false,
+        ...addBlend
+    });
     const flareDisc = new THREE.Mesh(flareGeo, flareMat);
-    flareDisc.position.y = 0.35;
-    flareDisc.renderOrder = 5;
+    flareDisc.position.y = 0.65;
+    flareDisc.renderOrder = 10;
     group.add(flareDisc);
 
-    const impactCoreGeo = new THREE.CircleGeometry(2.1, 20);
+    const impactCoreGeo = new THREE.CircleGeometry(3.2, 20);
     impactCoreGeo.rotateX(-Math.PI / 2);
-    const impactCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5, ...addBlend });
+    const impactCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, depthTest: false, ...addBlend });
     const impactCore = new THREE.Mesh(impactCoreGeo, impactCoreMat);
-    impactCore.position.y = 0.42;
-    impactCore.renderOrder = 6;
+    impactCore.position.y = 0.72;
+    impactCore.renderOrder = 11;
     group.add(impactCore);
 
     // 2. Rotating orbital energy vortex rings
@@ -1293,12 +1318,13 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                     spawnSmokePuff(group.position, 0x222f3e, 0.75);
                 }
                 if (life % 16 === 0) {
-                    const swGeo = new THREE.RingGeometry(1.2, 2.2, 24);
+                    if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(group.position, 24, 90);
+                    const swGeo = new THREE.RingGeometry(1.6, 3.0, 24);
                     swGeo.rotateX(-Math.PI / 2);
-                    const swMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, ...addBlend });
+                    const swMat = new THREE.MeshBasicMaterial({ color: 0x48dbfb, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, depthTest: false, ...addBlend });
                     const sw = new THREE.Mesh(swGeo, swMat);
-                    sw.position.set(group.position.x, group.position.y + 0.32, group.position.z);
-                    sw.renderOrder = 5;
+                    sw.position.set(group.position.x, group.position.y + 0.75, group.position.z);
+                    sw.renderOrder = 10;
                     scene.add(sw);
                     let swLife = 22;
                     activeFX.push({
@@ -1357,6 +1383,7 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                     window.activeParticleCannonControl = false;
                     if (isPlayerOwned) setParticleBeamCursor(false);
                     scene.remove(group);
+                    if (glowTex && typeof glowTex.dispose === 'function') glowTex.dispose();
                     group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
                     if (uplinkGroup) {
                         scene.remove(uplinkGroup);
