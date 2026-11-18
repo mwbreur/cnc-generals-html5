@@ -8,6 +8,10 @@ const GROUND_ONLY_AIRCRAFT = new Set(['aurora', 'stealthfighter']);
 
 function canUnitTarget(attacker, target) {
     if (!attacker || !target) return false;
+    const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+    if (target.isStealthed && !(target.revealedUntil && target.revealedUntil > curTick)) {
+        return false;
+    }
     if (target.isAir) {
         if (GROUND_ONLY_AIRCRAFT.has(attacker.type)) return false;
         return AA_CAPABLE_UNITS.has(attacker.type);
@@ -560,6 +564,12 @@ function executeWeaponFire(attacker, target) {
     if (gatling) gatling.rotation.z += 1.2;
     if (attacker.type === 'gatling' || attacker.type === 'gatlingTank' || attacker.type === 'gatlingCannon' || attacker.overlordUpgrade === 'gatling') {
         attacker._gatlingSpinVel = 0.55;
+    }
+
+    // Firing uncloaks stealth units briefly (~1.5s) unless Burton uses his silent knife at point-blank
+    if (attacker.isStealthed) {
+        attacker.isStealthed = false;
+        attacker.revealedUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 90;
     }
 
     // Authentic Heroic Tracers (Heroic rank units fire intense red laser tracers!)

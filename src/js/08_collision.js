@@ -439,7 +439,7 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
     const isBuilder = (type === 'dozer' || type === 'worker');
     const isTransport = (type === 'humvee' || type === 'chinook' || type === 'crawler' || type === 'battlebus' || type === 'technical' || type === 'ambulance');
-    const isNaturalStealth = ['stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker'].includes(type);
+    const isNaturalStealth = ['pathfinder', 'stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker', 'drone_scout'].includes(type);
     let cap = 0;
     if (isTransport) {
         if (type === 'crawler' || type === 'battlebus' || type === 'chinook') cap = 8;

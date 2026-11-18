@@ -1234,6 +1234,7 @@ function processEnemyAIEngine() {
                     let minDist = 38 * ZERO_HOUR_AI_DATA.guardInnerModifierAI;
                     hostileUnits.forEach(hu => {
                             if (hu.mesh) {
+                                if (hu.isStealthed && !(hu.revealedUntil && hu.revealedUntil > buildingTick)) return;
                                 const d = enemy.mesh.position.distanceTo(hu.mesh.position);
                                 if (d < minDist) { minDist = d; localIntruder = hu; }
                             }

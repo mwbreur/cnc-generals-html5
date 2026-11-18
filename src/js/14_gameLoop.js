@@ -1060,6 +1060,7 @@ function animate() {
             }
     });
 
+    if (buildingTick % 6 === 0) updateStealthAndDetection();
     processPointDefenseLasers();
     processScrapCrateCollection();
     processCameraKeyboardPanning();
@@ -2848,6 +2849,134 @@ function processEnemyMovement() {
     });
 }
 
+const STATIONARY_STEALTH_UNITS = new Set(['pathfinder', 'jarmen', 'burton', 'blacklotus', 'hijacker']);
+const ALWAYS_STEALTH_UNITS = new Set(['stealthfighter', 'drone_scout']);
+
+function setMeshStealthOpacity(mesh, cloaked) {
+    if (!mesh || mesh._stealthOpacityApplied === cloaked) return;
+    mesh._stealthOpacityApplied = cloaked;
+    mesh.traverse(c => {
+        if (!c.isMesh || !c.material) return;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        for (let i = 0; i < mats.length; i++) {
+            const m = mats[i];
+            if (!m) continue;
+            if (cloaked) {
+                if (m.userData._origOpacity === undefined) {
+                    m.userData._origOpacity = m.opacity !== undefined ? m.opacity : 1.0;
+                    m.userData._origTransparent = !!m.transparent;
+                }
+                m.transparent = true;
+                m.opacity = 0.42;
+            } else if (m.userData && m.userData._origOpacity !== undefined) {
+                m.opacity = m.userData._origOpacity;
+                m.transparent = m.userData._origTransparent;
+            }
+        }
+    });
+}
+
+function updateStealthAndDetection() {
+    const allUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined') ? [...units, ...enemyUnits] : [];
+    const allStructs = (typeof structures !== 'undefined' && typeof enemyStructures !== 'undefined') ? [...structures, ...enemyStructures] : [];
+
+    // 1. Update natural cloak / uncloak state for stealth units
+    for (let i = 0; i < allUnits.length; i++) {
+        const u = allUnits[i];
+        if (!u || u.health <= 0) continue;
+        const hasComancheStealth = u.type === 'comanche' && !u.isAI && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche');
+        const isStationaryStealth = STATIONARY_STEALTH_UNITS.has(u.type) || hasComancheStealth;
+        const isAlwaysStealth = ALWAYS_STEALTH_UNITS.has(u.type);
+        if (!isStationaryStealth && !isAlwaysStealth) continue;
+
+        const isRevealed = (u.revealedUntil && u.revealedUntil > buildingTick);
+        if (isAlwaysStealth) {
+            u.isStealthed = !isRevealed;
+        } else {
+            const isMoving = u.taskState === 'Moving' || (u.waypoints && u.waypoints.length > 0);
+            u.isStealthed = !isMoving && !isRevealed;
+        }
+    }
+
+    // 2. Run stealth detectors (units & defense structures)
+    const detectors = [];
+    for (let i = 0; i < allUnits.length; i++) {
+        const d = allUnits[i];
+        if (!d || d.health <= 0 || !d.mesh) continue;
+        if (d.detectsStealth || d.overlordUpgrade === 'gatling' || d.type === 'drone_scout') {
+            const range = (d.type === 'radarvan' || d.type === 'drone_scout') ? 34 : 26;
+            detectors.push({ obj: d, pos: d.mesh.position, range });
+        }
+    }
+    for (let i = 0; i < allStructs.length; i++) {
+        const s = allStructs[i];
+        if (!s || s.health <= 0 || s.isBuilding || !s.position) continue;
+        if (s.type === 'commandCenter' || s.type === 'center' || s.type === 'gatlingCannon' || s.type === 'patriot') {
+            detectors.push({ obj: s, pos: s.position, range: 30 });
+        }
+    }
+
+    for (let i = 0; i < allUnits.length; i++) {
+        const u = allUnits[i];
+        if (!u || u.health <= 0 || !u.mesh || !u.isStealthed) continue;
+        for (let j = 0; j < detectors.length; j++) {
+            const det = detectors[j];
+            if (isFriendly(u, det.obj)) continue;
+            if (u.mesh.position.distanceTo(det.pos) <= det.range) {
+                u.revealedUntil = buildingTick + 24;
+                u.isStealthed = false;
+                break;
+            }
+        }
+    }
+    for (let i = 0; i < allStructs.length; i++) {
+        const s = allStructs[i];
+        if (!s || s.health <= 0 || !s.position || !s.isStealthed) continue;
+        for (let j = 0; j < detectors.length; j++) {
+            const det = detectors[j];
+            if (isFriendly(s, det.obj)) continue;
+            if (s.position.distanceTo(det.pos) <= det.range) {
+                s.revealedUntil = buildingTick + 24;
+                break;
+            }
+        }
+    }
+
+    // 3. Visual stealth: hide unrevealed enemy stealthed units/structures; shimmer friendly stealthed units
+    if (typeof enemyUnits !== 'undefined') {
+        for (let i = 0; i < enemyUnits.length; i++) {
+            const eu = enemyUnits[i];
+            if (!eu || !eu.mesh || eu.health <= 0) continue;
+            const hidden = !!(eu.isStealthed && !(eu.revealedUntil && eu.revealedUntil > buildingTick));
+            eu.mesh.visible = !hidden;
+        }
+    }
+    if (typeof enemyStructures !== 'undefined') {
+        for (let i = 0; i < enemyStructures.length; i++) {
+            const es = enemyStructures[i];
+            if (!es || !es.mesh || es.health <= 0) continue;
+            const hidden = !!(es.isStealthed && !(es.revealedUntil && es.revealedUntil > buildingTick));
+            es.mesh.visible = !hidden;
+        }
+    }
+    if (typeof units !== 'undefined') {
+        for (let i = 0; i < units.length; i++) {
+            const u = units[i];
+            if (!u || !u.mesh || u.health <= 0) continue;
+            const cloaked = !!(u.isStealthed && !(u.revealedUntil && u.revealedUntil > buildingTick));
+            setMeshStealthOpacity(u.mesh, cloaked);
+        }
+    }
+    if (typeof structures !== 'undefined') {
+        for (let i = 0; i < structures.length; i++) {
+            const s = structures[i];
+            if (!s || !s.mesh || s.health <= 0) continue;
+            const cloaked = !!(s.isStealthed && !(s.revealedUntil && s.revealedUntil > buildingTick));
+            setMeshStealthOpacity(s.mesh, cloaked);
+        }
+    }
+}
+
 function processEnemyCombat() {
     enemyUnits.forEach((enemy, eIdx) => {
             if (enemy.health <= 0 || !enemy.mesh) return;
@@ -2876,7 +3005,7 @@ function processEnemyCombat() {
                         for (let i = 0; i < arr.length; i++) {
                             const cand = arr[i];
                             if (!cand || cand.health <= 0 || isFriendly(enemy, cand)) continue;
-                            if (cand.stealthed && !(cand.revealedUntil && cand.revealedUntil > buildingTick)) continue;
+                            if (cand.isStealthed && !(cand.revealedUntil && cand.revealedUntil > buildingTick)) continue;
                             const cPos = cand.position || (cand.mesh && cand.mesh.position);
                             if (!cPos) continue;
                             if (typeof canUnitTarget === 'function' && !canUnitTarget(enemy, cand)) continue;

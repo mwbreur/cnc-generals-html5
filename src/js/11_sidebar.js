@@ -3894,7 +3894,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
 
     const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
     const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
-    const isNaturalStealth = ['stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker'].includes(type) ||
+    const isNaturalStealth = ['pathfinder', 'stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker', 'drone_scout'].includes(type) ||
     (type === 'comanche' && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche'));
     const newUnitObj = {
         type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
