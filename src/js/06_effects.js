@@ -2575,3 +2575,41 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
     });
 }
 window.triggerSpectreGunship = triggerSpectreGunship;
+
+function spawnPingEffect(pos) {
+    if (!pos || typeof scene === 'undefined' || typeof activeFX === 'undefined') return;
+    const x = pos.x || 0, z = pos.z || 0;
+    const y = (typeof getTerrainHeight === 'function') ? getTerrainHeight(x, z) + 0.35 : 0.35;
+
+    if (typeof window !== 'undefined') {
+        if (!Array.isArray(window.minimapAlertPings)) window.minimapAlertPings = [];
+        window.minimapAlertPings.push({ x, z, life: 90, maxLife: 90, color: '#00f2fe' });
+    }
+
+    const ringGeo = new THREE.RingGeometry(1.0, 1.55, 24);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(x, y, z);
+    ring.renderOrder = 8;
+    scene.add(ring);
+
+    let life = 54;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            const prog = 1 - life / 54;
+            ring.scale.setScalar(1 + prog * 4.2);
+            ringMat.opacity = 0.95 * (1 - prog);
+            if (life <= 0) {
+                scene.remove(ring);
+                ringGeo.dispose();
+                ringMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+window.spawnPingEffect = spawnPingEffect;
