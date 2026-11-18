@@ -1074,8 +1074,8 @@ body.control-bar-collapsed #generals-command-bar {
 
 /* 1. BOTTOM-LEFT: RADAR MINIMAP BOX */
 #cb-radar-box {
-    width: clamp(236px, 19vw, 280px);
-    height: 184px;
+    width: clamp(276px, 21vw, 320px);
+    height: 218px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -1085,8 +1085,8 @@ body.control-bar-collapsed #generals-command-bar {
 }
 
 .cb-radar-frame {
-    width: 168px;
-    height: 168px;
+    width: 202px;
+    height: 202px;
     position: relative;
     background: #000;
     border: 2px solid #3d515e;
@@ -1133,9 +1133,9 @@ body.control-bar-collapsed #generals-command-bar {
 /* 2. BOTTOM-CENTER: PRODUCTION & COMMAND CONSOLE */
 #cb-center-console {
     flex: 1;
-    min-width: 560px;
+    min-width: 500px;
     max-width: 780px;
-    height: 184px;
+    height: 218px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1347,8 +1347,8 @@ body.control-bar-collapsed #generals-command-bar {
 
 /* 3. BOTTOM-RIGHT: INSPECTOR & TRAINING QUEUE */
 #cb-inspector-box {
-    width: clamp(360px, 28vw, 460px);
-    height: 184px;
+    width: clamp(410px, 31vw, 520px);
+    height: 218px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
