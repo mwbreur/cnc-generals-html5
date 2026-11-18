@@ -776,21 +776,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         const stripeSideR = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 74), accentMat);
         stripeSideR.position.set(21.2, 21.8, -2);
         root.add(stripeFront, stripeSideL, stripeSideR);
-    } else if (buildingKey === 'china_nukeSilo') {
-        // Close silo blast roof flat over the shaft at start (opens up as countdown progresses)
-        const roof = root.getObjectByName('LINE38');
-        if (roof) roof.rotation.z = Math.PI / 2;
-        const nukeTipGroup = new THREE.Group();
-        nukeTipGroup.name = 'nukeTip';
-        nukeTipGroup.position.set(0, 2, -20.5);
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 20, 12), new THREE.MeshStandardMaterial({ color: 0xecf0f1, metalness: 0.65, roughness: 0.3 }));
-        body.position.y = 10;
-        const band = new THREE.Mesh(new THREE.CylinderGeometry(3.35, 3.35, 3.5, 12), nukeMat);
-        band.position.y = 14;
-        const cone = new THREE.Mesh(new THREE.ConeGeometry(3.2, 7.5, 12), new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.35 }));
-        cone.position.y = 23.75;
-        nukeTipGroup.add(body, band, cone);
-        root.add(nukeTipGroup);
+
         // USA Command Center Radar Lattice Tower + Rotating Parabolic Dish at OBJECT22 pad
         const towerGrp = new THREE.Group();
         towerGrp.position.set(49.03, 0.89, 19.94);
@@ -823,14 +809,53 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         dishPivot.add(dish, feedHorn);
         towerGrp.add(dishPivot);
         root.add(towerGrp);
+
+        // Front service mini-crane with swinging jib & dangling hook
+        const craneMast = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 1.0, 16, 8), strutMat);
+        craneMast.position.set(16, 29, 34);
+        const craneBoomPivot = new THREE.Group();
+        craneBoomPivot.name = 'usaCcCraneBoom';
+        craneBoomPivot.position.set(16, 36.5, 34);
+        const craneArm = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 15), new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.5, metalness: 0.4 }));
+        craneArm.position.set(0, 1.8, 6.2);
+        craneArm.rotation.x = -0.22;
+        const craneHookPivot = new THREE.Group();
+        craneHookPivot.name = 'usaCcCraneHook';
+        craneHookPivot.position.set(0, 3.2, 13.0);
+        const craneCable = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 7.5, 5), strutMat);
+        craneCable.position.y = -3.75;
+        const craneHookBlock = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.6, 1.4), new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.45, metalness: 0.5 }));
+        craneHookBlock.position.y = -7.8;
+        craneHookPivot.add(craneCable, craneHookBlock);
+        craneBoomPivot.add(craneArm, craneHookPivot);
+        root.add(craneMast, craneBoomPivot);
+    } else if (buildingKey === 'china_nukeSilo') {
+        // Close silo blast roof flat over the shaft at start (opens up as countdown progresses)
+        const roof = root.getObjectByName('LINE38');
+        if (roof) roof.rotation.z = Math.PI / 2;
+        const nukeTipGroup = new THREE.Group();
+        nukeTipGroup.name = 'nukeTip';
+        nukeTipGroup.position.set(0, 2, -20.5);
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 20, 12), new THREE.MeshStandardMaterial({ color: 0xecf0f1, metalness: 0.65, roughness: 0.3 }));
+        body.position.y = 10;
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(3.35, 3.35, 3.5, 12), nukeMat);
+        band.position.y = 14;
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(3.2, 7.5, 12), new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.35 }));
+        cone.position.y = 23.75;
+        nukeTipGroup.add(body, band, cone);
+        root.add(nukeTipGroup);
     } else if (buildingKey === 'usa_barracks') {
         const hc4b = root.getObjectByName('HOUSECOLOR04');
         if (hc4b) hc4b.visible = false;
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.55, 44, 8), metalMat);
         pole.position.set(28.74, 22, 38.25);
+        const flagPivot = new THREE.Group();
+        flagPivot.name = 'factionFlag';
+        flagPivot.position.set(28.74, 40.5, 38.25);
         const flag = new THREE.Mesh(new THREE.BoxGeometry(0.35, 7.5, 12.0), accentMat);
-        flag.position.set(28.74, 40.5, 44.2);
-        root.add(pole, flag);
+        flag.position.set(0, 0, 5.95);
+        flagPivot.add(flag);
+        root.add(pole, flagPivot);
     } else if (buildingKey === 'usa_supplyCenter') {
         const banner = new THREE.Mesh(new THREE.BoxGeometry(16, 2.8, 3.2), accentMat);
         banner.position.set(0, 18.5, -14);
@@ -880,6 +905,50 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         rGlow.position.y = 7.5;
         rocketGrp.add(rBody, rCone, rGlow);
         root.add(rocketGrp);
+    }
+
+    // Animated production exit blast doors (open when a unit finishes training & exits)
+    if (/_factory$|_barracks$/i.test(buildingKey)) {
+        const exitStart = root.getObjectByName('EXITSTART');
+        const exitEnd = root.getObjectByName('EXITEND');
+        if (exitStart && exitEnd) {
+            const isFact = /_factory$/i.test(buildingKey);
+            const doorW = isFact ? 10.5 : 5.8;
+            const doorH = isFact ? 15.5 : 10.0;
+            const tDoor = isFact ? 0.56 : 0.52;
+            const doorGrp = new THREE.Group();
+            doorGrp.name = 'blastDoorGroup';
+            doorGrp.position.set(
+                exitStart.position.x + (exitEnd.position.x - exitStart.position.x) * tDoor,
+                doorH * 0.5 + 0.5,
+                exitStart.position.z + (exitEnd.position.z - exitStart.position.z) * tDoor
+            );
+            const dx = exitEnd.position.x - exitStart.position.x;
+            const dz = exitEnd.position.z - exitStart.position.z;
+            doorGrp.rotation.y = Math.atan2(dx, dz);
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0x2c3035, roughness: 0.5, metalness: 0.65 });
+            const trimMat = accentMat || metalMat;
+            const doorGeo = new THREE.BoxGeometry(doorW, doorH, 1.4);
+            const trimGeo = new THREE.BoxGeometry(doorW * 0.9, 1.4, 1.55);
+            const doorL = new THREE.Mesh(doorGeo, doorMat);
+            doorL.name = 'blastDoorL';
+            doorL.position.x = -doorW * 0.5;
+            doorL.userData.closedX = -doorW * 0.5;
+            doorL.userData.openOffset = -doorW * 0.88;
+            const trimL = new THREE.Mesh(trimGeo, trimMat);
+            trimL.position.y = doorH * 0.32;
+            doorL.add(trimL);
+            const doorR = new THREE.Mesh(doorGeo, doorMat);
+            doorR.name = 'blastDoorR';
+            doorR.position.x = doorW * 0.5;
+            doorR.userData.closedX = doorW * 0.5;
+            doorR.userData.openOffset = doorW * 0.88;
+            const trimR = new THREE.Mesh(trimGeo, trimMat);
+            trimR.position.y = doorH * 0.32;
+            doorR.add(trimR);
+            doorGrp.add(doorL, doorR);
+            root.add(doorGrp);
+        }
     }
 
     // Align base foundation to y = 0 (PERF: cache minBldY per buildingKey)

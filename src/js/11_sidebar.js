@@ -3659,6 +3659,7 @@ function processBuildingFunctions() {
                             spawnMuzzleFlash(mPos, 0xffa502, 0.5);
                             spawnBulletTracer(mPos, targetPos, 0xf1c40f, 3);
                             playAudio('gatling_fire', {}, 'china');
+                            structure._gatlingSpinVel = 0.55;
                             target.health -= 28;
                         } else if (structure.type === 'stingerSite') {
                             const mPos = structure.position.clone().add(new THREE.Vector3(0, 1.4, 0));

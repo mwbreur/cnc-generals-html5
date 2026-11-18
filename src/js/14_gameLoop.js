@@ -131,7 +131,8 @@ window.getCachedNode = getCachedNode;
 const ANIMATED_NODE_NAMES = new Set([
         'radarDish', 'radarDish2', 'hazardBeacon', 'fusionCore', 'nukeCore', 'pumpjackArm',
         'particleAcceleratorRing', 'particleEmitter', 'nukeTip', 'nukeBlastDoorL',
-        'nukeBlastDoorR', 'scudGantry', 'factionFlag'
+        'nukeBlastDoorR', 'scudGantry', 'factionFlag', 'usaCcCraneBoom', 'usaCcCraneHook',
+        'OILDERRICK', 'HAMMERS'
 ]);
 function classifyAnimatedNode(obj) {
     const n = obj.name;
@@ -142,6 +143,12 @@ function classifyAnimatedNode(obj) {
         n === "ductedFan" || n === "avbattledr.fan") return 1;
     if (n === "chinook_rotor2" || n.includes("props02") || (n === "PROPELLER02" && pName.includes("chinook"))) return 2;
     if (ANIMATED_NODE_NAMES.has(n)) return 3;
+    if (!obj.isMesh) {
+        if (/^FAN\d+$/i.test(n)) return 4;
+        if (/^HOUSECOLOR0[56]$/i.test(n) && pName && pName !== 'ROOTTRANSFORM') return 5;
+        if (/^BANNER[A-E](0[235689]|1[12])$/i.test(n)) return 6;
+        if (/^(FLOW)?TARP\d+$/i.test(n)) return 7;
+    }
     return 0;
 }
 let _animNodeFrame = 0;
@@ -362,7 +369,15 @@ function animate() {
                     spawnMuzzleFlash(weldPos, 0x00d2d3, 0.55);
                 }
 
+                // Open production bay doors shortly before unit deploys
+                if (item.progress >= 0.88 && (structure.type === 'factory' || structure.type === 'barracks')) {
+                    structure._doorOpenUntil = Math.max(structure._doorOpenUntil || 0, animTime + 1.8);
+                }
+
                 if (item.progress >= 1.0) {
+                    if (structure.type === 'factory' || structure.type === 'barracks') {
+                        structure._doorOpenUntil = animTime + 1.8;
+                    }
                     // Training complete! Deploy unit in neat rank-and-file rally grid
                     const rallyIdx = (structure._producedCount || 0);
                     structure._producedCount = rallyIdx + 1;
@@ -889,9 +904,33 @@ function animate() {
                 obj.rotation.y += 0.45;
             } else if (kind === 2) {
                 obj.rotation.y -= 0.45;
+            } else if (kind === 4) {
+                // Building rooftop ventilation / exhaust fans
+                obj.rotation.y += 0.14;
+            } else if (kind === 5) {
+                // W3D 3-segment faction flag cloth ripple
+                const phase = (obj.id || 0) * 0.9;
+                obj.rotation.x = Math.sin(animTime * 3.8 + phase) * 0.12;
+                obj.rotation.y = Math.cos(animTime * 2.6 + phase) * 0.09;
+            } else if (kind === 6) {
+                // W3D China & Black Market hanging banners waving in wind
+                const phase = (obj.id || 0) * 0.7;
+                obj.rotation.z = Math.sin(animTime * 3.5 + phase) * 0.10;
+                obj.rotation.y = Math.sin(animTime * 2.3 + phase) * 0.06;
+            } else if (kind === 7) {
+                // W3D GLA cloth tarps & canopies billowing in wind
+                const phase = (obj.id || 0) * 0.8;
+                obj.rotation.x = Math.sin(animTime * 2.7 + phase) * 0.065;
             } else if (obj.name === "radarDish" || obj.name === "radarDish2") {
                 // Continuous radar dish / array rotation
                 obj.rotation.y += 0.025;
+            } else if (obj.name === "usaCcCraneBoom") {
+                // USA Command Center front mini-crane gentle slewing
+                obj.rotation.y = Math.sin(animTime * 0.65) * 0.42;
+            } else if (obj.name === "usaCcCraneHook") {
+                // USA Command Center dangling crane cable & hook sway
+                obj.rotation.z = Math.sin(animTime * 2.0) * 0.11;
+                obj.rotation.x = Math.cos(animTime * 1.4) * 0.07;
             } else if (obj.name === "hazardBeacon") {
                 // Alert strobes blinking
                 obj.visible = (Math.floor(animTime * 4) % 2 === 0);
@@ -899,9 +938,12 @@ function animate() {
                 // Reactor core pulsing energy
                 const pulse = 1.0 + Math.sin(animTime * 4) * 0.18;
                 obj.scale.set(pulse, pulse, pulse);
-            } else if (obj.name === "pumpjackArm") {
+            } else if (obj.name === "pumpjackArm" || obj.name === "OILDERRICK") {
                 // Tech Oil Derrick walking-beam pumpjack rocking motion
-                obj.rotation.x = Math.sin(animTime * 2.2) * 0.28;
+                obj.rotation.x = Math.sin(animTime * 2.2) * 0.24;
+            } else if (obj.name === "HAMMERS") {
+                // Tech Oil Derrick counterweight crank rocking in sync
+                obj.rotation.x = -Math.sin(animTime * 2.2) * 0.28;
             } else if (obj.name === "particleAcceleratorRing") {
                 // Particle Cannon magnetic accelerator spinning ring
                 obj.rotation.z += 0.04;
@@ -960,6 +1002,61 @@ function animate() {
                         (Math.random() - 0.5) * 0.7
                 ));
                 spawnSmokePuff(smokePos, (buildingTick % 8 === 0) ? 0xff4d4d : 0xd63031, 0.85);
+            }
+            // Production bay blast doors: slide open when unit deploys, close afterwards
+            if ((s.type === 'factory' || s.type === 'barracks') && s.mesh && !s.isBuilding && s.health > 0) {
+                if (s._blastDoors === undefined) {
+                    const dl = s.mesh.getObjectByName('blastDoorL');
+                    const dr = s.mesh.getObjectByName('blastDoorR');
+                    s._blastDoors = (dl && dr) ? [dl, dr] : null;
+                    s._doorOpenProgress = 0;
+                }
+                if (s._blastDoors) {
+                    const wantOpen = (s._doorOpenUntil || 0) > animTime ? 1 : 0;
+                    s._doorOpenProgress += (wantOpen - s._doorOpenProgress) * 0.16;
+                    const p = s._doorOpenProgress;
+                    for (let d = 0; d < 2; d++) {
+                        const door = s._blastDoors[d];
+                        door.position.x = door.userData.closedX + door.userData.openOffset * p;
+                    }
+                }
+            }
+            // China Gatling Cannon defense structure spinning barrels
+            if (s.type === 'gatlingCannon' && s.mesh && !s.isBuilding && s.health > 0) {
+                if (s._gatlingBarrels === undefined) {
+                    s._gatlingBarrels = [];
+                    s.mesh.traverse(c => {
+                        if (c.name === 'gatlingBarrels') s._gatlingBarrels.push(c);
+                    });
+                }
+                if (s._gatlingSpinVel && s._gatlingSpinVel > 0.005) {
+                    for (let b = 0; b < s._gatlingBarrels.length; b++) {
+                        s._gatlingBarrels[b].rotation.z += s._gatlingSpinVel;
+                    }
+                    s._gatlingSpinVel *= 0.94;
+                }
+            }
+            // GLA SCUD Storm silo doors: open when ready to fire, closed while recharging
+            if (s.type === 'scudStorm' && s.mesh && !s.isBuilding && s.health > 0) {
+                if (s._scudDoors === undefined) {
+                    s._scudDoors = [];
+                    for (let d = 1; d <= 9; d++) {
+                        const dn = s.mesh.getObjectByName('DOOR0' + d);
+                        if (dn) {
+                            dn.userData.baseY = dn.position.y;
+                            s._scudDoors.push(dn);
+                        }
+                    }
+                    s._scudOpenAmt = 0;
+                }
+                if (s._scudDoors.length > 0) {
+                    const ready = (s.cooldownUntil || 0) <= buildingTick ? 1 : 0;
+                    s._scudOpenAmt += (ready - s._scudOpenAmt) * 0.05;
+                    for (let d = 0; d < s._scudDoors.length; d++) {
+                        const dn = s._scudDoors[d];
+                        dn.rotation.z = s._scudOpenAmt * 1.15;
+                    }
+                }
             }
     });
 
