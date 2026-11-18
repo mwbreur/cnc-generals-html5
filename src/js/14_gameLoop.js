@@ -2986,7 +2986,7 @@ function updateStealthAndDetection() {
             const eu = enemyUnits[i];
             if (!eu || !eu.mesh || eu.health <= 0) continue;
             const hidden = !!(eu.isStealthed && !(eu.revealedUntil && eu.revealedUntil > buildingTick));
-            eu.mesh.visible = !hidden;
+            if (hidden) eu.mesh.visible = false;
         }
     }
     if (typeof enemyStructures !== 'undefined') {
@@ -2994,7 +2994,7 @@ function updateStealthAndDetection() {
             const es = enemyStructures[i];
             if (!es || !es.mesh || es.health <= 0) continue;
             const hidden = !!(es.isStealthed && !(es.revealedUntil && es.revealedUntil > buildingTick));
-            es.mesh.visible = !hidden;
+            if (hidden) es.mesh.visible = false;
         }
     }
     if (typeof units !== 'undefined') {

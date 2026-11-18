@@ -299,11 +299,17 @@ function updateFogOfWar() {
 
     fogTexture.needsUpdate = true;
 
-    // 5. Hide Hostile Units & Hostile Structures when out of direct Line of Sight! (Allies stay visible)
+    // 5. Hide Hostile Units & Hostile Structures when out of direct Line of Sight OR concealed in Stealth! (Allies stay visible)
+    const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
     enemyUnits.forEach(enemy => {
             if (!enemy.mesh) return;
             if (isFriendly({ teamId: playerTeamId }, enemy)) {
                 enemy.mesh.visible = true;
+                return;
+            }
+            const isStealthHidden = !!(enemy.isStealthed && !(enemy.revealedUntil && enemy.revealedUntil > curTick));
+            if (isStealthHidden) {
+                enemy.mesh.visible = false;
                 return;
             }
             const cx = Math.floor(((enemy.mesh.position.x + halfMap) / mapSize) * FOG_RES);
@@ -318,6 +324,11 @@ function updateFogOfWar() {
             if (!es.mesh) return;
             if (isFriendly({ teamId: playerTeamId }, es)) {
                 es.mesh.visible = true;
+                return;
+            }
+            const isStealthHidden = !!(es.isStealthed && !(es.revealedUntil && es.revealedUntil > curTick));
+            if (isStealthHidden) {
+                es.mesh.visible = false;
                 return;
             }
             const cx = Math.floor(((es.position.x + halfMap) / mapSize) * FOG_RES);
