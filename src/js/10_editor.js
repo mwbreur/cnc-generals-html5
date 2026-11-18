@@ -622,7 +622,7 @@ function resetEntireBattlefieldState(mapSize = 1500) {
         enemyUnits.length = 0;
     }
 
-    // 4. Clear projectiles, explosions, debris
+    // 4. Clear projectiles, explosions, debris, active FX, missiles, supply planes, and control groups
     if (typeof projectiles !== 'undefined') {
         projectiles.forEach(p => { if (p.mesh && typeof scene !== 'undefined') scene.remove(p.mesh); });
         projectiles.length = 0;
@@ -631,6 +631,28 @@ function resetEntireBattlefieldState(mapSize = 1500) {
         debrisList.forEach(d => { if (d.mesh && typeof scene !== 'undefined') scene.remove(d.mesh); });
         debrisList.length = 0;
     }
+    if (typeof activeFX !== 'undefined' && Array.isArray(activeFX)) {
+        activeFX.forEach(fx => { if (fx && fx.mesh && typeof scene !== 'undefined') scene.remove(fx.mesh); });
+        activeFX.length = 0;
+    }
+    if (typeof activeMissiles !== 'undefined' && Array.isArray(activeMissiles)) {
+        activeMissiles.forEach(m => { if (m && m.mesh && typeof scene !== 'undefined') scene.remove(m.mesh); });
+        activeMissiles.length = 0;
+    }
+    if (typeof window !== 'undefined') {
+        if (Array.isArray(window.activeSupplyPlanes)) {
+            window.activeSupplyPlanes.forEach(p => { if (p && p.mesh && typeof scene !== 'undefined') scene.remove(p.mesh); });
+            window.activeSupplyPlanes.length = 0;
+        }
+        window.activeParticleCannonTarget = null;
+        window.activeParticleCannonPlayerOwned = false;
+        window.activeParticleCannonControl = false;
+    }
+    if (typeof controlGroups !== 'undefined' && controlGroups) {
+        for (let g = 1; g <= 9; g++) controlGroups[g] = [];
+    }
+    if (typeof attackMoveMode !== 'undefined') attackMoveMode = false;
+    if (typeof guardModeActive !== 'undefined') guardModeActive = false;
 
     // 5. Reset tech tree research, General powers, resources
     if (typeof researchedTechs !== 'undefined') researchedTechs.clear();
