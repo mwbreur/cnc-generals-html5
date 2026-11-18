@@ -509,10 +509,10 @@ function spawnSparks(pos, color = 0xfff200, count = 12) {
     }
 }
 
-// Charred blast crater decal on ground (cached procedural crater texture with ragged blast rays & feathered edge)
-let _craterTexCache = null;
-function _getCraterTexture() {
-    if (_craterTexCache) return _craterTexCache;
+// Charred blast crater decal on ground (cached per-weapon-style procedural crater textures)
+const _craterTexCache = {};
+function _getCraterTexture(style = 'explosive') {
+    if (_craterTexCache[style]) return _craterTexCache[style];
     if (typeof document === 'undefined' || !THREE.CanvasTexture) return null;
     const size = 128;
     const c = document.createElement('canvas');
@@ -520,21 +520,28 @@ function _getCraterTexture() {
     const ctx = c.getContext('2d');
     const cx = size / 2, cy = size / 2;
 
-    // Soft outer soot falloff
-    const outerGrad = ctx.createRadialGradient(cx, cy, size * 0.08, cx, cy, size * 0.48);
-    outerGrad.addColorStop(0.0, 'rgba(12, 10, 9, 0.96)');
-    outerGrad.addColorStop(0.32, 'rgba(26, 20, 16, 0.88)');
-    outerGrad.addColorStop(0.55, 'rgba(54, 42, 30, 0.62)');
-    outerGrad.addColorStop(0.78, 'rgba(28, 22, 18, 0.28)');
+    const palettes = {
+        explosive: { inner: 'rgba(12, 10, 9, 0.96)', mid: 'rgba(26, 20, 16, 0.88)', rim: 'rgba(54, 42, 30, 0.62)', ray: 'rgba(68, 52, 36, 0.50)', ridge: 'rgba(92, 74, 54, 0.45)' },
+        nuke:      { inner: 'rgba(30, 220, 100, 0.85)', mid: 'rgba(16, 65, 32, 0.92)', rim: 'rgba(18, 22, 16, 0.78)', ray: 'rgba(46, 213, 115, 0.42)', ridge: 'rgba(85, 239, 196, 0.45)' },
+        flame:     { inner: 'rgba(255, 95, 25, 0.75)', mid: 'rgba(28, 14, 10, 0.94)', rim: 'rgba(18, 12, 10, 0.72)', ray: 'rgba(255, 110, 40, 0.35)', ridge: 'rgba(120, 45, 20, 0.48)' },
+        toxin:     { inner: 'rgba(110, 235, 90, 0.78)', mid: 'rgba(28, 54, 20, 0.90)', rim: 'rgba(24, 34, 18, 0.68)', ray: 'rgba(80, 200, 70, 0.40)', ridge: 'rgba(123, 237, 159, 0.40)' },
+        ion:       { inner: 'rgba(110, 240, 255, 0.90)', mid: 'rgba(12, 60, 95, 0.90)', rim: 'rgba(14, 22, 34, 0.72)', ray: 'rgba(0, 210, 255, 0.48)', ridge: 'rgba(72, 219, 251, 0.55)' }
+    };
+    const pal = palettes[style] || palettes.explosive;
+
+    const outerGrad = ctx.createRadialGradient(cx, cy, size * 0.06, cx, cy, size * 0.48);
+    outerGrad.addColorStop(0.0, pal.inner);
+    outerGrad.addColorStop(0.28, pal.mid);
+    outerGrad.addColorStop(0.55, pal.rim);
+    outerGrad.addColorStop(0.80, 'rgba(18, 16, 14, 0.24)');
     outerGrad.addColorStop(1.0, 'rgba(15, 12, 10, 0.0)');
     ctx.fillStyle = outerGrad;
     ctx.fillRect(0, 0, size, size);
 
-    // Jagged scorch rays & rim debris
     for (let i = 0; i < 28; i++) {
         const ang = (i / 28) * Math.PI * 2 + (i % 3) * 0.11;
         const len = size * (0.30 + ((i * 37) % 19) * 0.009);
-        ctx.strokeStyle = (i % 2 === 0) ? 'rgba(14, 11, 9, 0.72)' : 'rgba(68, 52, 36, 0.50)';
+        ctx.strokeStyle = (i % 2 === 0) ? 'rgba(12, 10, 9, 0.72)' : pal.ray;
         ctx.lineWidth = 2 + (i % 3);
         ctx.beginPath();
         ctx.moveTo(cx + Math.cos(ang) * 6, cy + Math.sin(ang) * 6);
@@ -542,20 +549,19 @@ function _getCraterTexture() {
         ctx.stroke();
     }
 
-    // Highlighted crater lip ridge
-    ctx.strokeStyle = 'rgba(92, 74, 54, 0.45)';
+    ctx.strokeStyle = pal.ridge;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(cx, cy, size * 0.25, 0, Math.PI * 2);
     ctx.stroke();
 
-    _craterTexCache = new THREE.CanvasTexture(c);
-    return _craterTexCache;
+    _craterTexCache[style] = new THREE.CanvasTexture(c);
+    return _craterTexCache[style];
 }
 
-function spawnCraterDecal(pos, radius = 2.2, duration = 380) {
+function spawnCraterDecal(pos, radius = 2.2, duration = 380, style = 'explosive') {
     const groundY = getTerrainHeight(pos.x, pos.z);
-    const tex = _getCraterTexture();
+    const tex = _getCraterTexture(style);
     const geo = new THREE.PlaneGeometry(radius * 2.25, radius * 2.25);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
@@ -903,7 +909,7 @@ function spawnFuelAirExplosion(pos) {
     scene.add(ring);
 
     // 3. Persistent scorched blast crater
-    spawnCraterDecal(pos, 4.5, 520);
+    spawnCraterDecal(pos, 4.5, 520, 'flame');
 
     // 4. Lingering napalm scorch pool
     spawnNapalmScorchPool(pos);
@@ -1256,10 +1262,10 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
             glowTex = new THREE.CanvasTexture(gCan);
         }
     }
-    const flareGeo = new THREE.PlaneGeometry(22, 22);
+    const flareGeo = new THREE.PlaneGeometry(52, 52);
     flareGeo.rotateX(-Math.PI / 2);
     const flareMat = new THREE.MeshBasicMaterial({
-        color: 0x38d9ff,
+        color: 0x1ec8ff,
         map: glowTex,
         transparent: true,
         opacity: 0.95,
@@ -1273,7 +1279,23 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
     flareDisc.renderOrder = 10;
     group.add(flareDisc);
 
-    const impactCoreGeo = new THREE.CircleGeometry(3.2, 20);
+    // Big blue atmospheric plasma bloom dome around impact base
+    const domeGeo = new THREE.SphereGeometry(8.5, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    const domeMat = new THREE.MeshBasicMaterial({
+        color: 0x00b8ff,
+        transparent: true,
+        opacity: 0.36,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        ...addBlend
+    });
+    const plasmaDome = new THREE.Mesh(domeGeo, domeMat);
+    plasmaDome.position.y = 0.3;
+    plasmaDome.scale.set(1.3, 1.8, 1.3);
+    plasmaDome.renderOrder = 9;
+    group.add(plasmaDome);
+
+    const impactCoreGeo = new THREE.CircleGeometry(4.0, 20);
     impactCoreGeo.rotateX(-Math.PI / 2);
     const impactCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, depthTest: false, ...addBlend });
     const impactCore = new THREE.Mesh(impactCoreGeo, impactCoreMat);
@@ -1353,6 +1375,7 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                 coreBeam.scale.set(pulse, 1, pulse);
                 beam.scale.set(1.0 + Math.cos(life * 0.4) * 0.18, 1, 1.0 + Math.cos(life * 0.4) * 0.18);
                 flareDisc.scale.setScalar(0.92 + Math.sin(life * 0.5) * 0.22);
+                plasmaDome.scale.set(1.3 + Math.sin(life * 0.45) * 0.18, 1.8 + Math.cos(life * 0.55) * 0.25, 1.3 + Math.sin(life * 0.45) * 0.18);
                 impactCore.scale.setScalar(0.85 + Math.cos(life * 0.7) * 0.2);
 
                 rings.forEach((r, idx) => {
@@ -1419,7 +1442,7 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                             }
                     });
                     if (Math.random() < 0.35) {
-                        spawnCraterDecal(beamPos, 2.6, 360);
+                        spawnCraterDecal(beamPos, 2.6, 360, 'ion');
                     }
                 }
                 if (life % 14 === 0) {
@@ -1641,7 +1664,7 @@ function spawnMushroomCloud(pos, scaleMult = 1.0) {
     scene.add(machRing);
 
     // 4. Crater and lingering radioactive fallout field
-    spawnCraterDecal(pos, 8.0 * scaleMult, 900);
+    spawnCraterDecal(pos, 8.0 * scaleMult, 900, 'nuke');
     spawnLingeringToxinCloud(pos);
 
     const maxLife = Math.round(95 * Math.max(0.6, scaleMult));
@@ -1747,7 +1770,7 @@ function animateScudStormStrike(stormPos, targetPos) {
                                 }
                             }
                         });
-                        spawnCraterDecal(impactPos, 3.6, 520);
+                        spawnCraterDecal(impactPos, 3.6, 520, 'toxin');
                     }
                 });
             }, i * 155);

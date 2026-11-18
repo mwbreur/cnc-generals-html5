@@ -2330,6 +2330,13 @@ function animate() {
 
             // (Ground-unit soft repulsion is handled once per frame by separateGroundUnits())
 
+            // Vehicle dust & exhaust trail when moving on ground
+            if (!unit.isAir && !INFANTRY_TYPE_SET.has(unit.type) && unit.taskState === 'Moving' && (buildingTick + idx) % 12 === 0 && typeof spawnSmokePuff === 'function') {
+                const rotY = unit.mesh.rotation.y || 0;
+                const rearPos = unit.mesh.position.clone().add(new THREE.Vector3(-Math.sin(rotY) * (unit.radius || 2.5) * 0.7, 0.35, -Math.cos(rotY) * (unit.radius || 2.5) * 0.7));
+                spawnSmokePuff(rearPos, 0xc4aa82, 0.55);
+            }
+
             // Prevent driving through buildings, trees, skyscrapers or map edges
             resolveObstacleCollisions(unit);
     });
@@ -2339,12 +2346,25 @@ function animate() {
 
     updateHealthBars();
 
+    function spawnUnitDeathFX(u) {
+        if (!u || !u.mesh || u._silentRemove) return;
+        const pos = u.mesh.position;
+        if (INFANTRY_TYPE_SET.has(u.type)) {
+            if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0x555555, 0.45);
+            return;
+        }
+        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0xff9f43, u.isAir ? 1.8 : 1.35, false);
+        else createImpactExplosion(pos);
+        if (typeof spawnSparks === 'function') spawnSparks(pos, 0xffa502, 10);
+        if (typeof spawnCraterDecal === 'function') spawnCraterDecal(pos, u.isAir ? 3.2 : 2.2, 320, 'explosive');
+    }
+
     // PERF: only allocate/filter when at least one entity in the array actually died this frame
     if (enemyUnits.some(e => e.health <= 0)) {
         enemyUnits = enemyUnits.filter(enemy => {
                 if (enemy.health > 0) return true;
                 scene.remove(enemy.mesh);
-                createImpactExplosion(enemy.mesh.position);
+                spawnUnitDeathFX(enemy);
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
                 if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
@@ -2461,6 +2481,7 @@ function animate() {
                     unit.drone = null;
                 }
                 scene.remove(unit.mesh);
+                spawnUnitDeathFX(unit);
                 // USA Ejection Seat: Manned USA vehicles/aircraft at Veteran+ eject a pilot retaining veterancy
                 const USA_PILOT_EJECT_SET = new Set(['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'chinook']);
                 const isUsaOwned = unit.faction === 'usa' || (!unit.faction && typeof selectedFaction !== 'undefined' && selectedFaction === 'usa');
@@ -2758,6 +2779,10 @@ function processEnemyMovement() {
                 const step = Math.min(dist2D, enemy.speed * combatDeltaScale);
                 enemy.mesh.position.x += dirX * step;
                 enemy.mesh.position.z += dirZ * step;
+                if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type) && (buildingTick + (enemy.netId || 0)) % 12 === 0 && typeof spawnSmokePuff === 'function') {
+                    const rearPos = enemy.mesh.position.clone().add(new THREE.Vector3(-dirX * (enemy.radius || 2.5) * 0.7, 0.35, -dirZ * (enemy.radius || 2.5) * 0.7));
+                    spawnSmokePuff(rearPos, 0xc4aa82, 0.55);
+                }
 
                 // AI Anti-Stuck Watchdog: prevent dozers/units from vibrating forever against obstacles
                 if (!enemy.isAir) {
