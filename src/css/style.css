@@ -24,6 +24,7 @@ body {
         body.in-main-menu #hud,
         body.in-main-menu #top-hud-bar,
         body.in-main-menu #generals-command-bar,
+        body.in-main-menu #top-right-hud-stack,
         body.in-main-menu #general-powers-bar {
             display: none !important;
         }
@@ -1655,17 +1656,27 @@ body.control-bar-collapsed #generals-command-bar {
 }
 
 /* ========================================================================== */
-/* FLOATING GENERAL POWERS (Right Edge)                                      */
+/* FLOATING GENERAL POWERS (Right Edge, stacked below superweapon timers)  */
 /* ========================================================================== */
-.general-powers-bar {
+.top-right-hud-stack {
     position: fixed;
-    right: 16px;
-    top: 56px;
+    top: 44px;
+    right: 12px;
+    z-index: 120;
     display: flex;
     flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.general-powers-bar {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     gap: 8px;
     pointer-events: auto;
-    z-index: 20;
 }
 
 .gp-power-btn {
@@ -2222,15 +2233,15 @@ body.control-bar-collapsed #generals-command-bar {
 
 /* Official C&C Generals Top-Right Superweapon Countdown HUD */
 .superweapon-timers-hud {
-    position: fixed;
-    top: 44px;
-    right: 12px;
-    z-index: 120;
+    position: static;
     display: flex;
     flex-direction: column;
     gap: 5px;
     pointer-events: auto;
     min-width: 220px;
+}
+.superweapon-timers-hud:empty {
+    display: none;
 }
 
 .sw-timer-row {
