@@ -26,8 +26,9 @@ let currentGridSlots = [];
 
 // 1. RADAR MINIMAP ENGINE
 function initRadarMinimap() {
-    radarCanvas = document.getElementById('radar-canvas');
-    if (!radarCanvas) return;
+    if (!radarCanvas) radarCanvas = document.getElementById('radar-canvas');
+    if (!radarCanvas || radarCanvas._minimapInitialized) return;
+    radarCanvas._minimapInitialized = true;
     radarCtx = radarCanvas.getContext('2d');
 
     let isRadarDragging = false;
@@ -114,28 +115,33 @@ function initRadarMinimap() {
         }
     }
 
-    radarCanvas.addEventListener('mousedown', e => {
-            if (e.button === 0) {
-                isRadarDragging = true;
+    if (typeof radarCanvas.addEventListener === 'function') {
+        radarCanvas.addEventListener('mousedown', e => {
+                if (e.button === 0) {
+                    isRadarDragging = true;
+                    handleRadarPointer(e);
+                } else if (e.button === 2) {
+                    handleRadarPointer(e);
+                }
+        });
+        radarCanvas.addEventListener('contextmenu', e => {
                 handleRadarPointer(e);
-            } else if (e.button === 2) {
-                handleRadarPointer(e);
-            }
-    });
-    window.addEventListener('mousemove', e => {
-            if (isRadarDragging) handleRadarPointer(e);
-    });
-    window.addEventListener('mouseup', e => {
-            if (e.button === 0) isRadarDragging = false;
-    });
-    radarCanvas.addEventListener('contextmenu', e => {
-            handleRadarPointer(e);
-    });
+        });
+    }
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('mousemove', e => {
+                if (isRadarDragging) handleRadarPointer(e);
+        });
+        window.addEventListener('mouseup', e => {
+                if (e.button === 0) isRadarDragging = false;
+        });
+    }
 }
 
 function renderRadarMinimap() {
     if (!radarCanvas) radarCanvas = document.getElementById('radar-canvas');
     if (!radarCanvas || !scene) return;
+    if (!radarCanvas._minimapInitialized) initRadarMinimap();
     if (!radarCtx) radarCtx = radarCanvas.getContext('2d');
     const ctx = radarCtx;
     const w = radarCanvas.width;
@@ -842,7 +848,7 @@ if (typeof window !== 'undefined') {
 }
 
 function updateSidebar() {
-    if (!radarCanvas) initRadarMinimap();
+    if (!radarCanvas || !radarCanvas._minimapInitialized) initRadarMinimap();
     applyOfficialMenuArt(selectedFaction);
 
     // Faction Themes applied to top HUD and bottom command bar
