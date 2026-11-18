@@ -182,9 +182,31 @@ function updateFogOfWar() {
         if (b.life <= 0) activeVisionBeacons.splice(i, 1);
     }
 
+    function getOfficialVisionRange(src) {
+        if (!src) return 26;
+        const t = src.type;
+        let v = src.scanRange || (src.radius ? src.radius + 18 : 26);
+        if (!t) return v;
+        // Official C&C Generals VisionRange calibration:
+        // Artillery has shorter sight than weapon range (needs spotters/scouts)
+        if (t === 'tomahawk' || t === 'scud' || t === 'nukecannon' || t === 'nuketank') v = 30;
+        else if (t === 'inferno' || t === 'buggy') v = 28;
+        else if (t === 'radarvan') v = 46;
+        else if (t === 'drone_scout') v = 55;
+        else if (t === 'pathfinder' || t === 'jarmen') v = 40;
+        else if (src.isAir) v = 44;
+        else if (t === 'commandCenter' || t === 'center') v = 42;
+        else if (t === 'patriot' || t === 'gatlingCannon' || t === 'stingerSite') v = 40;
+        else if (t === 'strategyCenter' || t === 'propagandaCenter' || t === 'palace') v = 34;
+        else if (src.scanRange > 0) v = Math.max(v, src.scanRange * 1.15);
+        if (src.drone && src.drone.type === 'scout') v *= 1.35;
+        if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && !src.isAI) v *= 1.2;
+        return v;
+    }
+
     visionSources.forEach(src => {
             const pos = src.position || src.mesh.position;
-            const range = src.scanRange || (src.radius ? src.radius + 18 : 26);
+            const range = getOfficialVisionRange(src);
             const cx = Math.floor(((pos.x + halfMap) / mapSize) * FOG_RES);
             const cy = Math.floor(((pos.z + halfMap) / mapSize) * FOG_RES);
             const rCells = Math.ceil((range / mapSize) * FOG_RES);
@@ -236,9 +258,31 @@ function updateFogOfWar() {
 
     // 4. Punch soft high-res circular vision holes for currently visible areas
     fogCtx.globalCompositeOperation = 'destination-out';
+    function getOfficialVisionRange(src) {
+        if (!src) return 26;
+        const t = src.type;
+        let v = src.scanRange || (src.radius ? src.radius + 18 : 26);
+        if (!t) return v;
+        // Official C&C Generals VisionRange calibration:
+        // Artillery has shorter sight than weapon range (needs spotters/scouts)
+        if (t === 'tomahawk' || t === 'scud' || t === 'nukecannon' || t === 'nuketank') v = 30;
+        else if (t === 'inferno' || t === 'buggy') v = 28;
+        else if (t === 'radarvan') v = 46;
+        else if (t === 'drone_scout') v = 55;
+        else if (t === 'pathfinder' || t === 'jarmen') v = 40;
+        else if (src.isAir) v = 44;
+        else if (t === 'commandCenter' || t === 'center') v = 42;
+        else if (t === 'patriot' || t === 'gatlingCannon' || t === 'stingerSite') v = 40;
+        else if (t === 'strategyCenter' || t === 'propagandaCenter' || t === 'palace') v = 34;
+        else if (src.scanRange > 0) v = Math.max(v, src.scanRange * 1.15);
+        if (src.drone && src.drone.type === 'scout') v *= 1.35;
+        if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && !src.isAI) v *= 1.2;
+        return v;
+    }
+
     visionSources.forEach(src => {
             const pos = src.position || src.mesh.position;
-            const range = src.scanRange || (src.radius ? src.radius + 18 : 26);
+            const range = getOfficialVisionRange(src);
             const cx = ((pos.x + halfMap) / mapSize) * FOG_TEX_RES;
             const cy = ((pos.z + halfMap) / mapSize) * FOG_TEX_RES;
             const rPx = (range / mapSize) * FOG_TEX_RES;

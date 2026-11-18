@@ -3591,12 +3591,49 @@ function processBuildingFunctions() {
                 }
             }
 
-            if (['patriot', 'gatlingCannon', 'stingerSite'].includes(structure.type) && buildingTick % 45 === 0) {
+            if (['patriot', 'gatlingCannon', 'stingerSite'].includes(structure.type)) {
                 const isEmpDisabled = structure.disabledUntil && buildingTick < structure.disabledUntil;
                 const powerDependent = (structure.type === 'patriot' || structure.type === 'gatlingCannon');
-                if (isEmpDisabled || (powerDependent && isPlayerLowPower)) {
+                const defenseOffline = isEmpDisabled || (powerDependent && isPlayerLowPower);
+                if (defenseOffline) {
                     structure._sharedTarget = null;
-                } else {
+                    structure._patriotNetworked = false;
+                }
+
+                // Patriot Network Buff: persistent cyan data-link beams & base aura ring between nearby Patriots (<=55u)
+                if (structure.type === 'patriot' && buildingTick % 15 === 0) {
+                    const linked = !defenseOffline
+                        ? structures.filter(other => other !== structure && other.type === 'patriot' && !other.isBuilding && other.health > 0 && other.position.distanceTo(structure.position) <= 55)
+                        : [];
+                    structure._patriotNetworked = linked.length > 0;
+                    if (structure.mesh) {
+                        if (!structure._patriotLinkRing) {
+                            const ring = new THREE.Mesh(
+                                new THREE.RingGeometry(4.2, 4.9, 24),
+                                new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+                            );
+                            ring.rotation.x = -Math.PI / 2;
+                            ring.position.y = 0.25;
+                            ring.name = 'patriotLinkRing';
+                            structure.mesh.add(ring);
+                            structure._patriotLinkRing = ring;
+                        }
+                        structure._patriotLinkRing.visible = structure._patriotNetworked;
+                    }
+                    if (structure._patriotNetworked && typeof spawnLaserBeam === 'function' && buildingTick % 30 === 0) {
+                        const hasLock = !!(structure._sharedTarget && structure._sharedTarget.health > 0);
+                        linked.forEach(other => {
+                            if ((structure.netId || 0) < (other.netId || 0)) {
+                                const p1 = structure.position.clone().add(new THREE.Vector3(0, 3.2, 0));
+                                const p2 = other.position.clone().add(new THREE.Vector3(0, 3.2, 0));
+                                spawnLaserBeam(p1, p2, hasLock ? 0x00ffff : 0x0088ff, hasLock ? 1.8 : 0.85);
+                            }
+                        });
+                    }
+                }
+
+                const fireInterval = (structure.type === 'gatlingCannon') ? 15 : 45;
+                if (!defenseOffline && buildingTick % fireInterval === 0) {
                     // Ballistic Missile Interception (SCUD / Tomahawk) by operational Patriot Missile Systems
                     if (structure.type === 'patriot' && typeof activeMissiles !== 'undefined' && activeMissiles.length > 0) {
                         const incoming = activeMissiles.find(m =>
@@ -3608,23 +3645,25 @@ function processBuildingFunctions() {
                             incoming.intercepted = true;
                             const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
                             spawnMuzzleFlash(mPos, 0x00d2ff, 0.8);
-                            spawnRocketProjectile(mPos, incoming.group.position.clone(), false, false, { attacker: s });
+                            spawnRocketProjectile(mPos, incoming.group.position.clone(), false, false, { attacker: structure });
                             if (typeof playUSASound === 'function') playUSASound('missile_launch');
                         }
                     }
 
                     // Patriot Network Linking: share target lock & extended assist range (85u, matching official PatriotMissileAssistWeapon) with nearby Patriots (<=55u)
                     let target = null;
-                    if (structure.type === 'patriot' && structure._sharedTarget && structure._sharedTarget.health > 0 && structure._sharedTarget.mesh) {
-                        if (structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 85) {
+                    if (structure.type === 'patriot' && structure._sharedTarget) {
+                        if (structure._sharedTarget.health > 0 && structure._sharedTarget.mesh && structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 85) {
                             target = structure._sharedTarget;
+                        } else {
+                            structure._sharedTarget = null;
                         }
                     }
                     if (!target) {
                         const groundRange = 45;
                         const airRange = (structure.type === 'patriot') ? 58 : 45;
                         // Patriots prioritize aircraft & vehicles; less effective against small infantry
-                        const inRange = enemyUnits.filter(enemy => enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(structure.position) < (enemy.isAir ? airRange : groundRange));
+                        const inRange = enemyUnits.filter(enemy => enemy.health > 0 && enemy.mesh && !(enemy.isStealthed && !(enemy.revealedUntil && enemy.revealedUntil > buildingTick)) && enemy.mesh.position.distanceTo(structure.position) < (enemy.isAir ? airRange : groundRange));
                         target = inRange.find(e => e.isAir) ||
                         inRange.find(e => typeof getArmorCategory !== 'function' || getArmorCategory(e) !== 'infantry') ||
                         inRange[0] || null;
@@ -3638,7 +3677,7 @@ function processBuildingFunctions() {
                                         if (typeof spawnLaserBeam === 'function' && (!structure._lastLinkPulse || buildingTick - structure._lastLinkPulse >= 20)) {
                                             const p1 = structure.position.clone().add(new THREE.Vector3(0, 3.2, 0));
                                             const p2 = other.position.clone().add(new THREE.Vector3(0, 3.2, 0));
-                                            spawnLaserBeam(p1, p2, 0x00e5ff, 1.4);
+                                            spawnLaserBeam(p1, p2, 0x00ffff, 1.8);
                                         }
                                     }
                             });
@@ -3647,6 +3686,11 @@ function processBuildingFunctions() {
                             }
                         }
                         const targetPos = target.mesh.position.clone().add(new THREE.Vector3(0, target.isAir ? 0.3 : 0.5, 0));
+                        const turret = (structure.mesh && typeof getCachedNode === 'function') ? getCachedNode(structure.mesh, 'turretSystem') : null;
+                        if (turret && turret.parent) {
+                            const localT = turret.parent.worldToLocal(targetPos.clone());
+                            turret.rotation.y = Math.atan2(localT.x, localT.z);
+                        }
                         if (structure.type === 'patriot') {
                             const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
                             const isInfTarget = typeof getArmorCategory === 'function' && getArmorCategory(target) === 'infantry';

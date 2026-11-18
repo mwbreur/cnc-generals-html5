@@ -507,7 +507,7 @@ function executeWeaponFire(attacker, target) {
         'tank': 120, 'crusader': 120, 'battlemaster': 120, 'scorpion': 60, 'marauder': 90,
         'paladin': 120, 'overlord': 140,
         // Artillery & Heavy Siege Missiles
-        'tomahawk': 420, 'scud': 600, 'inferno': 240, 'nukecannon': 450,
+        'tomahawk': 420, 'scud': 600, 'inferno': 240, 'nukecannon': 450, 'nuketank': 450,
         // Anti-Tank & Rocket Troops / Base Defenses
         'rocket': 60, 'rpg': 60, 'tankhunter': 60, 'patriot': 120, 'stingerSite': 120,
         // Standard Infantry Rifle Bursts
