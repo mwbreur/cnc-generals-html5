@@ -154,10 +154,10 @@ function renderRadarMinimap() {
         ctx.drawImage(window._minimapTerrainCanvas, 0, 0, w, h);
     }
 
-    // 2. Fog of War shroud overlay on radar so unexplored sectors remain dark until discovered
+    // 2. Fog of War shroud overlay on radar so unexplored sectors remain pitch black until discovered
     if (typeof fogCanvas !== 'undefined' && fogCanvas) {
         ctx.save();
-        ctx.globalAlpha = 0.78;
+        ctx.globalAlpha = 1.0;
         ctx.drawImage(fogCanvas, 0, 0, w, h);
         ctx.restore();
     }

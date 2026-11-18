@@ -812,58 +812,68 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
         terrainTexture = createTerrainTextureForMap(mapType);
     }
 
-    const useRetailMacroTex = Boolean(officialMap && !isCustom && officialMap.terrainDataUrl && typeof createOfficialMapTexture === 'function');
-    const officialGroundTex = useRetailMacroTex ? createOfficialMapTexture(mapType) : null;
+    // On desert maps, upgrade the tiled ground texture to the crisp retail EA sand texture when available
+    if (effectiveTheme === 'desert' && !isCustom && window.RETAIL_DESERT_SAND_URI && typeof document !== 'undefined' && terrainTexture && terrainTexture.image) {
+        const sandImg = new Image();
+        sandImg.onload = function() {
+            terrainTexture.image = sandImg;
+            terrainTexture.repeat.set(42, 42);
+            terrainTexture.needsUpdate = true;
+        };
+        sandImg.src = window.RETAIL_DESERT_SAND_URI;
+    }
 
-    // Sample official aerial TGA layout into minimap (and into vertexColors only when retail macro texture is unavailable)
-    if (officialMap && !isCustom && officialMap.tgaDataUrl && typeof document !== 'undefined') {
+    // Sample retail BlendTileData+Roads macro texture (or fallback TGA) into vertexColors, keeping high-res tiled map sharp
+    const macroUrl = (officialMap && !isCustom) ? (officialMap.terrainDataUrl || officialMap.tgaDataUrl) : null;
+    if (macroUrl && typeof document !== 'undefined') {
         const aerialImg = new Image();
         aerialImg.onload = function() {
-            if (!officialGroundTex) {
-                const aSize = 256;
-                const aCan = document.createElement('canvas');
-                aCan.width = aCan.height = aSize;
-                const aCtx = aCan.getContext('2d');
-                aCtx.drawImage(aerialImg, 0, 0, aSize, aSize);
-                const aData = aCtx.getImageData(0, 0, aSize, aSize).data;
-                const cAttr = geo.attributes.color;
-                if (cAttr) {
-                    for (let i = 0; i < posAttr.count; i++) {
-                        const vx = posAttr.getX(i);
-                        const vz = posAttr.getZ(i);
-                        const u = Math.max(0, Math.min(1, (vx / mapSize) + 0.5));
-                        const v = Math.max(0, Math.min(1, (vz / mapSize) + 0.5));
-                        const ax = Math.min(aSize - 1, Math.floor(u * (aSize - 1)));
-                        const ay = Math.min(aSize - 1, Math.floor(v * (aSize - 1)));
-                        const aIdx = (ay * aSize + ax) << 2;
-                        const ar = Math.max(0, Math.min(1, (112 + (aData[aIdx] - 122) * 1.22) / 255));
-                        const ag = Math.max(0, Math.min(1, (110 + (aData[aIdx + 1] - 122) * 1.22) / 255));
-                        const ab = Math.max(0, Math.min(1, (105 + (aData[aIdx + 2] - 122) * 1.20) / 255));
-                        const br = cAttr.getX(i), bg = cAttr.getY(i), bb = cAttr.getZ(i);
-                        cAttr.setXYZ(i, br * 0.30 + ar * 0.70, bg * 0.30 + ag * 0.70, bb * 0.30 + ab * 0.70);
-                    }
-                    cAttr.needsUpdate = true;
+            const aSize = 256;
+            const aCan = document.createElement('canvas');
+            aCan.width = aCan.height = aSize;
+            const aCtx = aCan.getContext('2d');
+            aCtx.drawImage(aerialImg, 0, 0, aSize, aSize);
+            const aData = aCtx.getImageData(0, 0, aSize, aSize).data;
+            const cAttr = geo.attributes.color;
+            if (cAttr) {
+                for (let i = 0; i < posAttr.count; i++) {
+                    const vx = posAttr.getX(i);
+                    const vz = posAttr.getZ(i);
+                    const u = Math.max(0, Math.min(1, (vx / mapSize) + 0.5));
+                    const v = Math.max(0, Math.min(1, (vz / mapSize) + 0.5));
+                    const ax = Math.min(aSize - 1, Math.floor(u * (aSize - 1)));
+                    const ay = Math.min(aSize - 1, Math.floor(v * (aSize - 1)));
+                    const aIdx = (ay * aSize + ax) << 2;
+                    const ar = Math.max(0, Math.min(1, (124 + (aData[aIdx] - 124) * 1.15) / 255));
+                    const ag = Math.max(0, Math.min(1, (122 + (aData[aIdx + 1] - 124) * 1.15) / 255));
+                    const ab = Math.max(0, Math.min(1, (118 + (aData[aIdx + 2] - 124) * 1.12) / 255));
+                    const br = cAttr.getX(i), bg = cAttr.getY(i), bb = cAttr.getZ(i);
+                    cAttr.setXYZ(i, br * 0.25 + ar * 0.75, bg * 0.25 + ag * 0.75, bb * 0.25 + ab * 0.75);
                 }
-            }
-            if (window._minimapTerrainCanvas && typeof currentMapType !== 'undefined' && currentMapType === mapType) {
-                const mCtx = window._minimapTerrainCanvas.getContext('2d');
-                mCtx.drawImage(aerialImg, 0, 0, window._minimapTerrainCanvas.width, window._minimapTerrainCanvas.height);
+                cAttr.needsUpdate = true;
             }
         };
-        aerialImg.src = officialMap.tgaDataUrl;
+        aerialImg.src = macroUrl;
+    }
+    if (officialMap && !isCustom && officialMap.tgaDataUrl && typeof document !== 'undefined') {
+        const miniImg = new Image();
+        miniImg.onload = function() {
+            if (window._minimapTerrainCanvas && typeof currentMapType !== 'undefined' && currentMapType === mapType) {
+                const mCtx = window._minimapTerrainCanvas.getContext('2d');
+                mCtx.drawImage(miniImg, 0, 0, window._minimapTerrainCanvas.width, window._minimapTerrainCanvas.height);
+            }
+        };
+        miniImg.src = officialMap.tgaDataUrl;
     }
 
     if (terrainTexture && 'anisotropy' in terrainTexture) {
         terrainTexture.anisotropy = 8;
     }
-    if (officialGroundTex && 'anisotropy' in officialGroundTex) {
-        officialGroundTex.anisotropy = 8;
-    }
     const terrainMat = new THREE.MeshStandardMaterial({
-            map: officialGroundTex || terrainTexture,
-            vertexColors: !isCustom && !officialGroundTex,
+            map: terrainTexture,
+            vertexColors: !isCustom,
             bumpMap: terrainTexture,
-            bumpScale: 0.38,
+            bumpScale: 0.35,
             roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.92,
             metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
     });

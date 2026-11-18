@@ -66,7 +66,7 @@ function initFogOfWar(mapSize) {
     const fogMat = new THREE.MeshBasicMaterial({
             map: fogTexture,
             transparent: true,
-            opacity: 0.94,
+            opacity: 1.0,
             depthWrite: false
     });
     fogMesh = new THREE.Mesh(fogGeo, fogMat);
@@ -218,7 +218,7 @@ function updateFogOfWar() {
         for (let idx = 0; idx < total; idx++) {
             const p = idx << 2;
             if (fogGrid[idx] === 0) {
-                d[p] = 5; d[p + 1] = 7; d[p + 2] = 10; d[p + 3] = 255;
+                d[p] = 0; d[p + 1] = 0; d[p + 2] = 0; d[p + 3] = 255;
             } else {
                 d[p] = 10; d[p + 1] = 14; d[p + 2] = 18; d[p + 3] = 158;
             }
