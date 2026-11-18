@@ -3334,10 +3334,10 @@ function triggerSneakAttackTunnel() {
 }
 
 function getSuperweaponMaxCooldownTicks(sType) {
-    if (sType === 'particleCannon') return 7200; // 120s (2:00)
-    if (sType === 'scudStorm') return 9000;      // 150s (2:30)
-    if (sType === 'nukeSilo') return 10800;      // 180s (3:00)
-    return 7200;
+    if (sType === 'particleCannon') return 14400; // 240s (4:00) official
+    if (sType === 'scudStorm') return 18000;      // 300s (5:00) official
+    if (sType === 'nukeSilo') return 21600;       // 360s (6:00) official
+    return 14400;
 }
 window.getSuperweaponMaxCooldownTicks = getSuperweaponMaxCooldownTicks;
 

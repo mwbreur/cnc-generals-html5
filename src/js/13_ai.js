@@ -979,9 +979,13 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(46, 0, 36) },
         { check: s => s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace', build: f === 'china' ? 'propagandaCenter' : f === 'gla' ? 'palace' : 'strategyCenter', cost: 1500, offset: new THREE.Vector3(-62, 0, 0) }
     ];
-    if (cmd.difficulty !== 'easy') {
+    const hasCompletedTier3 = myStructures.some(s => !s.isBuilding && s.health > 0 && (s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace'));
+    const swMinTick = cmd.difficulty === 'hard' ? 12000 : 18000; // Hard: ~3m20s, Medium: ~5m00s
+    if (cmd.difficulty !== 'easy' && hasCompletedTier3 && (typeof buildingTick === 'undefined' || buildingTick >= swMinTick)) {
+        const swType = f === 'china' ? 'nukeSilo' : f === 'gla' ? 'scudStorm' : 'particleCannon';
+        const swCost = (typeof getStructureCost === 'function' ? getStructureCost(swType) : 0) || 2500;
         essentialList.push(
-            { check: s => s.type === 'particleCannon' || s.type === 'nukeSilo' || s.type === 'scudStorm', build: f === 'china' ? 'nukeSilo' : f === 'gla' ? 'scudStorm' : 'particleCannon', cost: 2500, offset: new THREE.Vector3(64, 0, 0) }
+            { check: s => s.type === 'particleCannon' || s.type === 'nukeSilo' || s.type === 'scudStorm', build: swType, cost: swCost, offset: new THREE.Vector3(64, 0, 0) }
         );
     }
 
