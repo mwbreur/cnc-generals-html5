@@ -2917,6 +2917,16 @@ function produceUnit(type) {
         return;
     }
 
+    // Official C&C Generals Hero Unit Limit: MaxSimultaneousOfType = 1 (Colonel Burton, Black Lotus, Jarmen Kell)
+    if (type === 'burton' || type === 'blacklotus' || type === 'jarmen') {
+        const aliveHero = (typeof units !== 'undefined') && units.some(u => u && u.type === type && u.health > 0 && (!u.ownerId || u.ownerId === 'player'));
+        const queuedHero = (typeof structures !== 'undefined') && structures.some(s => s && s.health > 0 && (!s.ownerId || s.ownerId === 'player') && Array.isArray(s.productionQueue) && s.productionQueue.some(q => q && q.type === type));
+        if (aliveHero || queuedHero) {
+            showNotification(`${spec.name} is a unique Hero unit (limit 1 active or queued).`, 'warning');
+            return;
+        }
+    }
+
     const effCost = getEffectiveUnitCost(type);
     if (playerResources < effCost) {
         showNotification(`Insufficient funds to train ${spec.name} ($${effCost} required).`, 'error');

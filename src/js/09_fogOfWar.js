@@ -975,36 +975,50 @@ function hideTacticalTooltip() {
 
 function refreshFactionRoster() {
     const faction = factionCatalog[selectedFaction];
+    const OFFICIAL_UNIT_BUILD_TIME = {
+        infantry: 5.0, ranger: 5.0, redguard: 7.0, rebel: 5.0,
+        rocket: 5.0, tankhunter: 5.0, rpg: 5.0,
+        pathfinder: 10.0, hacker: 12.0, terrorist: 5.0, mob: 10.0, hijacker: 10.0,
+        burton: 20.0, blacklotus: 20.0, jarmen: 20.0,
+        technical: 5.0, humvee: 8.0, ambulance: 8.0, radarvan: 8.0,
+        toxintractor: 10.0, dragon: 10.0, crawler: 10.0, bombtruck: 12.0,
+        scorpion: 10.0, battlemaster: 10.0, crusader: 10.0, tank: 10.0,
+        gatling: 10.0, quad: 10.0, buggy: 10.0,
+        paladin: 12.0, marauder: 12.0, inferno: 15.0, scud: 15.0,
+        tomahawk: 20.0, nukecannon: 20.0, nuketank: 20.0, overlord: 20.0,
+        chinook: 10.0, comanche: 15.0, raptor: 15.0, mig: 15.0, stealthfighter: 15.0, aurora: 20.0,
+        truck: 10.0, dozer: 5.0, worker: 5.0
+    };
     unitRoster = {};
 
     // 1. Barracks Infantry
     if (faction.barracks) {
         Object.entries(faction.barracks).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'barracks', role: data[2] || 'Infantry', buildTime: 3.0 };
+                unitRoster[type] = { name: data[0], cost: data[1], building: 'barracks', role: data[2] || 'Infantry', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 5.0 };
         });
     }
     // 2. War Factory Ground Armor
     if (faction.factory) {
         Object.entries(faction.factory).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'factory', role: data[2] || 'Ground Vehicle', buildTime: 5.5 };
+                unitRoster[type] = { name: data[0], cost: data[1], building: 'factory', role: data[2] || 'Ground Vehicle', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 10.0 };
         });
     }
     // 3. Airfield Aircraft & Helicopters
     if (faction.airfield) {
         Object.entries(faction.airfield).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'airfield', role: data[2] || 'Aircraft', buildTime: 7.0 };
+                unitRoster[type] = { name: data[0], cost: data[1], building: 'airfield', role: data[2] || 'Aircraft', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 15.0 };
         });
     }
     // 4. Logistics (Supply Center)
     if (faction.supplyCenter) {
         Object.entries(faction.supplyCenter).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'supplyCenter', role: data[2] || 'Logistics', buildTime: 4.0 };
+                unitRoster[type] = { name: data[0], cost: data[1], building: 'supplyCenter', role: data[2] || 'Logistics', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 10.0 };
         });
     }
     // 5. Command Center (Dozers / Workers)
     if (faction.commandCenter) {
         Object.entries(faction.commandCenter).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'commandCenter', role: data[2] || 'Construction', buildTime: 4.5 };
+                unitRoster[type] = { name: data[0], cost: data[1], building: 'commandCenter', role: data[2] || 'Construction', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 5.0 };
         });
     }
 

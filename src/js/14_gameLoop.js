@@ -1089,7 +1089,17 @@ function animate() {
                 const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 3.5;
                 if (s.dozerRef.taskState === 'Building' || dist2D <= buildThreshold) {
                     s.dozerRef.taskState = 'Building';
-                    const buildRate = (s.type === 'supplyDrop') ? (100 / 2700) : 0.35; // 45s build time for Supply Drop Zone
+                    const OFFICIAL_STRUCTURE_BUILD_SECS = {
+                        demoTrap: 5,
+                        barracks: 10, patriot: 10, gatlingCannon: 10, bunker: 10, stingerSite: 10,
+                        power: 15, coldFusionReactor: 15, nuclearReactor: 15, supplyCenter: 15, supplyStash: 15, tunnel: 15, speakerTower: 15,
+                        factory: 20, airfield: 20,
+                        center: 30, commandCenter: 30, strategyCenter: 30, propagandaCenter: 30, palace: 30, internetCenter: 30, detentionCamp: 30, blackMarket: 30,
+                        supplyDrop: 45,
+                        particleCannon: 60, nukeSilo: 60, scudStorm: 60
+                    };
+                    const buildSecs = OFFICIAL_STRUCTURE_BUILD_SECS[s.type] || 15;
+                    const buildRate = 100 / (buildSecs * 60);
                     s.buildProgress += buildRate * combatDeltaScale;
                     if (s.mesh) {
                         if (s._baseScaleY === undefined) s._baseScaleY = s.mesh.scale.y || 1;
