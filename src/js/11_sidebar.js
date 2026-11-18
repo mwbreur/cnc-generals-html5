@@ -1344,20 +1344,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         // Populate first 6 units into Row 1 (slots 0..5)
         for (; uIdx < Math.min(6, producers.length); uIdx++) {
             const [type, spec] = producers[uIdx];
-            const techReq = getUnitTechPrerequisite(type);
-            const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
-            const hasGenUnlock = typeof isUnitUnlockedByGeneralsPower === 'function' ? isUnitUnlockedByGeneralsPower(type) : true;
-            const canAfford = playerResources >= spec.cost;
-            let badge = !hasGenUnlock ? 'GEN LVL' : (!hasTech ? 'LOCKED' : (canAfford ? 'READY' : 'FUNDS'));
-            currentGridSlots[uIdx] = {
-                id: type,
-                name: spec.name.toUpperCase(),
-                cost: spec.cost,
-                badge: badge,
-                disabled: !hasGenUnlock || !hasTech || !canAfford || isConstructing,
-                action: () => produceUnit(type),
-                desc: !hasGenUnlock ? 'Unlock via Generals\' Promotions (Rank Bar)' : (spec.role || 'Combat Unit')
-            };
+            currentGridSlots[uIdx] = buildUnitGridSlot(type, spec, isConstructing);
         }
 
         // Slot 6 (Top-Right): RALLY POINT
@@ -1375,20 +1362,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         let slotPos = 7;
         for (; uIdx < producers.length && slotPos < 13; uIdx++, slotPos++) {
             const [type, spec] = producers[uIdx];
-            const techReq = getUnitTechPrerequisite(type);
-            const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
-            const hasGenUnlock = typeof isUnitUnlockedByGeneralsPower === 'function' ? isUnitUnlockedByGeneralsPower(type) : true;
-            const canAfford = playerResources >= spec.cost;
-            let badge = !hasGenUnlock ? 'GEN LVL' : (!hasTech ? 'LOCKED' : (canAfford ? 'READY' : 'FUNDS'));
-            currentGridSlots[slotPos] = {
-                id: type,
-                name: spec.name.toUpperCase(),
-                cost: spec.cost,
-                badge: badge,
-                disabled: !hasGenUnlock || !hasTech || !canAfford || isConstructing,
-                action: () => produceUnit(type),
-                desc: !hasGenUnlock ? 'Unlock via Generals\' Promotions (Rank Bar)' : (spec.role || 'Combat Unit')
-            };
+            currentGridSlots[slotPos] = buildUnitGridSlot(type, spec, isConstructing);
         }
 
         // Upgrades for this unit-producing building in remaining slots on Row 2
@@ -2908,6 +2882,33 @@ function getEffectiveUnitCost(type) {
     return cost;
 }
 
+function isHeroUnitActiveOrQueued(type) {
+    if (type !== 'burton' && type !== 'blacklotus' && type !== 'jarmen') return false;
+    const aliveHero = (typeof units !== 'undefined') && units.some(u => u && u.type === type && u.health > 0 && (!u.ownerId || u.ownerId === 'player'));
+    const queuedHero = (typeof structures !== 'undefined') && structures.some(s => s && s.health > 0 && (!s.ownerId || s.ownerId === 'player') && Array.isArray(s.productionQueue) && s.productionQueue.some(q => q && q.type === type));
+    return aliveHero || queuedHero;
+}
+
+function buildUnitGridSlot(type, spec, isConstructing) {
+    const techReq = getUnitTechPrerequisite(type);
+    const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
+    const hasGenUnlock = typeof isUnitUnlockedByGeneralsPower === 'function' ? isUnitUnlockedByGeneralsPower(type) : true;
+    const heroLimitReached = isHeroUnitActiveOrQueued(type);
+    const canAfford = playerResources >= spec.cost;
+    const badge = heroLimitReached ? 'LIMIT 1' : (!hasGenUnlock ? 'GEN LVL' : (!hasTech ? 'LOCKED' : (canAfford ? 'READY' : 'FUNDS')));
+    return {
+        id: type,
+        name: spec.name.toUpperCase(),
+        cost: spec.cost,
+        badge: badge,
+        disabled: heroLimitReached || !hasGenUnlock || !hasTech || !canAfford || isConstructing,
+        action: () => produceUnit(type),
+        desc: heroLimitReached
+            ? `${spec.name} is a unique Hero unit (limit 1 active or queued)`
+            : (!hasGenUnlock ? 'Unlock via Generals\' Promotions (Rank Bar)' : (spec.role || 'Combat Unit'))
+    };
+}
+
 function produceUnit(type) {
     const spec = unitRoster[type];
     if (!spec) return;
@@ -2918,13 +2919,9 @@ function produceUnit(type) {
     }
 
     // Official C&C Generals Hero Unit Limit: MaxSimultaneousOfType = 1 (Colonel Burton, Black Lotus, Jarmen Kell)
-    if (type === 'burton' || type === 'blacklotus' || type === 'jarmen') {
-        const aliveHero = (typeof units !== 'undefined') && units.some(u => u && u.type === type && u.health > 0 && (!u.ownerId || u.ownerId === 'player'));
-        const queuedHero = (typeof structures !== 'undefined') && structures.some(s => s && s.health > 0 && (!s.ownerId || s.ownerId === 'player') && Array.isArray(s.productionQueue) && s.productionQueue.some(q => q && q.type === type));
-        if (aliveHero || queuedHero) {
-            showNotification(`${spec.name} is a unique Hero unit (limit 1 active or queued).`, 'warning');
-            return;
-        }
+    if (isHeroUnitActiveOrQueued(type)) {
+        showNotification(`${spec.name} is a unique Hero unit (limit 1 active or queued).`, 'warning');
+        return;
     }
 
     const effCost = getEffectiveUnitCost(type);
