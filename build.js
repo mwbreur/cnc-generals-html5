@@ -57,7 +57,16 @@ const webHtml = template
     .replace('<script>\n// {{JS_CONTENT}}', () => `${externalTags.join('\n')}\n<script>\n// {{JS_CONTENT}}`)
     .replace('// {{JS_CONTENT}}', () => assembledJS);
 
-// 4. Validate JavaScript syntax before saving
+// 4. Static lint & JavaScript syntax validation before saving
+const { lintModules } = require('./tools/lint_js');
+const lintRes = lintModules();
+if (lintRes.errors.length > 0) {
+    console.error('✗ Build FAILED due to JS lint errors:');
+    lintRes.errors.forEach(e => console.error('  -', e));
+    process.exit(1);
+}
+console.log(`✓ JS Lint PASSED (${lintRes.filesChecked} modules, ${lintRes.funcCount} top-level functions, 0 duplicates/leaks)`);
+
 console.log('Validating JavaScript syntax with Node VM...');
 try {
     new vm.Script(fullSyntaxCheckJS);

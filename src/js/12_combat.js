@@ -1,170 +1,170 @@
 let _combatScanTick = 0;
 function processCombatScanning() {
-            _combatScanTick++;
-			units.forEach((unit, ui) => {
-                if (unit.health <= 0) return;
-                if (unit.isUnmanned || (unit.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < unit.disabledUntil)) return;
-                if (unit.garrisonedIn) {
-                    const tr = unit.garrisonedIn;
-                    const isBuildingGarrison = !!(tr && (tr.isWorldBuilding || tr.type === 'bunker'));
-                    const hasFireports = tr && tr.health > 0 && tr.mesh && (isBuildingGarrison || tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus' || (tr.type === 'overlord' && tr.overlordUpgrade === 'bunker'));
-                    if (!hasFireports) return;
-                    const trPos = tr.position || tr.mesh.position;
-                    unit.mesh.position.copy(trPos);
-                    if (isBuildingGarrison) unit.mesh.position.y += 2.0;
-                    if (tr.combatTarget && tr.combatTarget.health > 0) {
-                        unit.combatTarget = tr.combatTarget;
-                    } else if (!unit.combatTarget || unit.combatTarget.health <= 0) {
-                        const rangeBonus = isBuildingGarrison ? 1.5 : 1.0;
-                        const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
-                        let bestGTarget = null, bestGD = (unit.scanRange || 22) * rangeBonus + 8;
-                        for (let hi = 0; hi < hostiles.length; hi++) {
-                            const h = hostiles[hi];
-                            if (!h || h.health <= 0 || isFriendly(unit, h)) continue;
-                            const hp = h.position || (h.mesh && h.mesh.position);
-                            if (!hp) continue;
-                            const d = trPos.distanceTo(hp);
-                            if (d < bestGD) { bestGD = d; bestGTarget = h; }
-                        }
-                        if (bestGTarget) unit.combatTarget = bestGTarget;
+    _combatScanTick++;
+    units.forEach((unit, ui) => {
+            if (unit.health <= 0) return;
+            if (unit.isUnmanned || (unit.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < unit.disabledUntil)) return;
+            if (unit.garrisonedIn) {
+                const tr = unit.garrisonedIn;
+                const isBuildingGarrison = !!(tr && (tr.isWorldBuilding || tr.type === 'bunker'));
+                const hasFireports = tr && tr.health > 0 && tr.mesh && (isBuildingGarrison || tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus' || (tr.type === 'overlord' && tr.overlordUpgrade === 'bunker'));
+                if (!hasFireports) return;
+                const trPos = tr.position || tr.mesh.position;
+                unit.mesh.position.copy(trPos);
+                if (isBuildingGarrison) unit.mesh.position.y += 2.0;
+                if (tr.combatTarget && tr.combatTarget.health > 0) {
+                    unit.combatTarget = tr.combatTarget;
+                } else if (!unit.combatTarget || unit.combatTarget.health <= 0) {
+                    const rangeBonus = isBuildingGarrison ? 1.5 : 1.0;
+                    const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+                    let bestGTarget = null, bestGD = (unit.scanRange || 22) * rangeBonus + 8;
+                    for (let hi = 0; hi < hostiles.length; hi++) {
+                        const h = hostiles[hi];
+                        if (!h || h.health <= 0 || isFriendly(unit, h)) continue;
+                        const hp = h.position || (h.mesh && h.mesh.position);
+                        if (!hp) continue;
+                        const d = trPos.distanceTo(hp);
+                        if (d < bestGD) { bestGD = d; bestGTarget = h; }
+                    }
+                    if (bestGTarget) unit.combatTarget = bestGTarget;
+                }
+            }
+            // Manage weapon assembly cooldown timers
+            if (unit.attackCooldown > 0) unit.attackCooldown = Math.max(0, unit.attackCooldown - combatDeltaScale);
+
+            // If unit already has a valid target, verify proximity constraints
+            if (unit.combatTarget) {
+                const targetPos = unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position);
+                const targetRadius = unit.combatTarget.radius || 0;
+                const distance = targetPos
+                ? (unit.isAir || unit.combatTarget.isAir
+                    ? unit.mesh.position.distanceTo(targetPos)
+                    : Math.hypot(unit.mesh.position.x - targetPos.x, unit.mesh.position.z - targetPos.z))
+                : Infinity;
+                const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker')) ? 1.5 : 1.0;
+                const maxEffectiveRange = unit.scanRange * garrisonRangeMult + targetRadius;
+                const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
+
+                if ((unit.type === 'tomahawk' && unit.combatTarget.isAir) || distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
+                    unit.combatTarget = null; // Target lost, too close for siege artillery, or destroyed
+                } else {
+                    // Point Turret systems directly at target coordinates
+                    const turret = getCachedNode(unit.mesh, "turretSystem");
+                    if (turret && turret.parent && targetPos) {
+                        const localTarget = turret.parent.worldToLocal(targetPos.clone());
+                        turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);
+                    }
+                    // Fire Weapon Command Trigger Sequence
+                    if (unit.attackCooldown === 0) {
+                        executeWeaponFire(unit, unit.combatTarget);
                     }
                 }
-				// Manage weapon assembly cooldown timers
-				if (unit.attackCooldown > 0) unit.attackCooldown = Math.max(0, unit.attackCooldown - combatDeltaScale);
+            }
 
-				// If unit already has a valid target, verify proximity constraints
-				if (unit.combatTarget) {
-                    const targetPos = unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position);
-                    const targetRadius = unit.combatTarget.radius || 0;
-                    const distance = targetPos
-                        ? (unit.isAir || unit.combatTarget.isAir
-                            ? unit.mesh.position.distanceTo(targetPos)
-                            : Math.hypot(unit.mesh.position.x - targetPos.x, unit.mesh.position.z - targetPos.z))
-                        : Infinity;
-                    const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker')) ? 1.5 : 1.0;
-                    const maxEffectiveRange = unit.scanRange * garrisonRangeMult + targetRadius;
-                    const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
-
-                    if ((unit.type === 'tomahawk' && unit.combatTarget.isAir) || distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
-                        unit.combatTarget = null; // Target lost, too close for siege artillery, or destroyed
-                    } else {
-                        // Point Turret systems directly at target coordinates
-                        const turret = getCachedNode(unit.mesh, "turretSystem");
-                        if (turret && turret.parent && targetPos) {
-                            const localTarget = turret.parent.worldToLocal(targetPos.clone());
-                            turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);
-                        }
-                        // Fire Weapon Command Trigger Sequence
-                        if (unit.attackCooldown === 0) {
-                            executeWeaponFire(unit, unit.combatTarget);
+            // Autonomous Overlord Roof Gatling Cannon (Anti-Air & Anti-Infantry)
+            if (unit.type === 'overlord' && unit.overlordUpgrade === 'gatling' && unit.health > 0) {
+                if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
+                if (unit.overlordGatCooldown > 0) unit.overlordGatCooldown = Math.max(0, unit.overlordGatCooldown - combatDeltaScale);
+                if (unit.overlordGatCooldown === 0) {
+                    const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+                    let bestTarget = null;
+                    let bestScore = -Infinity;
+                    for (let hi = 0; hi < hostiles.length; hi++) {
+                        const h = hostiles[hi];
+                        const hPos = h && (h.position || (h.mesh && h.mesh.position));
+                        if (!h || h.health <= 0 || !hPos || isFriendly(unit, h)) continue;
+                        const d = unit.mesh.position.distanceTo(hPos);
+                        if (d <= 26) {
+                            let score = 100 - d;
+                            if (h.isAir) score += 60; // Prioritize airborne aircraft!
+                            if (getArmorCategory(h) === 'infantry') score += 30;
+                            if (score > bestScore) { bestScore = score; bestTarget = h; }
                         }
                     }
-                }
-
-                // Autonomous Overlord Roof Gatling Cannon (Anti-Air & Anti-Infantry)
-                if (unit.type === 'overlord' && unit.overlordUpgrade === 'gatling' && unit.health > 0) {
-                    if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
-                    if (unit.overlordGatCooldown > 0) unit.overlordGatCooldown = Math.max(0, unit.overlordGatCooldown - combatDeltaScale);
-                    if (unit.overlordGatCooldown === 0) {
-                        const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
-                        let bestTarget = null;
-                        let bestScore = -Infinity;
-                        for (let hi = 0; hi < hostiles.length; hi++) {
-                            const h = hostiles[hi];
-                            const hPos = h && (h.position || (h.mesh && h.mesh.position));
-                            if (!h || h.health <= 0 || !hPos || isFriendly(unit, h)) continue;
-                            const d = unit.mesh.position.distanceTo(hPos);
-                            if (d <= 26) {
-                                let score = 100 - d;
-                                if (h.isAir) score += 60; // Prioritize airborne aircraft!
-                                if (getArmorCategory(h) === 'infantry') score += 30;
-                                if (score > bestScore) { bestScore = score; bestTarget = h; }
+                    if (bestTarget) {
+                        unit.overlordGatCooldown = 18; // ~0.3s rapid fire!
+                        const upgMesh = unit.overlordUpgradeMesh || getCachedNode(unit.mesh, "overlordUpgrade");
+                        const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
+                        tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
+                        if (upgMesh) {
+                            const gatTurret = getCachedNode(upgMesh, "turretSystem") || upgMesh.getObjectByName("TURRET01");
+                            if (gatTurret && gatTurret.parent) {
+                                const localT = gatTurret.parent.worldToLocal(tPos.clone());
+                                gatTurret.rotation.y = Math.atan2(localT.x, localT.z);
                             }
+                            upgMesh.traverse(c => { if (c.name === "gatlingBarrels" || c.name === "gatlingBarrels2") c.rotation.z += 1.6; });
+                            upgMesh.updateMatrixWorld(true);
                         }
-                        if (bestTarget) {
-                            unit.overlordGatCooldown = 18; // ~0.3s rapid fire!
-                            const upgMesh = unit.overlordUpgradeMesh || getCachedNode(unit.mesh, "overlordUpgrade");
-                            const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
-                            tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
-                            if (upgMesh) {
-                                const gatTurret = getCachedNode(upgMesh, "turretSystem") || upgMesh.getObjectByName("TURRET01");
-                                if (gatTurret && gatTurret.parent) {
-                                    const localT = gatTurret.parent.worldToLocal(tPos.clone());
-                                    gatTurret.rotation.y = Math.atan2(localT.x, localT.z);
-                                }
-                                upgMesh.traverse(c => { if (c.name === "gatlingBarrels" || c.name === "gatlingBarrels2") c.rotation.z += 1.6; });
-                                upgMesh.updateMatrixWorld(true);
-                            }
-                            const m1 = upgMesh && upgMesh.getObjectByName("MUZZLE01");
-                            const m2 = upgMesh && upgMesh.getObjectByName("MUZZLE02");
-                            const fallbackMuzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
-                            const muzzleL = m1 ? m1.getWorldPosition(new THREE.Vector3()) : fallbackMuzzle;
-                            const muzzleR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : null;
-                            spawnMuzzleFlash(muzzleL, 0xffa502, 0.4);
-                            spawnBulletTracer(muzzleL, tPos, 0xf1c40f, 2.8);
-                            if (muzzleR) {
-                                spawnMuzzleFlash(muzzleR, 0xffa502, 0.4);
-                                spawnBulletTracer(muzzleR, tPos, 0xf1c40f, 2.8);
-                            }
-                            if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
-                            applyCalculatedDamage(unit, bestTarget, 16, 'GATLING');
+                        const m1 = upgMesh && upgMesh.getObjectByName("MUZZLE01");
+                        const m2 = upgMesh && upgMesh.getObjectByName("MUZZLE02");
+                        const fallbackMuzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+                        const muzzleL = m1 ? m1.getWorldPosition(new THREE.Vector3()) : fallbackMuzzle;
+                        const muzzleR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : null;
+                        spawnMuzzleFlash(muzzleL, 0xffa502, 0.4);
+                        spawnBulletTracer(muzzleL, tPos, 0xf1c40f, 2.8);
+                        if (muzzleR) {
+                            spawnMuzzleFlash(muzzleR, 0xffa502, 0.4);
+                            spawnBulletTracer(muzzleR, tPos, 0xf1c40f, 2.8);
                         }
+                        if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
+                        applyCalculatedDamage(unit, bestTarget, 16, 'GATLING');
                     }
                 }
+            }
 
-                // If combat target is friendly ally, clear immediately
-                if (unit.combatTarget && isFriendly(unit, unit.combatTarget)) {
-                    unit.combatTarget = null;
-                }
+            // If combat target is friendly ally, clear immediately
+            if (unit.combatTarget && isFriendly(unit, unit.combatTarget)) {
+                unit.combatTarget = null;
+            }
 
-                // Auto-Scan while Idle or Moving (Fire-on-the-move: engage nearest hostile in range without stopping)
-                // PERF: staggered every 2 frames when moving (4 when idle) using squared horizontal distance
-                const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker', 'pilot', 'drone_scout'].includes(unit.type);
-                const scanMod = (unit.taskState === 'Moving') ? 2 : 4;
-                if (!unit.combatTarget && ((_combatScanTick + ui) % scanMod === 0) && !isNonCombatSupport) {
-                    if (!(unit.isAir && unit.taskState === 'Moving')) {
-                        const uPos = unit.mesh.position;
-                        let bestUnitDist2 = Infinity;
-                        // 1. Scan for nearest hostile unit in range
-                        for (let ei = 0; ei < enemyUnits.length; ei++) {
-                            const enemy = enemyUnits[ei];
-                            if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
-                                if (unit.type === 'tomahawk' && enemy.isAir) continue;
-                                const ep = enemy.mesh.position;
-                                const dx = uPos.x - ep.x, dz = uPos.z - ep.z;
-                                const effR = unit.scanRange + (enemy.radius || 0);
+            // Auto-Scan while Idle or Moving (Fire-on-the-move: engage nearest hostile in range without stopping)
+            // PERF: staggered every 2 frames when moving (4 when idle) using squared horizontal distance
+            const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker', 'pilot', 'drone_scout'].includes(unit.type);
+            const scanMod = (unit.taskState === 'Moving') ? 2 : 4;
+            if (!unit.combatTarget && ((_combatScanTick + ui) % scanMod === 0) && !isNonCombatSupport) {
+                if (!(unit.isAir && unit.taskState === 'Moving')) {
+                    const uPos = unit.mesh.position;
+                    let bestUnitDist2 = Infinity;
+                    // 1. Scan for nearest hostile unit in range
+                    for (let ei = 0; ei < enemyUnits.length; ei++) {
+                        const enemy = enemyUnits[ei];
+                        if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
+                            if (unit.type === 'tomahawk' && enemy.isAir) continue;
+                            const ep = enemy.mesh.position;
+                            const dx = uPos.x - ep.x, dz = uPos.z - ep.z;
+                            const effR = unit.scanRange + (enemy.radius || 0);
+                            const d2 = dx * dx + dz * dz;
+                            if (d2 <= effR * effR && d2 < bestUnitDist2) {
+                                bestUnitDist2 = d2;
+                                unit.combatTarget = enemy;
+                                if (unit.isAir) unit.airState = 'attacking';
+                            }
+                        }
+                    }
+                    // 2. If no hostile units in range, auto-target nearest hostile structure
+                    if (!unit.combatTarget && enemyStructures.length > 0) {
+                        let bestStructDist2 = Infinity;
+                        for (let si = 0; si < enemyStructures.length; si++) {
+                            const struct = enemyStructures[si];
+                            if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
+                                const sPos = struct.position || struct.mesh.position;
+                                const effR = unit.scanRange + (struct.radius || 6);
+                                const dx = uPos.x - sPos.x, dz = uPos.z - sPos.z;
                                 const d2 = dx * dx + dz * dz;
-                                if (d2 <= effR * effR && d2 < bestUnitDist2) {
-                                    bestUnitDist2 = d2;
-                                    unit.combatTarget = enemy;
+                                if (d2 <= effR * effR && d2 < bestStructDist2) {
+                                    bestStructDist2 = d2;
+                                    unit.combatTarget = struct;
                                     if (unit.isAir) unit.airState = 'attacking';
                                 }
                             }
                         }
-                        // 2. If no hostile units in range, auto-target nearest hostile structure
-                        if (!unit.combatTarget && enemyStructures.length > 0) {
-                            let bestStructDist2 = Infinity;
-                            for (let si = 0; si < enemyStructures.length; si++) {
-                                const struct = enemyStructures[si];
-                                if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
-                                    const sPos = struct.position || struct.mesh.position;
-                                    const effR = unit.scanRange + (struct.radius || 6);
-                                    const dx = uPos.x - sPos.x, dz = uPos.z - sPos.z;
-                                    const d2 = dx * dx + dz * dz;
-                                    if (d2 <= effR * effR && d2 < bestStructDist2) {
-                                        bestStructDist2 = d2;
-                                        unit.combatTarget = struct;
-                                        if (unit.isAir) unit.airState = 'attacking';
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
-            });
-        }
+            }
+    });
+}
 
-        // =========================================================================
+// =========================================================================
 // AUTHENTIC SAGE ENGINE DAMAGE & ARMOR MULTIPLIER MATRIX (Damage.h & Armor.h)
 // =========================================================================
 const DAMAGE_TYPES = {
@@ -265,9 +265,9 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
 
     const cat = getArmorCategory(target);
     const mult = (ARMOR_COEFFICIENTS[cat] && ARMOR_COEFFICIENTS[cat][damageType] !== undefined)
-        ? ARMOR_COEFFICIENTS[cat][damageType]
-        : 1.0;
-    
+    ? ARMOR_COEFFICIENTS[cat][damageType]
+    : 1.0;
+
     let finalDmg = Math.max(1, Math.round(baseDamage * mult));
 
     // Attacker offensive buffs (USA Strategy Center Bombardment: +20% damage)
@@ -395,10 +395,10 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         }
     }
     const isFlyingAirUnit = !!(target.isAir && (
-        target.type === 'chinook' ||
-        target.airState === 'flying' ||
-        target.taskState === 'Moving' ||
-        (target.targetPosition && target.mesh && Math.hypot(target.targetPosition.x - target.mesh.position.x, target.targetPosition.z - target.mesh.position.z) > 4.0)
+            target.type === 'chinook' ||
+            target.airState === 'flying' ||
+            target.taskState === 'Moving' ||
+            (target.targetPosition && target.mesh && Math.hypot(target.targetPosition.x - target.mesh.position.x, target.targetPosition.z - target.mesh.position.z) > 4.0)
     ));
     if (target.health > 0 && target.scanRange > 0 && !target.combatTarget && target.taskState !== 'Moving' && !isFlyingAirUnit && attacker && attacker.health > 0 && !isFriendly(target, attacker)) {
         target.combatTarget = attacker;
@@ -407,9 +407,9 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     // Sync damage dealt over WebRTC DataChannel
     if (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive && typeof netConn !== 'undefined' && netConn && netConn.open && typeof units !== 'undefined' && units.includes(attacker) && target && target.netId) {
         broadcastNetPacket({
-            type: 'unit_damage',
-            targetNetId: target.netId,
-            remainingHealth: target.health
+                type: 'unit_damage',
+                targetNetId: target.netId,
+                remainingHealth: target.health
         });
     }
 
@@ -578,10 +578,10 @@ function executeWeaponFire(attacker, target) {
             const gatPosR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : gatPosL;
             for (let b = 0; b < 3; b++) {
                 setTimeout(() => {
-                    const gPos = (b % 2 === 0) ? gatPosL : gatPosR;
-                    spawnMuzzleFlash(gPos, 0xffa502, 0.35);
-                    spawnBulletTracer(gPos, targetPos, 0xf1c40f, 2.8);
-                }, b * 50);
+                        const gPos = (b % 2 === 0) ? gatPosL : gatPosR;
+                        spawnMuzzleFlash(gPos, 0xffa502, 0.35);
+                        spawnBulletTracer(gPos, targetPos, 0xf1c40f, 2.8);
+                    }, b * 50);
             }
             if (typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
             applyCalculatedDamage(attacker, target, 24, 'GATLING');
@@ -606,27 +606,27 @@ function executeWeaponFire(attacker, target) {
         if (typeof playUSASound === 'function') playUSASound('missile_launch');
         for (let r = 0; r < rCount; r++) {
             setTimeout(() => {
-                const mPos = getMuzzleWorldPosition(attacker, (r % 2 === 0 ? -0.25 : 0.25));
-                spawnMuzzleFlash(mPos, 0xff9f43, 0.4);
-                spawnRocketProjectile(mPos, targetPos, false, false, {
-                    attacker: attacker,
-                    target: target,
-                    damage: rDmg,
-                    damageType: 'EXPLOSIVE',
-                    splashRadius: 1.5
-                });
-            }, r * 80);
+                    const mPos = getMuzzleWorldPosition(attacker, (r % 2 === 0 ? -0.25 : 0.25));
+                    spawnMuzzleFlash(mPos, 0xff9f43, 0.4);
+                    spawnRocketProjectile(mPos, targetPos, false, false, {
+                            attacker: attacker,
+                            target: target,
+                            damage: rDmg,
+                            damageType: 'EXPLOSIVE',
+                            splashRadius: 1.5
+                    });
+                }, r * 80);
         }
     } else if (['rocket', 'rpg', 'tankhunter'].includes(attacker.type)) {
         // Shoulder-fired rockets (Tracked for Point Defense Laser interception!)
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff9f43, 0.5);
         const rDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets') && attacker.type === 'rpg') ? 52 : 42;
         spawnRocketProjectile(muzzlePos, targetPos, false, attacker.type === 'rpg' || attacker.type === 'tankhunter', {
-            attacker: attacker,
-            target: target,
-            damage: rDmg,
-            damageType: 'EXPLOSIVE',
-            splashRadius: 2.0
+                attacker: attacker,
+                target: target,
+                damage: rDmg,
+                damageType: 'EXPLOSIVE',
+                splashRadius: 2.0
         });
         if (typeof playUSASound === 'function') playUSASound('missile_launch');
     } else if (['tomahawk', 'scud'].includes(attacker.type)) {
@@ -645,11 +645,11 @@ function executeWeaponFire(attacker, target) {
         const mDmg = attacker.type === 'scud' ? 150 : 150;
         const mSplash = attacker.type === 'tomahawk' ? 7.5 : 5.5;
         spawnRocketProjectile(launchPos, targetPos, true, attacker.type === 'scud', {
-            attacker: attacker,
-            target: target,
-            damage: mDmg,
-            damageType: 'EXPLOSIVE',
-            splashRadius: mSplash
+                attacker: attacker,
+                target: target,
+                damage: mDmg,
+                damageType: 'EXPLOSIVE',
+                splashRadius: mSplash
         });
         if (attacker.type === 'tomahawk') playUSASound('missile_launch');
         if (attacker.type === 'scud') playAudio('scud_launch', {}, 'gla');
@@ -660,17 +660,17 @@ function executeWeaponFire(attacker, target) {
         playAudio('china_cannon', {}, 'china');
         const impactPos = targetPos.clone();
         setTimeout(() => {
-            if (typeof spawnExplosion === 'function') spawnExplosion(impactPos, 0xff5500);
-            if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(impactPos);
-            const allHostile = [...((attacker.isAI ? units : enemyUnits) || []), ...((attacker.isAI ? structures : enemyStructures) || [])];
-            allHostile.forEach(h => {
-                if (!h || h.health <= 0 || isFriendly(attacker, h)) return;
-                const hp = h.position || (h.mesh && h.mesh.position);
-                if (hp && hp.distanceTo(impactPos) <= 8.5) {
-                    applyCalculatedDamage(attacker, h, h === target ? 75 : 40, 'FLAME');
-                }
-            });
-        }, 280);
+                if (typeof spawnExplosion === 'function') spawnExplosion(impactPos, 0xff5500);
+                if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(impactPos);
+                const allHostile = [...((attacker.isAI ? units : enemyUnits) || []), ...((attacker.isAI ? structures : enemyStructures) || [])];
+                allHostile.forEach(h => {
+                        if (!h || h.health <= 0 || isFriendly(attacker, h)) return;
+                        const hp = h.position || (h.mesh && h.mesh.position);
+                        if (hp && hp.distanceTo(impactPos) <= 8.5) {
+                            applyCalculatedDamage(attacker, h, h === target ? 75 : 40, 'FLAME');
+                        }
+                });
+            }, 280);
     } else if (attacker.type === 'nukecannon' || attacker.type === 'nuketank') {
         // China Nuke Cannon: Hydraulic Outrigger Siege Deployment + Nuclear vs Neutron Shells!
         deployNukeCannonOutriggers(attacker);
@@ -688,18 +688,18 @@ function executeWeaponFire(attacker, target) {
                 if (typeof spawnNeutronBlast === 'function') spawnNeutronBlast(impactPos);
                 // Authentic Neutron Shell: Wipes out all infantry and kills drivers inside all ground vehicles in blast radius!
                 allHostileUnits.forEach(e => {
-                    if (e.health <= 0 || !e.mesh || isFriendly(attacker, e)) return;
-                    if (e.mesh.position.distanceTo(impactPos) <= 13.0) {
-                        const cat = getArmorCategory(e);
-                        if (cat === 'infantry') {
-                            applyCalculatedDamage(attacker, e, 999, 'TOXIN');
-                        } else if (!e.isAir) {
-                            e.isUnmanned = true;
-                            e.disabledUntil = 999999;
-                            e.combatTarget = null;
-                            if (e.targetPosition && e.mesh) e.targetPosition.copy(e.mesh.position);
+                        if (e.health <= 0 || !e.mesh || isFriendly(attacker, e)) return;
+                        if (e.mesh.position.distanceTo(impactPos) <= 13.0) {
+                            const cat = getArmorCategory(e);
+                            if (cat === 'infantry') {
+                                applyCalculatedDamage(attacker, e, 999, 'TOXIN');
+                            } else if (!e.isAir) {
+                                e.isUnmanned = true;
+                                e.disabledUntil = 999999;
+                                e.combatTarget = null;
+                                if (e.targetPosition && e.mesh) e.targetPosition.copy(e.mesh.position);
+                            }
                         }
-                    }
                 });
                 if (target && target.health > 0 && !isFriendly(attacker, target)) {
                     const tCat = getArmorCategory(target);
@@ -717,17 +717,17 @@ function executeWeaponFire(attacker, target) {
                 // AoE Tactical Nuclear Shell Splash across all units & structures within 12 units
                 const hitSet = new Set();
                 allHostileUnits.forEach(e => {
-                    if (e.health > 0 && e.mesh && !isFriendly(attacker, e) && e.mesh.position.distanceTo(impactPos) <= 12.0) {
-                        hitSet.add(e);
-                        applyCalculatedDamage(attacker, e, 160, 'EXPLOSIVE');
-                    }
+                        if (e.health > 0 && e.mesh && !isFriendly(attacker, e) && e.mesh.position.distanceTo(impactPos) <= 12.0) {
+                            hitSet.add(e);
+                            applyCalculatedDamage(attacker, e, 160, 'EXPLOSIVE');
+                        }
                 });
                 allHostileStructs.forEach(s => {
-                    const sp = s.position || (s.mesh && s.mesh.position);
-                    if (s.health > 0 && sp && !isFriendly(attacker, s) && sp.distanceTo(impactPos) <= 13.5) {
-                        hitSet.add(s);
-                        applyCalculatedDamage(attacker, s, 180, 'EXPLOSIVE');
-                    }
+                        const sp = s.position || (s.mesh && s.mesh.position);
+                        if (s.health > 0 && sp && !isFriendly(attacker, s) && sp.distanceTo(impactPos) <= 13.5) {
+                            hitSet.add(s);
+                            applyCalculatedDamage(attacker, s, 180, 'EXPLOSIVE');
+                        }
                 });
                 if (target && target.health > 0 && !hitSet.has(target)) {
                     applyCalculatedDamage(attacker, target, 160, 'EXPLOSIVE');
@@ -815,9 +815,9 @@ function executeWeaponFire(attacker, target) {
     } else if (attacker.type === 'quad') {
         // Quad Cannon 4x23mm Autocannon Salvo!
         [-0.22, 0.22].forEach(xOff => {
-            const mPos = getMuzzleWorldPosition(attacker, xOff);
-            spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
-            spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.5);
+                const mPos = getMuzzleWorldPosition(attacker, xOff);
+                spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
+                spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.5);
         });
         let qDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apBullets')) ? 40 : 32;
         if (attacker.salvageLevel >= 1) qDmg = Math.round(qDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
@@ -941,20 +941,20 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, blastDmg, isBio ? 'TOXIN' : 'EXPLOSIVE');
         const splashPool = attacker.isAI ? [...units, ...structures] : [...enemyUnits, ...enemyStructures];
         splashPool.forEach(other => {
-            if (other !== target && other.health > 0) {
-                const op = other.position || (other.mesh && other.mesh.position);
-                if (op && op.distanceTo(targetPos) <= blastRad) {
-                    applyCalculatedDamage(attacker, other, Math.round(blastDmg * 0.65), isBio ? 'TOXIN' : 'EXPLOSIVE');
+                if (other !== target && other.health > 0) {
+                    const op = other.position || (other.mesh && other.mesh.position);
+                    if (op && op.distanceTo(targetPos) <= blastRad) {
+                        applyCalculatedDamage(attacker, other, Math.round(blastDmg * 0.65), isBio ? 'TOXIN' : 'EXPLOSIVE');
+                    }
                 }
-            }
         });
         attacker.health = 0;
     } else if (attacker.type === 'mob') {
         // GLA Angry Mob: Multi-tracer AK-47 volley + Molotov Cocktails!
         [-0.35, 0, 0.35].forEach(off => {
-            const mPos = getMuzzleWorldPosition(attacker, off);
-            spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
-            spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.2);
+                const mPos = getMuzzleWorldPosition(attacker, off);
+                spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
+                spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.2);
         });
         playAudio('ak47', {}, 'gla');
         const hasAKs = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('armTheMob'));
@@ -979,9 +979,9 @@ function executeWeaponFire(attacker, target) {
             const rocketPos = rackNode ? rackNode.getWorldPosition(new THREE.Vector3()) : muzzlePos;
             const scRocketDmg = (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('apRockets')) ? 48 : 38;
             setTimeout(() => {
-                if (typeof playUSASound === 'function') playUSASound('missile_launch');
-                spawnRocketProjectile(rocketPos, targetPos, false, false, { attacker, target, damage: scRocketDmg, damageType: 'EXPLOSIVE' });
-            }, 120);
+                    if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                    spawnRocketProjectile(rocketPos, targetPos, false, false, { attacker, target, damage: scRocketDmg, damageType: 'EXPLOSIVE' });
+                }, 120);
         }
         if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
             if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
@@ -1047,17 +1047,17 @@ function activateBlueprint(type) {
         const previewMesh = createStructureMeshForFaction(type, f);
         if (previewMesh) {
             const wireMat = new THREE.MeshBasicMaterial({
-                color: 0x00ffcc,
-                wireframe: true,
-                transparent: true,
-                opacity: 0.55
+                    color: 0x00ffcc,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.55
             });
             previewMesh.traverse(child => {
-                if (child.isMesh) {
-                    child.material = wireMat;
-                    child.castShadow = false;
-                    child.receiveShadow = false;
-                }
+                    if (child.isMesh) {
+                        child.material = wireMat;
+                        child.castShadow = false;
+                        child.receiveShadow = false;
+                    }
             });
             previewMesh.name = "blueprintModel";
             group.add(previewMesh);
@@ -1153,9 +1153,9 @@ function updateBlueprintPosition(intersectPoint) {
 
     const colorHex = isBlueprintValid ? 0x00ffcc : 0xff4757;
     blueprintMesh.traverse(child => {
-        if (child.material && child.material.color) {
-            child.material.color.setHex(colorHex);
-        }
+            if (child.material && child.material.color) {
+                child.material.color.setHex(colorHex);
+            }
     });
 }
 let aiProductionTick = 0;

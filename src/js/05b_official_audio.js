@@ -24,15 +24,15 @@ function loadOfficialAudioGroup(group) {
     }
     const url = new URL('src/audio/' + group + '.json', document.baseURI);
     window.OFFICIAL_AUDIO_LOADS[group] = fetch(url).then(response => {
-        if (!response.ok) throw new Error('Audio catalog request failed: ' + response.status);
-        return response.json();
+            if (!response.ok) throw new Error('Audio catalog request failed: ' + response.status);
+            return response.json();
     }).then(entries => {
-        Object.assign(window.OFFICIAL_AUDIO_DATA, entries);
-        return entries;
+            Object.assign(window.OFFICIAL_AUDIO_DATA, entries);
+            return entries;
     }).catch(error => {
-        delete window.OFFICIAL_AUDIO_LOADS[group];
-        console.warn('Could not load official audio catalog: ' + group, error);
-        return {};
+            delete window.OFFICIAL_AUDIO_LOADS[group];
+            console.warn('Could not load official audio catalog: ' + group, error);
+            return {};
     });
     return window.OFFICIAL_AUDIO_LOADS[group];
 }
@@ -133,11 +133,11 @@ function playUnitVoice(unitType, action = 'select', faction = null) {
     ];
 
     loadOfficialAudioGroup(getOfficialAudioGroup(candidates[0], fac)).then(entries => {
-        const available = candidates.filter(key => entries[key]);
-        if (available.length) {
-            const chosen = available[Math.floor(Math.random() * available.length)];
-            (window.playOfficialSound || playOfficialSound)(chosen, 0.90, fac);
-        }
+            const available = candidates.filter(key => entries[key]);
+            if (available.length) {
+                const chosen = available[Math.floor(Math.random() * available.length)];
+                (window.playOfficialSound || playOfficialSound)(chosen, 0.90, fac);
+            }
     });
 }
 
@@ -203,17 +203,17 @@ function playUnitReadySound(unitType, faction = null) {
 
     const evaKey = 'eva_' + fac + '_unit_ready';
     loadOfficialAudioGroup(fac).then(entries => {
-        const hasUnitVoice = unitKey && entries[unitKey];
-        const hasEvaVoice = entries[evaKey];
-        const playSound = (typeof window !== 'undefined' && window.playOfficialSound) || playOfficialSound;
-        if (hasUnitVoice && hasEvaVoice) {
-            // Authentic mix: 60% unit callout, 40% faction EVA "Unit ready"
-            playSound(Math.random() < 0.6 ? unitKey : evaKey, 0.95, fac);
-        } else if (hasUnitVoice || hasEvaVoice) {
-            playSound(hasUnitVoice ? unitKey : evaKey, 0.95, fac);
-        } else if (typeof playUSASound === 'function') {
-            playUSASound('construction');
-        }
+            const hasUnitVoice = unitKey && entries[unitKey];
+            const hasEvaVoice = entries[evaKey];
+            const playSound = (typeof window !== 'undefined' && window.playOfficialSound) || playOfficialSound;
+            if (hasUnitVoice && hasEvaVoice) {
+                // Authentic mix: 60% unit callout, 40% faction EVA "Unit ready"
+                playSound(Math.random() < 0.6 ? unitKey : evaKey, 0.95, fac);
+            } else if (hasUnitVoice || hasEvaVoice) {
+                playSound(hasUnitVoice ? unitKey : evaKey, 0.95, fac);
+            } else if (typeof playUSASound === 'function') {
+                playUSASound('construction');
+            }
     });
 }
 
@@ -233,8 +233,8 @@ function playBuildingCompleteSound(structureType, faction = null) {
     }
     const evaKey = 'eva_' + fac + '_construction_complete';
     loadOfficialAudioGroup(fac).then(entries => {
-        if (entries[evaKey]) playSound(evaKey, 0.95, fac);
-        else if (typeof playUSASound === 'function') playUSASound('construction');
+            if (entries[evaKey]) playSound(evaKey, 0.95, fac);
+            else if (typeof playUSASound === 'function') playUSASound('construction');
     });
 }
 

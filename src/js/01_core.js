@@ -1,71 +1,70 @@
 
-        let scene, camera, renderer, groundPlane;
-        let units = [], structures = [];
-        let selectedStructure = null;
-        const healthBarElements = new Map();
-        let playerResources = 1200;
-        let selectedFaction = 'usa';
-        let choosingBaseLocation = false;
-        
-        let supplyCenterPos = typeof THREE !== 'undefined' ? new THREE.Vector3(-30, 0, -20) : { x: -30, y: 0, z: -20 };
-        const supplyPoints = [];
-        let activeCustomMap = null;
-        let savedCustomMaps = {};
-        let researchedTechs = new Set();
+let scene, camera, renderer, groundPlane;
+let units = [], structures = [];
+let selectedStructure = null;
+const healthBarElements = new Map();
+let playerResources = 1200;
+let selectedFaction = 'usa';
+let choosingBaseLocation = false;
 
-        let currentWaterLevel = -1.2;
-        const mapBridges = []; // Array of bridge bounding areas: { position, width, length, rotationY, deckY }
-        let randomMapSeed = 42;
-        let randomMapRiverFreq = 0.015;
-        let selectedSupplyPoint = null;
-        let activeBlueprintType = null;
-        let blueprintMesh = null;
-        let isBlueprintValid = true;
-        let aiDecisionTimer = 0;
-        const AI_TICK_RATE = 60; // AI reassesses tactical targets every 60 frames (~1 second) to maintain high performance
-        let buildingTick = 0;
-        let battlePlan = 'balanced';
-        let pendingSuperweapon = null;
-        let intelTimer = 0;
-        const landmines = [];
+let supplyCenterPos = typeof THREE !== 'undefined' ? new THREE.Vector3(-30, 0, -20) : { x: -30, y: 0, z: -20 };
+const supplyPoints = [];
+let activeCustomMap = null;
+let savedCustomMaps = {};
+let researchedTechs = new Set();
+
+let currentWaterLevel = -1.2;
+const mapBridges = []; // Array of bridge bounding areas: { position, width, length, rotationY, deckY }
+let randomMapSeed = 42;
+let randomMapRiverFreq = 0.015;
+let selectedSupplyPoint = null;
+let activeBlueprintType = null;
+let blueprintMesh = null;
+let isBlueprintValid = true;
+let aiDecisionTimer = 0;
+const AI_TICK_RATE = 60; // AI reassesses tactical targets every 60 frames (~1 second) to maintain high performance
+let buildingTick = 0;
+let battlePlan = 'balanced';
+let pendingSuperweapon = null;
+let intelTimer = 0;
+const landmines = [];
 
 
-        let cameraTarget = typeof THREE !== 'undefined' ? new THREE.Vector3(0, 0, 0) : { x: 0, y: 0, z: 0 };
-        let cameraRadius = 115;
-        let cameraAlpha = -Math.PI / 4; 
-        let cameraBeta = Math.PI / 3;  
-        const panSpeed = 0.7;
-        const zoomSpeed = 2.5;
-        const keysPressed = {};
-        let isRotatingCamera = false;
-        let previousMousePosition = { x: 0, y: 0 };
-		let enemyUnits = []; // Holds hostile AI entities
+let cameraTarget = typeof THREE !== 'undefined' ? new THREE.Vector3(0, 0, 0) : { x: 0, y: 0, z: 0 };
+let cameraRadius = 115;
+let cameraAlpha = -Math.PI / 4;
+let cameraBeta = Math.PI / 3;
+const panSpeed = 0.7;
+const zoomSpeed = 2.5;
+const keysPressed = {};
+let isRotatingCamera = false;
+let previousMousePosition = { x: 0, y: 0 };
+let enemyUnits = []; // Holds hostile AI entities
 
-        let isDragging = false;
-        let startPoint = { x: 0, y: 0 };
-        const selectionBox = document.getElementById('selection-box');
-        const selectionStatus = {
-            set textContent(val) { showNotification(val); },
-            set innerHTML(val) { showNotification(val); },
-            get textContent() { return document.getElementById('tactical-message')?.textContent || ''; }
-        };
-        const progressContainer = document.getElementById('build-progress');
-        const progressFill = document.getElementById('build-progress-fill');
-        const raycaster = typeof THREE !== 'undefined' ? new THREE.Raycaster() : null;
-        const mouse = typeof THREE !== 'undefined' ? new THREE.Vector2() : { x: 0, y: 0 };
+let isDragging = false;
+let startPoint = { x: 0, y: 0 };
+const selectionBox = document.getElementById('selection-box');
+const selectionStatus = {
+    set textContent(val) { showNotification(val); },
+    set innerHTML(val) { showNotification(val); },
+    get textContent() { return document.getElementById('tactical-message')?.textContent || ''; }
+};
+const progressContainer = document.getElementById('build-progress');
+const progressFill = document.getElementById('build-progress-fill');
+const raycaster = typeof THREE !== 'undefined' ? new THREE.Raycaster() : null;
+const mouse = typeof THREE !== 'undefined' ? new THREE.Vector2() : { x: 0, y: 0 };
 
-        // Deterministic Seeded PRNG (Mulberry32) for Skirmish / Multiplayer simulation consistency
-        let _simRngState = 0x6D2B79F5;
-        function setSimSeed(seed) {
-            _simRngState = (Number(seed) >>> 0) || 0x6D2B79F5;
-        }
-        function simRandom() {
-            let t = _simRngState += 0x6D2B79F5;
-            t = Math.imul(t ^ (t >>> 15), t | 1);
-            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        }
-        const SIM_FIXED_HZ = 30;
-        const SIM_FIXED_DT = 1 / SIM_FIXED_HZ;
+// Deterministic Seeded PRNG (Mulberry32) for Skirmish / Multiplayer simulation consistency
+let _simRngState = 0x6D2B79F5;
+function setSimSeed(seed) {
+    _simRngState = (Number(seed) >>> 0) || 0x6D2B79F5;
+}
+function simRandom() {
+    let t = _simRngState += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const SIM_FIXED_HZ = 30;
+const SIM_FIXED_DT = 1 / SIM_FIXED_HZ;
 
-        

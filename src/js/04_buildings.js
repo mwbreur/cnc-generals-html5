@@ -9,8 +9,8 @@ function createUSACommandCenter(isEnemy = false) {
 
     // Hazard warning boundary border
     [-6.6, 6.6].forEach(x => {
-        const curb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 12.8), matHazard);
-        curb.position.set(x, 0.7, 0); g.add(curb);
+            const curb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 12.8), matHazard);
+            curb.position.set(x, 0.7, 0); g.add(curb);
     });
 
     // Helipad marked area with white 'H' and perimeter lights
@@ -26,10 +26,10 @@ function createUSACommandCenter(isEnemy = false) {
 
     // Helipad touchdown perimeter lights
     [-2.5, 2.5].forEach(x => {
-        [-2.5, 2.5].forEach(z => {
-            const light = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), matBeaconAmber);
-            light.position.set(3.5 + x, 0.72, 2.8 + z); g.add(light);
-        });
+            [-2.5, 2.5].forEach(z => {
+                    const light = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), matBeaconAmber);
+                    light.position.set(3.5 + x, 0.72, 2.8 + z); g.add(light);
+            });
     });
 
     // Main 2-story Operations Command Pavilion
@@ -63,11 +63,11 @@ function createUSACommandCenter(isEnemy = false) {
 
     // Perimeter security spotlights
     [-6.2, 6.2].forEach(x => {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.5, 6), matGunmetal);
-        post.position.set(x, 1.6, -5.5); g.add(post);
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.5, 6), matGunmetal);
+            post.position.set(x, 1.6, -5.5); g.add(post);
 
-        const spot = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 6), matWindowGlow);
-        spot.position.set(x, 2.8, -5.5); g.add(spot);
+            const spot = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 6), matWindowGlow);
+            spot.position.set(x, 2.8, -5.5); g.add(spot);
     });
 
     return g;
@@ -164,12 +164,12 @@ function createUSAWarFactory(isEnemy = false) {
 
     // Massive double roll-up industrial blast doors
     [-2.8, 2.8].forEach(x => {
-        const door = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.6, 0.18), matCorrugated);
-        door.position.set(x, 2.1, 4.62); g.add(door);
+            const door = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.6, 0.18), matCorrugated);
+            door.position.set(x, 2.1, 4.62); g.add(door);
 
-        // Yellow/black hazard clearance header
-        const header = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.35, 0.22), matHazard);
-        header.position.set(x, 4.05, 4.62); g.add(header);
+            // Yellow/black hazard clearance header
+            const header = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.35, 0.22), matHazard);
+            header.position.set(x, 4.05, 4.62); g.add(header);
     });
 
     // Rooftop overhead gantry crane rails & exhaust funnels
@@ -179,8 +179,8 @@ function createUSAWarFactory(isEnemy = false) {
     rail2.position.set(0, 5.5, 2.5); g.add(rail2);
 
     [-4.5, 4.5].forEach(x => {
-        const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1.2, 8), matDarkMetal);
-        vent.position.set(x, 5.8, -3.2); g.add(vent);
+            const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 1.2, 8), matDarkMetal);
+            vent.position.set(x, 5.8, -3.2); g.add(vent);
     });
 
     return g;
@@ -207,8 +207,8 @@ function createUSASupplyCenter(isEnemy = false) {
 
     // Stacked supply cargo crates on pallets
     [-2.2, -0.6].forEach(x => {
-        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.1, 1.2), matTarp);
-        crate.position.set(x, 1.05, 2.8); g.add(crate);
+            const crate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.1, 1.2), matTarp);
+            crate.position.set(x, 1.05, 2.8); g.add(crate);
     });
 
     return g;
@@ -230,14 +230,14 @@ function createUSASupplyDropZone(isEnemy = false) {
 
     // 4 Corner landing towers with orange strobe beacons (hazardBeacon)
     [-4.8, 4.8].forEach(x => {
-        [-4.8, 4.8].forEach(z => {
-            const tower = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.4, 0.7), matGunmetal);
-            tower.position.set(x, 0.9, z); g.add(tower);
+            [-4.8, 4.8].forEach(z => {
+                    const tower = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.4, 0.7), matGunmetal);
+                    tower.position.set(x, 0.9, z); g.add(tower);
 
-            const strobe = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 6), matBeaconAmber);
-            strobe.name = "hazardBeacon";
-            strobe.position.set(x, 1.7, z); g.add(strobe);
-        });
+                    const strobe = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 6), matBeaconAmber);
+                    strobe.name = "hazardBeacon";
+                    strobe.position.set(x, 1.7, z); g.add(strobe);
+            });
     });
 
     return g;
@@ -260,8 +260,8 @@ function createUSAAirfield(isEnemy = false) {
 
     // Aircraft parking hardstand tie-downs
     [-5.5, 5.5].forEach(x => {
-        const pad = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.06, 4.2), matConcrete);
-        pad.position.set(x, 0.29, 0); g.add(pad);
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.06, 4.2), matConcrete);
+            pad.position.set(x, 0.29, 0); g.add(pad);
     });
 
     // Control Tower with tinted glass observation cab
@@ -340,10 +340,10 @@ function createUSAPatriotSystem(isEnemy = false) {
 
     // 4 Missile launch tubes with red caps
     [-0.45, 0.45].forEach(x => {
-        [-0.22, 0.22].forEach(y => {
-            const cap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), matRedStar);
-            cap.position.set(x, 0.45 + y, 1.72); launcherBox.add(cap);
-        });
+            [-0.22, 0.22].forEach(y => {
+                    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), matRedStar);
+                    cap.position.set(x, 0.45 + y, 1.72); launcherBox.add(cap);
+            });
     });
 
     // Tracking radar dome on launcher side
@@ -480,8 +480,8 @@ function createChinaNuclearReactor(isEnemy = false) {
 
     // High-voltage transformer substation
     [-1.2, 1.2].forEach(z => {
-        const trans = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.8), matDarkMetal);
-        trans.position.set(4.5, 1.0, z); g.add(trans);
+            const trans = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.8), matDarkMetal);
+            trans.position.set(4.5, 1.0, z); g.add(trans);
     });
 
     return g;
@@ -528,14 +528,14 @@ function createChinaWarFactory(isEnemy = false) {
 
     // Dual industrial smokestacks
     [-4.5, -2.5].forEach(x => {
-        const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 3.8, 10), matDarkMetal);
-        stack.position.set(x, 6.8, -3.2); g.add(stack);
+            const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 3.8, 10), matDarkMetal);
+            stack.position.set(x, 6.8, -3.2); g.add(stack);
     });
 
     // Double heavy armored blast doors
     [-2.8, 2.8].forEach(x => {
-        const door = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.8, 0.2), matDarkMetal);
-        door.position.set(x, 2.2, 4.75); g.add(door);
+            const door = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.8, 0.2), matDarkMetal);
+            door.position.set(x, 2.2, 4.75); g.add(door);
     });
 
     return g;
@@ -610,14 +610,14 @@ function createChinaSpeakerTower(isEnemy = false) {
 
     // Multi-tier directional megaphone broadcast horns
     [4.8, 6.2].forEach(y => {
-        for (let i = 0; i < 4; i++) {
-            const horn = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.6, 8), matChinaColor);
-            horn.rotation.z = Math.PI / 2;
-            horn.rotation.y = (i * Math.PI) / 2;
-            const a = (i * Math.PI) / 2;
-            horn.position.set(Math.cos(a) * 0.4, y, Math.sin(a) * 0.4);
-            g.add(horn);
-        }
+            for (let i = 0; i < 4; i++) {
+                const horn = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.6, 8), matChinaColor);
+                horn.rotation.z = Math.PI / 2;
+                horn.rotation.y = (i * Math.PI) / 2;
+                const a = (i * Math.PI) / 2;
+                horn.position.set(Math.cos(a) * 0.4, y, Math.sin(a) * 0.4);
+                g.add(horn);
+            }
     });
 
     // Top warning beacon
@@ -645,10 +645,10 @@ function createChinaNukeSilo(isEnemy = false) {
 
     // Heavy hydraulic blast door panels
     [-2.2, 2.2].forEach((x, idx) => {
-        const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 6.8), matChina);
-        door.position.set(x, 0.8, 0);
-        door.name = idx === 0 ? "nukeBlastDoorL" : "nukeBlastDoorR";
-        g.add(door);
+            const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 6.8), matChina);
+            door.position.set(x, 0.8, 0);
+            door.name = idx === 0 ? "nukeBlastDoorL" : "nukeBlastDoorR";
+            g.add(door);
     });
 
     // Visible nuclear missile nose tip emerging from shaft
@@ -701,11 +701,11 @@ function createChinaAirfield(isEnemy = false) {
 
     // Dual PLA MiG hardened revetment hangars with red trim
     [-5.6, 5.6].forEach(x => {
-        const hangar = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 4.8, 12, 1, false, 0, Math.PI), matChina);
-        hangar.rotation.z = Math.PI / 2; hangar.position.set(x, 0.3, 0); hangar.castShadow = true; g.add(hangar);
+            const hangar = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 4.8, 12, 1, false, 0, Math.PI), matChina);
+            hangar.rotation.z = Math.PI / 2; hangar.position.set(x, 0.3, 0); hangar.castShadow = true; g.add(hangar);
 
-        const trim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 4.8), matRedStar);
-        trim.position.set(x, 2.4, 0); g.add(trim);
+            const trim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 4.8), matRedStar);
+            trim.position.set(x, 2.4, 0); g.add(trim);
     });
 
     // Control Tower
@@ -749,9 +749,9 @@ function createChinaInternetCenter(isEnemy = false) {
 
     // Multiple rotating satellite communication dishes
     [-2.6, 2.6].forEach((x, idx) => {
-        const dish = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), matDarkMetal);
-        dish.name = idx === 0 ? "radarDish" : "radarDish2";
-        dish.scale.set(1.3, 0.35, 1.0); dish.rotation.x = -Math.PI / 4; dish.position.set(x, 4.6, 0); g.add(dish);
+            const dish = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), matDarkMetal);
+            dish.name = idx === 0 ? "radarDish" : "radarDish2";
+            dish.scale.set(1.3, 0.35, 1.0); dish.rotation.x = -Math.PI / 4; dish.position.set(x, 4.6, 0); g.add(dish);
     });
 
     return g;
@@ -774,10 +774,10 @@ function createGLACommandCenter(isEnemy = false) {
 
     // 4 Corner watch bastions
     [-4.8, 4.8].forEach(x => {
-        [-4.2, 4.2].forEach(z => {
-            const bastion = new THREE.Mesh(new THREE.BoxGeometry(2.4, 5.2, 2.4), matGLA);
-            bastion.position.set(x, 2.88, z); bastion.castShadow = true; g.add(bastion);
-        });
+            [-4.2, 4.2].forEach(z => {
+                    const bastion = new THREE.Mesh(new THREE.BoxGeometry(2.4, 5.2, 2.4), matGLA);
+                    bastion.position.set(x, 2.88, z); bastion.castShadow = true; g.add(bastion);
+            });
     });
 
     // Camouflage netting overhang
@@ -834,8 +834,8 @@ function createGLAArmsDealer(isFake = false, isEnemy = false) {
 
     // Oil drums & scrap piles
     [-3.5, -2.2].forEach(x => {
-        const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.85, 8), matDarkMetal);
-        drum.position.set(x, 0.68, 3.8); g.add(drum);
+            const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.85, 8), matDarkMetal);
+            drum.position.set(x, 0.68, 3.8); g.add(drum);
     });
 
     return g;
@@ -858,8 +858,8 @@ function createGLASupplyStash(isEnemy = false) {
 
     // Stacked contraband wooden crates
     [-2.2, 0, 2.2].forEach(x => {
-        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9, 1.1), matWood);
-        crate.position.set(x, 0.7, 2.8); g.add(crate);
+            const crate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9, 1.1), matWood);
+            crate.position.set(x, 0.7, 2.8); g.add(crate);
     });
 
     return g;
@@ -903,11 +903,11 @@ function createGLATunnelNetwork(isEnemy = false) {
 
     // Twin machine gun firing nests with gun shields
     [-1.6, 1.6].forEach(x => {
-        const shield = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.55, 0.08), matGunmetal);
-        shield.position.set(x, 0.9, 2.2); g.add(shield);
+            const shield = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.55, 0.08), matGunmetal);
+            shield.position.set(x, 0.9, 2.2); g.add(shield);
 
-        const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.2, 8), matDarkMetal);
-        gun.rotation.x = Math.PI / 2; gun.position.set(x, 0.9, 2.7); g.add(gun);
+            const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.2, 8), matDarkMetal);
+            gun.rotation.x = Math.PI / 2; gun.position.set(x, 0.9, 2.7); g.add(gun);
     });
 
     return g;
@@ -949,8 +949,8 @@ function createGLADemoTrap() {
     ant.position.set(0, 1.45, 0); g.add(ant);
 
     [-0.35, 0.35].forEach(x => {
-        const dyn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 6), matRedStar);
-        dyn.position.set(x, 0.35, 0.35); g.add(dyn);
+            const dyn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 6), matRedStar);
+            dyn.position.set(x, 0.35, 0.35); g.add(dyn);
     });
 
     return g;
@@ -974,8 +974,8 @@ function createGLAPalace(isEnemy = false) {
 
     // Balcony sniper perches on corners
     [-4.5, 4.5].forEach(x => {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.6), matGLA);
-        post.position.set(x, 4.8, 2.8); g.add(post);
+            const post = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.6), matGLA);
+            post.position.set(x, 4.8, 2.8); g.add(post);
     });
 
     return g;
@@ -1175,4 +1175,3 @@ function createGLAHoleMesh(isEnemy = false) {
 
     return g;
 }
-        

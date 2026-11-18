@@ -1,173 +1,173 @@
-        function init() {
-            const container = document.getElementById('canvas-container');
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0c10);
-            scene.fog = new THREE.FogExp2(0x0a0c10, 0.0012);
+function init() {
+    const container = document.getElementById('canvas-container');
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0c10);
+    scene.fog = new THREE.FogExp2(0x0a0c10, 0.0012);
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2500);
-            updateCameraPosition();
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2500);
+    updateCameraPosition();
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0x445566, 1.3);
+    scene.add(ambientLight);
+    initProceduralTextures();
+    initSharedMaterials();
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    dirLight.position.set(60, 80, 40);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 420;
+    const d = 140;
+    dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.bias = -0.0004;
+    scene.add(dirLight);
+    if (dirLight.target) scene.add(dirLight.target);
+    window._mainDirLight = dirLight;
+
+    window.setGraphicsQuality = function(level) {
+        if (!renderer) return;
+        const lvl = String(level || 'medium').toLowerCase();
+        if (lvl === 'low') {
+            renderer.setPixelRatio(1);
+            renderer.shadowMap.enabled = false;
+        } else if (lvl === 'high') {
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        } else {
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFShadowMap;
-            container.appendChild(renderer.domElement);
-
-            const ambientLight = new THREE.AmbientLight(0x445566, 1.3);
-            scene.add(ambientLight);
-            initProceduralTextures();
-            initSharedMaterials();
-
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
-            dirLight.position.set(60, 80, 40);
-            dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 2048;
-            dirLight.shadow.mapSize.height = 2048;
-            dirLight.shadow.camera.near = 0.5;
-            dirLight.shadow.camera.far = 420;
-            const d = 140;
-            dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
-            dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
-            dirLight.shadow.bias = -0.0004;
-            scene.add(dirLight);
-            if (dirLight.target) scene.add(dirLight.target);
-            window._mainDirLight = dirLight;
-
-            window.setGraphicsQuality = function(level) {
-                if (!renderer) return;
-                const lvl = String(level || 'medium').toLowerCase();
-                if (lvl === 'low') {
-                    renderer.setPixelRatio(1);
-                    renderer.shadowMap.enabled = false;
-                } else if (lvl === 'high') {
-                    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-                    renderer.shadowMap.enabled = true;
-                    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                } else {
-                    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-                    renderer.shadowMap.enabled = true;
-                    renderer.shadowMap.type = THREE.PCFShadowMap;
-                }
-            };
-
-            groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-            initCustomMapsStorage();
-            refreshMapDropdowns();
-            initLobbySlots('single');
-            initLobbySlots('multiplayer');
-            initMapEditor();
-            setupMapEnvironment('tournament_desert', 1500);
-
-            window.addEventListener('pointerdown', onPointerDown);
-            window.addEventListener('pointermove', onPointerMove);
-            window.addEventListener('pointerup', onPointerUp);
-            window.addEventListener('wheel', onWindowWheel, { passive: false });
-            window.addEventListener('keydown', e => { keysPressed[e.key.toLowerCase()] = true; });
-            window.addEventListener('keyup', e => { keysPressed[e.key.toLowerCase()] = false; });
-            window.addEventListener('resize', onWindowResize);
-            window.addEventListener('contextmenu', e => e.preventDefault());
-
-            animate();
         }
+    };
 
-        function createSupplyFields() {
-            if (typeof supplyPoints !== 'undefined' && Array.isArray(supplyPoints)) supplyPoints.length = 0;
-            const crystalMaterial = new THREE.MeshStandardMaterial({ color: 0xc7a85a, roughness: 0.58, metalness: 0.12 });
-            const shadowCrystalMaterial = new THREE.MeshStandardMaterial({ color: 0x8d7846, roughness: 0.72 });
-            const crateMaterial = new THREE.MeshStandardMaterial({ color: 0x66533a, roughness: 0.9 });
-            const barrelMaterial = new THREE.MeshStandardMaterial({ color: 0x9a814c, roughness: 0.55, metalness: 0.35 });
-            const padMaterial = new THREE.MeshStandardMaterial({ color: 0x363b30, roughness: 1 });
-            const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xd4b45e, transparent: true, opacity: 0.42, side: THREE.DoubleSide });
+    groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    initCustomMapsStorage();
+    refreshMapDropdowns();
+    initLobbySlots('single');
+    initLobbySlots('multiplayer');
+    initMapEditor();
+    setupMapEnvironment('tournament_desert', 1500);
 
-            // A 4-by-4 grid keeps resource fields distributed across the playable map.
-            for (let x = -240; x <= 240; x += 160) {
-                for (let z = -240; z <= 240; z += 160) {
-                    const position = new THREE.Vector3(x, 0, z);
-                    const field = new THREE.Group();
-                    const pad = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.8, 0.18, 20), padMaterial);
-                    pad.position.y = 0.06;
-                    pad.receiveShadow = true;
-                    field.add(pad);
-                    const marker = new THREE.Mesh(new THREE.RingGeometry(7.5, 8.1, 32), markerMaterial);
-                    marker.rotation.x = -Math.PI / 2;
-                    marker.position.y = 0.17;
-                    field.add(marker);
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('wheel', onWindowWheel, { passive: false });
+    window.addEventListener('keydown', e => { keysPressed[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', e => { keysPressed[e.key.toLowerCase()] = false; });
+    window.addEventListener('resize', onWindowResize);
+    window.addEventListener('contextmenu', e => e.preventDefault());
 
-                    const crystals = [];
-                    for (let i = 0; i < 7; i++) {
-                        const angle = i * 2.4;
-                        const crystal = new THREE.Mesh(
-                            new THREE.DodecahedronGeometry(0.85 + (i % 3) * 0.2, 0),
-                            i % 2 ? crystalMaterial : shadowCrystalMaterial
-                        );
-                        crystal.position.set(Math.cos(angle) * (2 + (i % 2)), 0.65 + (i % 3) * 0.15, Math.sin(angle) * (2 + (i % 2)));
-                        crystal.scale.y = 1.45;
-                        crystal.rotation.set(0.12 * i, angle, 0.08 * i);
-                        crystal.castShadow = true;
-                        field.add(crystal);
-                        crystals.push(crystal);
-                    }
+    animate();
+}
 
-                    for (let i = 0; i < 2; i++) {
-                        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.1, 1.2), crateMaterial);
-                        crate.position.set(i ? -4.4 : 4.2, 0.65, i ? 2.8 : -2.5);
-                        crate.rotation.y = i * 0.5;
-                        crate.castShadow = true;
-                        field.add(crate);
-                    }
-                    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 1.25, 10), barrelMaterial);
-                    barrel.position.set(4.4, 0.72, 3.8);
-                    barrel.castShadow = true;
-                    field.add(barrel);
+function createSupplyFields() {
+    if (typeof supplyPoints !== 'undefined' && Array.isArray(supplyPoints)) supplyPoints.length = 0;
+    const crystalMaterial = new THREE.MeshStandardMaterial({ color: 0xc7a85a, roughness: 0.58, metalness: 0.12 });
+    const shadowCrystalMaterial = new THREE.MeshStandardMaterial({ color: 0x8d7846, roughness: 0.72 });
+    const crateMaterial = new THREE.MeshStandardMaterial({ color: 0x66533a, roughness: 0.9 });
+    const barrelMaterial = new THREE.MeshStandardMaterial({ color: 0x9a814c, roughness: 0.55, metalness: 0.35 });
+    const padMaterial = new THREE.MeshStandardMaterial({ color: 0x363b30, roughness: 1 });
+    const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xd4b45e, transparent: true, opacity: 0.42, side: THREE.DoubleSide });
 
-                    field.position.copy(position);
-                    scene.add(field);
-                    supplyPoints.push({ position, mesh: field, crystals, stock: 8000, maxStock: 8000 }); // 4x supplies per depot
-                }
+    // A 4-by-4 grid keeps resource fields distributed across the playable map.
+    for (let x = -240; x <= 240; x += 160) {
+        for (let z = -240; z <= 240; z += 160) {
+            const position = new THREE.Vector3(x, 0, z);
+            const field = new THREE.Group();
+            const pad = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.8, 0.18, 20), padMaterial);
+            pad.position.y = 0.06;
+            pad.receiveShadow = true;
+            field.add(pad);
+            const marker = new THREE.Mesh(new THREE.RingGeometry(7.5, 8.1, 32), markerMaterial);
+            marker.rotation.x = -Math.PI / 2;
+            marker.position.y = 0.17;
+            field.add(marker);
+
+            const crystals = [];
+            for (let i = 0; i < 7; i++) {
+                const angle = i * 2.4;
+                const crystal = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.85 + (i % 3) * 0.2, 0),
+                    i % 2 ? crystalMaterial : shadowCrystalMaterial
+                );
+                crystal.position.set(Math.cos(angle) * (2 + (i % 2)), 0.65 + (i % 3) * 0.15, Math.sin(angle) * (2 + (i % 2)));
+                crystal.scale.y = 1.45;
+                crystal.rotation.set(0.12 * i, angle, 0.08 * i);
+                crystal.castShadow = true;
+                field.add(crystal);
+                crystals.push(crystal);
             }
-        }
 
-        function getSupplyDropoffPosition(unitPos = null) {
-            const dropoffs = structures.filter(s =>
-                !s.isBuilding && s.health > 0 &&
-                (s.type === 'center' || s.type === 'supplyCenter' || s.type === 'supplyStash')
-            );
-            if (dropoffs.length === 0) return supplyCenterPos;
-            if (!unitPos) {
-                const sc = dropoffs.find(s => s.type === 'supplyCenter' || s.type === 'supplyStash');
-                return sc ? sc.position : dropoffs[0].position;
+            for (let i = 0; i < 2; i++) {
+                const crate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.1, 1.2), crateMaterial);
+                crate.position.set(i ? -4.4 : 4.2, 0.65, i ? 2.8 : -2.5);
+                crate.rotation.y = i * 0.5;
+                crate.castShadow = true;
+                field.add(crate);
             }
-            let best = dropoffs[0];
-            let bestDist = Infinity;
-            for (const d of dropoffs) {
-                const dist = Math.hypot(unitPos.x - d.position.x, unitPos.z - d.position.z);
-                const weight = (d.type === 'supplyCenter' || d.type === 'supplyStash') ? 0.75 : 1.0;
-                if (dist * weight < bestDist) {
-                    bestDist = dist * weight;
-                    best = d;
-                }
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 1.25, 10), barrelMaterial);
+            barrel.position.set(4.4, 0.72, 3.8);
+            barrel.castShadow = true;
+            field.add(barrel);
+
+            field.position.copy(position);
+            scene.add(field);
+            supplyPoints.push({ position, mesh: field, crystals, stock: 8000, maxStock: 8000 }); // 4x supplies per depot
+        }
+    }
+}
+
+function getSupplyDropoffPosition(unitPos = null) {
+    const dropoffs = structures.filter(s =>
+        !s.isBuilding && s.health > 0 &&
+        (s.type === 'center' || s.type === 'supplyCenter' || s.type === 'supplyStash')
+    );
+    if (dropoffs.length === 0) return supplyCenterPos;
+    if (!unitPos) {
+        const sc = dropoffs.find(s => s.type === 'supplyCenter' || s.type === 'supplyStash');
+        return sc ? sc.position : dropoffs[0].position;
+    }
+    let best = dropoffs[0];
+    let bestDist = Infinity;
+    for (const d of dropoffs) {
+        const dist = Math.hypot(unitPos.x - d.position.x, unitPos.z - d.position.z);
+        const weight = (d.type === 'supplyCenter' || d.type === 'supplyStash') ? 0.75 : 1.0;
+        if (dist * weight < bestDist) {
+            bestDist = dist * weight;
+            best = d;
+        }
+    }
+    return best.position;
+}
+
+function findNearestSupplyPoint(position) {
+    let nearest = null;
+    let nearestDistance = Infinity;
+    supplyPoints.forEach(point => {
+            if (point.stock <= 0) return;
+            const distance = position.distanceTo(point.position);
+            if (distance < nearestDistance) {
+                nearest = point;
+                nearestDistance = distance;
             }
-            return best.position;
-        }
+    });
+    return nearest;
+}
 
-        function findNearestSupplyPoint(position) {
-            let nearest = null;
-            let nearestDistance = Infinity;
-            supplyPoints.forEach(point => {
-                if (point.stock <= 0) return;
-                const distance = position.distanceTo(point.position);
-                if (distance < nearestDistance) {
-                    nearest = point;
-                    nearestDistance = distance;
-                }
-            });
-            return nearest;
-        }
 
-        
-        // Procedural Textures and Materials for authentic C&C Generals visual style
-        // Module: Enhanced Textures and Materials
+// Procedural Textures and Materials for authentic C&C Generals visual style
+// Module: Enhanced Textures and Materials
 // High-resolution procedural textures with bump mapping, panel seams, rivets, stencils, and military shaders
 
 let texCamoUSA, texCamoChina, texCamoGLA, texHazard, texTread, texMetalPlate, texBumpPlate;
@@ -542,6 +542,6 @@ function initSharedMaterials() {
 let matEnemyHull, matEnemySkirt, matEnemyDark;
 
 
-        // Module: Enhanced Caterpillar Track Assembly
+// Module: Enhanced Caterpillar Track Assembly
 // High-detail tank track with dual roadwheels, rubber tires, hubcaps, toothed sprockets, return rollers, and side skirts
 
