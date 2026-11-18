@@ -3607,17 +3607,18 @@ function processBuildingFunctions() {
                         }
                     }
 
-                    // Patriot Network Linking: share target lock & extended range (62u) with nearby Patriots (<=55u)
+                    // Patriot Network Linking: share target lock & extended assist range (85u, matching official PatriotMissileAssistWeapon) with nearby Patriots (<=55u)
                     let target = null;
                     if (structure.type === 'patriot' && structure._sharedTarget && structure._sharedTarget.health > 0 && structure._sharedTarget.mesh) {
-                        if (structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 62) {
+                        if (structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 85) {
                             target = structure._sharedTarget;
                         }
                     }
                     if (!target) {
-                        const range = 45;
+                        const groundRange = 45;
+                        const airRange = (structure.type === 'patriot') ? 58 : 45;
                         // Patriots prioritize aircraft & vehicles; less effective against small infantry
-                        const inRange = enemyUnits.filter(enemy => enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(structure.position) < range);
+                        const inRange = enemyUnits.filter(enemy => enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(structure.position) < (enemy.isAir ? airRange : groundRange));
                         target = inRange.find(e => e.isAir) ||
                         inRange.find(e => typeof getArmorCategory !== 'function' || getArmorCategory(e) !== 'infantry') ||
                         inRange[0] || null;
@@ -3628,8 +3629,16 @@ function processBuildingFunctions() {
                             structures.forEach(other => {
                                     if (other !== structure && other.type === 'patriot' && !other.isBuilding && other.health > 0 && other.position.distanceTo(structure.position) <= 55) {
                                         other._sharedTarget = target;
+                                        if (typeof spawnLaserBeam === 'function' && (!structure._lastLinkPulse || buildingTick - structure._lastLinkPulse >= 20)) {
+                                            const p1 = structure.position.clone().add(new THREE.Vector3(0, 3.2, 0));
+                                            const p2 = other.position.clone().add(new THREE.Vector3(0, 3.2, 0));
+                                            spawnLaserBeam(p1, p2, 0x00e5ff, 1.4);
+                                        }
                                     }
                             });
+                            if (!structure._lastLinkPulse || buildingTick - structure._lastLinkPulse >= 20) {
+                                structure._lastLinkPulse = buildingTick;
+                            }
                         }
                         const targetPos = target.mesh.position.clone().add(new THREE.Vector3(0, target.isAir ? 0.3 : 0.5, 0));
                         if (structure.type === 'patriot') {
