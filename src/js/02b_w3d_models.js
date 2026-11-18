@@ -624,7 +624,9 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         }
 
         let mat = bldMat;
-        if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
+        if (buildingKey === 'usa_power' && (upper.includes('CYLINDER01') || upper.includes('CYLINDER02'))) {
+            mat = coldFusionGlowMat;
+        } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
             // Authentic metallic cooling tower / conduit finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
         } else if (upper.includes('HOUSECOLOR') || (upper.includes('BANNER') && !subTex)) {
@@ -666,6 +668,11 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     }
 
     if (buildingKey === 'usa_power') {
+        ['CYLINDER01', 'CYLINDER02'].forEach(cname => {
+            const cyl = root.getObjectByName(cname);
+            if (cyl) cyl.visible = false;
+        });
+
         // Official EA Control Rods W3D Sub-Model (ABPWRPLANT_A1.W3D)
         if (window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_power_upgrade']) {
             const upgData = window.W3D_BUILDING_DATA['usa_power_upgrade'];
@@ -674,7 +681,12 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 const [pname, parentIdx, tx, ty, tz] = p;
                 const grp = new THREE.Group();
                 grp.name = pname;
-                grp.position.set(tx, ty, tz);
+                if (pname === 'LINE01') {
+                    grp.position.set(-6.0, 27.2, -7.0);
+                    grp.rotation.y = Math.PI / 2;
+                } else {
+                    grp.position.set(tx, ty, tz);
+                }
                 upgPivots.push({ grp, parentIdx });
             });
             const upgRoot = new THREE.Group();
@@ -695,13 +707,13 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 const subTex = cleanT ? getW3dTexture(cleanT) : null;
                 let mMat = concreteMat;
                 if (cleanT === 'atpwrglow') {
-                    mMat = getCachedW3DMaterial('bld:usa_power_upgrade:atpwrglow_v2', () => new THREE.MeshStandardMaterial({
+                    mMat = getCachedW3DMaterial('bld:usa_power_upgrade:atpwrglow_v3', () => new THREE.MeshStandardMaterial({
                         ...(subTex ? { map: subTex, emissiveMap: subTex } : {}),
-                        color: subTex ? 0xffffff : 0x22ffaa,
-                        emissive: 0x00dd88,
-                        emissiveIntensity: 0.95,
-                        roughness: 0.25,
-                        metalness: 0.25,
+                        color: subTex ? 0xffffff : 0xc8ff00,
+                        emissive: 0x99ff00,
+                        emissiveIntensity: 1.45,
+                        roughness: 0.2,
+                        metalness: 0.2,
                         side: THREE.DoubleSide
                     }));
                 } else if (subTex) {

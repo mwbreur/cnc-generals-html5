@@ -3178,6 +3178,10 @@ function attachControlRodsVisual(structure) {
                     child.position.y = 31.2;
                 } else if (child.name === 'controlRodCore') {
                     child.visible = true;
+                } else if (child.name === 'CYLINDER01' || child.name === 'CYLINDER02') {
+                    child.visible = true;
+                    if (child.userData.baseY === undefined) child.userData.baseY = child.position.y;
+                    child.position.y = child.userData.baseY + 5.0;
                 }
         });
         return;
