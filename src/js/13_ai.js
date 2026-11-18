@@ -708,10 +708,10 @@ function evaluateEnemyThreatProfile(cmd, hostileUnits) {
 window.evaluateEnemyThreatProfile = evaluateEnemyThreatProfile;
 
 // Distance-Weighted Target Attack Priority (AI.h AttackPriorityDistanceModifier)
-const AI_AA_CAPABLE_TYPES = new Set(['gatling', 'quad', 'patriot', 'stingerSite', 'avenger', 'missiledefender', 'tankhunter', 'rpg', 'raptor', 'mig', 'comanche', 'stealthfighter', 'humvee']);
+const AI_AA_CAPABLE_TYPES = new Set(['gatling', 'gatlingTank', 'gatlingCannon', 'quad', 'patriot', 'stingerSite', 'avenger', 'rocket', 'missiledefender', 'tankhunter', 'rpg', 'raptor', 'mig', 'comanche', 'humvee']);
 function scoreAITargetPriority(attacker, target, cmd = null) {
     if (!attacker || !target || target.health <= 0) return -Infinity;
-    if (target.isAir && !AI_AA_CAPABLE_TYPES.has(attacker.type) && !(attacker.type === 'overlord' && attacker.overlordUpgrade === 'gatling')) {
+    if (typeof canUnitTarget === 'function' ? (!canUnitTarget(attacker, target) && !(attacker.type === 'overlord' && attacker.overlordUpgrade === 'gatling')) : (target.isAir && !AI_AA_CAPABLE_TYPES.has(attacker.type) && !(attacker.type === 'overlord' && attacker.overlordUpgrade === 'gatling'))) {
         return -Infinity;
     }
     const aPos = attacker.position || (attacker.mesh && attacker.mesh.position) || { x: 0, z: 0 };

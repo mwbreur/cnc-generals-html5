@@ -1660,7 +1660,7 @@ body.control-bar-collapsed #generals-command-bar {
 .general-powers-bar {
     position: fixed;
     right: 16px;
-    bottom: 200px;
+    top: 56px;
     display: flex;
     flex-direction: column;
     gap: 8px;

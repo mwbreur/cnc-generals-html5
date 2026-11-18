@@ -2707,7 +2707,8 @@ function processEnemyCombat() {
             const targetRadius = target.radius || 0;
             const distToTarget = enemy.mesh.position.distanceTo(targetPos);
             const minRange = (enemy.type === 'tomahawk' || enemy.type === 'nukecannon' || enemy.type === 'nuketank') ? (enemy.minRange || 16.0) : 0;
-            if (distToTarget <= (enemy.scanRange + targetRadius) && distToTarget >= minRange && !(enemy.type === 'tomahawk' && target.isAir) && enemy.attackCooldown === 0) {
+            const canHitTarget = (typeof canUnitTarget === 'function') ? canUnitTarget(enemy, target) : !(enemy.type === 'tomahawk' && target.isAir);
+        if (distToTarget <= (enemy.scanRange + targetRadius) && distToTarget >= minRange && canHitTarget && enemy.attackCooldown === 0) {
                 const turret = getCachedNode(enemy.mesh, "turretSystem");
                 if (turret && turret.parent) {
                     const localTarget = turret.parent.worldToLocal(targetPos.clone());

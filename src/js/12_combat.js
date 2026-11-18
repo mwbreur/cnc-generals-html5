@@ -1,3 +1,21 @@
+const AA_CAPABLE_UNITS = new Set([
+    'rocket', 'missiledefender', 'humvee', 'patriot', 'avenger',
+    'tankhunter', 'gatling', 'gatlingTank', 'gatlingCannon',
+    'rpg', 'quad', 'stingerSite',
+    'raptor', 'mig', 'comanche'
+]);
+const GROUND_ONLY_AIRCRAFT = new Set(['aurora', 'stealthfighter']);
+
+function canUnitTarget(attacker, target) {
+    if (!attacker || !target) return false;
+    if (target.isAir) {
+        if (GROUND_ONLY_AIRCRAFT.has(attacker.type)) return false;
+        return AA_CAPABLE_UNITS.has(attacker.type);
+    }
+    return true;
+}
+if (typeof window !== 'undefined') window.canUnitTarget = canUnitTarget;
+
 let _combatScanTick = 0;
 function processCombatScanning() {
     _combatScanTick++;
@@ -45,7 +63,7 @@ function processCombatScanning() {
                 const maxEffectiveRange = unit.scanRange * garrisonRangeMult + targetRadius;
                 const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
 
-                if ((unit.type === 'tomahawk' && unit.combatTarget.isAir) || distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
+                if (!canUnitTarget(unit, unit.combatTarget) || distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
                     unit.combatTarget = null; // Target lost, too close for siege artillery, or destroyed
                 } else {
                     // Point Turret systems directly at target coordinates
@@ -129,7 +147,7 @@ function processCombatScanning() {
                     for (let ei = 0; ei < enemyUnits.length; ei++) {
                         const enemy = enemyUnits[ei];
                         if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
-                            if (unit.type === 'tomahawk' && enemy.isAir) continue;
+                            if (!canUnitTarget(unit, enemy)) continue;
                             const ep = enemy.mesh.position;
                             const dx = uPos.x - ep.x, dz = uPos.z - ep.z;
                             const effR = unit.scanRange + (enemy.radius || 0);
@@ -467,8 +485,8 @@ function checkVeterancyPromotion(unit) {
 }
 
 function executeWeaponFire(attacker, target) {
-    // Never fire weapon or deal damage to friendly teammates / allies!
-    if (!attacker || !target || isFriendly(attacker, target)) {
+    // Never fire weapon or deal damage to friendly teammates / allies or invalid air/ground targets!
+    if (!attacker || !target || isFriendly(attacker, target) || !canUnitTarget(attacker, target)) {
         if (attacker && attacker.combatTarget === target) attacker.combatTarget = null;
         return;
     }
