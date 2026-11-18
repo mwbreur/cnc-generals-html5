@@ -1953,25 +1953,25 @@ function issueMoveCommand(e) {
                             unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'attacking';
                             unit.targetPosition.copy(targetPos);
                             unit.patrolCenter.copy(targetPos);
-                        }
-
-                        const distToEnemy = unit.mesh.position.distanceTo(targetPos);
-                        const desiredRange = unit.scanRange + targetRadius - 3;
-
-                        if (distToEnemy > desiredRange) {
-                            const approachVector = new THREE.Vector3()
-                            .subVectors(targetPos, unit.mesh.position)
-                            .normalize();
-
-                            // Fan out units around building perimeter to avoid collision bunching
-                            const fanAngle = (idx % 5 - 2) * 0.22;
-                            approachVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), fanAngle);
-
-                            const destX = targetPos.x - approachVector.x * desiredRange;
-                            const destZ = targetPos.z - approachVector.z * desiredRange;
-                            unit.targetPosition.set(destX, getTerrainHeight(destX, destZ), destZ);
                         } else {
-                            unit.targetPosition.copy(unit.mesh.position);
+                            const distToEnemy = unit.mesh.position.distanceTo(targetPos);
+                            const desiredRange = unit.scanRange + targetRadius - 3;
+
+                            if (distToEnemy > desiredRange) {
+                                const approachVector = new THREE.Vector3()
+                                .subVectors(targetPos, unit.mesh.position)
+                                .normalize();
+
+                                // Fan out units around building perimeter to avoid collision bunching
+                                const fanAngle = (idx % 5 - 2) * 0.22;
+                                approachVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), fanAngle);
+
+                                const destX = targetPos.x - approachVector.x * desiredRange;
+                                const destZ = targetPos.z - approachVector.z * desiredRange;
+                                unit.targetPosition.set(destX, getTerrainHeight(destX, destZ), destZ);
+                            } else {
+                                unit.targetPosition.copy(unit.mesh.position);
+                            }
                         }
 
                         if (unit.type === 'truck' || unit.type === 'worker') {

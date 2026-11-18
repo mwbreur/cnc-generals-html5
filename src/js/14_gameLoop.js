@@ -1756,9 +1756,9 @@ function animate() {
                 }
 
                 // 4. Attacking an Enemy Target
-                if (unit.airState === 'attacking' && unit.combatTarget) {
-                    const tPos = unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position);
-                    if (!tPos || unit.combatTarget.health <= 0) {
+                if (unit.airState === 'attacking') {
+                    const tPos = unit.combatTarget && (unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position));
+                    if (!unit.combatTarget || !tPos || unit.combatTarget.health <= 0) {
                         unit.combatTarget = null;
                         unit.planeAttackPhase = null;
                         if (isHeli) {

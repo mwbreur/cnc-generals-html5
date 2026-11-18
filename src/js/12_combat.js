@@ -67,8 +67,13 @@ function processCombatScanning() {
                 const maxEffectiveRange = unit.scanRange * garrisonRangeMult + targetRadius;
                 const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
 
-                if (!canUnitTarget(unit, unit.combatTarget) || distance > maxEffectiveRange || distance < minEffectiveRange || unit.combatTarget.health <= 0) {
-                    unit.combatTarget = null; // Target lost, too close for siege artillery, or destroyed
+                if (!canUnitTarget(unit, unit.combatTarget) || unit.combatTarget.health <= 0) {
+                    unit.combatTarget = null; // Target invalid, untargetable, or destroyed
+                } else if (distance > maxEffectiveRange || distance < minEffectiveRange) {
+                    // Keep explicit MovingToAttack targets while approaching from out of range
+                    if (unit.taskState !== 'MovingToAttack') {
+                        unit.combatTarget = null; // Out of range or too close for siege artillery
+                    }
                 } else {
                     // Point Turret systems directly at target coordinates
                     const turret = getCachedNode(unit.mesh, "turretSystem");
