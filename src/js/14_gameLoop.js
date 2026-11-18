@@ -985,7 +985,7 @@ function animate() {
                 if (!s._pulseMeshes) {
                     s._pulseMeshes = [];
                     s.mesh.traverse(c => {
-                            if (c.isMesh && c.name && c.name.toLowerCase().includes('cylinder')) s._pulseMeshes.push(c);
+                            if (c.isMesh && c.name && c.name.toLowerCase().includes('power glow')) s._pulseMeshes.push(c);
                     });
                 }
                 for (let i = 0; i < s._pulseMeshes.length; i++) {

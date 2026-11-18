@@ -3162,16 +3162,6 @@ function attachControlRodsVisual(structure) {
                     child.position.y = 31.2;
                 } else if (child.name === 'controlRodCore') {
                     child.visible = true;
-                } else if (child.name === 'CYLINDER01' || child.name === 'CYLINDER02') {
-                    child.visible = true;
-                    if (child.userData.baseY === undefined) child.userData.baseY = child.position.y;
-                    child.position.y = child.userData.baseY + 11.5;
-                } else if (child.isMesh && child.userData && child.userData.isColdFusionConduit && child.material) {
-                    child.material.color.setHex(0xb8ff00);
-                    if (child.material.emissive) child.material.emissive.setHex(0x88ee00);
-                    child.material.emissiveIntensity = 1.4;
-                    child.material.roughness = 0.25;
-                    child.material.metalness = 0.4;
                 }
         });
         return;

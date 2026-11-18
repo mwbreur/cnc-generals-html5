@@ -619,21 +619,8 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         }
 
         let mat = bldMat;
-        let isColdFusionConduit = false;
-        if (buildingKey === 'usa_power' && (upper.includes('CYLINDER01') || upper.includes('CYLINDER02') || upper.includes('CYLINDER'))) {
-            mat = coldFusionGlowMat;
-        } else if (buildingKey === 'usa_power' && (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2')))) {
-            // Dormant metallic conduit until Control Rods upgrade is installed
-            mat = new THREE.MeshStandardMaterial({
-                color: 0x3b4856,
-                emissive: 0x000000,
-                emissiveIntensity: 0,
-                roughness: 0.45,
-                metalness: 0.45
-            });
-            isColdFusionConduit = true;
-        } else if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
-            // Authentic metallic cooling tower finish - eliminates zebra stripes!
+        if (upper.includes('GRADIENT2') || (mdata.tex && mdata.tex.toLowerCase().includes('gradient2'))) {
+            // Authentic metallic cooling tower / conduit finish - eliminates zebra stripes!
             mat = new THREE.MeshStandardMaterial({ color: 0x585d64, roughness: 0.55, metalness: 0.25 });
         } else if (upper.includes('HOUSECOLOR') || (upper.includes('BANNER') && !subTex)) {
             mat = accentMat;
@@ -660,7 +647,6 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
         mesh.name = meshName;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        if (isColdFusionConduit) mesh.userData.isColdFusionConduit = true;
 
         if (pivotGroups[boneIdx]) {
             pivotGroups[boneIdx].grp.add(mesh);
@@ -675,13 +661,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
     }
 
     if (buildingKey === 'usa_power') {
-        // Control Rods cylinders, glowing core, and raised cap remain retracted/off until Control Rods upgrade is purchased
-        ['CYLINDER01', 'CYLINDER02'].forEach(cname => {
-            const cyl = root.getObjectByName(cname);
-            if (cyl) cyl.visible = false;
-        });
-
-        // Official EA Control Rods W3D Sub-Model (ABPWRPLANT_A1.W3D + atpwrglow.dds)
+        // Official EA Control Rods W3D Sub-Model (ABPWRPLANT_A1.W3D)
         if (window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_power_upgrade']) {
             const upgData = window.W3D_BUILDING_DATA['usa_power_upgrade'];
             const upgPivots = [];
@@ -709,10 +689,16 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 const cleanT = mdata.tex ? mdata.tex.toLowerCase().replace('.tga', '').replace('.dds', '') : '';
                 const subTex = cleanT ? getW3dTexture(cleanT) : null;
                 let mMat = concreteMat;
-                if (cleanT === 'atpwrglow' && subTex) {
-                    mMat = getCachedW3DMaterial('bld:usa_power_upgrade:atpwrglow', () => new THREE.MeshStandardMaterial({
-                        map: subTex, emissive: 0xffffff, emissiveMap: subTex, emissiveIntensity: 1.25,
-                        roughness: 0.25, metalness: 0.2, side: THREE.DoubleSide
+                if (cleanT === 'atpwrglow') {
+                    mMat = getCachedW3DMaterial('bld:usa_power_upgrade:atpwrglow_v2', () => new THREE.MeshStandardMaterial({
+                        map: subTex || undefined,
+                        color: subTex ? 0xffffff : 0x22ffaa,
+                        emissive: 0x00dd88,
+                        emissiveMap: subTex || undefined,
+                        emissiveIntensity: 0.95,
+                        roughness: 0.25,
+                        metalness: 0.25,
+                        side: THREE.DoubleSide
                     }));
                 } else if (subTex) {
                     mMat = getCachedW3DMaterial('bld:usa_power_upgrade:sub:' + cleanT, () => new THREE.MeshStandardMaterial({
