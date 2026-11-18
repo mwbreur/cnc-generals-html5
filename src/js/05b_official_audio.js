@@ -43,19 +43,21 @@ function preloadSkirmishAudio(faction = null) {
 }
 
 function playOfficialSound(soundKey, volume = 0.85, faction = null) {
-    if (!soundKey) return;
+    if (!soundKey) return false;
     const play = () => {
         const data = window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey];
-        if (!data) return;
+        if (!data) return false;
         try {
             const audio = new Audio(data);
             audio.volume = Math.max(0, Math.min(1, volume));
             const result = audio.play();
             if (result && result.catch) result.catch(() => {});
-        } catch (error) { /* Audio is optional when unavailable. */ }
+            return true;
+        } catch (error) { return false; }
     };
     if (window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey]) return play();
     loadOfficialAudioGroup(getOfficialAudioGroup(soundKey, faction)).then(play);
+    return true;
 }
 /**
  * Authentic Unit Voice Lines with Multiple Random Variations

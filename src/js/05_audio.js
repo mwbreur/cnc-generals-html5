@@ -174,6 +174,27 @@ function playAudio(type, options = {}, faction = null) {
                 }
                 break;
             }
+            case 'sniper_rifle': {
+                const bSize = Math.floor(ctx.sampleRate * 0.14);
+                const buf = ctx.createBuffer(1, bSize, ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < bSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.022));
+                const src = ctx.createBufferSource(); src.buffer = buf;
+                const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1200;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.45, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+                src.connect(f); f.connect(g); g.connect(ctx.destination);
+                src.start(t);
+
+                const osc = ctx.createOscillator(); const og = ctx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(750, t); osc.frequency.exponentialRampToValueAtTime(140, t + 0.09);
+                og.gain.setValueAtTime(0.28, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                osc.connect(og); og.connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.10);
+                break;
+            }
+            case 'tomahawk_launch':
             case 'missile_launch': {
                 const bSize = Math.floor(ctx.sampleRate * 0.45);
                 const buf = ctx.createBuffer(1, bSize, ctx.sampleRate);

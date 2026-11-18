@@ -568,7 +568,7 @@ function spawnLingeringSmokeColumn(pos, duration = 240, color = 0x2d3436) {
 
 // Multi-stage Particle Explosion (C&C Generals style)
 function spawnEnhancedExplosion(pos, color = 0xffa502, scale = 1.0, isHeavy = false) {
-    playUSASound('explosion');
+    playUSASound(isHeavy ? 'aurora_bomb' : 'explosion');
 
     const fireTex = _getFxSpriteTex('fireball');
     const flashTex = _getFxSpriteTex('flash');

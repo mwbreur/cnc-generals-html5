@@ -858,7 +858,7 @@ function executeWeaponFire(attacker, target) {
         // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry, Jarmen Kell also snipes vehicle drivers!)
         spawnMuzzleFlash(muzzlePos, 0xffffff, 0.3);
         spawnLaserBeam(muzzlePos, targetPos, 0xffffff, 2);
-        if (typeof playUSASound === 'function') playUSASound('cannon');
+        if (typeof playUSASound === 'function') playUSASound('sniper_rifle');
         const tArmor = getArmorCategory(target);
         if (attacker.type === 'jarmen' && (tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh && !target.isUnmanned) {
             target.isUnmanned = true;
