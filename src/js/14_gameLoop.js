@@ -308,7 +308,7 @@ function animate() {
     // =========================================================
     // 0. ACTIVE SELECTION VISUALS & DYNAMIC TRAJECTORY LINES
     // =========================================================
-    units.forEach(unit => {
+    units.forEach((unit, idx) => {
             if (unit.selected && unit.selectionCircle) {
                 unit.selectionCircle.rotation.y += 0.02;
                 const d = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
@@ -466,7 +466,7 @@ function animate() {
         return cachedLivingUnits;
     };
 
-    units.forEach(unit => {
+    units.forEach((unit, idx) => {
             if (unit.health <= 0) return;
 
             // 1. Authentic SAGE Engine Veterancy Passive Regeneration (ActiveBody.cpp)
@@ -1645,7 +1645,7 @@ function animate() {
     // (was two full O(N^2) passes per frame that fought each other)
     separateGroundUnits(units);
 
-    units.forEach(unit => {
+    units.forEach((unit, idx) => {
             // Embarking into transport vehicles or garrisonable structures (e.g. Internet Center)
             if (unit.taskState === 'MovingToEmbark' && unit.embarkTarget) {
                 const transport = unit.embarkTarget;
@@ -2369,7 +2369,7 @@ function animate() {
                 if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
                 }
-                units.forEach(unit => {
+                units.forEach((unit, idx) => {
                         if (unit.combatTarget === enemy) unit.combatTarget = null;
                 });
                 return false;
@@ -2436,7 +2436,7 @@ function animate() {
                 spawnExplosion(expPos, 0xff4757, 4.0);
                 showNotification(`Hostile ${structure.type} eradicated!`, 'success');
                 evacuateGarrisonedUnits(structure);
-                units.forEach(unit => {
+                units.forEach((unit, idx) => {
                         if (unit.combatTarget === structure) unit.combatTarget = null;
                 });
                 return false;
