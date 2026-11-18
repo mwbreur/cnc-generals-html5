@@ -495,6 +495,7 @@ function animate() {
                     dMesh.position.y += (targetY - dMesh.position.y) * 0.12;
 
                     // Tangential heading facing orbit direction + inward banking roll
+                    dMesh.rotation.order = 'YXZ';
                     dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
                     dMesh.rotation.z = -0.22;
                     dMesh.rotation.x = 0.08;
@@ -546,11 +547,12 @@ function animate() {
                     dMesh.position.y += (targetY - dMesh.position.y) * 0.11;
 
                     // Fly like recon drone: horizontal orientation facing flight tangent, slight nose trim, gentle banking roll
+                    dMesh.rotation.order = 'YXZ';
                     dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
                     dMesh.rotation.x = 0.08 + Math.sin(drone.timer * 0.04) * 0.03;
                     dMesh.rotation.z = -0.18 + Math.sin(drone.timer * 0.05) * 0.04;
                 } else {
-                    // Battle Drone: oriented downwards (~28 degrees down pitch) towards ground targets, hovering & wandering
+                    // Battle Drone: oriented downwards (~41 degrees down pitch) towards ground targets, hovering & wandering
                     if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
                     drone.orbitAngle += 0.020 + Math.sin(drone.timer * 0.015) * 0.008;
 
@@ -563,9 +565,10 @@ function animate() {
                     dMesh.position.z += (targetZ - dMesh.position.z) * 0.10;
                     dMesh.position.y += (targetY - dMesh.position.y) * 0.10;
 
-                    // Downward pitch (~28 degrees down) towards battlefield
+                    // Local-frame downward pitch so gun barrel always points downward at ground targets
+                    dMesh.rotation.order = 'YXZ';
                     dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
-                    dMesh.rotation.x = 0.48 + Math.sin(drone.timer * 0.06) * 0.04;
+                    dMesh.rotation.x = 0.72 + Math.sin(drone.timer * 0.06) * 0.04;
                     dMesh.rotation.z = Math.sin(drone.timer * 0.07) * 0.08;
 
                     // Ducted lift fan spin (PERF: fan nodes cached once)
