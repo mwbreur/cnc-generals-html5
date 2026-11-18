@@ -555,9 +555,12 @@ function executeWeaponFire(attacker, target) {
 
     const muzzlePos = getMuzzleWorldPosition(attacker);
 
-    // Spin Gatling barrels when firing
+    // Spin Gatling barrels when firing (sets momentum for smooth continuous spin in gameLoop)
     const gatling = getCachedNode(attacker.mesh, "gatlingBarrels");
     if (gatling) gatling.rotation.z += 1.2;
+    if (attacker.type === 'gatling' || attacker.type === 'gatlingTank' || attacker.type === 'gatlingCannon' || attacker.overlordUpgrade === 'gatling') {
+        attacker._gatlingSpinVel = 0.55;
+    }
 
     // Authentic Heroic Tracers (Heroic rank units fire intense red laser tracers!)
     const isHeroic = (attacker.veterancy === 3);

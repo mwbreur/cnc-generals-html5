@@ -755,25 +755,36 @@ function animate() {
                 const moveDist = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
                 if (inInternetCenter || moveDist < 0.8) {
                     unit._isHacking = true;
-                    // Show deployed hacking terminal + glowing green uplink ring when stationary outside
+                    // Show deployed hacking terminal, crouch/typing stance & glowing green uplink ring when stationary outside
                     if (!inInternetCenter && unit.mesh && !unit._hackVisual && typeof THREE !== 'undefined' && typeof THREE.CylinderGeometry === 'function') {
                         const hGrp = new THREE.Group();
                         const matGlow = new THREE.MeshBasicMaterial({ color: 0x2ecc71, transparent: true, opacity: 0.75, side: THREE.DoubleSide });
+                        const matDeck = new THREE.MeshStandardMaterial({ color: 0x1e272e, roughness: 0.6, metalness: 0.4 });
                         const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.45, 18), matGlow);
                         ring.rotation.x = -Math.PI / 2;
                         ring.position.y = 0.12;
+                        const laptopBase = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.05, 0.38), matDeck);
+                        laptopBase.position.set(0, 0.48, 0.68);
+                        const laptopScreen = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.34, 0.04), matGlow);
+                        laptopScreen.position.set(0, 0.66, 0.86);
+                        laptopScreen.rotation.x = -0.25;
                         const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 6), matGlow);
                         mast.position.set(0.55, 0.9, 0.45);
                         const dish = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.28, 8), matGlow);
                         dish.rotation.x = Math.PI * 0.75;
                         dish.position.set(0.55, 1.85, 0.45);
-                        hGrp.add(ring, mast, dish);
+                        hGrp.add(ring, laptopBase, laptopScreen, mast, dish);
                         unit.mesh.add(hGrp);
                         unit._hackVisual = hGrp;
+                        unit._hackDish = dish;
                     }
                     if (unit._hackVisual) {
                         unit._hackVisual.visible = !inInternetCenter;
-                        if (!inInternetCenter) unit._hackVisual.rotation.y += 0.04;
+                        if (!inInternetCenter && unit._hackDish) unit._hackDish.rotation.y += 0.08;
+                    }
+                    if (!inInternetCenter && unit.mesh) {
+                        // Authentic Hacker crouched typing stance
+                        unit.mesh.rotation.x = 0.22 + Math.sin(buildingTick * 0.45) * 0.04;
                     }
                     unit._hackTimer = (unit._hackTimer || 0) + 1;
                     const hackCycle = inInternetCenter ? 40 : 60; // Internet Center accelerates hacking (+50% faster + boosted yield)
@@ -798,9 +809,11 @@ function animate() {
                 } else {
                     unit._isHacking = false;
                     if (unit._hackVisual) unit._hackVisual.visible = false;
+                    if (unit.mesh) unit.mesh.rotation.x = 0;
                 }
             } else if (unit._hackVisual) {
                 unit._hackVisual.visible = false;
+                if (unit.mesh) unit.mesh.rotation.x = 0;
             }
 
             // 6. Dozer & Worker Mine / Demo Trap Sweeping + China Troop Crawler Stealth Detection
@@ -1399,6 +1412,27 @@ function animate() {
                 t2.visible = (lvl >= 2);
                 if (t0 && t2.visible) t2.rotation.y = t0.rotation.y;
             }
+            const airPitch = (unit.combatTarget && unit.combatTarget.health > 0 && unit.combatTarget.isAir) ? -0.62 : 0;
+            ['TURRETEL', 'TURRETEL01', 'TURRETEL02'].forEach(elName => {
+                const el = getCachedNode(unit.mesh, elName);
+                if (el) el.rotation.x += (airPitch - el.rotation.x) * 0.14;
+            });
+            const qDish = getCachedNode(unit.mesh, 'RADARDISH01');
+            if (qDish) qDish.rotation.y += 0.04;
+        } else if (unit.type === 'marauder') {
+            const lvl = unit.salvageLevel || 0;
+            const t0 = getCachedNode(unit.mesh, 'turretSystem');
+            const t1 = getCachedNode(unit.mesh, 'TURRETUP01');
+            const t2 = getCachedNode(unit.mesh, 'TURRETUP02');
+            if (t0) t0.visible = (lvl === 0);
+            if (t1) {
+                t1.visible = (lvl === 1);
+                if (t0 && t1.visible) t1.rotation.y = t0.rotation.y;
+            }
+            if (t2) {
+                t2.visible = (lvl >= 2);
+                if (t0 && t2.visible) t2.rotation.y = t0.rotation.y;
+            }
         } else if (unit.type === 'scud') {
             const turretEl = getCachedNode(unit.mesh, 'TURRETEL');
             if (turretEl) {
@@ -1419,6 +1453,31 @@ function animate() {
             if (missile) {
                 missile.visible = !(unit.attackCooldown && unit.attackCooldown > 100);
             }
+            const tRadar = getCachedNode(unit.mesh, 'RADAR');
+            if (tRadar) tRadar.rotation.y += 0.04;
+        } else if (unit.type === 'radarvan' || unit.type === 'overlord') {
+            const rNode = getCachedNode(unit.mesh, 'RADAR') || getCachedNode(unit.mesh, 'RADARDISH01');
+            if (rNode) rNode.rotation.y += 0.05;
+        } else if (unit.type === 'dozer') {
+            const arms = getCachedNode(unit.mesh, 'ARMS') || getCachedNode(unit.mesh, 'BUCKET');
+            if (arms) {
+                const targetArmRot = (unit.taskState === 'Building' || unit.taskState === 'Repairing')
+                    ? Math.sin(buildingTick * 0.2) * 0.22
+                    : 0;
+                arms.rotation.x += (targetArmRot - arms.rotation.x) * 0.12;
+            }
+        }
+        // Smooth Gatling barrel spin momentum for Gatling Tank & Overlord Gatling Upgrade
+        if (unit._gatlingSpinVel && unit._gatlingSpinVel > 0.01) {
+            const gBarrels = getCachedNode(unit.mesh, 'gatlingBarrels');
+            if (gBarrels) gBarrels.rotation.z += unit._gatlingSpinVel;
+            if (unit.overlordUpgradeMesh) {
+                const og1 = getCachedNode(unit.overlordUpgradeMesh, 'gatlingBarrels');
+                const og2 = getCachedNode(unit.overlordUpgradeMesh, 'gatlingBarrels2');
+                if (og1) og1.rotation.z += unit._gatlingSpinVel;
+                if (og2) og2.rotation.z += unit._gatlingSpinVel;
+            }
+            unit._gatlingSpinVel *= 0.94;
         }
     };
     units.forEach(u => syncGLASalvageMeshes(u, false));
