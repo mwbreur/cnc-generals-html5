@@ -341,6 +341,10 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             const tr = root.getObjectByName(tname);
             if (tr) tr.rotation.y = Math.PI;
         });
+    } else if (modelKey === 'scorpion') {
+        // UVLiteTank.W3D HOUSECOLOR01 has an unbaked W3D pivot transform that causes floating red trim strips
+        const hc1 = root.getObjectByName('HOUSECOLOR01');
+        if (hc1) hc1.visible = false;
     } else if (modelKey === 'paladin') {
         const chassisGrp = root.getObjectByName('CHASSIS') || root;
         const turretGrp = root.getObjectByName('turretSystem') || root;
