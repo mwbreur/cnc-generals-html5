@@ -498,7 +498,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         }
     } else {
         root.userData.isAir = true;
-        root.userData.flightAltitude = (modelKey === 'chinook') ? 8.5 : (modelKey === 'comanche') ? 8.0 : (modelKey === 'raptor' || modelKey === 'aurora') ? 9.5 : 8.5;
+        root.userData.flightAltitude = (modelKey === 'chinook') ? 14.5 : (modelKey === 'comanche') ? 10.5 : (modelKey === 'raptor' || modelKey === 'aurora') ? 13.5 : 10.5;
     }
 
     root.userData.isW3D = true;
@@ -686,7 +686,6 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 const grp = new THREE.Group();
                 grp.name = pname;
                 grp.position.set(tx, ty, tz);
-                if (pname === 'LINE01' && grp.quaternion) grp.quaternion.set(0.5, -0.5, 0.5, -0.5);
                 upgPivots.push({ grp, parentIdx });
             });
             const upgRoot = new THREE.Group();

@@ -558,7 +558,7 @@ function createChinookMesh(isEnemy = false) {
     }
     const g = new THREE.Group();
     g.userData.isAir = true;
-    g.userData.flightAltitude = 8.0;
+    g.userData.flightAltitude = 14.5;
 
     // Aerodynamic elongated fuselage
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 5.2), matUSA);
