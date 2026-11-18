@@ -53,10 +53,13 @@ function playAudio(type, options = {}, faction = null) {
     if (typeof playOfficialSound === 'function') {
         const officialMap = {
             cannon: 'sfx_cannon_crusader',
+            china_cannon: 'sfx_cannon_crusader',
             paladin_cannon: 'sfx_cannon_paladin',
             machine_gun: 'sfx_rifle_ranger',
+            ak47: 'sfx_rifle_ranger',
             comanche_missile: 'sfx_missile_comanche',
             tomahawk_launch: 'sfx_missile_tomahawk',
+            scud_launch: 'sfx_missile_tomahawk',
             missile_launch: 'sfx_missile_comanche',
             explosion: 'sfx_explosion',
             nuke_artillery: 'sfx_nukecannon_fire',
