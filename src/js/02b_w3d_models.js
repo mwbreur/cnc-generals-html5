@@ -696,10 +696,9 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null) 
                 let mMat = concreteMat;
                 if (cleanT === 'atpwrglow') {
                     mMat = getCachedW3DMaterial('bld:usa_power_upgrade:atpwrglow_v2', () => new THREE.MeshStandardMaterial({
-                        map: subTex || undefined,
+                        ...(subTex ? { map: subTex, emissiveMap: subTex } : {}),
                         color: subTex ? 0xffffff : 0x22ffaa,
                         emissive: 0x00dd88,
-                        emissiveMap: subTex || undefined,
                         emissiveIntensity: 0.95,
                         roughness: 0.25,
                         metalness: 0.25,

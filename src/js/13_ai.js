@@ -2564,7 +2564,10 @@ function updateHealthBars() {
             if (!(asset.health > 0 && !asset.garrisonedIn)) continue;
             if (asset.mesh && !asset.mesh.visible) {
                 const hiddenBar = healthBarElements.get(asset);
-                if (hiddenBar) hiddenBar.style.display = 'none';
+                if (hiddenBar && hiddenBar.container && hiddenBar.shown !== false) {
+                    hiddenBar.container.style.display = 'none';
+                    hiddenBar.shown = false;
+                }
                 continue;
             }
             const isSelected = !!asset.selected || (isStructure && asset === selStruct);
