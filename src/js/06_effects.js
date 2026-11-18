@@ -283,6 +283,9 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
                 if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
 
                 spawnEnhancedExplosion(this.toPos, this.isToxin ? 0x2ed573 : 0xff4757, this.isHeavy ? 2.2 : 1.2, this.isHeavy);
+                if (this.metadata && typeof this.metadata.onImpact === 'function') {
+                    this.metadata.onImpact(this.toPos);
+                }
                 if (this.isToxin) {
                     spawnLingeringToxinCloud(this.toPos);
                 } else if (this.isHeavy) {
@@ -1407,12 +1410,13 @@ function animateNukeStrike(siloPos, targetPos) {
     // Target Warning Hazard Reticle on the Ground
     const warnGroup = new THREE.Group();
     const tGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
-    warnGroup.position.set(targetPos.x, tGroundY + 0.2, targetPos.z);
+    warnGroup.position.set(targetPos.x, tGroundY + 0.5, targetPos.z);
     const warnRing = new THREE.Mesh(
         new THREE.RingGeometry(2.5, 3.2, 32),
-        new THREE.MeshBasicMaterial({ color: 0xff2222, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+        new THREE.MeshBasicMaterial({ color: 0xff2222, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false, depthTest: false })
     );
     warnRing.rotation.x = -Math.PI / 2;
+    warnRing.renderOrder = 10;
     warnGroup.add(warnRing);
     scene.add(warnGroup);
 
@@ -1481,16 +1485,18 @@ function animateNukeStrike(siloPos, targetPos) {
 
                         // Thermonuclear Detonation!
                         playAudio('nuke_detonation');
+                        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(targetPos, 34, 420);
                         if (typeof triggerScreenShake === 'function') triggerScreenShake(2.4);
                         spawnMushroomCloud(targetPos);
                         // Lingering Nuclear Radiation Pool
                         const radGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
                         const radPool = new THREE.Mesh(
                             new THREE.CircleGeometry(14, 24),
-                            new THREE.MeshBasicMaterial({ color: 0x39ff14, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false })
+                            new THREE.MeshBasicMaterial({ color: 0x39ff14, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false, depthTest: false })
                         );
                         radPool.rotation.x = -Math.PI / 2;
-                        radPool.position.set(targetPos.x, radGroundY + 0.16, targetPos.z);
+                        radPool.position.set(targetPos.x, radGroundY + 0.45, targetPos.z);
+                        radPool.renderOrder = 9;
                         scene.add(radPool);
                         let radTicks = 0;
                         activeFX.push({
@@ -1671,33 +1677,33 @@ function animateScudStormStrike(stormPos, targetPos) {
 
                 if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(launchOrigin, 0xffa502, 1.2);
                 if (typeof spawnSmokePuff === 'function') spawnSmokePuff(launchOrigin, 0xdcdde1, 1.1);
-                spawnRocketProjectile(launchOrigin, subTarget, true, true);
-
-                setTimeout(() => {
+                spawnRocketProjectile(launchOrigin, subTarget, true, true, {
+                    onImpact: (impactPos) => {
                         playAudio('scud_detonation');
+                        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(impactPos, 22, 300);
                         if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
-                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(subTarget, 0x2ecc71, 3.2, true);
+                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPos, 0x2ecc71, 3.2, true);
                         enemyUnits.forEach(enemy => {
-                                if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(subTarget) <= 11.5) {
-                                    if (typeof applyCalculatedDamage === 'function') {
-                                        applyCalculatedDamage(null, enemy, 165, 'EXPLOSIVE');
-                                    } else {
-                                        enemy.health -= 165;
-                                    }
+                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(impactPos) <= 11.5) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(null, enemy, 165, 'EXPLOSIVE');
+                                } else {
+                                    enemy.health -= 165;
                                 }
+                            }
                         });
                         enemyStructures.forEach(struct => {
-                                if (struct.health > 0 && struct.position && struct.position.distanceTo(subTarget) <= 13.5) {
-                                    if (typeof applyCalculatedDamage === 'function') {
-                                        applyCalculatedDamage(null, struct, 195, 'EXPLOSIVE');
-                                    } else {
-                                        struct.health -= 195;
-                                    }
+                            if (struct.health > 0 && struct.position && struct.position.distanceTo(impactPos) <= 13.5) {
+                                if (typeof applyCalculatedDamage === 'function') {
+                                    applyCalculatedDamage(null, struct, 195, 'EXPLOSIVE');
+                                } else {
+                                    struct.health -= 195;
                                 }
+                            }
                         });
-                        spawnLingeringToxinCloud(subTarget);
-                        spawnCraterDecal(subTarget, 3.6, 520);
-                    }, 1350);
+                        spawnCraterDecal(impactPos, 3.6, 520);
+                    }
+                });
             }, i * 155);
     }
 }
