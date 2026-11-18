@@ -52,6 +52,13 @@ function playAudio(type, options = {}, faction = null) {
     // Trigger authentic retail WAV from 05b_official_audio.js when available
     if (typeof playOfficialSound === 'function') {
         const officialMap = {
+            cannon: 'sfx_cannon_crusader',
+            paladin_cannon: 'sfx_cannon_paladin',
+            machine_gun: 'sfx_rifle_ranger',
+            comanche_missile: 'sfx_missile_comanche',
+            tomahawk_launch: 'sfx_missile_tomahawk',
+            missile_launch: 'sfx_missile_comanche',
+            explosion: 'sfx_explosion',
             nuke_artillery: 'sfx_nukecannon_fire',
             nukecannon_deploy: 'sfx_nukecannon_deploy',
             nukecannon_undeploy: 'sfx_nukecannon_undeploy',
@@ -64,8 +71,8 @@ function playAudio(type, options = {}, faction = null) {
             superweapon_siren: 'sfx_nuke_siren',
             drone_repair: 'sfx_drone_fire'
         };
-        if (officialMap[type]) {
-            playOfficialSound(officialMap[type], options.volume || 0.90);
+        if (officialMap[type] && playOfficialSound(officialMap[type], options.volume || 0.90)) {
+            return;
         }
     }
 

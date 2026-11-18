@@ -183,19 +183,33 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
     const group = new THREE.Group();
     group.position.copy(fromPos);
 
-    const bodyMat = new THREE.MeshStandardMaterial({
-            color: isToxin ? 0x2ed573 : 0x747d8c,
-            metalness: 0.8,
-            roughness: 0.3
-    });
-    const rGeo = new THREE.CylinderGeometry(isHeavy ? 0.22 : 0.12, isHeavy ? 0.22 : 0.12, isHeavy ? 1.4 : 0.8, 8);
-    rGeo.rotateX(Math.PI / 2);
-    const rocketBody = new THREE.Mesh(rGeo, bodyMat);
-    group.add(rocketBody);
+    if (metadata && metadata.missileTemplate && typeof metadata.missileTemplate.clone === 'function') {
+        const mClone = metadata.missileTemplate.clone(true);
+        mClone.visible = true;
+        mClone.position.set(0, 0, 0);
+        mClone.rotation.set(0, 0, 0);
+        mClone.scale.setScalar(0.32);
+        mClone.traverse(c => {
+            c.visible = true;
+            if (!c.userData) c.userData = {};
+            c.userData._sharedW3D = true;
+        });
+        group.add(mClone);
+    } else {
+        const bodyMat = new THREE.MeshStandardMaterial({
+                color: isToxin ? 0x2ed573 : 0x747d8c,
+                metalness: 0.8,
+                roughness: 0.3
+        });
+        const rGeo = new THREE.CylinderGeometry(isHeavy ? 0.22 : 0.12, isHeavy ? 0.22 : 0.12, isHeavy ? 1.4 : 0.8, 8);
+        rGeo.rotateX(Math.PI / 2);
+        const rocketBody = new THREE.Mesh(rGeo, bodyMat);
+        group.add(rocketBody);
+    }
 
     const glowMat = new THREE.MeshBasicMaterial({ color: isToxin ? 0x7bed9f : 0xff793f, transparent: true, opacity: 0.9 });
-    const motorGlow = new THREE.Mesh(new THREE.SphereGeometry(isHeavy ? 0.35 : 0.2, 6, 6), glowMat);
-    motorGlow.position.z = isHeavy ? -0.8 : -0.45;
+    const motorGlow = new THREE.Mesh(new THREE.SphereGeometry(isHeavy ? 0.45 : 0.2, 6, 6), glowMat);
+    motorGlow.position.z = isHeavy ? -1.4 : -0.45;
     group.add(motorGlow);
 
     group.lookAt(toPos);
@@ -221,6 +235,7 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
                 // Point Defense Laser Interception in Mid-Air!
                 scene.remove(this.group);
                 this.group.traverse(child => {
+                        if (child.userData && child.userData._sharedW3D) return;
                         if (child.geometry) child.geometry.dispose();
                         if (child.material) child.material.dispose();
                 });
@@ -242,8 +257,12 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
             this.curPos.lerpVectors(fromPos, this.toPos, alpha);
 
             if (this.isHeavy) {
-                const arcHeight = Math.sin(alpha * Math.PI) * 12.0;
+                const arcHeight = Math.sin(alpha * Math.PI) * 14.0;
                 this.group.position.set(this.curPos.x, this.curPos.y + arcHeight, this.curPos.z);
+                const nextAlpha = Math.min(1.0, alpha + 0.04);
+                const nextPos = new THREE.Vector3().lerpVectors(fromPos, this.toPos, nextAlpha);
+                nextPos.y += Math.sin(nextAlpha * Math.PI) * 14.0;
+                if (typeof this.group.lookAt === 'function' && nextAlpha < 1.0) this.group.lookAt(nextPos);
             } else {
                 this.group.position.copy(this.curPos);
             }
@@ -255,6 +274,7 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
             if (alpha >= 1.0) {
                 scene.remove(this.group);
                 this.group.traverse(child => {
+                        if (child.userData && child.userData._sharedW3D) return;
                         if (child.geometry) child.geometry.dispose();
                         if (child.material) child.material.dispose();
                 });

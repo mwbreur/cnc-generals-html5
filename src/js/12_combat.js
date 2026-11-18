@@ -639,8 +639,11 @@ function executeWeaponFire(attacker, target) {
             }
         }
         // Heavy cruise / ballistic missile (Tracked for Point Defense Laser interception!)
+        const tomMissileNode = (attacker.type === 'tomahawk') ? getCachedNode(attacker.mesh, 'MISSILE') : null;
         const scudMuzzle = (attacker.type === 'scud') ? (getCachedNode(attacker.mesh, 'WEAPONA01') || getCachedNode(attacker.mesh, 'MISSILE')) : null;
-        const launchPos = scudMuzzle ? scudMuzzle.getWorldPosition(new THREE.Vector3()) : muzzlePos;
+        const launchNode = tomMissileNode || scudMuzzle;
+        const launchPos = launchNode ? launchNode.getWorldPosition(new THREE.Vector3()) : muzzlePos;
+        if (tomMissileNode) tomMissileNode.visible = false;
         spawnMuzzleFlash(launchPos, isHeroic ? heroicFlashColor : 0xff793f, 1.2);
         const mDmg = attacker.type === 'scud' ? 150 : 150;
         const mSplash = attacker.type === 'tomahawk' ? 7.5 : 5.5;
@@ -649,9 +652,10 @@ function executeWeaponFire(attacker, target) {
                 target: target,
                 damage: mDmg,
                 damageType: 'EXPLOSIVE',
-                splashRadius: mSplash
+                splashRadius: mSplash,
+                missileTemplate: tomMissileNode
         });
-        if (attacker.type === 'tomahawk') playUSASound('missile_launch');
+        if (attacker.type === 'tomahawk') playUSASound('tomahawk_launch');
         if (attacker.type === 'scud') playAudio('scud_launch', {}, 'gla');
     } else if (attacker.type === 'inferno') {
         // Inferno Cannon Long-Range Incendiary Napalm Artillery
@@ -775,12 +779,12 @@ function executeWeaponFire(attacker, target) {
         spawnMuzzleFlash(mPosR, 0xff9f43, 0.5);
         spawnRocketProjectile(mPosL, targetPos, false, false, { attacker, target, damage: 60, damageType: 'EXPLOSIVE', splashRadius: 2.0 });
         setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false, { attacker, target, damage: 60, damageType: 'EXPLOSIVE', splashRadius: 2.0 }), 100);
-        playUSASound('missile_launch');
+        playUSASound('comanche_missile');
     } else if (attacker.type === 'stealthfighter') {
         // USA Stealth Fighter: Laser-Guided Precision Bunker-Buster Bomb!
         spawnMuzzleFlash(muzzlePos, 0x00d2d3, 0.6);
         spawnGuidedBomb(muzzlePos, targetPos, false);
-        playUSASound('missile_launch');
+        playUSASound('comanche_missile');
         setTimeout(() => applyCalculatedDamage(attacker, target, 150, 'EXPLOSIVE'), 400);
     } else if (attacker.type === 'aurora') {
         // USA Aurora Hypersonic Bomber: Fuel-Air Cluster Bomb with Massive Shockwave!
@@ -801,13 +805,13 @@ function executeWeaponFire(attacker, target) {
             setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false, { attacker, target, damage: 25, damageType: 'EXPLOSIVE' }), 340);
         }
         playUSASound('machine_gun');
-        playUSASound('missile_launch');
+        playUSASound('comanche_missile');
         applyCalculatedDamage(attacker, target, 25, 'SMALL_ARMS');
     } else if (attacker.type === 'paladin') {
         // USA Paladin Tank: High-Velocity 105mm Tank Cannon (PDL runs autonomously on defense!)
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
         spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
-        playUSASound('cannon');
+        playUSASound('paladin_cannon');
         if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
             if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
         }

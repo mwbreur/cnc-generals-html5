@@ -1409,6 +1409,16 @@ function animate() {
             if (missile) {
                 missile.visible = !(unit.attackCooldown && unit.attackCooldown > 280);
             }
+        } else if (unit.type === 'tomahawk') {
+            const turretEl = getCachedNode(unit.mesh, 'TURRETEL');
+            if (turretEl) {
+                const targetElev = (unit.combatTarget && unit.combatTarget.health > 0) ? -0.55 : 0;
+                turretEl.rotation.x += (targetElev - turretEl.rotation.x) * 0.08;
+            }
+            const missile = getCachedNode(unit.mesh, 'MISSILE');
+            if (missile) {
+                missile.visible = !(unit.attackCooldown && unit.attackCooldown > 100);
+            }
         }
     };
     units.forEach(u => syncGLASalvageMeshes(u, false));

@@ -31,6 +31,7 @@ function initRadarMinimap() {
     radarCtx = radarCanvas.getContext('2d');
 
     let isRadarDragging = false;
+    let lastRadarRightClickMs = 0;
     function getRadarWorldCoords(e) {
         const rect = radarCanvas.getBoundingClientRect();
         const rw = rect.width || radarCanvas.width || 185;
@@ -75,6 +76,9 @@ function initRadarMinimap() {
         if (e.button === 2 || e.buttons === 2 || e.type === 'contextmenu') {
             e.preventDefault();
             e.stopPropagation();
+            const now = Date.now();
+            if (now - lastRadarRightClickMs < 150) return;
+            lastRadarRightClickMs = now;
             sendSelectedUnitsToRadarPos(targetPos);
             return;
         }
@@ -113,6 +117,8 @@ function initRadarMinimap() {
     radarCanvas.addEventListener('mousedown', e => {
             if (e.button === 0) {
                 isRadarDragging = true;
+                handleRadarPointer(e);
+            } else if (e.button === 2) {
                 handleRadarPointer(e);
             }
     });
