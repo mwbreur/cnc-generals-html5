@@ -2849,28 +2849,65 @@ function processEnemyMovement() {
 }
 
 function processEnemyCombat() {
-    enemyUnits.forEach(enemy => {
-            if (enemy.health <= 0) return;
+    enemyUnits.forEach((enemy, eIdx) => {
+            if (enemy.health <= 0 || !enemy.mesh) return;
             if (enemy.attackCooldown > 0) enemy.attackCooldown = Math.max(0, enemy.attackCooldown - combatDeltaScale);
+            if (!enemy.scanRange || enemy.scanRange <= 0) return;
 
-            const target = enemy.combatTarget;
-            if (!target || target.health <= 0 || isFriendly(enemy, target)) {
+            const minRange = (enemy.type === 'tomahawk' || enemy.type === 'nukecannon' || enemy.type === 'nuketank') ? (enemy.minRange || 16.0) : 0;
+            let fireTarget = enemy.combatTarget;
+            if (fireTarget && (fireTarget.health <= 0 || isFriendly(enemy, fireTarget))) {
                 enemy.combatTarget = null;
-                return;
+                fireTarget = null;
             }
 
-            const targetPos = target.position || target.mesh.position;
-            const targetRadius = target.radius || 0;
-            const distToTarget = enemy.mesh.position.distanceTo(targetPos);
-            const minRange = (enemy.type === 'tomahawk' || enemy.type === 'nukecannon' || enemy.type === 'nuketank') ? (enemy.minRange || 16.0) : 0;
-            const canHitTarget = (typeof canUnitTarget === 'function') ? canUnitTarget(enemy, target) : !(enemy.type === 'tomahawk' && target.isAir);
-        if (distToTarget <= (enemy.scanRange + targetRadius) && distToTarget >= minRange && canHitTarget && enemy.attackCooldown === 0) {
+            let targetPos = fireTarget ? (fireTarget.position || (fireTarget.mesh && fireTarget.mesh.position)) : null;
+            let targetRadius = fireTarget ? (fireTarget.radius || 0) : 0;
+            let distToTarget = targetPos ? enemy.mesh.position.distanceTo(targetPos) : Infinity;
+            let canHitTarget = fireTarget ? ((typeof canUnitTarget === 'function') ? canUnitTarget(enemy, fireTarget) : !(enemy.type === 'tomahawk' && fireTarget.isAir)) : false;
+
+            // Fire-on-the-move auto-scan: if assigned target is missing or out of range, engage nearest in-range hostile without stopping
+            if (!fireTarget || !targetPos || distToTarget > (enemy.scanRange + targetRadius) || distToTarget < minRange || !canHitTarget) {
+                if ((buildingTick + eIdx) % 3 === 0 || enemy.attackCooldown === 0) {
+                    let bestOpp = null;
+                    let bestDist = Infinity;
+                    const checkList = (arr, defaultR) => {
+                        if (!arr) return;
+                        for (let i = 0; i < arr.length; i++) {
+                            const cand = arr[i];
+                            if (!cand || cand.health <= 0 || isFriendly(enemy, cand)) continue;
+                            if (cand.stealthed && !(cand.revealedUntil && cand.revealedUntil > buildingTick)) continue;
+                            const cPos = cand.position || (cand.mesh && cand.mesh.position);
+                            if (!cPos) continue;
+                            if (typeof canUnitTarget === 'function' && !canUnitTarget(enemy, cand)) continue;
+                            const cR = cand.radius || defaultR;
+                            const d = enemy.mesh.position.distanceTo(cPos);
+                            if (d <= enemy.scanRange + cR && d >= minRange && d < bestDist) {
+                                bestDist = d;
+                                bestOpp = cand;
+                            }
+                        }
+                    };
+                    checkList(units, 1.5);
+                    if (!bestOpp) checkList(structures, 6.0);
+                    if (bestOpp) {
+                        fireTarget = bestOpp;
+                        targetPos = fireTarget.position || fireTarget.mesh.position;
+                        targetRadius = fireTarget.radius || 0;
+                        distToTarget = bestDist;
+                        canHitTarget = true;
+                        if (!enemy.combatTarget) enemy.combatTarget = bestOpp;
+                    }
+                }
+            }
+
+            if (fireTarget && targetPos && distToTarget <= (enemy.scanRange + targetRadius) && distToTarget >= minRange && canHitTarget && enemy.attackCooldown === 0) {
                 const turret = getCachedNode(enemy.mesh, "turretSystem");
                 if (turret && turret.parent) {
                     const localTarget = turret.parent.worldToLocal(targetPos.clone());
                     turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);
                 }
-                executeWeaponFire(enemy, target);
+                executeWeaponFire(enemy, fireTarget);
             }
     });
 }
