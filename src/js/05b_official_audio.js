@@ -55,6 +55,8 @@ function playOfficialAudioBuffer(ctx, buffer, volume, pan = null) {
         if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(() => {});
         const src = ctx.createBufferSource();
         src.buffer = buffer;
+        // Retail PitchShift: +/-5% random pitch so repeated shots don't sound identical
+        if (isWorld && src.playbackRate) src.playbackRate.value = 0.95 + Math.random() * 0.10;
         const gain = ctx.createGain();
         gain.gain.value = volume;
         src.connect(gain);
@@ -77,6 +79,100 @@ function playOfficialAudioBuffer(ctx, buffer, volume, pan = null) {
     }
 }
 
+const IMA_INDEX_TABLE = [-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8];
+const IMA_STEP_TABLE = [
+    7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45,
+    50, 55, 60, 66, 73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230,
+    253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963,
+    1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327,
+    3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442,
+    11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767
+];
+
+// Retail EA Audio.big / AudioZH.big SFX WAVs use 4-bit IMA ADPCM (fmt=0x0011), which browsers'
+// native AudioContext.decodeAudioData() & <audio> reject. Transcode IMA ADPCM in-memory to standard
+// 16-bit linear PCM (fmt=1) WAV so WebAudio decodes 100% of retail SFX with zero WebMediaPlayer fallback.
+function ensurePcmWavBuffer(bytes) {
+    if (!bytes || bytes.length < 44) return bytes.buffer;
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) return bytes.buffer;
+    let fmt = 1, channels = 1, sampleRate = 22050, blockAlign = 512, samplesPerBlock = 0;
+    let dataOffset = 0, dataSize = 0;
+    let pos = 12;
+    while (pos + 8 <= bytes.length) {
+        const id = dv.getUint32(pos, false);
+        const sz = dv.getUint32(pos + 4, true);
+        if (id === 0x666d7420) {
+            fmt = dv.getUint16(pos + 8, true);
+            channels = dv.getUint16(pos + 10, true) || 1;
+            sampleRate = dv.getUint32(pos + 12, true) || 22050;
+            blockAlign = dv.getUint16(pos + 20, true) || 512;
+            if (sz >= 20 && pos + 28 <= bytes.length) {
+                samplesPerBlock = dv.getUint16(pos + 26, true);
+            }
+        } else if (id === 0x64617461) {
+            dataOffset = pos + 8;
+            dataSize = Math.min(sz, bytes.length - dataOffset);
+            break;
+        }
+        pos += 8 + ((sz + 1) & ~1);
+    }
+    if (fmt !== 0x0011 || !dataOffset || dataSize <= 0) return bytes.buffer;
+
+    const numBlocks = Math.floor(dataSize / blockAlign);
+    const spb = samplesPerBlock || (1 + Math.floor((blockAlign - 4 * channels) * 2 / channels));
+    const totalFrames = numBlocks * spb;
+    const pcmBytes = totalFrames * channels * 2;
+    const out = new ArrayBuffer(44 + pcmBytes);
+    const outDv = new DataView(out);
+    outDv.setUint32(0, 0x52494646, false);
+    outDv.setUint32(4, 36 + pcmBytes, true);
+    outDv.setUint32(8, 0x57415645, false);
+    outDv.setUint32(12, 0x666d7420, false);
+    outDv.setUint32(16, 16, true);
+    outDv.setUint16(20, 1, true);
+    outDv.setUint16(22, channels, true);
+    outDv.setUint32(24, sampleRate, true);
+    outDv.setUint32(28, sampleRate * channels * 2, true);
+    outDv.setUint16(32, channels * 2, true);
+    outDv.setUint16(34, 16, true);
+    outDv.setUint32(36, 0x64617461, false);
+    outDv.setUint32(40, pcmBytes, true);
+
+    let outPos = 44;
+    for (let b = 0; b < numBlocks; b++) {
+        const bOff = dataOffset + b * blockAlign;
+        let pred = dv.getInt16(bOff, true);
+        let idx = Math.max(0, Math.min(88, bytes[bOff + 2]));
+        outDv.setInt16(outPos, pred, true);
+        outPos += 2;
+        const endOff = Math.min(bytes.length, bOff + blockAlign);
+        let produced = 1;
+        for (let i = bOff + 4; i < endOff && produced < spb; i++) {
+            const byte = bytes[i];
+            for (let nibShift = 0; nibShift <= 4 && produced < spb; nibShift += 4) {
+                const nib = (byte >> nibShift) & 0x0f;
+                const step = IMA_STEP_TABLE[idx];
+                let diff = step >> 3;
+                if (nib & 1) diff += step >> 2;
+                if (nib & 2) diff += step >> 1;
+                if (nib & 4) diff += step;
+                if (nib & 8) pred -= diff;
+                else pred += diff;
+                if (pred > 32767) pred = 32767;
+                else if (pred < -32768) pred = -32768;
+                idx += IMA_INDEX_TABLE[nib];
+                if (idx < 0) idx = 0;
+                else if (idx > 88) idx = 88;
+                outDv.setInt16(outPos, pred, true);
+                outPos += 2;
+                produced++;
+            }
+        }
+    }
+    return out;
+}
+
 function decodeOfficialAudioData(ctx, data) {
     if (typeof data === 'string' && data.startsWith('data:')) {
         const commaIdx = data.indexOf(',');
@@ -85,10 +181,10 @@ function decodeOfficialAudioData(ctx, data) {
             const bin = atob(b64);
             const bytes = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            return ctx.decodeAudioData(bytes.buffer);
+            return ctx.decodeAudioData(ensurePcmWavBuffer(bytes));
         }
     }
-    return fetch(data).then(r => r.arrayBuffer()).then(buf => ctx.decodeAudioData(buf));
+    return fetch(data).then(r => r.arrayBuffer()).then(buf => ctx.decodeAudioData(ensurePcmWavBuffer(new Uint8Array(buf))));
 }
 
 const MAX_AUDIO_FALLBACK_POOL = 8;

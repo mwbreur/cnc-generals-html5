@@ -1431,6 +1431,20 @@ console.log("✓ Verified all 11 retail visual, model, terrain, base orientation
     ['sfx_expl_tomahawk', 'sfx_missile_defender', 'sfx_missile_defender_1', 'sfx_missile_defender_2'].forEach(k => {
         if (!catalog[k]) throw new Error('Missing retail audio key ' + k);
     });
+    // Verify IMA ADPCM (fmt=0x0011) retail WAVs transcode cleanly to 16-bit PCM (fmt=1) in ensurePcmWavBuffer
+    const offAudioSrc = rd('05b_official_audio.js');
+    if (!/function ensurePcmWavBuffer\(/.test(offAudioSrc)) throw new Error('Missing ensurePcmWavBuffer IMA ADPCM transcoder in 05b_official_audio.js');
+    const mdRaw = Buffer.from(catalog['sfx_missile_defender'].split(',')[1], 'base64');
+    if (mdRaw.readUInt16LE(20) !== 0x0011) throw new Error('Expected retail sfx_missile_defender to be IMA ADPCM fmt=17');
+    const adpcmCtx = { DataView, ArrayBuffer, Uint8Array, Math };
+    vm.createContext(adpcmCtx);
+    const adpcmStart = offAudioSrc.indexOf('const IMA_INDEX_TABLE');
+    const adpcmEnd = offAudioSrc.indexOf('function decodeOfficialAudioData(');
+    vm.runInContext(offAudioSrc.slice(adpcmStart, adpcmEnd) + '\nthis.transcode = ensurePcmWavBuffer;', adpcmCtx);
+    const pcmOut = Buffer.from(adpcmCtx.transcode(new Uint8Array(mdRaw)));
+    if (pcmOut.readUInt16LE(20) !== 1 || pcmOut.readUInt16LE(34) !== 16 || pcmOut.length < 40000) {
+        throw new Error('IMA ADPCM -> PCM16 transcoder failed on sfx_missile_defender');
+    }
     const loopSrc = rd('14_gameLoop.js');
     if (!/c\._stealthOwnMat/.test(loopSrc)) throw new Error('Stealth must use per-mesh cloned materials');
     if (!/FRIENDLY_STEALTH_OPACITY_MIN = 0\.5/.test(loopSrc)) throw new Error('Friendly stealth opacity must match retail 50%+');

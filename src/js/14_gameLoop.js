@@ -2773,7 +2773,38 @@ function animate() {
         updateShellMapDemo(dt);
     }
     if (typeof renderRadarMinimap === 'function') renderRadarMinimap();
+    const _shakeOff = (typeof applyViewShake === 'function') ? applyViewShake(dt) : null;
     renderer.render(scene, camera);
+    if (_shakeOff) camera.position.sub(_shakeOff);
+}
+
+// Retail ViewShake (GameClient shake): intensity impulses accumulate (clamped), decay exponentially,
+// and fall off with distance from the camera focus (MaxShakeRange).
+let _viewShakeIntensity = 0;
+const _viewShakeOffset = (typeof THREE !== 'undefined' && typeof THREE.Vector3 === 'function') ? new THREE.Vector3() : null;
+const VIEW_SHAKE_MAX_RANGE = 260;
+const VIEW_SHAKE_MAX_INTENSITY = 3.0;
+function triggerScreenShake(intensity = 1, pos = null) {
+    let amount = Number(intensity) || 0;
+    if (pos && typeof cameraTarget !== 'undefined' && cameraTarget) {
+        const d = Math.hypot(pos.x - cameraTarget.x, pos.z - cameraTarget.z);
+        if (d >= VIEW_SHAKE_MAX_RANGE) return;
+        amount *= 1 - d / VIEW_SHAKE_MAX_RANGE;
+    }
+    _viewShakeIntensity = Math.min(VIEW_SHAKE_MAX_INTENSITY, _viewShakeIntensity + amount);
+}
+window.triggerScreenShake = triggerScreenShake;
+function applyViewShake(dt) {
+    if (_viewShakeIntensity < 0.01 || !_viewShakeOffset || typeof camera === 'undefined' || !camera || !camera.position) {
+        _viewShakeIntensity = 0;
+        return null;
+    }
+    const mag = _viewShakeIntensity * 0.55;
+    _viewShakeOffset.set((Math.random() - 0.5) * 2 * mag, (Math.random() - 0.5) * 2 * mag * 0.7, (Math.random() - 0.5) * 2 * mag);
+    camera.position.add(_viewShakeOffset);
+    if (typeof camera.updateMatrixWorld === 'function') camera.updateMatrixWorld(true);
+    _viewShakeIntensity *= Math.exp(-(dt || 0.016) * 4.5);
+    return _viewShakeOffset;
 }
 function processEnemyMovement() {
     separateGroundUnits(enemyUnits);

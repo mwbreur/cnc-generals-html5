@@ -75,6 +75,11 @@ function computeSpatialAudio(pos) {
     gain *= zoomBonus;
     if (gain < SPATIAL_AUDIO_MIN_GAIN) return { cull: true, gain: 0, pan: 0 };
     let pan = 0;
+    // Retail shrouded dampening: sounds originating inside fogged/unexplored terrain are muffled
+    if (typeof isPositionVisible === 'function' && !isPositionVisible(pos.x, pos.z)) {
+        gain *= 0.55;
+        if (gain < SPATIAL_AUDIO_MIN_GAIN) return { cull: true, gain: 0, pan: 0 };
+    }
     if (typeof camera !== 'undefined' && camera && camera.matrixWorld && camera.matrixWorld.elements) {
         const e = camera.matrixWorld.elements;
         pan = Math.max(-0.85, Math.min(0.85, (dx * e[0] + dz * e[2]) / 110));
