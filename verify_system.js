@@ -1396,6 +1396,86 @@ vm.runInContext(`
         if (Math.abs((pWorldFlagYaw - eWorldFlagYaw) % (Math.PI * 2)) > 0.35) {
             throw new Error('Expected flags across buildings to blow in same world direction! p=' + pWorldFlagYaw + ' e=' + eWorldFlagYaw);
         }
+
+        // 11. USA Barracks Flagpole (abbarracks.box07__tex_atgradient) & USA Command Center Player Color (abbtcmdhq.housecolor01 + fascia trims)
+        const brkMesh = createW3DBuildingMesh('usa_barracks', false, null, 0x2563eb);
+        const brkPole = brkMesh.getObjectByName('abbarracks.box07__tex_atgradient');
+        const brkData = window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_barracks'];
+        const poleMdata = brkData && brkData.m && brkData.m['abbarracks.box07__tex_atgradient'];
+        if (!brkPole || !poleMdata || !poleMdata.v) {
+            throw new Error('Expected usa_barracks to include flagpole submesh abbarracks.box07__tex_atgradient!');
+        }
+        let maxPoleY = -1e9;
+        for (let i = 0; i < poleMdata.v.length; i += 3) {
+            if (poleMdata.v[i] > 20 && poleMdata.v[i + 2] > 30 && poleMdata.v[i + 1] > maxPoleY) maxPoleY = poleMdata.v[i + 1];
+        }
+        if (maxPoleY < 45) {
+            throw new Error('Expected usa_barracks flagpole at front-right corner to reach y >= 48, got maxPoleY=' + maxPoleY);
+        }
+
+        const ccColorTest = createW3DBuildingMesh('usa_commandCenter', false, null, 0xe11d48);
+        const ccHouseDeck = ccColorTest.getObjectByName('abbtcmdhq.housecolor01');
+        const ccTrimFront = ccColorTest.getObjectByName('usaCcHouseColorTrimFront');
+        const ccTrimUpper = ccColorTest.getObjectByName('usaCcHouseColorTrimUpper');
+        if (!ccHouseDeck || !ccTrimFront || !ccTrimUpper) {
+            throw new Error('Expected usa_commandCenter to include abbtcmdhq.housecolor01 and player-color trim fascia meshes!');
+        }
+        if (ccHouseDeck.material !== ccTrimFront.material || ccHouseDeck.material !== ccTrimUpper.material) {
+            throw new Error('Expected abbtcmdhq.housecolor01 on usa_commandCenter to share accentMat with player-color trims!');
+        }
+
+        // 12. Heartland Shield river bridges & land unit river crossing
+        mapBridges.length = 0;
+        setupMapEnvironment('heartland_shield', 1500);
+        if (!mapBridges || mapBridges.length !== 5) {
+            throw new Error('Expected heartland_shield to spawn 5 paired river bridges, got ' + (mapBridges && mapBridges.length));
+        }
+        for (let bi = 0; bi < mapBridges.length; bi++) {
+            const br = mapBridges[bi];
+            if (Math.abs(br.rotationY) < 0.1 || br.length < 100 || br.deckY <= currentWaterLevel + 1.0) {
+                throw new Error('Invalid Heartland Shield bridge #' + bi + ': ' + JSON.stringify({ rot: br.rotationY, len: br.length, deckY: br.deckY }));
+            }
+        }
+        // Test unit river crossing on Heartland Shield across Bridge #3 (northwest bank -> southeast bank, laterally offset from bridge)
+        const testBr = mapBridges[2];
+        const bFwdX = Math.sin(testBr.rotationY), bFwdZ = Math.cos(testBr.rotationY);
+        const bRightX = Math.cos(testBr.rotationY), bRightZ = -Math.sin(testBr.rotationY);
+        const bankA = new THREE.Vector3(testBr.position.x - bFwdX * (testBr.length * 0.55) + bRightX * 22, 0, testBr.position.z - bFwdZ * (testBr.length * 0.55) + bRightZ * 22);
+        const bankB = new THREE.Vector3(testBr.position.x + bFwdX * (testBr.length * 0.55) + bRightX * 22, 0, testBr.position.z + bFwdZ * (testBr.length * 0.55) + bRightZ * 22);
+        bankA.y = getTerrainHeight(bankA.x, bankA.z);
+        bankB.y = getTerrainHeight(bankB.x, bankB.z);
+        const crossWps = findBridgeCrossingsForPath(bankA, bankB);
+        if (!crossWps || crossWps.length < 2) {
+            throw new Error('Expected findBridgeCrossingsForPath to return entry/exit bridge ramps across Heartland Shield river!');
+        }
+        if (!mapBridges.some(b => isPointOnBridge(crossWps[0].x, crossWps[0].z, b)) || !mapBridges.some(b => isPointOnBridge(crossWps[1].x, crossWps[1].z, b))) {
+            throw new Error('Expected bridge entry/exit ramps to lie inside isPointOnBridge footprint!');
+        }
+        // Simulate a Crusader tank driving along [bankA -> ramp1 -> ramp2 -> bankB] and verify it never hits water ejection
+        const simTank = spawnUnit('crusader', bankA.clone(), 'usa');
+        applyGroupFormationMove([simTank], bankB.clone());
+        for (let step = 0; step < 360; step++) {
+            const dx = simTank.targetPosition.x - simTank.mesh.position.x;
+            const dz = simTank.targetPosition.z - simTank.mesh.position.z;
+            const d2 = Math.hypot(dx, dz);
+            if (d2 > 0.4) {
+                const mv = Math.min(d2, 1.2);
+                simTank.mesh.position.x += (dx / d2) * mv;
+                simTank.mesh.position.z += (dz / d2) * mv;
+            } else if (simTank.waypoints && simTank.waypoints.length > 0) {
+                simTank.targetPosition.copy(simTank.waypoints.shift());
+            } else {
+                break;
+            }
+            const gY = getTerrainHeight(simTank.mesh.position.x, simTank.mesh.position.z);
+            const onB = mapBridges.find(b => isPointOnBridge(simTank.mesh.position.x, simTank.mesh.position.z, b));
+            simTank.mesh.position.y = onB ? onB.deckY : gY;
+            resolveObstacleCollisions(simTank);
+        }
+        const finalDistToBankB = Math.hypot(simTank.mesh.position.x - bankB.x, simTank.mesh.position.z - bankB.z);
+        if (finalDistToBankB > 3.0) {
+            throw new Error('Simulated tank failed to cross Heartland Shield river bridge! Remaining dist=' + finalDistToBankB.toFixed(2));
+        }
     }
 `, sandbox);
 console.log("✓ Verified all 11 retail visual, model, terrain, base orientation, flag wind, and Composite Armor fixes.");

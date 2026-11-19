@@ -2124,13 +2124,22 @@ function animate() {
                     const targetRadius = unit.combatTarget.radius || 0;
                     if (distToTarget <= (unit.scanRange + targetRadius - 1.5)) {
                         // In effective weapon range: halt chassis and open fire
+                        unit.waypoints = [];
                         unit.targetPosition.x = unit.mesh.position.x;
                         unit.targetPosition.z = unit.mesh.position.z;
                         return;
-                    } else {
-                        // Target moved out of range: pursue target
-                        unit.targetPosition.x = targetMesh.position.x;
-                        unit.targetPosition.z = targetMesh.position.z;
+                    } else if (!unit.waypoints || unit.waypoints.length === 0) {
+                        // Target moved out of range: pursue target (routing across bridges if a river separates us)
+                        const bridges = (!unit.isAir && typeof findBridgeCrossingsForPath === 'function')
+                            ? findBridgeCrossingsForPath(unit.mesh.position, targetMesh.position)
+                            : null;
+                        if (bridges && bridges.length > 0) {
+                            unit.waypoints = [...bridges.filter(Boolean), targetMesh.position.clone()];
+                            unit.targetPosition.copy(unit.waypoints.shift());
+                        } else {
+                            unit.targetPosition.x = targetMesh.position.x;
+                            unit.targetPosition.z = targetMesh.position.z;
+                        }
                     }
                 } else {
                     // Target destroyed or lost: resume idle

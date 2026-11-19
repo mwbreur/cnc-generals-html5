@@ -340,7 +340,7 @@ function parseOfficialMap(mapKey, meta) {
     let hmChunkPos = -1;
     let blendPos = -1, blendEnd = -1, blendVer = 0;
     let objListPos = -1, objListEnd = -1;
-    let trigPos = -1, trigEnd = -1;
+    let trigPos = -1, trigEnd = -1, trigVer = 0;
     let scanPos = pos;
     while (scanPos + 10 <= decomp.length) {
         const cid = decomp.readUInt32LE(scanPos);
@@ -360,6 +360,7 @@ function parseOfficialMap(mapKey, meta) {
         } else if (cname === 'PolygonTriggers') {
             trigPos = dataStart;
             trigEnd = dataStart + csz;
+            trigVer = cver;
         }
         if (csz <= 0 || dataStart + csz > decomp.length) break;
         scanPos = dataStart + csz;
@@ -411,6 +412,12 @@ function parseOfficialMap(mapKey, meta) {
     const rawProps = [];
     const rawRoads = [];
     let pendingRoadPt1 = null;
+    let pendingBridgePt1 = null;
+    const hAtNorm = (nxVal, nzVal) => {
+        const col = Math.max(0, Math.min(GRID - 1, Math.round((nxVal + 0.5) * (GRID - 1))));
+        const row = Math.max(0, Math.min(GRID - 1, Math.round((nzVal + 0.5) * (GRID - 1))));
+        return grid[row][col];
+    };
     let p = objListPos;
     while (p > 0 && p + 10 <= objListEnd) {
         const cid = decomp.readUInt32LE(p);
@@ -505,8 +512,43 @@ function parseOfficialMap(mapKey, meta) {
                 rawBunkers.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)), angle: parseFloat(angle.toFixed(2)) });
                 rawBuildings.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), parseFloat(angle.toFixed(2)), 'bunker']);
             } else if (/Bridge/i.test(templateName)) {
-                if (!rawBridges.some(b => Math.hypot(b.nx - nx, b.nz - nz) < 0.04)) {
-                    rawBridges.push({ nx: parseFloat(nx.toFixed(3)), nz: parseFloat(nz.toFixed(3)), angle: parseFloat(angle.toFixed(2)) });
+                const bnx = (x / (playW * 10)) - 0.5;
+                const bnz = 0.5 - (y / (playH * 10));
+                if ((flags & 0x30) === 0x10) {
+                    // BRIDGE_POINT1: start endpoint of a paired river bridge
+                    pendingBridgePt1 = { nx: bnx, nz: bnz, tName: templateName };
+                } else if ((flags & 0x30) === 0x20 && pendingBridgePt1) {
+                    // BRIDGE_POINT2: end endpoint of a paired river bridge -> compute center, angle, span & bank deck elevation
+                    const midNx = (pendingBridgePt1.nx + bnx) * 0.5;
+                    const midNz = (pendingBridgePt1.nz + bnz) * 0.5;
+                    const dNx = bnx - pendingBridgePt1.nx;
+                    const dNz = bnz - pendingBridgePt1.nz;
+                    const rawSpan = Math.hypot(dNx, dNz);
+                    const spanAngle = Math.atan2(dNx, dNz);
+                    const bank1 = Math.max(hAtNorm(pendingBridgePt1.nx, pendingBridgePt1.nz), hAtNorm(pendingBridgePt1.nx - dNx * 0.15, pendingBridgePt1.nz - dNz * 0.15));
+                    const bank2 = Math.max(hAtNorm(bnx, bnz), hAtNorm(bnx + dNx * 0.15, bnz + dNz * 0.15));
+                    const deckH = Math.max(bank1, bank2);
+                    const isWide = /wide/i.test(pendingBridgePt1.tName || templateName);
+                    if (!rawBridges.some(b => Math.hypot(b.nx - midNx, b.nz - midNz) < 0.03)) {
+                        rawBridges.push({
+                            nx: parseFloat(midNx.toFixed(4)),
+                            nz: parseFloat(midNz.toFixed(4)),
+                            angle: parseFloat(spanAngle.toFixed(3)),
+                            span: parseFloat((rawSpan + 0.022).toFixed(4)),
+                            deckH: parseFloat(deckH.toFixed(2)),
+                            width: isWide ? 24 : 20
+                        });
+                    }
+                    pendingBridgePt1 = null;
+                } else if ((flags & 0x30) === 0) {
+                    // Standalone single-object decorative/canyon bridge (e.g., MonumentTrainBridge)
+                    if (!rawBridges.some(b => Math.hypot(b.nx - nx, b.nz - nz) < 0.04)) {
+                        rawBridges.push({
+                            nx: parseFloat(nx.toFixed(3)),
+                            nz: parseFloat(nz.toFixed(3)),
+                            angle: parseFloat(angle.toFixed(2))
+                        });
+                    }
                 }
             } else if (/Warehouse|Wherehouse|WatchTower|Hanger|Garage|IndustrialBuilding|AmmoCache|Apartment|Hut/i.test(templateName)) {
                 rawBuildings.push([parseFloat(nx.toFixed(3)), parseFloat(nz.toFixed(3)), parseFloat(angle.toFixed(2)), 'civilian']);
@@ -581,10 +623,13 @@ function parseOfficialMap(mapKey, meta) {
         for (let i = 0; i < nTrig && tp + 16 <= trigEnd; i++) {
             const nLen = decomp.readUInt16LE(tp); tp += 2;
             const tName = decomp.toString('ascii', tp, tp + nLen); tp += nLen;
+            if (trigVer >= 4) {
+                const lLen = decomp.readUInt16LE(tp); tp += 2 + lLen; // layerName in PolygonTriggers v4
+            }
             tp += 4; // trigId
             const isWater = decomp[tp++];
             tp += 1; // isRiver
-            tp += 4; // riverStart
+            if (trigVer >= 3) tp += 4; // riverStart
             const nPts = decomp.readInt32LE(tp); tp += 4;
             const pts = [];
             let sumZ = 0;

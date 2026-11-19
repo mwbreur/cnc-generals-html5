@@ -1503,8 +1503,17 @@ function spawnMapProps(theme, mapSize) {
         if (Array.isArray(offMap.bridges)) {
             offMap.bridges.forEach(b => {
                     const bx = b.nx * mapSize, bz = b.nz * mapSize;
-                    const by = Math.max(getTerrainHeight(bx, bz), currentWaterLevel + 1.0);
-                    spawnBridge(bx, by, bz, b.angle || 0, 20, 62);
+                    const bAngle = b.angle || 0;
+                    const bWidth = b.width || 20;
+                    const bLen = b.span ? Math.max(66, Math.round(b.span * mapSize) + 18) : 64;
+                    const endOffset = bLen * 0.48;
+                    const end1H = getTerrainHeight(bx - Math.sin(bAngle) * endOffset, bz - Math.cos(bAngle) * endOffset);
+                    const end2H = getTerrainHeight(bx + Math.sin(bAngle) * endOffset, bz + Math.cos(bAngle) * endOffset);
+                    const bankY = Math.max(b.deckH !== undefined ? b.deckH : -999, end1H, end2H, getTerrainHeight(bx, bz));
+                    const by = (currentWaterLevel > -100)
+                        ? Math.max(bankY, currentWaterLevel + 1.15)
+                        : bankY;
+                    spawnBridge(bx, by, bz, bAngle, bWidth, bLen);
             });
         }
         if (Array.isArray(offMap.buildings)) {
@@ -1748,25 +1757,26 @@ function spawnBridge(x, y, z, rotationY = 0, width = 16, length = 56) {
     });
     // Flatten & elevate both bridge approaches above water so AI & player units never stall on banks
     if (typeof registerFlattenedFootprint === 'function' && currentWaterLevel > -100) {
-        const halfL = length * 0.48;
-        const dx = Math.sin(rotationY) * halfL;
-        const dz = Math.cos(rotationY) * halfL;
-        const rampY = Math.max(y + 0.2, currentWaterLevel + 0.85);
-        registerFlattenedFootprint(x + dx, z + dz, width * 0.75, rampY);
-        registerFlattenedFootprint(x - dx, z - dz, width * 0.75, rampY);
+        const rampY = Math.max(y + 0.15, currentWaterLevel + 0.85);
+        const fwdX = Math.sin(rotationY);
+        const fwdZ = Math.cos(rotationY);
+        for (const frac of [-0.52, -0.32, 0.32, 0.52]) {
+            registerFlattenedFootprint(x + fwdX * (length * frac), z + fwdZ * (length * frac), width * 0.85, rampY);
+        }
     }
+    if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
 }
 
 function isPointOnBridge(x, z, bridge) {
     const dx = x - bridge.position.x;
     const dz = z - bridge.position.z;
-    const halfW = bridge.width * 0.5 + 0.8;
-    const halfL = bridge.length * 0.5 + 1.2;
+    const halfW = bridge.width * 0.5 + 2.2;
+    const halfL = bridge.length * 0.5 + 4.5;
     const maxHalf = halfW + halfL;
     if (dx > maxHalf || dx < -maxHalf || dz > maxHalf || dz < -maxHalf) return false;
     if (bridge._rotCached !== bridge.rotationY) {
-        bridge._cos = Math.cos(-bridge.rotationY);
-        bridge._sin = Math.sin(-bridge.rotationY);
+        bridge._cos = Math.cos(bridge.rotationY);
+        bridge._sin = Math.sin(bridge.rotationY);
         bridge._rotCached = bridge.rotationY;
     }
     const lx = dx * bridge._cos - dz * bridge._sin;

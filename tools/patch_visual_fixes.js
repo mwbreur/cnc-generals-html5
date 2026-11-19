@@ -579,6 +579,40 @@ for (const [bKey, w3dFile] of flagPatchTargets) {
     console.log(`Flag pivots patched on ${bKey} (${w3dFile}): ${cnt}`);
 }
 
+// 6b. Restore missing retail submeshes (flagpoles, HOUSECOLOR01/02 decks, girders, antenna masts)
+function injectMissingSubmeshesFromW3D(buildingKey, w3dFile, meshFilterRe) {
+    const bObj = W3D_BUILDING_DATA[buildingKey];
+    if (!bObj) throw new Error(`Missing W3D_BUILDING_DATA.${buildingKey}`);
+    const raw = parseRawW3d(w3dFile, { includeQuats: true });
+    let injected = 0;
+    for (const [boneIdx, mName] of raw.h) {
+        if (!meshFilterRe.test(mName)) continue;
+        const m = raw.meshes[mName];
+        if (!m || !m.v || m.v.length === 0 || !m.i || m.i.length === 0) continue;
+        const vCopy = m.v.slice();
+        // Lift flat untextured HOUSECOLOR01 rooftop terraces by +0.06 Y to prevent Z-fighting with adjacent slab faces
+        if (/\.housecolor01$/i.test(mName) && !m.tex) {
+            for (let k = 1; k < vCopy.length; k += 3) {
+                vCopy[k] = parseFloat((vCopy[k] + 0.06).toFixed(2));
+            }
+        }
+        bObj.m[mName] = { v: vCopy, i: m.i, u: m.u, tex: m.tex };
+        if (!bObj.h.some(([bi, mn]) => mn === mName)) {
+            bObj.h.push([boneIdx, mName]);
+        }
+        injected++;
+    }
+    console.log(`Injected ${injected} submeshes into ${buildingKey} from ${w3dFile}`);
+}
+
+injectMissingSubmeshesFromW3D('usa_barracks', 'ABBARRACKS.W3D', /abbarracks\.box07__tex_atgradient/i);
+injectMissingSubmeshesFromW3D('usa_commandCenter', 'ABBtCmdHQ.W3D', /abbtcmdhq\.(housecolor01|girders|building__tex_atgradient)/i);
+injectMissingSubmeshesFromW3D('usa_supplyCenter', 'ABSupplyCt.W3D', /absupplyct\.(housecolor01|box34__tex_atgradient)/i);
+injectMissingSubmeshesFromW3D('usa_patriot', 'ABPatriot.W3D', /abpatriot\.housecolor02/i);
+injectMissingSubmeshesFromW3D('usa_strategyCenter', 'ABStrategy.W3D', /abstrategy\.ac box__tex_atgradient/i);
+injectMissingSubmeshesFromW3D('usa_detentionCamp', 'ABPrison.W3D', /abprison\.building__tex_atgradient/i);
+injectMissingSubmeshesFromW3D('gla_commandCenter', 'UBCmdHQ.W3D', /ubcmdhq\.ubcmdhq__tex_atgradient/i);
+
 // 7. Patch supply_drop_crate (PMUNCrate03.W3D)
 const crateParsed = parseRawW3d('PMUNCrate03.W3D', {
     dropRe: null,

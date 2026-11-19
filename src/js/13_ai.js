@@ -1768,11 +1768,14 @@ function findBridgeCrossingsForPath(startPos, endPos, ignoreStruct = null) {
     if (!startPos || !endPos) return null;
     let crossesWater = false;
     const hasBridges = typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0;
-    // Dense 20-sample scan along trajectory to detect water channels
-    for (let t = 0.05; t <= 0.95; t += 0.05) {
+    const segDist = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z);
+    // Dense adaptive scan (at least every 6 world units) along trajectory to detect water channels
+    const numSamples = Math.max(20, Math.min(180, Math.ceil(segDist / 6.0)));
+    for (let i = 1; i < numSamples; i++) {
+        const t = i / numSamples;
         const px = startPos.x + (endPos.x - startPos.x) * t;
         const pz = startPos.z + (endPos.z - startPos.z) * t;
-        if (getTerrainHeight(px, pz) < currentWaterLevel && (!hasBridges || !mapBridges.some(b => isPointOnBridge(px, pz, b)))) {
+        if (getTerrainHeight(px, pz) < currentWaterLevel + 0.15 && (!hasBridges || !mapBridges.some(b => isPointOnBridge(px, pz, b)))) {
             crossesWater = true;
             break;
         }
@@ -1793,13 +1796,13 @@ function findBridgeCrossingsForPath(startPos, endPos, ignoreStruct = null) {
         if (bestBridge) {
             const fwdX = Math.sin(bestBridge.rotationY);
             const fwdZ = Math.cos(bestBridge.rotationY);
-            const halfLen = bestBridge.length * 0.5 + 3.0;
+            const halfLen = bestBridge.length * 0.44;
 
             const ramp1 = new THREE.Vector3(bestBridge.position.x - fwdX * halfLen, bestBridge.deckY, bestBridge.position.z - fwdZ * halfLen);
             const ramp2 = new THREE.Vector3(bestBridge.position.x + fwdX * halfLen, bestBridge.deckY, bestBridge.position.z + fwdZ * halfLen);
 
-            const d1 = startPos.distanceTo(ramp1);
-            const d2 = startPos.distanceTo(ramp2);
+            const d1 = Math.hypot(startPos.x - ramp1.x, startPos.z - ramp1.z);
+            const d2 = Math.hypot(startPos.x - ramp2.x, startPos.z - ramp2.z);
 
             const entryRamp = d1 <= d2 ? ramp1 : ramp2;
             const exitRamp = d1 <= d2 ? ramp2 : ramp1;
@@ -1970,8 +1973,19 @@ function issueMoveCommand(e) {
 
                                 const destX = targetPos.x - approachVector.x * desiredRange;
                                 const destZ = targetPos.z - approachVector.z * desiredRange;
-                                unit.targetPosition.set(destX, getTerrainHeight(destX, destZ), destZ);
+                                const destV = new THREE.Vector3(destX, getTerrainHeight(destX, destZ), destZ);
+                                const bridges = (typeof findBridgeCrossingsForPath === 'function')
+                                    ? findBridgeCrossingsForPath(unit.mesh.position, destV)
+                                    : null;
+                                if (bridges && bridges.length > 0) {
+                                    unit.waypoints = [...bridges.filter(Boolean), destV];
+                                    unit.targetPosition.copy(unit.waypoints.shift());
+                                } else {
+                                    unit.waypoints = [];
+                                    unit.targetPosition.copy(destV);
+                                }
                             } else {
+                                unit.waypoints = [];
                                 unit.targetPosition.copy(unit.mesh.position);
                             }
                         }
