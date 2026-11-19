@@ -689,6 +689,7 @@ function processBaseDefenseCombat() {
                         def.attackCooldown = 190; // ~3.16s reload
                         spawnMuzzleFlash(defPos, 0xff9f43, 0.8);
                         spawnRocketProjectile(defPos, targetPos, true, false);
+                        if ((!def.mesh || def.mesh.visible) && typeof playUSASound === 'function') playUSASound('patriot_fire');
                         closestEnemy.health -= 65;
                     } else if (def.type === 'stingerSite') {
                         def.attackCooldown = 150; // ~2.5s reload

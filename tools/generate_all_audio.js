@@ -53,6 +53,11 @@ const soundFiles = {
     'sfx_rifle_ranger': 'iranweaa.wav',
     'sfx_missile_comanche': 'vcomweaa.wav',
     'sfx_missile_tomahawk': 'vtomweaa.wav',
+    'sfx_patriot_fire_0': 'btunweaa.wav',
+    'sfx_patriot_fire_1': 'btunweab.wav',
+    'sfx_patriot_fire_2': 'btunweac.wav',
+    'sfx_patriot_fire_3': 'btunwead.wav',
+    'sfx_patriot_select': 'bpatsela.wav',
     'sfx_explosion': 'bgendiea.wav',
     'sfx_click': 'umenucla.wav',
 

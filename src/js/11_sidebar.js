@@ -3647,7 +3647,7 @@ function processBuildingFunctions() {
                             const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
                             spawnMuzzleFlash(mPos, 0x00d2ff, 0.8);
                             spawnRocketProjectile(mPos, incoming.group.position.clone(), false, false, { attacker: structure });
-                            if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                            if (typeof playUSASound === 'function') playUSASound('patriot_fire');
                         }
                     }
 
@@ -3704,7 +3704,7 @@ function processBuildingFunctions() {
                                     damageType: 'EXPLOSIVE',
                                     splashRadius: isInfTarget ? 1.0 : 2.5
                             });
-                            if (typeof playUSASound === 'function') playUSASound('missile_launch');
+                            if (typeof playUSASound === 'function') playUSASound('patriot_fire');
                         } else if (structure.type === 'gatlingCannon') {
                             const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.8, 0));
                             spawnMuzzleFlash(mPos, 0xffa502, 0.5);

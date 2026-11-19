@@ -73,9 +73,13 @@ function playAudio(type, options = {}, faction = null) {
             scud_storm_volley: 'sfx_scud_alarm',
             scud_detonation: 'sfx_scud_blast',
             superweapon_siren: 'sfx_nuke_siren',
-            drone_repair: 'sfx_drone_fire'
+            drone_repair: 'sfx_drone_fire',
+            patriot_fire: ['sfx_patriot_fire_0', 'sfx_patriot_fire_1', 'sfx_patriot_fire_2', 'sfx_patriot_fire_3'],
+            patriot_select: 'sfx_patriot_select'
         };
-        if (officialMap[type] && playOfficialSound(officialMap[type], options.volume || 0.90)) {
+        const mapped = officialMap[type];
+        const soundKey = Array.isArray(mapped) ? mapped[Math.floor(Math.random() * mapped.length)] : mapped;
+        if (soundKey && playOfficialSound(soundKey, options.volume || 0.90)) {
             return;
         }
     }
@@ -198,6 +202,7 @@ function playAudio(type, options = {}, faction = null) {
                 osc.start(t); osc.stop(t + 0.10);
                 break;
             }
+            case 'patriot_fire':
             case 'tomahawk_launch':
             case 'missile_launch': {
                 const bSize = Math.floor(ctx.sampleRate * 0.45);
