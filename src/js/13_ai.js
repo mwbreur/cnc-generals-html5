@@ -1136,19 +1136,18 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // --- 2. Reconnaissance & Scout Allocation ---
+            // --- 2. Reconnaissance & Scout Squad Assembly (Original Generals: form a 2-3 unit recon group before setting out) ---
             for (let sId of cmd.scoutNetIds) {
                 if (!myUnits.some(u => u.netId === sId)) cmd.scoutNetIds.delete(sId);
             }
-
-            if (cmd.scoutNetIds.size < (cmd.difficulty === 'easy' ? 1 : 2) && combatUnits.length > 0) {
-                const candidateScout = combatUnits.find(u => !u.combatTarget && !cmd.scoutNetIds.has(u.netId));
-                if (candidateScout) {
-                    candidateScout.isScout = true;
-                    cmd.scoutNetIds.add(candidateScout.netId);
-                    if (cmd.stagingTeam) {
-                        cmd.stagingTeam = cmd.stagingTeam.filter(id => id !== candidateScout.netId);
-                    }
+            const reconSquadSize = (cmd.difficulty === 'easy') ? 2 : 3;
+            while (cmd.scoutNetIds.size < reconSquadSize && combatUnits.length > cmd.scoutNetIds.size) {
+                const candidateScout = combatUnits.find(u => !u.combatTarget && !u._releasedForAttack && !cmd.scoutNetIds.has(u.netId));
+                if (!candidateScout) break;
+                candidateScout.isScout = true;
+                cmd.scoutNetIds.add(candidateScout.netId);
+                if (cmd.stagingTeam) {
+                    cmd.stagingTeam = cmd.stagingTeam.filter(id => id !== candidateScout.netId);
                 }
             }
 
@@ -1171,24 +1170,67 @@ function processEnemyAIEngine() {
                 }
             };
 
-            cmd.scoutNetIds.forEach(scoutNetId => {
-                    const scout = myUnits.find(u => u.netId === scoutNetId);
-                    if (!scout) return;
-                    if (scout.waypoints && scout.waypoints.length > 0) return;
+            const scoutUnits = [];
+            cmd.scoutNetIds.forEach(sId => {
+                const su = myUnits.find(u => u.netId === sId);
+                if (su && su.health > 0) scoutUnits.push(su);
+            });
 
-                    const distToGoal = scout.mesh.position.distanceTo(scout.targetPosition);
-                    if (distToGoal < 16.0 || scout.targetPosition.distanceTo(cmd.basePos) < 2.0) {
+            if (scoutUnits.length > 0) {
+                if (!cmd._reconLaunched) {
+                    // Hold recon squad together at rallyPoint until the full 2-3 unit group is assembled
+                    if (scoutUnits.length >= reconSquadSize) {
+                        cmd._reconLaunched = true;
+                        cmd._reconGoal = null;
+                    } else {
+                        scoutUnits.forEach((su, si) => {
+                            if (su.waypoints && su.waypoints.length > 0) return;
+                            const ang = (si / Math.max(1, reconSquadSize)) * Math.PI * 2;
+                            const spot = new THREE.Vector3(cmd.rallyPoint.x + Math.cos(ang) * 6.5, cmd.rallyPoint.y || 0, cmd.rallyPoint.z + Math.sin(ang) * 6.5);
+                            if (su.mesh.position.distanceTo(spot) > 7.5) {
+                                assignAIGroundRoute(su, spot);
+                                su.taskState = 'Moving';
+                            }
+                        });
+                    }
+                }
+                if (cmd._reconLaunched) {
+                    // Check if the squad needs a new shared exploration waypoint
+                    const needNewGoal = !cmd._reconGoal || scoutUnits.some(su => su.mesh.position.distanceTo(cmd._reconGoal) < 18.0);
+                    if (needNewGoal) {
                         if (cmd.unexploredWaypoints.length > 0) {
-                            const nextWp = cmd.unexploredWaypoints.shift();
-                            assignAIGroundRoute(scout, nextWp);
+                            cmd._reconGoal = cmd.unexploredWaypoints.shift().clone();
                         } else {
                             const half = mapSize * 0.35;
                             const rx = (simRandom() * 2 - 1) * half;
                             const rz = (simRandom() * 2 - 1) * half;
-                            assignAIGroundRoute(scout, new THREE.Vector3(rx, typeof getTerrainHeight === 'function' ? getTerrainHeight(rx, rz) : 0, rz));
+                            cmd._reconGoal = new THREE.Vector3(rx, typeof getTerrainHeight === 'function' ? getTerrainHeight(rx, rz) : 0, rz);
                         }
+                        scoutUnits.forEach((su, si) => {
+                            if (su.combatTarget) return;
+                            const offAng = (si / Math.max(1, scoutUnits.length)) * Math.PI * 2;
+                            const dest = new THREE.Vector3(
+                                cmd._reconGoal.x + Math.cos(offAng) * 4.0,
+                                cmd._reconGoal.y || 0,
+                                cmd._reconGoal.z + Math.sin(offAng) * 4.0
+                            );
+                            assignAIGroundRoute(su, dest);
+                        });
+                    } else {
+                        // Ensure any newly reinforced scout joins the active recon squad
+                        scoutUnits.forEach((su, si) => {
+                            if (su.combatTarget || (su.waypoints && su.waypoints.length > 0)) return;
+                            if (su.mesh.position.distanceTo(su.targetPosition) < 4.0 && su.mesh.position.distanceTo(cmd._reconGoal) > 18.0) {
+                                const offAng = (si / Math.max(1, scoutUnits.length)) * Math.PI * 2;
+                                assignAIGroundRoute(su, new THREE.Vector3(cmd._reconGoal.x + Math.cos(offAng) * 4.0, cmd._reconGoal.y || 0, cmd._reconGoal.z + Math.sin(offAng) * 4.0));
+                            }
+                        });
                     }
-            });
+                }
+            } else {
+                cmd._reconLaunched = false;
+                cmd._reconGoal = null;
+            }
 
             // --- 3. Line-of-Sight & Recon Detection Pass (NO OMNISCIENCE!) ---
             myUnits.forEach(u => {
