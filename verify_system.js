@@ -1603,6 +1603,34 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
         if (!obsRun1 || obsRun1 !== obsRun2) {
             throw new Error('Procedural map obstacles should be 100% deterministic under setSimSeed!');
         }
+
+        // 5. Verify retail tank tree toppling (ToppleUpdate): tank drives through tree, topples it & removes from mapObstacles
+        const treeObs = mapObstacles.find(o => o.crushable && o.kind === 'tree');
+        if (!treeObs) throw new Error('Expected crushable tree obstacle on jungle map!');
+        const countBefore = mapObstacles.length;
+        topplingTrees.length = 0;
+        const crusher = spawnUnit('paladin', new THREE.Vector3(treeObs.position.x - 1.0, 0, treeObs.position.z), 'usa');
+        resolveObstacleCollisions(crusher);
+        if (mapObstacles.length !== countBefore - 1 || topplingTrees.length !== 1 || !treeObs.toppled) {
+            throw new Error('Expected Paladin tank to crush and topple tree on contact!');
+        }
+        for (let tStep = 0; tStep < 30; tStep++) updateTopplingTrees(1.0);
+        if (topplingTrees[0].angle < 0.8) {
+            throw new Error('Expected toppling tree to rotate downward during updateTopplingTrees! angle=' + topplingTrees[0].angle);
+        }
+
+        // 6. Verify AI findNavigationPath routes across Heartland Shield river bridges without returning empty []
+        mapBridges.length = 0;
+        setupMapEnvironment('heartland_shield', 1500);
+        const brTest = mapBridges[2];
+        const bfX = Math.sin(brTest.rotationY), bfZ = Math.cos(brTest.rotationY);
+        const bRightX = Math.cos(brTest.rotationY), bRightZ = -Math.sin(brTest.rotationY);
+        const aiStart = new THREE.Vector3(brTest.position.x - bfX * 90 + bRightX * 45, 0, brTest.position.z - bfZ * 90 + bRightZ * 45);
+        const aiGoal = new THREE.Vector3(brTest.position.x + bfX * 90 + bRightX * 45, 0, brTest.position.z + bfZ * 90 + bRightZ * 45);
+        const aiBridgePath = findNavigationPath(aiStart, aiGoal);
+        if (!aiBridgePath || aiBridgePath.length < 3 || !mapBridges.some(b => isPointOnBridge(aiBridgePath[0].x, aiBridgePath[0].z, b))) {
+            throw new Error('Expected AI findNavigationPath to return [entryRamp, exitRamp, goal] across river bridge!');
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

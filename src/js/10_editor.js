@@ -704,6 +704,9 @@ function resetEntireBattlefieldState(mapSize = 1500) {
         landmines.forEach(m => { if (m && m.mesh) disposeSceneNodeSafe(m.mesh); });
         landmines.length = 0;
     }
+    if (typeof topplingTrees !== 'undefined' && Array.isArray(topplingTrees)) {
+        topplingTrees.length = 0;
+    }
     if (typeof window !== 'undefined') {
         if (Array.isArray(window.activeSupplyPlanes)) {
             window.activeSupplyPlanes.forEach(p => { if (p && p.mesh) disposeSceneNodeSafe(p.mesh); });

@@ -3,6 +3,79 @@
 var collisionCount = 0;
 window.collisionCount = 0;
 
+// Retail SAGE CrusherLevel >= 2 vehicles that topple trees/palms/bushes on contact (ToppleUpdate.cpp)
+const TREE_TOPPLE_VEHICLE_SET = new Set([
+    'tank', 'crusader', 'paladin', 'battlemaster', 'overlord',
+    'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank',
+    'scorpion', 'marauder', 'scud', 'dozer', 'crawler', 'tomahawk', 'toxintractor', 'quad'
+]);
+const topplingTrees = [];
+window.topplingTrees = topplingTrees;
+
+function triggerTreeTopple(obs, pushDirX, pushDirZ) {
+    if (!obs || obs.toppled) return;
+    obs.toppled = true;
+    const len = Math.hypot(pushDirX, pushDirZ) || 1;
+    const dirX = pushDirX / len;
+    const dirZ = pushDirZ / len;
+    // Axis perpendicular to push direction on XZ plane: cross((0,1,0), (dirX,0,dirZ)) = (dirZ, 0, -dirX)
+    if (obs.mesh && typeof THREE !== 'undefined' && typeof THREE.Vector3 === 'function') {
+        const axis = new THREE.Vector3(dirZ, 0, -dirX).normalize();
+        const baseQuat = obs.mesh.quaternion && typeof obs.mesh.quaternion.clone === 'function'
+            ? obs.mesh.quaternion.clone()
+            : null;
+        topplingTrees.push({
+            mesh: obs.mesh,
+            axis,
+            baseQuat,
+            baseY: obs.mesh.position.y,
+            angle: 0,
+            angularVel: 0.045,
+            sinkTimer: 0,
+            isBush: obs.kind === 'bush'
+        });
+    }
+    if (typeof spawnTreadDustPuff === 'function' && obs.position) {
+        spawnTreadDustPuff(obs.position, dirX, dirZ, 0x5c4a32, obs.kind === 'bush' ? 0.5 : 0.85);
+    }
+    if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+}
+
+function updateTopplingTrees(scale = 1.0) {
+    if (topplingTrees.length === 0) return;
+    const qStep = (typeof THREE !== 'undefined' && typeof THREE.Quaternion === 'function') ? new THREE.Quaternion() : null;
+    for (let i = topplingTrees.length - 1; i >= 0; i--) {
+        const t = topplingTrees[i];
+        if (!t.mesh) { topplingTrees.splice(i, 1); continue; }
+        if (t.angle < Math.PI * 0.48) {
+            t.angularVel = Math.min(0.14, t.angularVel + 0.0045 * scale);
+            t.angle = Math.min(Math.PI * 0.48, t.angle + t.angularVel * scale);
+            if (qStep && t.baseQuat && t.mesh.quaternion) {
+                qStep.setFromAxisAngle(t.axis, t.angle);
+                t.mesh.quaternion.copy(qStep).multiply(t.baseQuat);
+            } else if (t.mesh.rotation) {
+                t.mesh.rotation.x = t.angle * t.axis.x;
+                t.mesh.rotation.z = t.angle * t.axis.z;
+            }
+            if (t.isBush && t.mesh.scale) {
+                const s = Math.max(0.25, 1 - (t.angle / (Math.PI * 0.48)) * 0.7);
+                t.mesh.scale.y = s;
+            }
+        } else {
+            // After lying fallen for ~2.5s, sink gently into terrain and remove
+            t.sinkTimer += scale;
+            if (t.sinkTimer > 150) {
+                t.mesh.position.y -= 0.05 * scale;
+                if (t.mesh.position.y < t.baseY - 4.5) {
+                    if (t.mesh.parent) t.mesh.parent.remove(t.mesh);
+                    topplingTrees.splice(i, 1);
+                }
+            }
+        }
+    }
+}
+window.updateTopplingTrees = updateTopplingTrees;
+
 function resolveObstacleCollisions(unit) {
     if (unit.isAir) return; // Aircraft fly safely above ground structures and trees
 
@@ -78,14 +151,27 @@ function resolveObstacleCollisions(unit) {
         }
     }
 
-    // 2. Map Obstacle Collisions (Skyscrapers, Rocks, Dense Trees)
-    for (let obs of mapObstacles) {
+    // 2. Map Obstacle Collisions (Skyscrapers, Rocks, Dense Trees — tracked tanks crush & topple trees/bushes!)
+    const canToppleTrees = TREE_TOPPLE_VEHICLE_SET.has(unit.type);
+    for (let oi = mapObstacles.length - 1; oi >= 0; oi--) {
+        const obs = mapObstacles[oi];
+        if (!obs || obs.toppled) continue;
         const minDist = obs.radius + unit.radius;
         const dx = unit.mesh.position.x - obs.position.x;
         const dz = unit.mesh.position.z - obs.position.z;
         const dist2D = Math.hypot(dx, dz);
 
         if (dist2D < minDist && dist2D > 0.0001) {
+            // Retail SAGE ToppleUpdate: tracked vehicles knock down trees/palms/bushes in travel direction without stopping
+            if (obs.crushable && (canToppleTrees || obs.kind === 'bush')) {
+                const fwdX = -dx;
+                const fwdZ = -dz;
+                triggerTreeTopple(obs, fwdX, fwdZ);
+                mapObstacles.splice(oi, 1);
+                continue;
+            }
+            if (obs.nonBlocking) continue;
+
             const push = minDist - dist2D;
             const normX = dx / dist2D;
             const normZ = dz / dist2D;

@@ -102,11 +102,11 @@ function classifyPathfindPosition(wx, wz, ignoreStruct = null, extraClearance = 
     if (typeof structures !== 'undefined' && checkStructList(structures)) return PATHFIND_CELL_TYPES.OBSTACLE;
     if (typeof enemyStructures !== 'undefined' && checkStructList(enemyStructures)) return PATHFIND_CELL_TYPES.OBSTACLE;
 
-    // Check map obstacles
+    // Check map obstacles (skip nonBlocking bushes and crushable trees/palms so tanks & AI path cleanly through foliage)
     if (typeof mapObstacles !== 'undefined' && mapObstacles) {
         for (let i = 0; i < mapObstacles.length; i++) {
             const obs = mapObstacles[i];
-            if (!obs || !obs.position) continue;
+            if (!obs || !obs.position || obs.nonBlocking || obs.crushable || obs.toppled) continue;
             const r = (obs.radius || 2.5) + extraClearance * 0.8;
             const dx = wx - obs.position.x;
             const dz = wz - obs.position.z;
@@ -214,7 +214,7 @@ function rebuildPathfindGrid() {
     if (typeof mapObstacles !== 'undefined' && mapObstacles) {
         for (let i = 0; i < mapObstacles.length; i++) {
             const obs = mapObstacles[i];
-            if (!obs || !obs.position) continue;
+            if (!obs || !obs.position || obs.nonBlocking || obs.crushable || obs.toppled) continue;
             stampCircle(obs.position.x, obs.position.z, (obs.radius || 2.5) + 1.2);
         }
     }
@@ -298,6 +298,43 @@ function findNavigationPath(startPos, endPos, options = {}) {
     // Fast path: if direct line-of-sight is clear, no intermediate waypoints needed
     if (isPathfindSegmentClear(startPos, endPos, ignoreStruct, 1.4)) {
         return [endPos.clone()];
+    }
+
+    // Bridge-aware macro shortcut: if direct line crosses a river and bridges exist, route cleanly via bridge entry/exit ramps
+    const hasBridges = typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0;
+    if (hasBridges && typeof currentWaterLevel !== 'undefined' && currentWaterLevel > -100 && typeof getTerrainHeight === 'function') {
+        const segDist = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z);
+        const samples = Math.max(16, Math.min(120, Math.ceil(segDist / 8.0)));
+        let hitsWater = false;
+        for (let i = 1; i < samples; i++) {
+            const t = i / samples;
+            const px = startPos.x + (endPos.x - startPos.x) * t;
+            const pz = startPos.z + (endPos.z - startPos.z) * t;
+            if (getTerrainHeight(px, pz) < currentWaterLevel + 0.15 && !mapBridges.some(b => isPointOnBridge(px, pz, b))) {
+                hitsWater = true;
+                break;
+            }
+        }
+        if (hitsWater) {
+            let bestB = null, bestD = Infinity;
+            for (let bi = 0; bi < mapBridges.length; bi++) {
+                const b = mapBridges[bi];
+                const d = Math.hypot(startPos.x - b.position.x, startPos.z - b.position.z) + Math.hypot(endPos.x - b.position.x, endPos.z - b.position.z);
+                if (d < bestD) { bestD = d; bestB = b; }
+            }
+            if (bestB) {
+                const fwdX = Math.sin(bestB.rotationY);
+                const fwdZ = Math.cos(bestB.rotationY);
+                const halfLen = bestB.length * 0.44;
+                const r1 = new THREE.Vector3(bestB.position.x - fwdX * halfLen, bestB.deckY, bestB.position.z - fwdZ * halfLen);
+                const r2 = new THREE.Vector3(bestB.position.x + fwdX * halfLen, bestB.deckY, bestB.position.z + fwdZ * halfLen);
+                const d1 = Math.hypot(startPos.x - r1.x, startPos.z - r1.z);
+                const d2 = Math.hypot(startPos.x - r2.x, startPos.z - r2.z);
+                const entry = d1 <= d2 ? r1 : r2;
+                const exit = d1 <= d2 ? r2 : r1;
+                return [entry, exit, endPos.clone()];
+            }
+        }
     }
 
     const sCount = (typeof structures !== 'undefined' && structures) ? structures.length : 0;
@@ -1107,20 +1144,40 @@ function processEnemyAIEngine() {
                 }
             }
 
+            const assignAIGroundRoute = (unit, destPos, ignoreStruct = null) => {
+                if (!unit || !destPos) return;
+                if (unit.isAir) {
+                    unit.waypoints = [];
+                    unit.targetPosition.copy(destPos);
+                    return;
+                }
+                const navPath = (typeof findNavigationPath === 'function')
+                    ? findNavigationPath(unit.mesh.position, destPos, { ignoreStruct })
+                    : [destPos.clone()];
+                if (navPath && navPath.length > 1) {
+                    unit.waypoints = navPath.slice(1);
+                    unit.targetPosition.copy(navPath[0]);
+                } else {
+                    unit.waypoints = [];
+                    unit.targetPosition.copy(destPos);
+                }
+            };
+
             cmd.scoutNetIds.forEach(scoutNetId => {
                     const scout = myUnits.find(u => u.netId === scoutNetId);
                     if (!scout) return;
+                    if (scout.waypoints && scout.waypoints.length > 0) return;
 
                     const distToGoal = scout.mesh.position.distanceTo(scout.targetPosition);
                     if (distToGoal < 16.0 || scout.targetPosition.distanceTo(cmd.basePos) < 2.0) {
                         if (cmd.unexploredWaypoints.length > 0) {
                             const nextWp = cmd.unexploredWaypoints.shift();
-                            scout.targetPosition.copy(nextWp);
+                            assignAIGroundRoute(scout, nextWp);
                         } else {
                             const half = mapSize * 0.35;
                             const rx = (simRandom() * 2 - 1) * half;
                             const rz = (simRandom() * 2 - 1) * half;
-                            scout.targetPosition.set(rx, typeof getTerrainHeight === 'function' ? getTerrainHeight(rx, rz) : 0, rz);
+                            assignAIGroundRoute(scout, new THREE.Vector3(rx, typeof getTerrainHeight === 'function' ? getTerrainHeight(rx, rz) : 0, rz));
                         }
                     }
             });
@@ -1169,7 +1226,7 @@ function processEnemyAIEngine() {
                         combatUnits.forEach(ally => {
                                 if (!ally.combatTarget && ally.mesh.position.distanceTo(victimPos) <= ZERO_HOUR_AI_DATA.retaliateFriendsRadius) {
                                     ally.combatTarget = attacker;
-                                    ally.targetPosition.copy(attackerPos);
+                                    assignAIGroundRoute(ally, attackerPos, attacker);
                                 }
                         });
                     }
@@ -1225,7 +1282,10 @@ function processEnemyAIEngine() {
                             enemy.combatTarget = null;
                         } else {
                             if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
-                                enemy.targetPosition.copy(targetPos);
+                                // Never overwrite active bridge/A* waypoints while already routing toward target!
+                                if (!enemy.waypoints || enemy.waypoints.length === 0) {
+                                    assignAIGroundRoute(enemy, targetPos, enemy.combatTarget);
+                                }
                             }
                             return;
                         }
@@ -1245,19 +1305,20 @@ function processEnemyAIEngine() {
                     });
                     if (localIntruder) {
                         enemy.combatTarget = localIntruder;
-                        enemy.targetPosition.copy(localIntruder.mesh.position);
+                        assignAIGroundRoute(enemy, localIntruder.mesh.position, localIntruder);
                         return;
                     }
 
                     // Hold in staging rally area until wave is full or offensive grace expires
                     const isStaging = cmd.stagingTeam.includes(enemy.netId) && !enemy._releasedForAttack;
                     if (!canLaunchOffensive || isStaging || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
+                        if (enemy.waypoints && enemy.waypoints.length > 0) return;
                         const slotIdx = (enemy.netId || 1);
                         const slotAng = (slotIdx % 12) * (Math.PI * 2 / 12);
                         const slotR = 5.5 + ((slotIdx >> 2) % 3) * 4.5;
                         const stagedSpot = new THREE.Vector3(cmd.rallyPoint.x + Math.cos(slotAng) * slotR, cmd.rallyPoint.y || 0, cmd.rallyPoint.z + Math.sin(slotAng) * slotR);
                         if (enemy.mesh.position.distanceTo(stagedSpot) > 5) {
-                            enemy.targetPosition.copy(stagedSpot);
+                            assignAIGroundRoute(enemy, stagedSpot);
                             enemy.taskState = 'Moving';
                         }
                         return;

@@ -365,6 +365,7 @@ function animate() {
     // Update Weapon Effects & Particle System
 
     updateFXEngine();
+    if (typeof updateTopplingTrees === 'function') updateTopplingTrees(combatDeltaScale);
 
     // Update Top-Right Match Clock (Zero Hour style)
     if (typeof isMatchActive !== 'undefined' && isMatchActive && typeof matchStartTime !== 'undefined' && matchStartTime > 0) {
@@ -2985,7 +2986,7 @@ function processEnemyMovement() {
                     }
                 }
 
-                // AI Anti-Stuck Watchdog: prevent dozers/units from vibrating forever against obstacles
+                // AI Anti-Stuck Watchdog: prevent dozers/units from vibrating forever against obstacles or riverbanks
                 if (!enemy.isAir) {
                     enemy._aiStuckTick = (enemy._aiStuckTick || 0) + 1;
                     if (!enemy._aiLastPos) enemy._aiLastPos = enemy.mesh.position.clone();
@@ -2994,13 +2995,28 @@ function processEnemyMovement() {
                         enemy._aiLastPos.copy(enemy.mesh.position);
                         enemy._aiStuckTick = 0;
                         if (moved < 0.25) {
-                            const sideAngle = ((enemy.netId || 1) % 2 === 0 ? 1 : -1) * (Math.PI / 2);
-                            const perpX = Math.cos(sideAngle) * dirX - Math.sin(sideAngle) * dirZ;
-                            const perpZ = Math.sin(sideAngle) * dirX + Math.cos(sideAngle) * dirZ;
-                            const detour = new THREE.Vector3(enemy.mesh.position.x + perpX * 14, 0, enemy.mesh.position.z + perpZ * 14);
-                            if (!enemy.waypoints) enemy.waypoints = [];
-                            enemy.waypoints.unshift(enemy.targetPosition.clone());
-                            enemy.targetPosition.copy(detour);
+                            // First attempt full A* / bridge reroute to final goal instead of blind perpendicular sidestep
+                            const finalGoal = (enemy.waypoints && enemy.waypoints.length > 0)
+                                ? enemy.waypoints[enemy.waypoints.length - 1]
+                                : enemy.targetPosition;
+                            const reroute = (typeof findNavigationPath === 'function' && finalGoal)
+                                ? findNavigationPath(enemy.mesh.position, finalGoal, { ignoreStruct: enemy.targetStructure || enemy.combatTarget || null })
+                                : null;
+                            if (reroute && reroute.length > 1) {
+                                enemy.waypoints = reroute.slice(1);
+                                enemy.targetPosition.copy(reroute[0]);
+                            } else {
+                                const sideAngle = ((enemy.netId || 1) % 2 === 0 ? 1 : -1) * (Math.PI / 2);
+                                const perpX = Math.cos(sideAngle) * dirX - Math.sin(sideAngle) * dirZ;
+                                const perpZ = Math.sin(sideAngle) * dirX + Math.cos(sideAngle) * dirZ;
+                                const rawDetour = new THREE.Vector3(enemy.mesh.position.x + perpX * 14, 0, enemy.mesh.position.z + perpZ * 14);
+                                const safeDetour = (typeof adjustToPossibleDestination === 'function')
+                                    ? adjustToPossibleDestination(rawDetour, enemy.targetStructure || null)
+                                    : rawDetour;
+                                if (!enemy.waypoints) enemy.waypoints = [];
+                                enemy.waypoints.unshift(enemy.targetPosition.clone());
+                                enemy.targetPosition.copy(safeDetour);
+                            }
                         }
                     }
                 }

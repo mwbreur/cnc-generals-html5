@@ -1483,14 +1483,14 @@ function spawnMapProps(theme, mapSize) {
                     : createPalmTreeMesh();
                     palm.position.set(x, y, z);
                     mapPropsGroup.add(palm);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.6 });
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.6, kind: 'palm', mesh: palm, crushable: true, toppled: false });
                 } else if (kind === 'tree') {
                     const tree = (theme !== 'snow' && typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_tree'])
                     ? createW3DBuildingMesh('prop_tree', false)
                     : ((theme === 'snow') ? createSnowPineMesh() : createJungleTreeMesh());
                     tree.position.set(x, y, z);
                     mapPropsGroup.add(tree);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0, kind: 'tree', mesh: tree, crushable: true, toppled: false });
                 } else if (kind === 'bush') {
                     const bush = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_bush'])
                     ? createW3DBuildingMesh('prop_bush', false)
@@ -1498,6 +1498,7 @@ function spawnMapProps(theme, mapSize) {
                     if (!bush.userData || !bush.userData.isW3D) bush.scale.set(0.5, 0.45, 0.5);
                     bush.position.set(x, y, z);
                     mapPropsGroup.add(bush);
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: bush, crushable: true, toppled: false, nonBlocking: true });
                 } else if (kind === 'rock') {
                     const rockCol = theme === 'snow' ? 0xbdc3c7 : theme === 'jungle' ? 0x5d6d5a : 0x8a775b;
                     const rock = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_rock'])
@@ -1611,12 +1612,12 @@ function spawnMapProps(theme, mapSize) {
                     const palm = createPalmTreeMesh();
                     palm.position.set(x, y, z);
                     mapPropsGroup.add(palm);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.8 });
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.8, kind: 'palm', mesh: palm, crushable: true, toppled: false });
                 } else if (roll > 0.3) {
                     const cactus = createCactusMesh();
                     cactus.position.set(x, y, z);
                     mapPropsGroup.add(cactus);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.4 });
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.4, kind: 'bush', mesh: cactus, crushable: true, toppled: false });
                 } else if (roll > 0.1) {
                     const rock = createRockMesh(0x8a775b);
                     rock.position.set(x, y + 0.5, z);
@@ -1635,11 +1636,12 @@ function spawnMapProps(theme, mapSize) {
                     const tree = createJungleTreeMesh();
                     tree.position.set(x, y, z);
                     mapPropsGroup.add(tree);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.4 });
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.4, kind: 'tree', mesh: tree, crushable: true, toppled: false });
                 } else if (roll > 0.25) {
                     const fern = createFernMesh();
                     fern.position.set(x, y, z);
                     mapPropsGroup.add(fern);
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: fern, crushable: true, toppled: false, nonBlocking: true });
                 } else if (roll > 0.1) {
                     const reed = createReedMesh();
                     reed.position.set(x, y, z);
@@ -1656,7 +1658,7 @@ function spawnMapProps(theme, mapSize) {
                     const pine = createSnowPineMesh();
                     pine.position.set(x, y, z);
                     mapPropsGroup.add(pine);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
+                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0, kind: 'tree', mesh: pine, crushable: true, toppled: false });
                 } else if (roll > 0.2) {
                     const ice = createIceSpikeMesh();
                     ice.position.set(x, y, z);
