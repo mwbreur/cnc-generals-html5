@@ -4020,7 +4020,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
     else if (type === 'drone_scout') {
         mesh = (typeof createW3DVehicleMesh === 'function') ? createW3DVehicleMesh('drone_scout', false) : new THREE.Group();
         radius = 1.4; speed = 0.25; health = 80; scanRange = 45; isAir = true;
-        mesh.userData = Object.assign(mesh.userData || {}, { flightAltitude: 14.0 });
+        mesh.userData = Object.assign(mesh.userData || {}, { flightAltitude: 18.0 });
     }
     else {
         mesh = spawnFaction === 'china' ? createBattlemasterTankMesh(false) : spawnFaction === 'gla' ? createScorpionTankMesh(false) : createCrusaderTankMesh(false);

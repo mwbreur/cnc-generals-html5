@@ -349,10 +349,10 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         cargoHold.visible = false;
         const slingMat = new THREE.MeshStandardMaterial({ color: 0x3a3832, roughness: 0.9, metalness: 0.1 });
         const ropePairs = [
-            ['ROPESTART01', [-4.01, -6.28, 4.51], [-4.2, -16.8, 3.0]],
-            ['ROPESTART02', [-4.04, -6.28, -9.41], [-4.2, -16.8, -6.5]],
-            ['ROPESTART03', [4.79, -6.28, 4.76], [4.2, -16.8, 3.0]],
-            ['ROPESTART04', [4.86, -6.28, -9.17], [4.2, -16.8, -6.5]]
+            ['ROPESTART01', [-4.01, -6.28, 4.51], [-4.0, -13.2, 2.8]],
+            ['ROPESTART02', [-4.04, -6.28, -9.41], [-4.0, -13.2, -6.2]],
+            ['ROPESTART03', [4.79, -6.28, 4.76], [4.0, -13.2, 2.8]],
+            ['ROPESTART04', [4.86, -6.28, -9.17], [4.0, -13.2, -6.2]]
         ];
         const upVec = (typeof THREE.Vector3 === 'function') ? new THREE.Vector3(0, 1, 0) : null;
         ropePairs.forEach(([, topArr, botArr]) => {
@@ -370,7 +370,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         if (window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['chinook_cargo_net']) {
             const netMesh = createW3DBuildingMesh('chinook_cargo_net', isEnemy);
             netMesh.scale.set(0.62, 0.72, 0.62);
-            netMesh.position.set(0.3, -21.2, -1.8);
+            netMesh.position.set(0.3, -16.8, -1.8);
             cargoHold.add(netMesh);
         }
         const chBone = root.getObjectByName('CHASSIS') || root;
@@ -486,7 +486,7 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         }
     } else {
         root.userData.isAir = true;
-        root.userData.flightAltitude = (modelKey === 'chinook') ? 15.0 : (modelKey === 'comanche') ? 13.5 : (modelKey === 'aurora') ? 16.5 : 15.5;
+        root.userData.flightAltitude = (modelKey === 'chinook') ? 20.0 : (modelKey === 'comanche') ? 17.5 : (modelKey === 'aurora') ? 25.0 : 22.5;
     }
 
     root.userData.isW3D = true;

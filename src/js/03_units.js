@@ -558,7 +558,7 @@ function createChinookMesh(isEnemy = false) {
     }
     const g = new THREE.Group();
     g.userData.isAir = true;
-    g.userData.flightAltitude = 15.0;
+    g.userData.flightAltitude = 20.0;
 
     // Aerodynamic elongated fuselage
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 5.2), matUSA);
@@ -621,7 +621,7 @@ function createComancheMesh(isEnemy = false) {
     }
     const g = new THREE.Group();
     g.userData.isAir = true;
-    g.userData.flightAltitude = 13.5;
+    g.userData.flightAltitude = 17.5;
 
     // RAH-66 Faceted Stealth Attack Fuselage
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.95, 4.4), matUSA);
@@ -693,7 +693,7 @@ function createRaptorMesh(isEnemy = false) {
     }
     const g = new THREE.Group();
     g.userData.isAir = true;
-    g.userData.flightAltitude = 15.5;
+    g.userData.flightAltitude = 22.5;
 
     // F-22 Stealth Air Superiority Airframe
     const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.65, 4.8), matUSA);
@@ -740,7 +740,7 @@ function createStealthFighterMesh(isEnemy = false) {
     }
     const g = new THREE.Group();
     g.userData.isAir = true;
-    g.userData.flightAltitude = 15.5;
+    g.userData.flightAltitude = 22.5;
     const stealthMat = new THREE.MeshStandardMaterial({ color: 0x1f2421, roughness: 0.4, metalness: 0.8 });
 
     // F-117 Faceted Stealth Body
@@ -766,7 +766,7 @@ function createAuroraMesh(isEnemy = false) {
     }
     const g = new THREE.Group();
     g.userData.isAir = true;
-    g.userData.flightAltitude = 16.5;
+    g.userData.flightAltitude = 25.0;
     const sleekMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, roughness: 0.25, metalness: 0.85 });
 
     // Hypersonic Mach 5 waverider blended body

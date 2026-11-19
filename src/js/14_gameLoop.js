@@ -1485,20 +1485,23 @@ function animate() {
             if (unit.type === 'chinook') unit.airState = 'hovering';
             unit.timerState = (unit.timerState || 0) + 1;
             if (unit.timerState > 40) {
-                const earned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? 100 : 200));
+                const baseEarned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? 100 : 200));
                 if (!isAIUnit && unit.teamId === (typeof playerTeamId !== 'undefined' ? playerTeamId : 1)) {
+                    // USA Strategy Center "Supply Lines" upgrade: +10% bonus cash on every Supply Center delivery
+                    const hasSupplyLines = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines'));
+                    const earned = hasSupplyLines ? Math.round(baseEarned * 1.10) : baseEarned;
                     playerResources += earned;
                     const resEl = document.getElementById('resource-display');
                     if (resEl) resEl.innerText = '$' + playerResources;
                     if (typeof spawnFloatingCashNumber === 'function' && unit.mesh) {
                         spawnFloatingCashNumber(unit.mesh.position.clone().add(new THREE.Vector3(0, 2.5, 0)), earned);
                     }
-                    showNotification('Supplies delivered: +$' + earned, 'success');
+                    showNotification('Supplies delivered: +$' + earned + (hasSupplyLines ? ' (+10% Supply Lines)' : ''), 'success');
                     updateSidebar();
                 } else if (unit.ownerId && typeof aiCommanders !== 'undefined' && aiCommanders[unit.ownerId]) {
-                    aiCommanders[unit.ownerId].resources = (aiCommanders[unit.ownerId].resources || 0) + earned;
+                    aiCommanders[unit.ownerId].resources = (aiCommanders[unit.ownerId].resources || 0) + baseEarned;
                 } else if (typeof aiResources !== 'undefined') {
-                    aiResources += earned;
+                    aiResources += baseEarned;
                 }
                 unit.cargoLoaded = 0;
                 if (cargoHold) cargoHold.visible = false;
