@@ -1415,13 +1415,15 @@ vm.runInContext(`
 
         const ccColorTest = createW3DBuildingMesh('usa_commandCenter', false, null, 0xe11d48);
         const ccHouseDeck = ccColorTest.getObjectByName('abbtcmdhq.housecolor01');
-        const ccTrimFront = ccColorTest.getObjectByName('usaCcHouseColorTrimFront');
-        const ccTrimUpper = ccColorTest.getObjectByName('usaCcHouseColorTrimUpper');
-        if (!ccHouseDeck || !ccTrimFront || !ccTrimUpper) {
-            throw new Error('Expected usa_commandCenter to include abbtcmdhq.housecolor01 and player-color trim fascia meshes!');
+        const ccFlag = ccColorTest.getObjectByName('abbtcmdhq.housecolor04');
+        if (!ccHouseDeck || !ccFlag) {
+            throw new Error('Expected usa_commandCenter to include official retail abbtcmdhq.housecolor01 and flag meshes!');
         }
-        if (ccHouseDeck.material !== ccTrimFront.material || ccHouseDeck.material !== ccTrimUpper.material) {
-            throw new Error('Expected abbtcmdhq.housecolor01 on usa_commandCenter to share accentMat with player-color trims!');
+        if (ccColorTest.getObjectByName('usaCcHouseColorTrimFront') || ccColorTest.getObjectByName('usaCcHouseColorTrimUpper')) {
+            throw new Error('usa_commandCenter must use only official retail W3D geometry (no custom procedural trim boxes)!');
+        }
+        if (ccHouseDeck.material !== ccFlag.material) {
+            throw new Error('Expected abbtcmdhq.housecolor01 on usa_commandCenter to share accentMat with official house-color flag!');
         }
 
         // 12. Heartland Shield river bridges & land unit river crossing

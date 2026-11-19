@@ -590,12 +590,6 @@ function injectMissingSubmeshesFromW3D(buildingKey, w3dFile, meshFilterRe) {
         const m = raw.meshes[mName];
         if (!m || !m.v || m.v.length === 0 || !m.i || m.i.length === 0) continue;
         const vCopy = m.v.slice();
-        // Lift flat untextured HOUSECOLOR01 rooftop terraces by +0.06 Y to prevent Z-fighting with adjacent slab faces
-        if (/\.housecolor01$/i.test(mName) && !m.tex) {
-            for (let k = 1; k < vCopy.length; k += 3) {
-                vCopy[k] = parseFloat((vCopy[k] + 0.06).toFixed(2));
-            }
-        }
         bObj.m[mName] = { v: vCopy, i: m.i, u: m.u, tex: m.tex };
         if (!bObj.h.some(([bi, mn]) => mn === mName)) {
             bObj.h.push([boneIdx, mName]);
