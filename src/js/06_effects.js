@@ -261,14 +261,591 @@ function spawnGroundDustPlume(pos, scale = 1.0) {
 
 function spawnCannonImpactFX(pos, isHeavy = false, isHeroic = false, armorCat = 'heavy_vehicle') {
     if (!pos || typeof scene === 'undefined') return;
-    const flashCol = isHeroic ? 0xff2a2a : (isHeavy ? 0xff9f43 : 0xffbe55);
-    spawnMuzzleFlash(pos, flashCol, isHeavy ? 0.72 : 0.48);
-    spawnSparks(pos, isHeroic ? 0xff4444 : 0xffd32a, isHeavy ? 10 : 6);
-    spawnTreadDustPuff(pos, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, getTerrainDustColor(), isHeavy ? 0.62 : 0.42);
+    const flashCol = isHeroic ? 0xff2a2a : (isHeavy ? 0xff7f2a : 0xffaa3b);
+    const fireTex = _getFxSpriteTex('fireball');
+    const flashTex = _getFxSpriteTex('flash');
+
+    // 1. Bright core flash + fiery impact fireball
+    spawnMuzzleFlash(pos, isHeroic ? 0xff2222 : 0xfff0c0, isHeavy ? 0.95 : 0.65);
+    if (fireTex && activeFX.length < 340) {
+        const puffs = isHeavy ? 3 : 2;
+        for (let i = 0; i < puffs; i++) {
+            const mat = new THREE.SpriteMaterial({
+                map: fireTex,
+                color: flashCol,
+                transparent: true,
+                opacity: 0.95,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const sp = new THREE.Sprite(mat);
+            const s0 = (isHeavy ? 1.55 : 1.05) * (0.85 + Math.random() * 0.35);
+            sp.scale.set(s0, s0, s0);
+            sp.position.set(
+                pos.x + (Math.random() - 0.5) * (isHeavy ? 0.9 : 0.45),
+                (pos.y || 0) + 0.35 + Math.random() * 0.45,
+                pos.z + (Math.random() - 0.5) * (isHeavy ? 0.9 : 0.45)
+            );
+            scene.add(sp);
+            let life = isHeavy ? 16 : 12;
+            const maxLife = life;
+            activeFX.push({
+                mesh: sp,
+                life,
+                update() {
+                    life--;
+                    const prog = 1 - life / maxLife;
+                    const s = s0 * (1 + prog * 1.45);
+                    sp.scale.set(s, s, s);
+                    sp.position.y += 0.04;
+                    mat.opacity = Math.max(0, (1 - prog) * 0.95);
+                    if (life <= 0) {
+                        scene.remove(sp);
+                        mat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+    }
+
+    // 2. Incandescent shrapnel sparks & flying dirt/dust kick-up
+    spawnSparks(pos, isHeroic ? 0xff4444 : 0xffd32a, isHeavy ? 14 : 8);
+    const dustCol = getTerrainDustColor();
+    const dustCount = isHeavy ? 3 : 2;
+    for (let d = 0; d < dustCount; d++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = (isHeavy ? 1.4 : 0.9) * (0.6 + Math.random() * 0.6);
+        spawnTreadDustPuff(pos, Math.cos(ang) * spd, Math.sin(ang) * spd, dustCol, isHeavy ? 0.72 : 0.48);
+    }
+
+    // 3. Dark impact smoke plume
+    spawnSmokePuff(
+        { x: pos.x, y: (pos.y || 0) + 0.4, z: pos.z },
+        0x2e333b,
+        isHeavy ? 0.62 : 0.40
+    );
+
+    // 4. Subtle scorch mark on heavy or ground hits
+    if (isHeavy || Math.random() < 0.45) {
+        spawnCraterDecal(pos, isHeavy ? 1.55 : 0.95, isHeavy ? 260 : 180, 'explosive');
+    }
+
     if (typeof playAudio === 'function') {
         const key = armorCat === 'building' ? 'impact_building' : (isHeavy ? 'expl_small' : 'impact_vehicle');
         playAudio(key, { volume: isHeavy ? 0.55 : 0.42, pos });
     }
+}
+
+function spawnBulletImpactFX(pos, armorCat = 'heavy_vehicle', isHeroic = false) {
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 330) return;
+    if (armorCat === 'heavy_vehicle' || armorCat === 'light_vehicle' || armorCat === 'air') {
+        spawnSparks(pos, isHeroic ? 0xff3b3b : 0xffe066, 3);
+        if (Math.random() < 0.5) spawnMuzzleFlash(pos, isHeroic ? 0xff2222 : 0xffcc55, 0.22);
+    } else {
+        spawnTreadDustPuff(pos, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, getTerrainDustColor(), 0.28);
+        if (Math.random() < 0.35) spawnSparks(pos, isHeroic ? 0xff3b3b : 0xffd32a, 2);
+    }
+}
+
+// Authentic C&C Generals Tank & Artillery Cannon Muzzle Blast:
+// Directional fireball cone + muzzle-brake side gas vents + billowing lingering gunsmoke plume + ground overpressure dust
+function spawnCannonMuzzleBlast(muzzlePos, targetPos, opts = {}) {
+    if (!muzzlePos || typeof scene === 'undefined') return;
+    const scale = opts.scale || 1.0;
+    const isHeroic = !!opts.isHeroic;
+    const isArtillery = !!opts.isArtillery;
+    const dualVent = opts.dualVent !== false;
+    const flashCol = isHeroic ? 0xff2222 : (opts.color || 0xff9f43);
+    const smokeCol = opts.smokeColor !== undefined ? opts.smokeColor : 0xc8c4bc;
+
+    let dx = targetPos ? (targetPos.x - muzzlePos.x) : 0;
+    let dy = targetPos ? (targetPos.y - muzzlePos.y) : 0;
+    let dz = targetPos ? (targetPos.z - muzzlePos.z) : 1;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    dx /= len; dy /= len; dz /= len;
+    const hLen = Math.hypot(dx, dz) || 1;
+    const hx = dx / hLen, hz = dz / hLen;
+    // Perpendicular horizontal vector for muzzle-brake side vents
+    const sx = -hz, sz = hx;
+
+    const flashTex = _getFxSpriteTex('flash');
+    const fireTex = _getFxSpriteTex('fireball');
+    const smokeTex = _getFxSpriteTex('smoke');
+
+    // 1. Directional bright muzzle flame cone (3 staggered sprites forward along bore)
+    const coneOffsets = [0.0, 0.55 * scale, 1.15 * scale];
+    const coneSizes = [1.05 * scale, 0.85 * scale, 0.62 * scale];
+    for (let i = 0; i < coneOffsets.length; i++) {
+        const useFlash = (i === 0);
+        const tex = useFlash ? flashTex : fireTex;
+        const mat = tex
+            ? new THREE.SpriteMaterial({
+                map: tex,
+                color: i === 0 ? (isHeroic ? 0xff4444 : 0xfff5cc) : flashCol,
+                transparent: true,
+                opacity: 1.0,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            })
+            : new THREE.MeshBasicMaterial({ color: flashCol, transparent: true, opacity: 0.95 });
+        const sp = tex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere8, mat);
+        const s0 = coneSizes[i] * (tex ? 2.2 : 0.85);
+        sp.scale.set(s0, s0, s0);
+        sp.position.set(
+            muzzlePos.x + dx * coneOffsets[i],
+            muzzlePos.y + dy * coneOffsets[i],
+            muzzlePos.z + dz * coneOffsets[i]
+        );
+        scene.add(sp);
+        let life = 6 + i * 2;
+        const maxLife = life;
+        const fwdSpd = (0.14 + i * 0.06) * scale;
+        activeFX.push({
+            mesh: sp,
+            life,
+            update() {
+                life--;
+                const prog = 1 - life / maxLife;
+                const curS = s0 * (1 + prog * 0.85);
+                sp.scale.set(curS, curS, curS);
+                sp.position.x += dx * fwdSpd * (1 - prog * 0.6);
+                sp.position.y += dy * fwdSpd * (1 - prog * 0.6) + 0.015;
+                sp.position.z += dz * fwdSpd * (1 - prog * 0.6);
+                mat.opacity = Math.max(0, 1 - prog);
+                if (life <= 0) {
+                    scene.remove(sp);
+                    mat.dispose();
+                    return false;
+                }
+                return true;
+            }
+        });
+    }
+
+    // 2. Side muzzle-brake V-blast gas vents (signature Generals Crusader/Overlord/Battlemaster detail)
+    if (dualVent && activeFX.length < 320) {
+        [-1, 1].forEach(sideSign => {
+            const mat = (fireTex || smokeTex)
+                ? new THREE.SpriteMaterial({
+                    map: fireTex || smokeTex,
+                    color: isHeroic ? 0xff4444 : 0xffc87a,
+                    transparent: true,
+                    opacity: 0.85,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+                : new THREE.MeshBasicMaterial({ color: flashCol, transparent: true, opacity: 0.8 });
+            const sp = (fireTex || smokeTex) ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
+            const s0 = 0.72 * scale * ((fireTex || smokeTex) ? 2.0 : 0.7);
+            sp.scale.set(s0, s0, s0);
+            sp.position.set(
+                muzzlePos.x + sx * sideSign * 0.3 * scale,
+                muzzlePos.y,
+                muzzlePos.z + sz * sideSign * 0.3 * scale
+            );
+            scene.add(sp);
+            let life = 9;
+            const maxLife = 9;
+            let vx = (sx * sideSign * 0.24 - hx * 0.05) * scale;
+            let vz = (sz * sideSign * 0.24 - hz * 0.05) * scale;
+            activeFX.push({
+                mesh: sp,
+                life,
+                update() {
+                    life--;
+                    const prog = 1 - life / maxLife;
+                    const curS = s0 * (1 + prog * 1.15);
+                    sp.scale.set(curS, curS, curS);
+                    sp.position.x += vx;
+                    sp.position.z += vz;
+                    sp.position.y += 0.015;
+                    vx *= 0.84;
+                    vz *= 0.84;
+                    mat.opacity = Math.max(0, (1 - prog) * 0.85);
+                    if (life <= 0) {
+                        scene.remove(sp);
+                        mat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        });
+    }
+
+    // 3. Billowing directional cannon gunsmoke plume (lingers ~1.1-1.6s)
+    if (activeFX.length < 320) {
+        const smokeCount = isArtillery ? 6 : 4;
+        for (let i = 0; i < smokeCount; i++) {
+            const mat = smokeTex
+                ? new THREE.SpriteMaterial({
+                    map: smokeTex,
+                    color: smokeCol,
+                    transparent: true,
+                    opacity: 0.68,
+                    depthWrite: false
+                })
+                : new THREE.MeshBasicMaterial({ color: smokeCol, transparent: true, opacity: 0.62 });
+            const sp = smokeTex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
+            const s0 = (0.42 + i * 0.12) * scale * (smokeTex ? 2.5 : 0.9);
+            sp.scale.set(s0, s0, s0);
+            const fwdOff = (0.25 + i * 0.45) * scale;
+            sp.position.set(
+                muzzlePos.x + dx * fwdOff + (Math.random() - 0.5) * 0.28 * scale,
+                muzzlePos.y + dy * fwdOff + (Math.random() - 0.5) * 0.2 * scale,
+                muzzlePos.z + dz * fwdOff + (Math.random() - 0.5) * 0.28 * scale
+            );
+            scene.add(sp);
+            let life = (isArtillery ? 74 : 56) + Math.floor(Math.random() * 24);
+            const maxLife = life;
+            let vx = (hx * (0.15 + i * 0.045) + sx * (Math.random() - 0.5) * 0.08) * scale;
+            let vz = (hz * (0.15 + i * 0.045) + sz * (Math.random() - 0.5) * 0.08) * scale;
+            const vy = 0.022 + Math.random() * 0.022;
+            activeFX.push({
+                mesh: sp,
+                life,
+                update() {
+                    life--;
+                    const prog = 1 - life / maxLife;
+                    const curS = s0 * (1 + prog * 1.95);
+                    sp.scale.set(curS, curS, curS);
+                    sp.position.x += vx;
+                    sp.position.z += vz;
+                    sp.position.y += vy * (0.5 + prog * 0.8);
+                    vx *= 0.92;
+                    vz *= 0.92;
+                    mat.opacity = Math.max(0, (1 - prog) * 0.65);
+                    if (life <= 0) {
+                        scene.remove(sp);
+                        mat.dispose();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+    }
+
+    // 4. Ground overpressure dust kick-up right beneath the cannon barrel
+    if (activeFX.length < 320) {
+        const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(muzzlePos.x, muzzlePos.z) : 0;
+        if ((muzzlePos.y - gY) < 6.0) {
+            const dustCol = getTerrainDustColor();
+            const dustRings = isArtillery ? 5 : 3;
+            for (let d = 0; d < dustRings; d++) {
+                const ang = (d / dustRings) * Math.PI * 2 + Math.random() * 0.5;
+                const r = (0.7 + Math.random() * 0.6) * scale;
+                const dp = {
+                    x: muzzlePos.x + hx * 0.6 * scale + Math.cos(ang) * r,
+                    y: gY + 0.16,
+                    z: muzzlePos.z + hz * 0.6 * scale + Math.sin(ang) * r
+                };
+                spawnTreadDustPuff(
+                    dp,
+                    (Math.cos(ang) * 1.35 + hx * 0.65) * scale,
+                    (Math.sin(ang) * 1.35 + hz * 0.65) * scale,
+                    dustCol,
+                    (isArtillery ? 0.88 : 0.58) * scale
+                );
+            }
+        }
+    }
+}
+
+// Authentic Rocket / Missile Launcher Backblast Smoke & Dust Cloud
+function spawnRocketBackblast(muzzlePos, targetPos, scale = 1.0) {
+    if (!muzzlePos || typeof scene === 'undefined') return;
+    let dx = targetPos ? (targetPos.x - muzzlePos.x) : 0;
+    let dz = targetPos ? (targetPos.z - muzzlePos.z) : 1;
+    const hLen = Math.hypot(dx, dz) || 1;
+    const bx = -dx / hLen, bz = -dz / hLen;
+
+    spawnMuzzleFlash(muzzlePos, 0xff9f43, 0.55 * scale);
+    const smokeTex = _getFxSpriteTex('smoke');
+    const count = scale >= 1.2 ? 5 : 3;
+    for (let i = 0; i < count; i++) {
+        if (activeFX.length > 330) break;
+        const mat = smokeTex
+            ? new THREE.SpriteMaterial({ map: smokeTex, color: 0xd8d5ce, transparent: true, opacity: 0.65, depthWrite: false })
+            : new THREE.MeshBasicMaterial({ color: 0xd8d5ce, transparent: true, opacity: 0.58 });
+        const sp = smokeTex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
+        const s0 = (0.36 + i * 0.1) * scale * (smokeTex ? 2.4 : 0.85);
+        sp.scale.set(s0, s0, s0);
+        sp.position.set(
+            muzzlePos.x + bx * (0.4 + i * 0.45) * scale + (Math.random() - 0.5) * 0.25,
+            muzzlePos.y + (Math.random() - 0.5) * 0.2,
+            muzzlePos.z + bz * (0.4 + i * 0.45) * scale + (Math.random() - 0.5) * 0.25
+        );
+        scene.add(sp);
+        let life = 34 + Math.floor(Math.random() * 14);
+        const maxLife = life;
+        let vx = bx * (0.14 + i * 0.03) * scale;
+        let vz = bz * (0.14 + i * 0.03) * scale;
+        activeFX.push({
+            mesh: sp,
+            life,
+            update() {
+                life--;
+                const prog = 1 - life / maxLife;
+                const curS = s0 * (1 + prog * 1.8);
+                sp.scale.set(curS, curS, curS);
+                sp.position.x += vx;
+                sp.position.z += vz;
+                sp.position.y += 0.025;
+                vx *= 0.90;
+                vz *= 0.90;
+                mat.opacity = Math.max(0, (1 - prog) * 0.62);
+                if (life <= 0) {
+                    scene.remove(sp);
+                    mat.dispose();
+                    return false;
+                }
+                return true;
+            }
+        });
+    }
+    if (scale >= 1.2) {
+        const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(muzzlePos.x, muzzlePos.z) : 0;
+        const dustCol = getTerrainDustColor();
+        for (let d = 0; d < 3; d++) {
+            spawnTreadDustPuff(
+                { x: muzzlePos.x + bx * (1.2 + d * 0.6), y: gY + 0.18, z: muzzlePos.z + bz * (1.2 + d * 0.6) },
+                bx * 1.4,
+                bz * 1.4,
+                dustCol,
+                0.75 * scale
+            );
+        }
+    }
+}
+
+// Smooth, non-accumulating turret kickback + chassis rock when tanks/artillery fire
+function triggerUnitRecoil(unit, targetPos, strength = 1.0) {
+    if (!unit || !unit.mesh || unit.isAir) return;
+    const turret = (typeof getCachedNode === 'function') ? getCachedNode(unit.mesh, 'turretSystem') : null;
+    if (unit._activeRecoilFX) {
+        unit._activeRecoilFX.cancel();
+        unit._activeRecoilFX = null;
+    }
+    if (turret && !turret.userData._recoilRestPos) {
+        turret.userData._recoilRestPos = turret.position.clone();
+    }
+    const restPos = turret ? turret.userData._recoilRestPos : null;
+    const kickDist = Math.min(0.45, 0.24 * strength);
+    const kickPitch = Math.min(0.085, 0.042 * strength);
+    const totalFrames = 20;
+    let frame = 0;
+    let cancelled = false;
+    const turretYaw = turret ? turret.rotation.y : 0;
+    const kickLocalX = -Math.sin(turretYaw) * kickDist;
+    const kickLocalZ = -Math.cos(turretYaw) * kickDist;
+
+    const fx = {
+        life: totalFrames,
+        cancel() {
+            cancelled = true;
+            if (turret && restPos) turret.position.copy(restPos);
+            if (unit.mesh) unit.mesh.rotation.x = 0;
+        },
+        update() {
+            if (cancelled || !unit.mesh || unit.health <= 0) {
+                if (turret && restPos) turret.position.copy(restPos);
+                if (unit.mesh) unit.mesh.rotation.x = 0;
+                if (unit._activeRecoilFX === fx) unit._activeRecoilFX = null;
+                return false;
+            }
+            frame++;
+            // Fast kick back over first 3 frames, smooth damped recovery over remaining 17 frames
+            const amp = frame <= 3
+                ? (frame / 3)
+                : Math.pow(Math.max(0, 1 - (frame - 3) / (totalFrames - 3)), 1.7);
+            if (turret && restPos) {
+                turret.position.set(
+                    restPos.x + kickLocalX * amp,
+                    restPos.y,
+                    restPos.z + kickLocalZ * amp
+                );
+            }
+            unit.mesh.rotation.x = -kickPitch * amp;
+            if (frame >= totalFrames) {
+                if (turret && restPos) turret.position.copy(restPos);
+                unit.mesh.rotation.x = 0;
+                if (unit._activeRecoilFX === fx) unit._activeRecoilFX = null;
+                return false;
+            }
+            return true;
+        }
+    };
+    unit._activeRecoilFX = fx;
+    activeFX.push(fx);
+}
+
+// High-velocity glowing Cannon / Artillery Shell with smoke streak & synced impact callback
+function spawnCannonShellProjectile(fromPos, toPos, opts = {}) {
+    if (!fromPos || !toPos || typeof scene === 'undefined') {
+        if (opts && typeof opts.onImpact === 'function') opts.onImpact(toPos);
+        return;
+    }
+    const start = fromPos.clone();
+    const end = toPos.clone();
+    const totalDist = start.distanceTo(end);
+    if (totalDist < 0.1) {
+        if (typeof opts.onImpact === 'function') opts.onImpact(end);
+        return;
+    }
+
+    const isHeroic = !!opts.isHeroic;
+    const shellColor = isHeroic ? 0xff2222 : (opts.color || 0xffb830);
+    const coreColor = isHeroic ? 0xffd0d0 : (opts.coreColor || 0xfff8dc);
+    const smokeColor = isHeroic ? 0xff4444 : (opts.smokeColor !== undefined ? opts.smokeColor : 0xd6d2ca);
+    const thickness = opts.thickness || 1.0;
+    const speed = opts.speed || 3.8;
+    const arcHeight = opts.arcHeight !== undefined ? opts.arcHeight : Math.min(1.1, totalDist * 0.025);
+    const trailRate = opts.trailRate !== undefined ? opts.trailRate : 0.72;
+    const trailSize = opts.trailSize || (0.24 * thickness);
+
+    const group = new THREE.Group();
+    group.position.copy(start);
+
+    const outerMat = new THREE.MeshBasicMaterial({
+        color: shellColor,
+        transparent: true,
+        opacity: 0.92,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    const coreMat = new THREE.MeshBasicMaterial({
+        color: coreColor,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    const outerBolt = new THREE.Mesh(_fxTracerGeo, outerMat);
+    outerBolt.scale.set(0.16 * thickness, 0.16 * thickness, 1.9 * thickness);
+    const coreBolt = new THREE.Mesh(_fxTracerGeo, coreMat);
+    coreBolt.scale.set(0.08 * thickness, 0.08 * thickness, 1.45 * thickness);
+    group.add(outerBolt);
+    group.add(coreBolt);
+
+    if (typeof group.lookAt === 'function') group.lookAt(end);
+    scene.add(group);
+
+    let distTraveled = 0;
+    const curPos = start.clone();
+    const nextPos = start.clone();
+
+    activeFX.push({
+        mesh: group,
+        life: Math.max(4, Math.ceil(totalDist / speed) + 4),
+        update() {
+            distTraveled += speed;
+            const alpha = Math.min(1.0, distTraveled / totalDist);
+            curPos.lerpVectors(start, end, alpha);
+            curPos.y += Math.sin(alpha * Math.PI) * arcHeight;
+            group.position.copy(curPos);
+
+            if (alpha < 0.99 && typeof group.lookAt === 'function') {
+                const nAlpha = Math.min(1.0, alpha + 0.05);
+                nextPos.lerpVectors(start, end, nAlpha);
+                nextPos.y += Math.sin(nAlpha * Math.PI) * arcHeight;
+                group.lookAt(nextPos);
+            }
+
+            if (Math.random() < trailRate && activeFX.length < 320) {
+                spawnSmokePuff(curPos, smokeColor, trailSize);
+            }
+
+            if (alpha >= 1.0) {
+                scene.remove(group);
+                outerMat.dispose();
+                coreMat.dispose();
+                if (typeof opts.onImpact === 'function') {
+                    opts.onImpact(end);
+                }
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+// Supersonic Sniper Vapor Trail (Pathfinder / Jarmen Kell)
+function spawnSniperVaporTrail(fromPos, toPos, color = 0xeef6ff, isHeroic = false) {
+    if (!fromPos || !toPos || typeof scene === 'undefined') return;
+    const lineCol = isHeroic ? 0xff2222 : color;
+    const points = [fromPos.clone(), toPos.clone()];
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+    const lineMat = new THREE.LineBasicMaterial({ color: lineCol, transparent: true, opacity: 0.92 });
+    const line = new THREE.Line(lineGeo, lineMat);
+    scene.add(line);
+
+    spawnMuzzleFlash(fromPos, isHeroic ? 0xff2222 : 0xffffff, 0.42);
+    spawnSmokePuff(fromPos, 0xd8dce2, 0.22);
+    spawnSparks(toPos, lineCol, 4);
+
+    let life = 22;
+    const maxLife = 22;
+    activeFX.push({
+        mesh: line,
+        life,
+        update() {
+            life--;
+            lineMat.opacity = Math.max(0, (life / maxLife) * 0.88);
+            if (life <= 0) {
+                scene.remove(line);
+                lineGeo.dispose();
+                lineMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+// Arcing Thrown Projectile (Ranger Flashbang Grenade / Angry Mob Molotov Cocktail)
+function spawnThrownProjectile(fromPos, toPos, opts = {}) {
+    if (!fromPos || !toPos || typeof scene === 'undefined') {
+        if (opts && typeof opts.onImpact === 'function') opts.onImpact(toPos);
+        return;
+    }
+    const start = fromPos.clone();
+    const end = toPos.clone();
+    const totalDist = Math.max(0.5, start.distanceTo(end));
+    const isMolotov = !!opts.isMolotov;
+    const color = isMolotov ? 0xff6b22 : 0xf4f8ff;
+    const mat = new THREE.MeshBasicMaterial({ color });
+    const mesh = new THREE.Mesh(_fxSphere6, mat);
+    mesh.scale.setScalar(isMolotov ? 0.18 : 0.15);
+    mesh.position.copy(start);
+    scene.add(mesh);
+
+    const speed = isMolotov ? 0.95 : 1.15;
+    const arcH = Math.min(4.5, Math.max(1.8, totalDist * 0.22));
+    let dist = 0;
+
+    activeFX.push({
+        mesh,
+        life: Math.ceil(totalDist / speed) + 4,
+        update() {
+            dist += speed;
+            const alpha = Math.min(1.0, dist / totalDist);
+            mesh.position.lerpVectors(start, end, alpha);
+            mesh.position.y += Math.sin(alpha * Math.PI) * arcH;
+            if (isMolotov && Math.random() < 0.7 && activeFX.length < 320) {
+                spawnSmokePuff(mesh.position, 0xff7b29, 0.18);
+            }
+            if (alpha >= 1.0) {
+                scene.remove(mesh);
+                mat.dispose();
+                if (typeof opts.onImpact === 'function') opts.onImpact(end);
+                return false;
+            }
+            return true;
+        }
+    });
 }
 
 function spawnBuildingDestructionFX(pos, radius = 5.5, color = 0xff793f) {
@@ -369,6 +946,13 @@ if (typeof window !== 'undefined') {
     window.spawnExplosionDebris = spawnExplosionDebris;
     window.spawnGroundDustPlume = spawnGroundDustPlume;
     window.spawnCannonImpactFX = spawnCannonImpactFX;
+    window.spawnBulletImpactFX = spawnBulletImpactFX;
+    window.spawnCannonMuzzleBlast = spawnCannonMuzzleBlast;
+    window.spawnRocketBackblast = spawnRocketBackblast;
+    window.triggerUnitRecoil = triggerUnitRecoil;
+    window.spawnCannonShellProjectile = spawnCannonShellProjectile;
+    window.spawnSniperVaporTrail = spawnSniperVaporTrail;
+    window.spawnThrownProjectile = spawnThrownProjectile;
     window.spawnBuildingDestructionFX = spawnBuildingDestructionFX;
     window.spawnEMPDisableSparks = spawnEMPDisableSparks;
     window.spawnPromotionFX = spawnPromotionFX;
@@ -1177,30 +1761,126 @@ function spawnLingeringToxinCloud(pos) {
 function spawnToxinPuddle(pos) { spawnLingeringToxinCloud(pos); }
 
 function spawnFlamethrowerBurst(fromPos, toPos) {
-    const steps = 7;
+    if (!fromPos || !toPos || typeof scene === 'undefined') return;
+    const fireTex = _getFxSpriteTex('fireball');
+    const steps = 9;
+    spawnMuzzleFlash(fromPos, 0xffdd55, 0.72);
     for (let i = 0; i < steps; i++) {
         const alpha = (i + 1) / steps;
         const pos = new THREE.Vector3().lerpVectors(fromPos, toPos, alpha);
         setTimeout(() => {
+            if (typeof scene === 'undefined') return;
+            // Rolling incandescent fireball jet (white-yellow -> vivid orange -> deep red)
+            if (fireTex && activeFX.length < 330) {
+                const col = alpha < 0.3 ? 0xffe066 : (alpha < 0.7 ? 0xff7722 : 0xe83b12);
+                const mat = new THREE.SpriteMaterial({
+                    map: fireTex,
+                    color: col,
+                    transparent: true,
+                    opacity: 0.95,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const sp = new THREE.Sprite(mat);
+                const s0 = (0.75 + alpha * 1.65);
+                sp.scale.set(s0, s0, s0);
+                sp.position.set(
+                    pos.x + (Math.random() - 0.5) * (0.3 + alpha * 0.9),
+                    pos.y + 0.1 + alpha * 0.3,
+                    pos.z + (Math.random() - 0.5) * (0.3 + alpha * 0.9)
+                );
+                scene.add(sp);
+                let life = 16 + Math.floor(alpha * 8);
+                const maxLife = life;
+                activeFX.push({
+                    mesh: sp,
+                    life,
+                    update() {
+                        life--;
+                        const prog = 1 - life / maxLife;
+                        const s = s0 * (1 + prog * 1.15);
+                        sp.scale.set(s, s, s);
+                        sp.position.y += 0.045;
+                        mat.opacity = Math.max(0, (1 - prog) * 0.95);
+                        if (life <= 0) {
+                            scene.remove(sp);
+                            mat.dispose();
+                            return false;
+                        }
+                        return true;
+                    }
+                });
+            } else {
                 spawnSmokePuff(pos, 0xff6b35, 0.4 + alpha * 0.6);
-                if (i === steps - 1 && Math.random() < 0.4) {
-                    spawnNapalmScorchPool(toPos);
-                }
-            }, i * 35);
+            }
+            // Rising dark soot smoke off the flame tail
+            if (i >= 4 && i % 2 === 0) {
+                spawnSmokePuff({ x: pos.x, y: pos.y + 0.45, z: pos.z }, 0x26282e, 0.38 + alpha * 0.35);
+            }
+            if (i === steps - 1) {
+                spawnSparks(toPos, 0xffaa22, 5);
+                if (Math.random() < 0.45) spawnNapalmScorchPool(toPos);
+            }
+        }, i * 28);
     }
 }
 
 function spawnToxinSprayBurst(fromPos, toPos) {
-    const steps = 6;
+    if (!fromPos || !toPos || typeof scene === 'undefined') return;
+    const smokeTex = _getFxSpriteTex('smoke');
+    const steps = 8;
+    spawnMuzzleFlash(fromPos, 0x7bed9f, 0.52);
     for (let i = 0; i < steps; i++) {
         const alpha = (i + 1) / steps;
         const pos = new THREE.Vector3().lerpVectors(fromPos, toPos, alpha);
         setTimeout(() => {
-                spawnSmokePuff(pos, 0x2ed573, 0.35 + alpha * 0.5);
-                if (i === steps - 1 && Math.random() < 0.4) {
-                    spawnLingeringToxinCloud(toPos);
-                }
-            }, i * 40);
+            if (typeof scene === 'undefined') return;
+            const col = alpha < 0.45 ? 0x7bed9f : 0x2ed573;
+            if (smokeTex && activeFX.length < 330) {
+                const mat = new THREE.SpriteMaterial({
+                    map: smokeTex,
+                    color: col,
+                    transparent: true,
+                    opacity: 0.82,
+                    depthWrite: false
+                });
+                const sp = new THREE.Sprite(mat);
+                const s0 = 0.75 + alpha * 1.55;
+                sp.scale.set(s0, s0, s0);
+                sp.position.set(
+                    pos.x + (Math.random() - 0.5) * (0.25 + alpha * 0.85),
+                    pos.y + 0.08,
+                    pos.z + (Math.random() - 0.5) * (0.25 + alpha * 0.85)
+                );
+                scene.add(sp);
+                let life = 24 + Math.floor(alpha * 10);
+                const maxLife = life;
+                activeFX.push({
+                    mesh: sp,
+                    life,
+                    update() {
+                        life--;
+                        const prog = 1 - life / maxLife;
+                        const s = s0 * (1 + prog * 1.35);
+                        sp.scale.set(s, s, s);
+                        sp.position.y += 0.018;
+                        mat.opacity = Math.max(0, (1 - prog) * 0.8);
+                        if (life <= 0) {
+                            scene.remove(sp);
+                            mat.dispose();
+                            return false;
+                        }
+                        return true;
+                    }
+                });
+            } else {
+                spawnSmokePuff(pos, col, 0.35 + alpha * 0.5);
+            }
+            if (i === steps - 1) {
+                spawnSparks(toPos, 0x7bed9f, 4);
+                if (Math.random() < 0.45) spawnLingeringToxinCloud(toPos);
+            }
+        }, i * 32);
     }
 }
 
