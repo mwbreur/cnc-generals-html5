@@ -142,7 +142,15 @@ npm run lan
 
 ### Run with Docker (LAN Party / NAS / Home Server)
 
-Run a single lightweight container (`node:22-alpine`, ~30 MB RAM) on any PC, NAS, or Raspberry Pi on your LAN:
+Multi-architecture images (`linux/amd64` and `linux/arm64` for PCs, NAS boxes, and Raspberry Pis) are automatically built and published to **GitHub Container Registry (GHCR)** on every push to `master`.
+
+Run directly from GHCR on any Docker host on your LAN:
+
+```bash
+docker run -d --name cnc-generals-lan -p 8181:8080 --restart unless-stopped ghcr.io/mwbreur/cnc-generals-html5:latest
+```
+
+Or build and run locally with Docker Compose:
 
 ```bash
 docker compose up -d
@@ -151,18 +159,6 @@ docker compose up -d
 Then everyone on your LAN opens `http://<host-ip>:8181` in their browser (override the port with `PORT=8080 docker compose up -d`). Each player runs their own 3D game instance locally in their browser and can see/join open games in the built-in **LAN Lobby**.
 
 > **Note on `http://` vs `https://`:** On a local IP like `http://192.168.1.55:8181`, plain `http://` works cleanly out of the box with the built-in WebSocket LAN relay and avoids self-signed certificate warnings in players' browsers.
-
-You can also tag and push the image to either **Docker Hub** (`hub.docker.com`) or **GitHub Container Registry** (`ghcr.io`):
-
-```bash
-# Docker Hub
-docker build -t <your-dockerhub-user>/cnc-generals-html5:latest .
-docker push <your-dockerhub-user>/cnc-generals-html5:latest
-
-# GitHub Container Registry (GHCR)
-docker build -t ghcr.io/<your-github-user>/cnc-generals-html5:latest .
-docker push ghcr.io/<your-github-user>/cnc-generals-html5:latest
-```
 
 ### Updating bundled Three.js / PeerJS (when online)
 
