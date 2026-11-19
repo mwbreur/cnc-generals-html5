@@ -664,7 +664,7 @@ for (const [bKey, w3dFile] of fullQuatPatchTargets) {
 }
 console.log(`Patched ${totalQuatPivotsPatched} retail W3D pivot quaternions across ${fullQuatPatchTargets.length} faction & tech buildings.`);
 
-// 7. Patch supply_drop_crate (PMUNCrate03.W3D)
+// 7. Patch supply_drop_crate (PMUNCrate03.W3D) & chinook_cargo_net (PMCargoNet.W3D)
 const crateParsed = parseRawW3d('PMUNCrate03.W3D', {
     dropRe: null,
     includeQuats: true,
@@ -678,6 +678,20 @@ W3D_BUILDING_DATA['supply_drop_crate'] = {
     m: crateParsed.meshes
 };
 console.log('supply_drop_crate meshes:', Object.keys(crateParsed.meshes).length);
+
+const cargoNetParsed = parseRawW3d('PMCargoNet.W3D', {
+    dropRe: null,
+    includeQuats: true,
+    fallbackTex: 'pmcargonet.dds'
+});
+W3D_BUILDING_DATA['chinook_cargo_net'] = {
+    f: 'usa',
+    s: 1.0,
+    p: cargoNetParsed.pivots,
+    h: cargoNetParsed.h,
+    m: cargoNetParsed.meshes
+};
+console.log('chinook_cargo_net meshes:', Object.keys(cargoNetParsed.meshes).length);
 
 // 8. Ensure all required textures exist in W3D_TEXTURE_DATA
 function ensureTexture(key, fileName, maxDim = 128) {

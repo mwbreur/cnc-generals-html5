@@ -1631,6 +1631,18 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
         if (!aiBridgePath || aiBridgePath.length < 3 || !mapBridges.some(b => isPointOnBridge(aiBridgePath[0].x, aiBridgePath[0].z, b))) {
             throw new Error('Expected AI findNavigationPath to return [entryRamp, exitRamp, goal] across river bridge!');
         }
+
+        // 7. Verify Chinook retail PMCargoNet underslung cargoHold & China Supply Truck CARGO01 start hidden until loaded
+        const chiMesh = createW3DVehicleMesh('chinook', false);
+        const chiCargo = chiMesh.getObjectByName('cargoHold');
+        if (!chiCargo || chiCargo.visible !== false) {
+            throw new Error('Expected Chinook to have hidden retail cargoHold sling net on spawn!');
+        }
+        const trkMesh = createW3DVehicleMesh('truck', false);
+        const trkCargo = trkMesh.getObjectByName('cargoHold');
+        if (!trkCargo || trkCargo.visible !== false) {
+            throw new Error('Expected China Supply Truck CARGO01 (cargoHold) to start hidden/empty on spawn!');
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

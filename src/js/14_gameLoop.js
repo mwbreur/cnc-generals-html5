@@ -1362,6 +1362,18 @@ function animate() {
         if (!unit || unit.health <= 0 || !unit.mesh) return;
         if ((unit.type !== 'truck' && unit.type !== 'worker' && unit.type !== 'chinook') || unit.taskState !== 'Idle') return;
         const cargoHold = getCachedNode(unit.mesh, "cargoHold");
+        if (cargoHold) {
+            const hasCargo = !!(unit.cargoLoaded > 0 || unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing');
+            cargoHold.visible = hasCargo;
+            if (hasCargo && unit.type === 'chinook') {
+                const swayPhase = animTime * 3.2 + (unit.mesh.id || 0);
+                cargoHold.rotation.z = Math.sin(swayPhase) * 0.08;
+                cargoHold.rotation.x = Math.cos(swayPhase * 0.85) * 0.06;
+            } else if (unit.type === 'chinook') {
+                cargoHold.rotation.z = 0;
+                cargoHold.rotation.x = 0;
+            }
+        }
         switch (unit.aiState) {
             case 'MovingToDock': {
                 if (!unit.supplyTarget || unit.supplyTarget.stock <= 0) {
