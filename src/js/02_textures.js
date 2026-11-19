@@ -22,6 +22,7 @@ function init() {
 
     const ambientLight = new THREE.AmbientLight(0x445566, 1.3);
     scene.add(ambientLight);
+    window._mainAmbientLight = ambientLight;
     initProceduralTextures();
     initSharedMaterials();
 

@@ -810,23 +810,8 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     mapPropsGroup = new THREE.Group();
     scene.add(mapPropsGroup);
 
-    // 1. Bright Daytime Atmosphere Lighting & Light Horizon Haze
-    if (effectiveTheme === 'desert' || effectiveTheme === 'tournament_desert') {
-        scene.background.setHex(0xd8c39e);
-        scene.fog = new THREE.FogExp2(0xd8c39e, 0.0004);
-    } else if (effectiveTheme === 'jungle') {
-        scene.background.setHex(0xa8d0e6);
-        scene.fog = new THREE.FogExp2(0xa8d0e6, 0.00038);
-    } else if (effectiveTheme === 'snow') {
-        scene.background.setHex(0xcfdce6);
-        scene.fog = new THREE.FogExp2(0xcfdce6, 0.00042);
-    } else if (effectiveTheme === 'city') {
-        scene.background.setHex(0xb8c4d0);
-        scene.fog = new THREE.FogExp2(0xb8c4d0, 0.00045);
-    } else {
-        scene.background.setHex(0xd8c39e);
-        scene.fog = new THREE.FogExp2(0xd8c39e, 0.0004);
-    }
+    // 1. 3D Sky Dome + Day / Dusk / Night Time-of-Day Atmosphere & Lighting
+    applyAtmosphereAndSkybox(effectiveTheme, typeof currentMapType !== 'undefined' ? currentMapType : effectiveTheme);
 
     // 2. High-Resolution Displaced Terrain Mesh (256x256 on standard maps for sharp cliff ledges)
     const segments = mapSize >= 2200 ? 280 : mapSize >= 1400 ? 256 : 160;
@@ -2018,5 +2003,238 @@ function createSupplyFieldsForMap(mapSize) {
         }
     }
 }
+
+// =========================================================================
+// 3D SKY DOME & TIME-OF-DAY (DAY / DUSK / NIGHT) ATMOSPHERE ENGINE
+// =========================================================================
+const _skyboxTexCache = {};
+
+function resolveEffectiveTimeOfDay(mapKey) {
+    const selEl = (typeof document !== 'undefined') ? document.getElementById('sp-time-of-day') : null;
+    const pref = (typeof window !== 'undefined' && window.selectedTimeOfDay)
+        ? window.selectedTimeOfDay
+        : (selEl ? selEl.value : 'auto');
+    if (pref === 'day' || pref === 'dusk' || pref === 'night') return pref;
+    const mk = String(mapKey || '').toLowerCase();
+    if (mk.includes('twilight')) return 'dusk';
+    return 'day';
+}
+
+function _getSkyboxTexture(theme, tod) {
+    const cacheKey = `${theme}_${tod}`;
+    if (_skyboxTexCache[cacheKey]) return _skyboxTexCache[cacheKey];
+    if (typeof document === 'undefined' || !document.createElement || typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+
+    const w = 1024, h = 512;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext && c.getContext('2d');
+    if (!ctx) return null;
+
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    if (tod === 'night') {
+        grad.addColorStop(0.00, '#040915');
+        grad.addColorStop(0.32, '#0a162c');
+        grad.addColorStop(0.50, '#162844');
+        grad.addColorStop(0.58, '#132036');
+        grad.addColorStop(1.00, '#09101d');
+    } else if (tod === 'dusk') {
+        grad.addColorStop(0.00, '#1b1b3a');
+        grad.addColorStop(0.24, '#3d2c52');
+        grad.addColorStop(0.42, '#9e4747');
+        grad.addColorStop(0.50, '#e88b48');
+        grad.addColorStop(0.56, '#c46a3a');
+        grad.addColorStop(1.00, '#3a2420');
+    } else if (theme === 'snow') {
+        grad.addColorStop(0.00, '#4f7ea8');
+        grad.addColorStop(0.32, '#8fb8d6');
+        grad.addColorStop(0.50, '#d8e6f0');
+        grad.addColorStop(0.60, '#c2d3df');
+        grad.addColorStop(1.00, '#9db2c2');
+    } else if (theme === 'jungle') {
+        grad.addColorStop(0.00, '#2a6cb0');
+        grad.addColorStop(0.32, '#6cb0dc');
+        grad.addColorStop(0.50, '#bfe0f0');
+        grad.addColorStop(0.60, '#9bc0cf');
+        grad.addColorStop(1.00, '#6a8792');
+    } else if (theme === 'city') {
+        grad.addColorStop(0.00, '#3e6285');
+        grad.addColorStop(0.32, '#7d9db8');
+        grad.addColorStop(0.50, '#c2ced8');
+        grad.addColorStop(0.60, '#a6b3be');
+        grad.addColorStop(1.00, '#78848f');
+    } else {
+        // Desert / Tournament Desert
+        grad.addColorStop(0.00, '#2f6aa8');
+        grad.addColorStop(0.28, '#6ca4cf');
+        grad.addColorStop(0.46, '#d9c9a6');
+        grad.addColorStop(0.52, '#e2cca3');
+        grad.addColorStop(0.62, '#c8b288');
+        grad.addColorStop(1.00, '#9a845e');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Deterministic pseudo-random helper for stars & clouds
+    let seed = 1337;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+    if (tod === 'night') {
+        // Crisp starfield across the upper hemisphere
+        for (let i = 0; i < 420; i++) {
+            const sx = rand() * w;
+            const sy = rand() * (h * 0.47);
+            const sr = 0.5 + rand() * 1.35;
+            const alpha = (0.35 + rand() * 0.65) * Math.max(0.15, 1 - sy / (h * 0.49));
+            ctx.fillStyle = (i % 7 === 0) ? `rgba(180,215,255,${alpha.toFixed(2)})` : `rgba(255,252,240,${alpha.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Luminous full moon + atmospheric halo
+        const mx = w * 0.24, my = h * 0.22;
+        const mHalo = ctx.createRadialGradient(mx, my, 4, mx, my, 68);
+        mHalo.addColorStop(0.0, 'rgba(235, 246, 255, 0.95)');
+        mHalo.addColorStop(0.18, 'rgba(180, 215, 255, 0.55)');
+        mHalo.addColorStop(0.55, 'rgba(90, 140, 210, 0.14)');
+        mHalo.addColorStop(1.0, 'rgba(30, 60, 120, 0)');
+        ctx.fillStyle = mHalo;
+        ctx.beginPath();
+        ctx.arc(mx, my, 68, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        // Sun disc & atmospheric glow
+        const sx = w * 0.22;
+        const sy = tod === 'dusk' ? h * 0.45 : h * 0.24;
+        const sunGrad = ctx.createRadialGradient(sx, sy, 6, sx, sy, tod === 'dusk' ? 115 : 85);
+        if (tod === 'dusk') {
+            sunGrad.addColorStop(0.0, 'rgba(255, 240, 195, 0.98)');
+            sunGrad.addColorStop(0.22, 'rgba(255, 170, 85, 0.72)');
+            sunGrad.addColorStop(0.58, 'rgba(235, 95, 45, 0.22)');
+            sunGrad.addColorStop(1.0, 'rgba(180, 50, 30, 0)');
+        } else {
+            sunGrad.addColorStop(0.0, 'rgba(255, 255, 235, 0.95)');
+            sunGrad.addColorStop(0.20, 'rgba(255, 244, 200, 0.50)');
+            sunGrad.addColorStop(0.60, 'rgba(255, 230, 180, 0.12)');
+            sunGrad.addColorStop(1.0, 'rgba(255, 220, 170, 0)');
+        }
+        ctx.fillStyle = sunGrad;
+        ctx.beginPath();
+        ctx.arc(sx, sy, tod === 'dusk' ? 115 : 85, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Soft painted horizon & upper sky cloud bands
+        const cloudCount = 34;
+        for (let i = 0; i < cloudCount; i++) {
+            const cx = rand() * w;
+            const cy = h * (0.16 + rand() * 0.29);
+            const rx = 38 + rand() * 82;
+            const ry = 9 + rand() * 18;
+            const cg = ctx.createRadialGradient(cx, cy, 4, cx, cy, rx);
+            if (tod === 'dusk') {
+                cg.addColorStop(0.0, 'rgba(255, 175, 115, 0.34)');
+                cg.addColorStop(0.55, 'rgba(130, 62, 72, 0.22)');
+                cg.addColorStop(1.0, 'rgba(70, 38, 60, 0)');
+            } else {
+                cg.addColorStop(0.0, 'rgba(255, 255, 255, 0.42)');
+                cg.addColorStop(0.60, 'rgba(240, 245, 252, 0.18)');
+                cg.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
+            }
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(1, ry / rx);
+            ctx.fillStyle = cg;
+            ctx.beginPath();
+            ctx.arc(0, 0, rx, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    _skyboxTexCache[cacheKey] = tex;
+    return tex;
+}
+
+function applyAtmosphereAndSkybox(effectiveTheme, mapKey) {
+    if (typeof scene === 'undefined' || typeof THREE === 'undefined') return;
+    const tod = resolveEffectiveTimeOfDay(mapKey);
+    if (typeof window !== 'undefined') window._activeTimeOfDay = tod;
+
+    // 1. Fog & fallback background color
+    let bgHex = 0xd8c39e;
+    let fogDensity = 0.0004;
+    if (tod === 'night') {
+        bgHex = 0x0d192d;
+        fogDensity = 0.00058;
+    } else if (tod === 'dusk') {
+        bgHex = 0xb5684b;
+        fogDensity = 0.00048;
+    } else if (effectiveTheme === 'jungle') {
+        bgHex = 0xa8d0e6; fogDensity = 0.00038;
+    } else if (effectiveTheme === 'snow') {
+        bgHex = 0xcfdce6; fogDensity = 0.00042;
+    } else if (effectiveTheme === 'city') {
+        bgHex = 0xb8c4d0; fogDensity = 0.00045;
+    } else {
+        bgHex = 0xd8c39e; fogDensity = 0.00040;
+    }
+    if (scene.background && typeof scene.background.setHex === 'function') scene.background.setHex(bgHex);
+    scene.fog = new THREE.FogExp2(bgHex, fogDensity);
+
+    // 2. Directional sun/moon light & ambient tint
+    const amb = (typeof window !== 'undefined') ? window._mainAmbientLight : null;
+    const dir = (typeof window !== 'undefined') ? window._mainDirLight : null;
+    const setLightHex = (light, hex, intensity) => {
+        if (!light) return;
+        if (light.color && typeof light.color.setHex === 'function') light.color.setHex(hex);
+        light.intensity = intensity;
+    };
+    if (tod === 'night') {
+        setLightHex(amb, 0x284068, 0.82);
+        setLightHex(dir, 0x88b4ff, 0.85);
+        if (dir && dir.position && typeof dir.position.set === 'function') dir.position.set(-55, 72, -35);
+    } else if (tod === 'dusk') {
+        setLightHex(amb, 0x634b68, 1.05);
+        setLightHex(dir, 0xffa463, 1.30);
+        if (dir && dir.position && typeof dir.position.set === 'function') dir.position.set(-85, 42, 48);
+    } else {
+        setLightHex(amb, 0x445566, 1.30);
+        setLightHex(dir, 0xffffff, 1.40);
+        if (dir && dir.position && typeof dir.position.set === 'function') dir.position.set(60, 80, 40);
+    }
+
+    // 3. 3D Sky Dome surrounding the map
+    if (typeof window !== 'undefined' && window._skyboxMesh) {
+        scene.remove(window._skyboxMesh);
+        if (window._skyboxMesh.geometry) window._skyboxMesh.geometry.dispose();
+        if (window._skyboxMesh.material) window._skyboxMesh.material.dispose();
+        window._skyboxMesh = null;
+    }
+    const skyTex = _getSkyboxTexture(effectiveTheme, tod);
+    if (skyTex && typeof THREE.SphereGeometry === 'function') {
+        const skyRadius = Math.max(520, (typeof mapSize === 'number' ? mapSize : 900) * 1.45);
+        const skyGeo = new THREE.SphereGeometry(skyRadius, 28, 16);
+        const skyMat = new THREE.MeshBasicMaterial({
+            map: skyTex,
+            side: THREE.BackSide,
+            depthWrite: false,
+            fog: false
+        });
+        const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+        skyMesh.name = 'battlefieldSkybox';
+        skyMesh.renderOrder = -10;
+        scene.add(skyMesh);
+        if (typeof window !== 'undefined') window._skyboxMesh = skyMesh;
+    }
+
+    if (typeof refreshAllNightLights === 'function') refreshAllNightLights();
+}
+if (typeof window !== 'undefined') {
+    window.resolveEffectiveTimeOfDay = resolveEffectiveTimeOfDay;
+    window.applyAtmosphereAndSkybox = applyAtmosphereAndSkybox;
+}
+
 
 

@@ -3334,17 +3334,37 @@ function createC130FlyoverPlane(modelKey = 'c130') {
     return { plane, c130Props };
 }
 
+// Compute full edge-to-edge map-crossing flight path passing directly over dropCenter
+function computeMapCrossingFlightPath(dropCenter, flightY, dirX = 0.90, dirZ = 0.435, speedPerTick = 0.95) {
+    const len = Math.hypot(dirX, dirZ) || 1;
+    const ux = dirX / len, uz = dirZ / len;
+    const halfBound = ((typeof mapSize === 'number' && mapSize > 100) ? mapSize * 0.5 : 450) + 55;
+    // Ray-box intersection along ±(ux, uz) from dropCenter to padded map edges
+    const hitDist = (sx, sz) => {
+        const tx = Math.abs(sx) > 1e-4 ? ((sx > 0 ? halfBound : -halfBound) - dropCenter.x) / sx : 1e9;
+        const tz = Math.abs(sz) > 1e-4 ? ((sz > 0 ? halfBound : -halfBound) - dropCenter.z) / sz : 1e9;
+        return Math.max(95, Math.min(tx > 0 ? tx : 1e9, tz > 0 ? tz : 1e9));
+    };
+    const backDist = hitDist(-ux, -uz);
+    const fwdDist = hitDist(ux, uz);
+    const totalDist = backDist + fwdDist;
+    const startPos = new THREE.Vector3(dropCenter.x - ux * backDist, flightY, dropCenter.z - uz * backDist);
+    const endPos = new THREE.Vector3(dropCenter.x + ux * fwdDist, flightY, dropCenter.z + uz * fwdDist);
+    const dropT = Math.max(0.15, Math.min(0.85, backDist / Math.max(1, totalDist)));
+    const duration = Math.max(240, Math.round(totalDist / Math.max(0.35, speedPerTick)));
+    return { startPos, endPos, dropT, duration };
+}
+
 function triggerSupplyDropZoneDelivery(structure) {
     if (!structure || !structure.position || structure.health <= 0 || structure.isBuilding) return;
     const dropCenter = structure.position.clone();
     const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
-    // 1. Official W3D C-130 Hercules Flyover Mesh (AvCargoPln.W3D)
+    // 1. Official W3D C-130 Hercules Flyover Mesh (AvCargoPln.W3D) — full edge-to-edge map crossing!
     const { plane, c130Props } = createC130FlyoverPlane('c130');
 
-    const flightY = groundY + 16.5;
-    const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 45);
-    const endPos = new THREE.Vector3(dropCenter.x + 95, flightY, dropCenter.z + 45);
+    const flightY = groundY + 26.0;
+    const { startPos, endPos, dropT, duration: planeDuration } = computeMapCrossingFlightPath(dropCenter, flightY, 0.90, 0.435, 1.05);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
@@ -3360,7 +3380,6 @@ function triggerSupplyDropZoneDelivery(structure) {
     if (typeof showNotification === 'function') showNotification('✈ C-130 Supply Drop inbound!', 'info');
 
     let planeTick = 0;
-    const planeDuration = 420;
     let crateDropped = false;
 
     // 2. Parachute Supply Crate
@@ -3483,7 +3502,7 @@ function triggerSupplyDropZoneDelivery(structure) {
                 const t = planeTick / planeDuration;
                 plane.position.lerpVectors(startPos, endPos, t);
                 for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.65;
-                if (!crateDropped && t >= 0.44) {
+                if (!crateDropped && t >= Math.max(0.05, dropT - 0.02)) {
                     crateDropped = true;
                     const hasSupplyLines = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines'));
                     const perCrateVal = hasSupplyLines ? 550 : 500;
@@ -3524,9 +3543,8 @@ function triggerC130Paradrop(targetPos) {
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
     const { plane, c130Props } = createC130FlyoverPlane('c130');
-    const flightY = groundY + 16.5;
-    const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 45);
-    const endPos = new THREE.Vector3(dropCenter.x + 95, flightY, dropCenter.z + 45);
+    const flightY = groundY + 26.0;
+    const { startPos, endPos, dropT, duration: totalFrames } = computeMapCrossingFlightPath(dropCenter, flightY, 0.90, 0.435, 1.15);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
@@ -3544,7 +3562,6 @@ function triggerC130Paradrop(targetPos) {
     }
 
     let frame = 0;
-    const totalFrames = 380;
     let dropped = false;
     activeFX.push({
         update() {
@@ -3553,7 +3570,7 @@ function triggerC130Paradrop(targetPos) {
             plane.position.lerpVectors(startPos, endPos, t);
             for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.75;
 
-            if (!dropped && t >= 0.5) {
+            if (!dropped && t >= dropT) {
                 dropped = true;
                 if (typeof playAudio === 'function') playAudio('parachute_open', { volume: 0.75 }, 'usa');
                 for (let i = 0; i < 4; i++) {
@@ -3600,9 +3617,8 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
     const { plane, c130Props } = createC130FlyoverPlane('c130');
-    const flightY = groundY + 18.0;
-    const startPos = new THREE.Vector3(dropCenter.x - 100, flightY, dropCenter.z - 42);
-    const endPos = new THREE.Vector3(dropCenter.x + 100, flightY, dropCenter.z + 42);
+    const flightY = groundY + 26.5;
+    const { startPos, endPos, dropT: fabDropT, duration: totalFrames } = computeMapCrossingFlightPath(dropCenter, flightY, 0.92, 0.39, 1.25);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
@@ -3616,7 +3632,6 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
     }
 
     let frame = 0;
-    const totalFrames = 320;
     let dropped = false;
 
     activeFX.push({
@@ -3626,7 +3641,7 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
             plane.position.lerpVectors(startPos, endPos, t);
             for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.8;
 
-            if (!dropped && t >= 0.5) {
+            if (!dropped && t >= fabDropT) {
                 dropped = true;
                 if (typeof playAudio === 'function') playAudio('daisycutter_drop', { volume: 0.9 }, 'usa');
                 const canisterGrp = new THREE.Group();
@@ -3762,9 +3777,8 @@ function triggerChinaCarpetBomber(targetPos, pseudoAttacker) {
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
     const { plane, c130Props } = createC130FlyoverPlane('china_bomber');
-    const flightY = groundY + 18.0;
-    const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 48);
-    const endPos = new THREE.Vector3(dropCenter.x + 95, flightY, dropCenter.z + 48);
+    const flightY = groundY + 26.5;
+    const { startPos, endPos, dropT: carpetDropT, duration: totalFrames } = computeMapCrossingFlightPath(dropCenter, flightY, 0.89, 0.45, 1.35);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
@@ -3778,7 +3792,6 @@ function triggerChinaCarpetBomber(targetPos, pseudoAttacker) {
     }
 
     let frame = 0;
-    const totalFrames = 260;
     const droppedIdx = new Set();
 
     activeFX.push({
@@ -3789,7 +3802,7 @@ function triggerChinaCarpetBomber(targetPos, pseudoAttacker) {
             for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.8;
 
             for (let b = 0; b < 7; b++) {
-                const triggerT = 0.36 + b * 0.045;
+                const triggerT = Math.max(0.05, carpetDropT - 0.06 + b * 0.02);
                 if (!droppedIdx.has(b) && t >= triggerT) {
                     droppedIdx.add(b);
                     const dropOrigin = plane.position.clone();
@@ -4126,9 +4139,8 @@ function triggerLeafletDropFX(targetPos) {
     const dropCenter = targetPos.clone();
     const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
     const { plane, c130Props } = createC130FlyoverPlane('c130');
-    const flightY = gY + 19.0;
-    const startPos = new THREE.Vector3(dropCenter.x - 90, flightY, dropCenter.z - 40);
-    const endPos = new THREE.Vector3(dropCenter.x + 90, flightY, dropCenter.z + 40);
+    const flightY = gY + 26.0;
+    const { startPos, endPos, dropT: leafDropT, duration: leafDur } = computeMapCrossingFlightPath(dropCenter, flightY, 0.91, 0.41, 1.3);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
@@ -4139,10 +4151,10 @@ function triggerLeafletDropFX(targetPos) {
     activeFX.push({
         update() {
             frame++;
-            const t = frame / 240;
+            const t = frame / leafDur;
             plane.position.lerpVectors(startPos, endPos, t);
             for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.8;
-            if (!released && t >= 0.48) {
+            if (!released && t >= leafDropT) {
                 released = true;
                 if (typeof playAudio === 'function') playAudio('parachute_open', { volume: 0.75 });
                 const paperGeo = new THREE.PlaneGeometry(0.65, 0.42);
@@ -4226,6 +4238,237 @@ function triggerSneakAttackFX(targetPos) {
     spawnExplosionDebris(targetPos, 7, 1.2, true);
 }
 
+// =========================================================================
+// NIGHT & DUSK LIGHTING FX: VEHICLE HEADLIGHTS, BUILDING GLOWS & SEARCHLIGHTS
+// (Zero-cost additive translucent geometry — no dynamic PointLight/SpotLight shader spikes!)
+// =========================================================================
+let _nightGlowTex = null;
+let _nightBeamTex = null;
+let _nightHeadlightConeGeo = null;
+let _nightSearchlightConeGeo = null;
+let _nightHeadlightMat = null;
+let _nightSearchlightMat = null;
+
+function _getNightGlowTex() {
+    if (_nightGlowTex) return _nightGlowTex;
+    if (typeof document === 'undefined' || !document.createElement || typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext && c.getContext('2d');
+    if (!ctx) return null;
+    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+    g.addColorStop(0.0, 'rgba(255, 250, 225, 1.0)');
+    g.addColorStop(0.35, 'rgba(255, 232, 165, 0.58)');
+    g.addColorStop(0.75, 'rgba(255, 200, 110, 0.16)');
+    g.addColorStop(1.0, 'rgba(255, 180, 80, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    _nightGlowTex = new THREE.CanvasTexture(c);
+    _nightGlowTex.needsUpdate = true;
+    return _nightGlowTex;
+}
+
+function _getNightBeamTex() {
+    if (_nightBeamTex) return _nightBeamTex;
+    if (typeof document === 'undefined' || !document.createElement || typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 128;
+    const ctx = c.getContext && c.getContext('2d');
+    if (!ctx) return null;
+    const g = ctx.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0.0, 'rgba(255, 252, 220, 0.55)');
+    g.addColorStop(0.35, 'rgba(240, 245, 210, 0.24)');
+    g.addColorStop(0.80, 'rgba(200, 225, 255, 0.06)');
+    g.addColorStop(1.0, 'rgba(180, 215, 255, 0.0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 128);
+    _nightBeamTex = new THREE.CanvasTexture(c);
+    _nightBeamTex.needsUpdate = true;
+    return _nightBeamTex;
+}
+
+function _ensureNightLightSharedAssets() {
+    if (typeof THREE === 'undefined') return false;
+    if (!_nightHeadlightConeGeo && typeof THREE.CylinderGeometry === 'function') {
+        // Open-ended cone pointing along +Z (narrow at headlights, wide ahead on ground)
+        const geo = new THREE.CylinderGeometry(0.22, 2.2, 8.8, 10, 1, true);
+        if (typeof geo.translate === 'function') geo.translate(0, -4.4, 0);
+        if (typeof geo.rotateX === 'function') geo.rotateX(-Math.PI / 2);
+        geo.userData = Object.assign(geo.userData || {}, { _shared: true });
+        _nightHeadlightConeGeo = geo;
+    }
+    if (!_nightSearchlightConeGeo && typeof THREE.CylinderGeometry === 'function') {
+        const sGeo = new THREE.CylinderGeometry(0.45, 5.2, 24.0, 14, 1, true);
+        if (typeof sGeo.translate === 'function') sGeo.translate(0, -12.0, 0);
+        if (typeof sGeo.rotateX === 'function') sGeo.rotateX(-Math.PI / 2);
+        sGeo.userData = Object.assign(sGeo.userData || {}, { _shared: true });
+        _nightSearchlightConeGeo = sGeo;
+    }
+    if (!_nightHeadlightMat) {
+        _nightHeadlightMat = new THREE.MeshBasicMaterial({
+            map: _getNightBeamTex() || null,
+            color: 0xfff3c4,
+            transparent: true,
+            opacity: 0.42,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        _nightHeadlightMat.userData = Object.assign(_nightHeadlightMat.userData || {}, { _shared: true });
+    }
+    if (!_nightSearchlightMat) {
+        _nightSearchlightMat = new THREE.MeshBasicMaterial({
+            map: _getNightBeamTex() || null,
+            color: 0xcbeeff,
+            transparent: true,
+            opacity: 0.34,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        _nightSearchlightMat.userData = Object.assign(_nightSearchlightMat.userData || {}, { _shared: true });
+    }
+    return true;
+}
+
+const _SEARCHLIGHT_STRUCT_TYPES = new Set([
+    'center', 'commandCenter', 'airfield', 'strategyCenter', 'propagandaCenter',
+    'palace', 'patriot', 'gatlingCannon', 'stingerSite', 'barracks', 'factory'
+]);
+
+function attachNightLightsToUnit(unit) {
+    if (!unit || !unit.mesh || unit.isAir) return;
+    if (typeof isInfantryType === 'function' && isInfantryType(unit.type)) return;
+    const tod = (typeof window !== 'undefined' && window._activeTimeOfDay) ? window._activeTimeOfDay : 'day';
+    const wantVisible = (tod === 'night' || tod === 'dusk');
+
+    let grp = unit.mesh.getObjectByName ? unit.mesh.getObjectByName('nightLightsGroup') : null;
+    if (!grp) {
+        if (!wantVisible) return; // Lazy-create only when Dusk/Night is active
+        if (!_ensureNightLightSharedAssets()) return;
+        grp = new THREE.Group();
+        grp.name = 'nightLightsGroup';
+        // Normalize against W3D / procedural mesh scale so headlights are always true world scale
+        const invS = 1 / Math.max(0.05, (unit.mesh.scale && unit.mesh.scale.x) ? unit.mesh.scale.x : 1);
+        grp.scale.set(invS, invS, invS);
+
+        const r = Math.min(4.2, Math.max(1.8, (unit.radius || 2.8) * 0.62));
+        const frontZ = r * 0.85;
+        const sideX = r * 0.42;
+        const lensY = 0.85;
+        const glowTex = _getNightGlowTex();
+
+        [-sideX, sideX].forEach((xOff) => {
+            if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+                const spMat = new THREE.SpriteMaterial({
+                    map: glowTex || null,
+                    color: 0xfff3c4,
+                    transparent: true,
+                    opacity: 0.9,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const sp = new THREE.Sprite(spMat);
+                sp.scale.set(1.15, 1.15, 1);
+                sp.position.set(xOff, lensY, frontZ);
+                grp.add(sp);
+            }
+            if (_nightHeadlightConeGeo) {
+                const cone = new THREE.Mesh(_nightHeadlightConeGeo, _nightHeadlightMat);
+                cone.position.set(xOff, lensY - 0.12, frontZ);
+                cone.rotation.x = 0.08; // Slight downward angle onto road/terrain
+                grp.add(cone);
+            }
+        });
+        unit.mesh.add(grp);
+    }
+    grp.visible = wantVisible;
+}
+
+function attachNightLightsToStructure(structure) {
+    if (!structure || !structure.mesh) return;
+    const tod = (typeof window !== 'undefined' && window._activeTimeOfDay) ? window._activeTimeOfDay : 'day';
+    const wantVisible = (tod === 'night' || tod === 'dusk');
+
+    let grp = structure.mesh.getObjectByName ? structure.mesh.getObjectByName('nightLightsGroup') : null;
+    if (!grp) {
+        if (!wantVisible) return;
+        if (!_ensureNightLightSharedAssets()) return;
+        grp = new THREE.Group();
+        grp.name = 'nightLightsGroup';
+        const invS = 1 / Math.max(0.05, (structure.mesh.scale && structure.mesh.scale.x) ? structure.mesh.scale.x : 1);
+        grp.scale.set(invS, invS, invS);
+
+        const rad = Math.min(7.5, Math.max(3.0, (structure.radius || 5.0) * 0.65));
+        const glowTex = _getNightGlowTex();
+        const isDef = (structure.type === 'patriot' || structure.type === 'gatlingCannon' || structure.type === 'stingerSite');
+
+        // 1. Warm lit window / pad glow sprites around the building
+        if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+            const lampColor = structure.faction === 'usa' ? 0xcceeff : (structure.faction === 'china' ? 0xffdd99 : 0xffcc77);
+            const lampOffsets = isDef
+                ? [[0, 3.2, 0]]
+                : [[-rad * 0.55, 2.4, rad * 0.55], [rad * 0.55, 2.4, rad * 0.55], [0, 3.6, -rad * 0.45]];
+            lampOffsets.forEach(([lx, ly, lz]) => {
+                const spMat = new THREE.SpriteMaterial({
+                    map: glowTex || null,
+                    color: lampColor,
+                    transparent: true,
+                    opacity: 0.72,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const sp = new THREE.Sprite(spMat);
+                sp.scale.set(isDef ? 2.6 : 4.2, isDef ? 2.6 : 4.2, 1);
+                sp.position.set(lx, ly, lz);
+                grp.add(sp);
+            });
+        }
+
+        // 2. Sweeping volumetric base searchlight beam on key structures
+        if (_SEARCHLIGHT_STRUCT_TYPES.has(structure.type) && _nightSearchlightConeGeo) {
+            const pivot = new THREE.Group();
+            pivot.name = 'searchlightPivot';
+            pivot.position.set(0, isDef ? 4.2 : 6.4, 0);
+            pivot.userData.phaseOffset = Math.random() * Math.PI * 2;
+            const beam = new THREE.Mesh(_nightSearchlightConeGeo, _nightSearchlightMat);
+            beam.rotation.x = 0.36; // Angled downward sweeping the terrain around the base
+            pivot.add(beam);
+            grp.add(pivot);
+            structure._searchlightPivot = pivot;
+        }
+        structure.mesh.add(grp);
+    }
+    grp.visible = wantVisible && !structure.isBuilding;
+}
+
+function refreshAllNightLights() {
+    const tod = (typeof window !== 'undefined' && window._activeTimeOfDay) ? window._activeTimeOfDay : 'day';
+    const isNight = (tod === 'night');
+    const isDusk = (tod === 'dusk');
+    if (_nightHeadlightMat) _nightHeadlightMat.opacity = isNight ? 0.46 : (isDusk ? 0.24 : 0);
+    if (_nightSearchlightMat) _nightSearchlightMat.opacity = isNight ? 0.36 : (isDusk ? 0.18 : 0);
+
+    const uLists = [
+        typeof units !== 'undefined' ? units : [],
+        typeof enemyUnits !== 'undefined' ? enemyUnits : []
+    ];
+    uLists.forEach(list => {
+        for (let i = 0; i < list.length; i++) {
+            if (list[i] && list[i].health > 0) attachNightLightsToUnit(list[i]);
+        }
+    });
+    const sLists = [
+        typeof structures !== 'undefined' ? structures : [],
+        typeof enemyStructures !== 'undefined' ? enemyStructures : []
+    ];
+    sLists.forEach(list => {
+        for (let i = 0; i < list.length; i++) {
+            if (list[i] && list[i].health > 0) attachNightLightsToStructure(list[i]);
+        }
+    });
+}
+
 if (typeof window !== 'undefined') {
     window.triggerA10Strike = triggerA10Strike;
     window.triggerSpyDronePower = triggerSpyDronePower;
@@ -4236,4 +4479,7 @@ if (typeof window !== 'undefined') {
     window.triggerEmergencyRepairFX = triggerEmergencyRepairFX;
     window.triggerRebelAmbushFX = triggerRebelAmbushFX;
     window.triggerSneakAttackFX = triggerSneakAttackFX;
+    window.attachNightLightsToUnit = attachNightLightsToUnit;
+    window.attachNightLightsToStructure = attachNightLightsToStructure;
+    window.refreshAllNightLights = refreshAllNightLights;
 }

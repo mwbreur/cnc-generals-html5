@@ -1092,6 +1092,17 @@ function animate() {
                 mistPos.y -= 0.4;
                 spawnSmokePuff(mistPos, (buildingTick % 28 === 0) ? 0x80ecff : 0x38c8ff, 0.52);
             }
+            // Dusk / Night base searchlights & building night glows
+            if (s.mesh && s.health > 0 && typeof window !== 'undefined' && (window._activeTimeOfDay === 'night' || window._activeTimeOfDay === 'dusk')) {
+                if (!s._nightLightsAttached && !s.isBuilding && typeof attachNightLightsToStructure === 'function') {
+                    attachNightLightsToStructure(s);
+                    s._nightLightsAttached = true;
+                }
+                if (s._searchlightPivot && !s.isBuilding) {
+                    const phase = s._searchlightPivot.userData.phaseOffset || 0;
+                    s._searchlightPivot.rotation.y = Math.sin(animTime * 0.55 + phase) * 1.45 + phase;
+                }
+            }
             // Production bay blast doors: slide open when unit deploys, close afterwards
             if ((s.type === 'factory' || s.type === 'barracks') && s.mesh && !s.isBuilding && s.health > 0) {
                 if (s._blastDoors === undefined) {
@@ -1178,6 +1189,20 @@ function animate() {
     processPointDefenseLasers();
     processScrapCrateCollection();
     processCameraKeyboardPanning();
+    // Keep 3D sky dome centered horizontally on camera target so edges never clip
+    if (typeof window !== 'undefined' && window._skyboxMesh && typeof cameraTarget !== 'undefined' && cameraTarget) {
+        window._skyboxMesh.position.set(cameraTarget.x, 0, cameraTarget.z);
+    }
+    // Lazily attach headlights to newly spawned enemy vehicles at Dusk/Night (throttled)
+    if (typeof window !== 'undefined' && (window._activeTimeOfDay === 'night' || window._activeTimeOfDay === 'dusk') && (buildingTick % 30 === 0) && typeof attachNightLightsToUnit === 'function' && typeof enemyUnits !== 'undefined') {
+        for (let ei = 0; ei < enemyUnits.length; ei++) {
+            const eu = enemyUnits[ei];
+            if (eu && eu.health > 0 && !eu.isAir && !eu._nightLightsAttached) {
+                attachNightLightsToUnit(eu);
+                eu._nightLightsAttached = true;
+            }
+        }
+    }
     updateTurretSystems();
     updateFogOfWar();
     processEnemyAIEngine();
@@ -2511,6 +2536,10 @@ function animate() {
             }
 
             // Vehicle terrain tread/wheel dust & diesel exhaust trail when moving on ground
+            if (!unit.isAir && !unit._nightLightsAttached && typeof window !== 'undefined' && (window._activeTimeOfDay === 'night' || window._activeTimeOfDay === 'dusk') && typeof attachNightLightsToUnit === 'function') {
+                attachNightLightsToUnit(unit);
+                unit._nightLightsAttached = true;
+            }
             if (!unit.isAir && !INFANTRY_TYPE_SET.has(unit.type) && unit.taskState === 'Moving' && typeof spawnTreadDustPuff === 'function') {
                 const isTracked = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(unit.type);
                 const rotY = unit.mesh.rotation.y || 0;
