@@ -1551,6 +1551,13 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
     if (untypedButtons.length > 0) {
         throw new Error(`Found ${untypedButtons.length} <button> elements without explicit type= attribute in src/html/body.html`);
     }
+    const indexTpl = fs.readFileSync(path.join(__dirname, 'src', 'index_template.html'), 'utf8');
+    if ((indexTpl.match(/integrity="sha384-[A-Za-z0-9+/=]+"/g) || []).length < 4) {
+        throw new Error('Expected SHA-384 Subresource Integrity (integrity) attributes on primary & fallback Three.js and PeerJS scripts in src/index_template.html');
+    }
+    if (!fs.existsSync(path.join(__dirname, 'LICENSE')) || !fs.existsSync(path.join(__dirname, 'package.json')) || !fs.existsSync(path.join(__dirname, 'package-lock.json'))) {
+        throw new Error('Expected LICENSE, package.json, and package-lock.json in repository root');
+    }
 
     vm.runInContext(`
         // 1. Validate multiplayer packet schema & authority rules

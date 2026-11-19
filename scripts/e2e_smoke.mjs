@@ -81,10 +81,137 @@ try {
     if (stats.cameoCount < 200 || stats.mapCount < 12 || stats.infantryCount < 10 || !stats.hasCanvas || stats.unitCount < 1 || stats.structCount < 1 || stats.enemyStructCount < 1) {
         throw new Error(`E2E Skirmish check failed: ${JSON.stringify(stats)}`);
     }
+
+    // 2. Two-Peer Multiplayer E2E Stress Test (Host Page <-> Client Page with simulated latency, packet drop & disconnect)
+    const clientPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    clientPage.on('pageerror', (err) => pageErrors.push(`client pageerror: ${err.message}`));
+    clientPage.on('console', (msg) => {
+        if (msg.type() === 'error') pageErrors.push(`client console.error: ${msg.text()}`);
+    });
+    await clientPage.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await clientPage.waitForFunction(() => Boolean(window.THREE && window.OFFICIAL_CAMEOS && window.OFFICIAL_SKIRMISH_MAPS && window.W3D_INFANTRY_DATA), { timeout: 20000 });
+
+    // Wire an in-memory WebRTC DataConnection bridge between Host (page) and Client (clientPage)
+    const hostQueue = [];
+    const clientQueue = [];
+    await page.exposeFunction('__sendToClientPeer', (pkt) => clientQueue.push(JSON.parse(JSON.stringify(pkt))));
+    await clientPage.exposeFunction('__sendToHostPeer', (pkt) => hostQueue.push(JSON.parse(JSON.stringify(pkt))));
+
+    await page.evaluate(() => {
+        isMultiplayerHost = true;
+        isMultiplayerActive = false;
+        currentRoomCode = 'CNC-E2ETST';
+        netConn = {
+            open: true,
+            send: (pkt) => window.__sendToClientPeer(pkt),
+            close: function() { this.open = false; }
+        };
+    });
+    await clientPage.evaluate(() => {
+        isMultiplayerHost = false;
+        isMultiplayerActive = false;
+        currentRoomCode = 'CNC-E2ETST';
+        netConn = {
+            open: true,
+            send: (pkt) => window.__sendToHostPeer(pkt),
+            close: function() { this.open = false; }
+        };
+    });
+
+    const flushPackets = async ({ dropEvery = 0 } = {}) => {
+        let idx = 0;
+        while (hostQueue.length > 0 || clientQueue.length > 0) {
+            while (clientQueue.length > 0) {
+                const pkt = clientQueue.shift();
+                idx++;
+                // Only drop non-critical state_sync packets when simulating packet loss
+                if (dropEvery > 0 && pkt.type === 'state_sync' && (idx % dropEvery === 0)) continue;
+                await clientPage.evaluate((p) => handleNetworkPacket(p), pkt);
+            }
+            while (hostQueue.length > 0) {
+                const pkt = hostQueue.shift();
+                await page.evaluate((p) => handleNetworkPacket(p), pkt);
+            }
+        }
+    };
+
+    // A. Client sends handshake -> Host updates lobby & syncs back -> Host launches multiplayer battle
+    await clientPage.evaluate(() => {
+        selectedFaction = 'china';
+        broadcastNetPacket({ type: 'handshake', clientFaction: 'china' });
+    });
+    await flushPackets();
+
+    await page.evaluate(() => {
+        mpSlots = [
+            { id: 1, active: true, isHost: true, isHuman: true, name: 'Host', faction: 'usa', color: 'blue', team: 1, spawnId: 1 },
+            { id: 2, active: true, isHost: false, isHuman: true, name: 'Challenger', faction: 'china', color: 'red', team: 2, spawnId: 2 }
+        ];
+        const pkt = {
+            type: 'start_battle',
+            mapType: 'tournament_desert',
+            mapSize: 1500,
+            money: 10000,
+            startingUnits: 'small',
+            slots: mpSlots,
+            customMapData: null,
+            seed: 987654
+        };
+        broadcastNetPacket(pkt);
+        startMultiplayerMatch(true, pkt);
+    });
+    await flushPackets();
+
+    // B. Stress test: Spawn combat unit, issue move & chat, pump 8 host state_sync snapshots under 25% simulated packet loss & out-of-order replay
+    await page.evaluate(() => {
+        const u = units[0];
+        if (u && u.netId) {
+            broadcastNetPacket({
+                type: 'move_units',
+                unitNetIds: [u.netId],
+                targetPos: { x: u.mesh.position.x + 25, y: u.mesh.position.y, z: u.mesh.position.z - 20 }
+            });
+        }
+        broadcastNetPacket({ type: 'chat', sender: 'Host', text: 'Advancing across valley!' });
+        for (let i = 0; i < 8; i++) {
+            _mpLastStateSyncMs = -1000;
+            broadcastHostStateSync();
+        }
+    });
+    await flushPackets({ dropEvery: 4 });
+
+    // Inject an out-of-order stale state_sync packet on client and confirm it is rejected
+    const staleRejected = await clientPage.evaluate(() => {
+        return handleNetworkPacket({ type: 'state_sync', v: 2, seq: 1, u: [], s: [] }) === false;
+    });
+    if (!staleRejected) {
+        throw new Error('Client failed to reject out-of-order stale state_sync packet in browser E2E!');
+    }
+
+    // C. Simulate host disconnect and verify client displays disconnect modal cleanly
+    await page.evaluate(() => {
+        broadcastNetPacket({ type: 'host_left', message: 'Host ended E2E test session.' });
+    });
+    await flushPackets();
+
+    const mpStats = await clientPage.evaluate(() => {
+        const modal = document.getElementById('host-disconnected-modal');
+        return {
+            modalVisible: Boolean(modal && modal.style.display === 'flex'),
+            chatCount: document.querySelectorAll('#mp-chat-messages .mp-chat-msg').length,
+            clientStructCount: typeof structures !== 'undefined' ? structures.length : 0,
+            clientEnemyStructCount: typeof enemyStructures !== 'undefined' ? enemyStructures.length : 0
+        };
+    });
+    if (!mpStats.modalVisible || mpStats.chatCount < 2 || mpStats.clientStructCount < 1 || mpStats.clientEnemyStructCount < 1) {
+        throw new Error(`E2E Two-Peer Multiplayer check failed: ${JSON.stringify(mpStats)}`);
+    }
+    await clientPage.close();
+
     if (pageErrors.length > 0) {
         throw new Error(`Browser errors detected: ${pageErrors.join(' | ')}`);
     }
-    console.log(`✓ Playwright E2E Skirmish smoke passed: ${JSON.stringify(stats)}`);
+    console.log(`✓ Playwright E2E Skirmish & Two-Peer Multiplayer smoke passed: ${JSON.stringify({ ...stats, mpStats })}`);
 } finally {
     if (browser) await browser.close();
     server.close();

@@ -7,7 +7,10 @@
   "scripts": {
     "build": "node build.js",
     "lint": "node tools/lint_js.js",
-    "test": "node verify_system.js && node tools/validate_audio_catalog.js && node tools/test_audio_loader.js",
+    "test": "node tools/lint_js.js && node verify_system.js && node tools/validate_audio_catalog.js && node tools/test_audio_loader.js && node build.js && node tools/validate_audio_catalog.js",
     "e2e": "node scripts/e2e_smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
   }
 }

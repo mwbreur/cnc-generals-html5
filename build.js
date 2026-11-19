@@ -77,10 +77,23 @@ try {
     process.exit(1);
 }
 
-// 5. Write the GitHub Pages output
+// 5. Write the GitHub Pages output and verify generated assets/data directory integrity
 fs.writeFileSync(pagesOutput, webHtml, 'utf8');
+const actualDataFiles = fs.readdirSync(dataOutDir).sort();
+const expectedDataFiles = Array.from(EXTERNAL_DATA_FILES).sort();
+if (actualDataFiles.length !== expectedDataFiles.length || actualDataFiles.some((f, i) => f !== expectedDataFiles[i])) {
+    console.error(`✗ Build FAILED: unexpected files in assets/data: ${JSON.stringify(actualDataFiles)}`);
+    process.exit(1);
+}
+for (const df of actualDataFiles) {
+    const sz = fs.statSync(path.join(dataOutDir, df)).size;
+    if (sz < 1024) {
+        console.error(`✗ Build FAILED: generated assets/data/${df} is unexpectedly small (${sz} bytes)`);
+        process.exit(1);
+    }
+}
 const duration = Date.now() - startTime;
 const webSizeKB = (webHtml.length / 1024).toFixed(1);
 
 console.log(`✓ SUCCESS: Built ${pagesOutput} (Ready for GitHub Pages!)`);
-console.log(`  Web build: ${webSizeKB} KB | Build time: ${duration}ms`);
+console.log(`  Web build: ${webSizeKB} KB | External bundles: ${actualDataFiles.join(', ')} | Build time: ${duration}ms`);
