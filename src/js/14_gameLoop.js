@@ -1081,6 +1081,17 @@ function animate() {
                 ));
                 spawnSmokePuff(smokePos, (buildingTick % 8 === 0) ? 0xff4d4d : 0xd63031, 0.85);
             }
+            // USA Particle Cannon: authentic soft rising blueish ion mist inside the round emitter pit
+            if (s.type === 'particleCannon' && s.mesh && !s.isBuilding && s.health > 0 && (buildingTick % 14 === 0) && typeof spawnSmokePuff === 'function') {
+                const pitNode = getCachedNode(s.mesh, 'particleCannonGlowLight');
+                const mistPos = pitNode
+                    ? pitNode.getWorldPosition(new THREE.Vector3())
+                    : s.position.clone().add(new THREE.Vector3(0, 2.5, 0));
+                mistPos.x += (Math.random() - 0.5) * 2.2;
+                mistPos.z += (Math.random() - 0.5) * 2.2;
+                mistPos.y -= 0.4;
+                spawnSmokePuff(mistPos, (buildingTick % 28 === 0) ? 0x80ecff : 0x38c8ff, 0.52);
+            }
             // Production bay blast doors: slide open when unit deploys, close afterwards
             if ((s.type === 'factory' || s.type === 'barracks') && s.mesh && !s.isBuilding && s.health > 0) {
                 if (s._blastDoors === undefined) {

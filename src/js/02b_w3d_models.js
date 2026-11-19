@@ -763,12 +763,36 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         ringWrapper.add(accelRing);
         root.add(ringWrapper);
 
-        // Glow is a light-free additive sprite: PointLights force scene-wide shader recompiles (frame spikes) in r128.
+        // Glow is a light-free soft circular radial mist sprite (no square edges, no PointLight shader recompiles in r128)
         if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
-            const pitGlow = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+            if (!window._particlePitGlowTex && typeof document !== 'undefined' && document.createElement && typeof THREE.CanvasTexture === 'function') {
+                const c = document.createElement('canvas');
+                c.width = c.height = 128;
+                const ctx = c.getContext && c.getContext('2d');
+                if (ctx) {
+                    const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
+                    g.addColorStop(0.0, 'rgba(215, 250, 255, 0.92)');
+                    g.addColorStop(0.28, 'rgba(80, 225, 255, 0.68)');
+                    g.addColorStop(0.62, 'rgba(0, 175, 255, 0.28)');
+                    g.addColorStop(1.0, 'rgba(0, 140, 255, 0)');
+                    ctx.fillStyle = g;
+                    ctx.fillRect(0, 0, 128, 128);
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.needsUpdate = true;
+                window._particlePitGlowTex = tex;
+            }
+            const pitGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: window._particlePitGlowTex || null,
+                color: 0x00e5ff,
+                transparent: true,
+                opacity: 0.48,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
             pitGlow.name = 'particleCannonGlowLight';
-            pitGlow.scale.set(14, 14, 1);
-            pitGlow.position.set(0, 11.5, 24.6);
+            pitGlow.scale.set(22, 22, 1);
+            pitGlow.position.set(0, 10.5, 24.6);
             root.add(pitGlow);
         }
     } else if (buildingKey === 'usa_commandCenter') {
