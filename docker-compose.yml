@@ -1,0 +1,8 @@
+services:
+  cnc-generals:
+    build: .
+    image: cnc-generals-html5:latest
+    container_name: cnc-generals-lan
+    ports:
+      - "${PORT:-8181}:8080"
+    restart: unless-stopped

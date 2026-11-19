@@ -138,7 +138,31 @@ npm run lan
 
 **How players join on a local network:**
 - Other players on the same Wi-Fi or Ethernet network just open the printed LAN URL (`http://<host-ip>:8080`) in any modern browser (Chrome, Edge, Firefox) — no software to install on player PCs.
-- When the game is served by `npm run lan`, multiplayer **automatically detects** the local LAN server (`/api/lan-status`) and routes rooms over your local network with zero configuration. When hosted on GitHub Pages or static hosting, it automatically uses the PeerJS cloud broker instead.
+- When the game is served by `npm run lan` (or the Docker container below), multiplayer **automatically detects** the local LAN server (`/api/lan-status`), shows a **1-click Local Network (LAN) Lobby** inside **Multiplayer → Join Match** so players can join open rooms without typing room codes, and routes traffic over your local network with zero internet access. When hosted on GitHub Pages or static hosting, it automatically uses the PeerJS cloud broker instead.
+
+### Run with Docker (LAN Party / NAS / Home Server)
+
+Run a single lightweight container (`node:22-alpine`, ~30 MB RAM) on any PC, NAS, or Raspberry Pi on your LAN:
+
+```bash
+docker compose up -d
+```
+
+Then everyone on your LAN opens `http://<host-ip>:8181` in their browser (override the port with `PORT=8080 docker compose up -d`). Each player runs their own 3D game instance locally in their browser and can see/join open games in the built-in **LAN Lobby**.
+
+> **Note on `http://` vs `https://`:** On a local IP like `http://192.168.1.55:8181`, plain `http://` works cleanly out of the box with the built-in WebSocket LAN relay and avoids self-signed certificate warnings in players' browsers.
+
+You can also tag and push the image to either **Docker Hub** (`hub.docker.com`) or **GitHub Container Registry** (`ghcr.io`):
+
+```bash
+# Docker Hub
+docker build -t <your-dockerhub-user>/cnc-generals-html5:latest .
+docker push <your-dockerhub-user>/cnc-generals-html5:latest
+
+# GitHub Container Registry (GHCR)
+docker build -t ghcr.io/<your-github-user>/cnc-generals-html5:latest .
+docker push ghcr.io/<your-github-user>/cnc-generals-html5:latest
+```
 
 ### Updating bundled Three.js / PeerJS (when online)
 

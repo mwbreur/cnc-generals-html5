@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+_site
+index.html
+assets/data
+generals_big_files
+extracted_assets
+extracted_models
+scratch
+*.bak*
+*.backup*
+*.png
+.DS_Store
+Thumbs.db

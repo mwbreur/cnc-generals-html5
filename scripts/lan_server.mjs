@@ -133,8 +133,23 @@ function handleWsMessage(client, text) {
         }
         client.roomCode = roomCode;
         client.role = 'host';
-        rooms.set(roomCode, { host: client, guest: null });
+        rooms.set(roomCode, {
+            host: client,
+            guest: null,
+            hostFaction: String(msg.hostFaction || 'usa').slice(0, 16),
+            mapName: String(msg.mapName || 'Tournament Desert').slice(0, 48),
+            createdAt: Date.now()
+        });
         sendWsJson(client, { _lan: 'hosted', room: roomCode });
+        return;
+    }
+
+    if (msg._lan === 'update_meta') {
+        const room = client.roomCode ? rooms.get(client.roomCode) : null;
+        if (room && room.host === client) {
+            if (msg.hostFaction) room.hostFaction = String(msg.hostFaction).slice(0, 16);
+            if (msg.mapName) room.mapName = String(msg.mapName).slice(0, 48);
+        }
         return;
     }
 
@@ -265,6 +280,28 @@ const server = http.createServer((req, res) => {
             'Cache-Control': 'no-store'
         });
         res.end(JSON.stringify({ ok: true, mode: 'lan', rooms: rooms.size, wsPath: '/lan-ws' }));
+        return;
+    }
+
+    if (reqPath === '/api/lan-rooms') {
+        const list = [];
+        for (const [code, room] of rooms.entries()) {
+            if (!room.host || room.host.closed) continue;
+            const hasGuest = Boolean(room.guest && !room.guest.closed);
+            list.push({
+                room: code,
+                hostFaction: room.hostFaction || 'usa',
+                mapName: room.mapName || 'Tournament Desert',
+                players: hasGuest ? 2 : 1,
+                maxPlayers: 2,
+                open: !hasGuest
+            });
+        }
+        res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+        });
+        res.end(JSON.stringify({ ok: true, rooms: list }));
         return;
     }
 

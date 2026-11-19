@@ -140,6 +140,7 @@ function switchGameModeTab(mode) {
     const startMenu = document.getElementById('start-menu');
 
     if (!['single', 'multiplayer', 'editor'].includes(mode)) mode = 'single';
+    if (mode !== 'multiplayer') stopLanLobbyPolling();
     currentStartMenuMode = mode;
     [spPanel, mpPanel, edPanel].forEach(p => { if (p) p.style.display = 'none'; });
 
@@ -179,6 +180,7 @@ function switchMpSubTab(tab) {
     const joinSection = document.getElementById('mp-join-section');
 
     if (tab === 'host') {
+        stopLanLobbyPolling();
         hostBtn.classList.add('active');
         joinBtn.classList.remove('active');
         hostSection.style.display = 'block';
@@ -189,6 +191,7 @@ function switchMpSubTab(tab) {
         hostBtn.classList.remove('active');
         joinSection.style.display = 'block';
         hostSection.style.display = 'none';
+        startLanLobbyPolling();
     }
 }
 
@@ -264,6 +267,72 @@ function createLanRelayConnection(ws) {
     return conn;
 }
 
+let _lanLobbyPollTimer = null;
+
+function stopLanLobbyPolling() {
+    if (_lanLobbyPollTimer) {
+        clearInterval(_lanLobbyPollTimer);
+        _lanLobbyPollTimer = null;
+    }
+}
+
+function startLanLobbyPolling() {
+    stopLanLobbyPolling();
+    detectLanServer().then((lanInfo) => {
+        const lobbyEl = document.getElementById('mp-lan-lobby');
+        if (!lanInfo) {
+            if (lobbyEl) lobbyEl.style.display = 'none';
+            return;
+        }
+        if (lobbyEl) lobbyEl.style.display = 'block';
+        refreshLanRooms();
+        _lanLobbyPollTimer = setInterval(refreshLanRooms, 2500);
+    });
+}
+
+function joinLanRoom(roomCode) {
+    const input = document.getElementById('mp-join-input');
+    if (input) input.value = roomCode;
+    stopLanLobbyPolling();
+    joinConnectToHost();
+}
+window.joinLanRoom = joinLanRoom;
+
+function refreshLanRooms() {
+    const listEl = document.getElementById('mp-lan-rooms-list');
+    if (!listEl || typeof fetch !== 'function') return;
+    fetch('/api/lan-rooms', { cache: 'no-store' })
+        .then(r => (r && r.ok ? r.json() : null))
+        .then(data => {
+            if (!data || !data.ok || !Array.isArray(data.rooms)) return;
+            const rooms = data.rooms;
+            if (rooms.length === 0) {
+                listEl.innerHTML = '<div style="color:#95a5a6; font-style:italic; padding:4px 0;">No hosted games yet on this LAN. Have one player click "Host Match".</div>';
+                return;
+            }
+            let html = '';
+            rooms.forEach(rm => {
+                const code = escapeHtml(rm.room || '');
+                const fac = escapeHtml(String(rm.hostFaction || 'usa').toUpperCase());
+                const mapName = escapeHtml(String(rm.mapName || 'Tournament Desert'));
+                const open = Boolean(rm.open);
+                const statusBadge = open
+                    ? `<button type="button" class="rts-btn" style="padding:4px 12px; font-size:11px; background:#1f4030; border-color:#55efc4; color:#55efc4;" onclick="joinLanRoom('${code}')">JOIN</button>`
+                    : `<span style="color:#ff9f43; font-size:11px; font-weight:bold;">FULL (${rm.players}/${rm.maxPlayers})</span>`;
+                html += `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; background:rgba(12,20,16,0.9); border:1px solid #2b4436; padding:6px 10px; border-radius:3px; margin-bottom:5px;">
+                    <div>
+                        <div style="color:#55efc4; font-family:monospace; font-weight:bold; font-size:13px;">${code} <span style="color:#f1c40f; font-family:sans-serif; font-size:11px;">(${fac})</span></div>
+                        <div style="color:#b2bec3; font-size:11px;">Map: ${mapName} &bull; Players: ${rm.players}/${rm.maxPlayers}</div>
+                    </div>
+                    <div>${statusBadge}</div>
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        })
+        .catch(() => {});
+}
+window.refreshLanRooms = refreshLanRooms;
+
 function initHostPeerLan(lanInfo, statusEl) {
     try {
         const ws = new WebSocket(lanInfo.wsUrl);
@@ -274,7 +343,16 @@ function initHostPeerLan(lanInfo, statusEl) {
             }
         };
         ws.onopen = () => {
-            ws.send(JSON.stringify({ _lan: 'host', room: currentRoomCode }));
+            const mapSelect = document.getElementById('mp-map-select');
+            const mapName = (mapSelect && mapSelect.options && mapSelect.selectedIndex >= 0)
+                ? mapSelect.options[mapSelect.selectedIndex].text
+                : (typeof currentMapType !== 'undefined' ? String(currentMapType) : 'Tournament Desert');
+            ws.send(JSON.stringify({
+                _lan: 'host',
+                room: currentRoomCode,
+                hostFaction: (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'),
+                mapName
+            }));
         };
         ws.onmessage = (ev) => {
             let msg;
