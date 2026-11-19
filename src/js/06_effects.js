@@ -3282,40 +3282,71 @@ function attachOverlordUpgrade(tank, upgradeType) {
 // CHINA NUKE CANNON OUTRIGGER SIEGE DEPLOYMENT & RETRACTION
 // =========================================================================
 
+function applyNukeCannonPose(mesh, isDeployed) {
+    if (!mesh) return;
+    const packedNames = ['TURRETBACK', 'TURRETFRONT', 'ELEVATIONBARREL', 'GUNBARREL', 'LIFTERS'];
+    packedNames.forEach(n => {
+        const node = mesh.getObjectByName(n);
+        if (node) node.visible = !isDeployed;
+    });
+    const turret = mesh.getObjectByName('turretSystem') || mesh.getObjectByName('TURRET01');
+    if (turret) {
+        turret.visible = !!isDeployed;
+        turret.rotation.x = 0; // Base spins strictly horizontally on Y — NEVER tilts upward!
+        const turretEl = turret.getObjectByName('TURRETEL');
+        if (turretEl) {
+            // Barrel trunnion pitches up/down independently of the spinning turret base
+            turretEl.rotation.x = isDeployed ? -0.62 : 0;
+        }
+    }
+    // Retail W3D hydraulic outrigger arms (ARM01-ARM04 + HOUSECOLOR01-04 + TOE01-12)
+    ['ARM01', 'ARM02', 'ARM03', 'ARM04'].forEach(armName => {
+        const arm = mesh.getObjectByName(armName);
+        if (arm) {
+            if (arm.userData._restY === undefined) arm.userData._restY = arm.position.y;
+            arm.scale.x = isDeployed ? 1.0 : 0.42;
+            arm.position.y = isDeployed ? (arm.userData._restY - 2.2) : (arm.userData._restY + 0.5);
+        }
+    });
+}
+window.applyNukeCannonPose = applyNukeCannonPose;
+
 function deployNukeCannonOutriggers(cannon) {
     if (!cannon || !cannon.mesh || cannon.isDeployed) return;
     cannon.isDeployed = true;
     cannon.deployTimestamp = Date.now();
     if (cannon.targetPosition) cannon.targetPosition.copy(cannon.mesh.position);
+    if (cannon.waypoints) cannon.waypoints = [];
+    cannon.taskState = 'Idle';
     playAudio('nukecannon_deploy', {}, 'china');
 
     const chassis = cannon.mesh;
-    let legGroup = chassis.getObjectByName("outriggerLegs");
-    if (legGroup) chassis.remove(legGroup);
-
-    legGroup = new THREE.Group();
-    legGroup.name = "outriggerLegs";
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.85, roughness: 0.3 });
-    const padMat = new THREE.MeshStandardMaterial({ color: 0xc0392b, metalness: 0.6, roughness: 0.4 });
-    [-1.45, 1.45].forEach(x => {
-            [-1.65, 1.65].forEach(z => {
-                    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.16, 0.22), legMat);
-                    strut.position.set(x * 0.78, 0.45, z);
-                    legGroup.add(strut);
-
-                    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.85, 8), legMat);
-                    leg.position.set(x, 0.35, z);
-                    legGroup.add(leg);
-
-                    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.12, 8), padMat);
-                    pad.position.set(x, 0.06, z);
-                    legGroup.add(pad);
-            });
-    });
-    chassis.add(legGroup);
-
-    const turret = chassis.getObjectByName("turretSystem");
-    if (turret) turret.rotation.x = -0.32; // Elevate siege barrel
+    if (chassis.userData && chassis.userData.isW3D) {
+        applyNukeCannonPose(chassis, true);
+    } else {
+        // Fallback procedural Nuke Cannon mesh
+        let legGroup = chassis.getObjectByName("outriggerLegs");
+        if (legGroup) chassis.remove(legGroup);
+        legGroup = new THREE.Group();
+        legGroup.name = "outriggerLegs";
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, metalness: 0.85, roughness: 0.3 });
+        const padMat = new THREE.MeshStandardMaterial({ color: 0xc0392b, metalness: 0.6, roughness: 0.4 });
+        [-1.45, 1.45].forEach(x => {
+                [-1.65, 1.65].forEach(z => {
+                        const strut = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.16, 0.22), legMat);
+                        strut.position.set(x * 0.78, 0.45, z);
+                        legGroup.add(strut);
+                        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.85, 8), legMat);
+                        leg.position.set(x, 0.35, z);
+                        legGroup.add(leg);
+                        const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.12, 8), padMat);
+                        pad.position.set(x, 0.06, z);
+                        legGroup.add(pad);
+                });
+        });
+        chassis.add(legGroup);
+    }
+    if (cannon.selected && typeof updateSidebar === 'function') updateSidebar();
 }
 
 function undeployNukeCannonOutriggers(cannon) {
@@ -3324,16 +3355,19 @@ function undeployNukeCannonOutriggers(cannon) {
     playAudio('nukecannon_undeploy', {}, 'china');
 
     const chassis = cannon.mesh;
-    const legGroup = chassis.getObjectByName("outriggerLegs");
-    if (legGroup) {
-        chassis.remove(legGroup);
-        legGroup.traverse(c => {
-                if (c.geometry) c.geometry.dispose();
-                if (c.material) c.material.dispose();
-        });
+    if (chassis.userData && chassis.userData.isW3D) {
+        applyNukeCannonPose(chassis, false);
+    } else {
+        const legGroup = chassis.getObjectByName("outriggerLegs");
+        if (legGroup) {
+            chassis.remove(legGroup);
+            legGroup.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) c.material.dispose();
+            });
+        }
     }
-    const turret = chassis.getObjectByName("turretSystem");
-    if (turret) turret.rotation.x = 0;
+    if (cannon.selected && typeof updateSidebar === 'function') updateSidebar();
 }
 window.deployNukeCannonOutriggers = deployNukeCannonOutriggers;
 window.undeployNukeCannonOutriggers = undeployNukeCannonOutriggers;

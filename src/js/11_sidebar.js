@@ -1176,14 +1176,14 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
         } else if (u.type === 'nukecannon' || u.type === 'nuketank') {
             currentGridSlots.push(
                 {
-                    name: u.isDeployed ? 'PACK OUTRIGGERS' : 'OUTRIGGERS',
-                    badge: u.isDeployed ? 'DEPLOYED' : 'DEPLOY',
+                    name: u.isDeployed ? 'PACK OUTRIGGERS' : 'DEPLOY OUTRIGGERS',
+                    badge: u.isDeployed ? 'PACK' : 'DEPLOY',
                     action: () => {
                         if (u.isDeployed && typeof undeployNukeCannonOutriggers === 'function') undeployNukeCannonOutriggers(u);
                         else deployNukeCannonOutriggers(u);
                         updateSidebar();
                     },
-                    desc: 'Deploy or retract hydraulic stabilization legs for siege artillery'
+                    desc: 'Pack or deploy hydraulic stabilization outriggers (auto-deploys when engaging enemies)'
                 },
                 { name: 'NEUTRON SHELLS', cost: 1000, badge: u.neutronShells ? 'ACTIVE' : 'UPGRADE', action: () => purchaseNukeCannonUpgrade(1000), desc: 'Eliminates vehicle crews and leaves radiation' }
             );
@@ -2444,6 +2444,9 @@ function renderCommandGrid(container, slots) {
             html += '<div class="grid-slot-btn empty"></div>';
         }
     }
+    // Skip DOM rebuild if command grid HTML is unchanged (prevents rapid button hover flashing on live updates!)
+    if (container._lastGridHtml === html) return;
+    container._lastGridHtml = html;
     container.innerHTML = html;
 }
 

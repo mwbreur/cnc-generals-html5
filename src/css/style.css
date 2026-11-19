@@ -959,7 +959,7 @@ body.control-bar-collapsed #generals-command-bar {
 }
 .grid-slot-btn:hover:not(:disabled) {
     background: linear-gradient(180deg, #384d3b 0%, #202e23 100%);
-    border-color: #55efc4; color: #fff; transform: translateY(-1px);
+    border-color: #55efc4; color: #fff;
     box-shadow: 0 0 8px rgba(85,239,196,0.3);
 }
 .grid-slot-btn.hotkey-pulse {
@@ -1234,7 +1234,6 @@ body.control-bar-collapsed #generals-command-bar {
     border-color: #00ffcc;
     background: linear-gradient(180deg, #2b3a44 0%, #161e24 100%);
     box-shadow: 0 0 10px rgba(0,255,204,0.45);
-    transform: translateY(-1px);
 }
 
 .cb-production-grid .grid-slot-btn[disabled] {

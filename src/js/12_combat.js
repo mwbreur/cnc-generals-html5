@@ -75,7 +75,11 @@ function processCombatScanning() {
                         unit.combatTarget = null; // Out of range or too close for siege artillery
                     }
                 } else {
-                    // Point Turret systems directly at target coordinates
+                    // Nuke Cannon: automatically deploy hydraulic outriggers as soon as it spots/locks a target in range!
+                    if ((unit.type === 'nukecannon' || unit.type === 'nuketank') && !unit.isDeployed && typeof deployNukeCannonOutriggers === 'function') {
+                        deployNukeCannonOutriggers(unit);
+                    }
+                    // Point Turret systems directly at target coordinates (yaw only; barrel pitch stays independent!)
                     const turret = getCachedNode(unit.mesh, "turretSystem");
                     if (turret && turret.parent && targetPos) {
                         const localTarget = turret.parent.worldToLocal(targetPos.clone());
