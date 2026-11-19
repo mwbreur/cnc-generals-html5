@@ -68,7 +68,7 @@ jobs:
           if ! node scripts/e2e_smoke.mjs; then
             echo "Initial E2E attempt failed; installing missing system deps with apt retries and re-running..."
             sudo apt-get update -o Acquire::Retries=3 || true
-            npx playwright install-deps --only-shell chromium || true
+            npx playwright install-deps chromium || true
             node scripts/e2e_smoke.mjs
           fi
 
