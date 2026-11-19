@@ -940,8 +940,10 @@ function createGLAStingerSite(isEnemy = false) {
 
 function createGLADemoTrap() {
     const g = new THREE.Group();
+    const demoTex = (typeof getW3dTexture === 'function') ? getW3dTexture('ubdemotrap') : null;
+    const trapMat = demoTex ? new THREE.MeshStandardMaterial({ map: demoTex, roughness: 0.7, metalness: 0.2 }) : matRedStar;
     // High-explosive barrel cluster with skull warning
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 1.25, 10), matRedStar);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 1.25, 10), trapMat);
     barrel.position.y = 0.48; g.add(barrel);
 
     // Proximity antenna & dynamite sticks
@@ -949,7 +951,7 @@ function createGLADemoTrap() {
     ant.position.set(0, 1.45, 0); g.add(ant);
 
     [-0.35, 0.35].forEach(x => {
-            const dyn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 6), matRedStar);
+            const dyn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 6), trapMat);
             dyn.position.set(x, 0.35, 0.35); g.add(dyn);
     });
 

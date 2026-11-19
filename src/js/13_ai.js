@@ -2364,8 +2364,8 @@ function evaluateClickSelection(e) {
             if (structures.includes(hitCandidate)) {
                 selectedStructure = hitCandidate;
                 activeSidebarTab = 'production';
-                if (hitCandidate.type === 'patriot' && typeof playUSASound === 'function') {
-                    playUSASound('patriot_select', { volume: 0.55 });
+                if (typeof playBuildingSelectSound === 'function') {
+                    playBuildingSelectSound(hitCandidate.type, hitCandidate.faction || selectedFaction);
                 }
                 if (hitCandidate.type === 'particleCannon' && window.activeParticleCannonTarget && window.activeParticleCannonPlayerOwned) {
                     window.activeParticleCannonControl = true;

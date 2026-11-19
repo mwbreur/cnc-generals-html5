@@ -17,6 +17,8 @@ function switchGameModeTab(mode) {
     const edPanel = document.getElementById('editor-controls-panel');
     const menuTitle = document.getElementById('setup-screen-title');
     const factionSection = document.getElementById('faction-selection');
+    const startCard = document.getElementById('start-card');
+    const startMenu = document.getElementById('start-menu');
 
     if (!['single', 'multiplayer', 'editor'].includes(mode)) mode = 'single';
     currentStartMenuMode = mode;
@@ -25,18 +27,26 @@ function switchGameModeTab(mode) {
     if (mode === 'single') {
         if (spPanel) spPanel.style.display = 'block';
         if (menuTitle) menuTitle.textContent = 'Skirmish';
-        if (factionSection) factionSection.style.display = '';
+        if (factionSection) factionSection.style.display = 'none';
+        if (startCard) startCard.classList.add('zh-skirmish-card');
+        if (startMenu) startMenu.classList.add('zh-skirmish-backdrop');
         onMapSelectionChange('single');
+        if (typeof loadSkirmishStats === 'function') loadSkirmishStats();
+        if (typeof updateSkirmishMapSummary === 'function') updateSkirmishMapSummary();
     } else if (mode === 'multiplayer') {
         if (mpPanel) mpPanel.style.display = 'block';
         if (menuTitle) menuTitle.textContent = 'Multiplayer';
         if (factionSection) factionSection.style.display = '';
+        if (startCard) startCard.classList.remove('zh-skirmish-card');
+        if (startMenu) startMenu.classList.remove('zh-skirmish-backdrop');
         if (!netPeer) initHostPeer();
         onMapSelectionChange('multiplayer');
     } else if (mode === 'editor') {
         if (edPanel) edPanel.style.display = 'block';
         if (menuTitle) menuTitle.textContent = 'Map Editor';
         if (factionSection) factionSection.style.display = 'none';
+        if (startCard) startCard.classList.remove('zh-skirmish-card');
+        if (startMenu) startMenu.classList.remove('zh-skirmish-backdrop');
         renderEditorCanvas();
         loadSavedMapsList();
     }
@@ -684,6 +694,7 @@ function processBaseDefenseCombat() {
                         def.attackCooldown = 28; // ~0.46s reload
                         spawnMuzzleFlash(defPos, 0xffa502, 0.4);
                         spawnBulletTracer(defPos, targetPos, 0xf1c40f, 2.5);
+                        if ((!def.mesh || def.mesh.visible) && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
                         closestEnemy.health -= 22;
                     } else if (def.type === 'patriot') {
                         def.attackCooldown = 190; // ~3.16s reload
@@ -695,6 +706,7 @@ function processBaseDefenseCombat() {
                         def.attackCooldown = 150; // ~2.5s reload
                         spawnMuzzleFlash(defPos, 0xff9f43, 0.5);
                         spawnRocketProjectile(defPos, targetPos, false, true);
+                        if ((!def.mesh || def.mesh.visible) && typeof playAudio === 'function') playAudio('stinger_fire', {}, 'gla');
                         closestEnemy.health -= 50;
                     }
 

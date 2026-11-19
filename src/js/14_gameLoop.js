@@ -253,7 +253,8 @@ function animate() {
     ? Math.min(0.1, (nowTime - window._lastCombatFrameTime) / 1000)
     : (1 / 60);
     window._lastCombatFrameTime = nowTime;
-    combatDeltaScale = Math.max(0.25, Math.min(3.0, dt * 60));
+    const speedMul = (typeof window !== 'undefined' && typeof window.gameSpeedMultiplier === 'number' && isFinite(window.gameSpeedMultiplier)) ? window.gameSpeedMultiplier : 1.0;
+    combatDeltaScale = Math.max(0.25, Math.min(4.0, dt * 60 * speedMul));
 
     const animTime = nowTime * 0.003;
 
@@ -2611,12 +2612,14 @@ function animate() {
             showNotification("MISSION ACCOMPLISHED: ALL HOSTILE FORCES ELIMINATED!", "success");
             const ticker = document.getElementById('tactical-message');
             if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: Operational theater secured. All hostile forces destroyed!</strong>';
+            if (typeof recordSkirmishOutcome === 'function') recordSkirmishOutcome(true);
             if (typeof showVictoryBanner === 'function') showVictoryBanner();
         } else if (!hasFriendly) {
             isMatchActive = false;
             showNotification("MISSION FAILED: ALL STRATEGIC ASSETS LOST!", "error");
             const ticker = document.getElementById('tactical-message');
             if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">CRITICAL DEFEAT: Command Center and all friendly forces destroyed.</strong>';
+            if (typeof recordSkirmishOutcome === 'function') recordSkirmishOutcome(false);
             if (typeof showDefeatBanner === 'function') showDefeatBanner();
         }
     }

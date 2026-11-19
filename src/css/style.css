@@ -2488,3 +2488,462 @@ body.control-bar-collapsed #generals-command-bar {
     margin-top: 3px;
     line-height: 1.3;
 }
+
+/* ===================================================================== */
+/* AUTHENTIC C&C GENERALS / ZERO HOUR SKIRMISH SCREEN (SkirmishGameOptionsMenu) */
+/* ===================================================================== */
+#start-menu.zh-skirmish-backdrop {
+    background: rgba(2, 4, 10, 0.42);
+}
+#start-card.zh-skirmish-card {
+    width: min(920px, calc(100vw - 24px));
+    background: rgba(2, 5, 14, 0.88) !important;
+    border: 2px solid #2f37a8;
+    box-shadow: 0 0 0 1px rgba(10, 14, 36, 0.9), 0 18px 48px rgba(0, 0, 0, 0.85), inset 0 0 24px rgba(24, 34, 96, 0.35);
+    border-radius: 2px;
+    padding: 16px 20px;
+}
+#start-card.zh-skirmish-card #setup-screen-title {
+    color: #ffbe01;
+    font-size: 24px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 6px #000;
+    margin-bottom: 4px;
+}
+#start-card.zh-skirmish-card #setup-screen-title::before {
+    content: none;
+    display: none;
+}
+#start-card.zh-skirmish-card #return-main-menu-btn {
+    display: none !important;
+}
+#start-card.zh-skirmish-card .menu-ruler-img {
+    max-width: none;
+    width: 100%;
+    height: 12px;
+}
+#start-card.zh-skirmish-card .menu-header-banner {
+    margin-bottom: 10px;
+}
+#start-card.zh-skirmish-card .menu-faction-crest {
+    width: 52px;
+    height: 52px;
+}
+.zh-skirmish-top-grid {
+    display: grid;
+    grid-template-columns: 1fr 248px;
+    gap: 14px;
+    align-items: start;
+}
+.zh-skirmish-players-panel,
+.zh-skirmish-map-panel,
+.zh-skirmish-options-bar,
+.zh-skirmish-stats-box,
+.zh-skirmish-intel-box {
+    background: rgba(4, 9, 24, 0.78);
+    border: 1.5px solid #2f37a8;
+    padding: 10px;
+    box-sizing: border-box;
+}
+.zh-skirmish-col-title {
+    color: #ffbe01;
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+.zh-skirmish-table-header {
+    display: grid;
+    grid-template-columns: minmax(135px, 1.35fr) 104px 118px 82px;
+    gap: 6px;
+    align-items: center;
+    color: #ffbe01;
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #2f37a8;
+    padding: 0 6px 5px 6px;
+    margin-bottom: 6px;
+}
+.zh-skirmish-slots-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.zh-slot-row {
+    display: grid;
+    grid-template-columns: minmax(135px, 1.35fr) 104px 118px 82px;
+    gap: 6px;
+    align-items: center;
+    background: rgba(8, 15, 36, 0.85);
+    border: 1px solid #1f2a6d;
+    padding: 4px 6px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+.zh-slot-row:hover {
+    border-color: #4657c9;
+    background: rgba(12, 22, 52, 0.9);
+}
+.zh-slot-row.focused {
+    border-color: #ffbe01;
+    box-shadow: inset 0 0 8px rgba(255, 190, 1, 0.22);
+}
+.zh-slot-row.inactive-slot {
+    opacity: 0.62;
+}
+.zh-color-cell {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+}
+.zh-color-swatch {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 1px;
+}
+.zh-skirmish-select,
+.zh-skirmish-input {
+    background: #070d20;
+    color: #e8eefc;
+    border: 1px solid #3948b5;
+    font-size: 11.5px;
+    padding: 4px 6px;
+    border-radius: 1px;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+}
+.zh-skirmish-select:focus,
+.zh-skirmish-input:focus {
+    border-color: #ffbe01;
+    outline: none;
+}
+.zh-skirmish-select:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.zh-skirmish-select option {
+    background: #070d20;
+    color: #e8eefc;
+}
+.zh-skirmish-map-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.zh-skirmish-preview-frame {
+    padding: 3px;
+    background: #030611;
+    border: 1px solid #3948b5;
+    line-height: 0;
+}
+.zh-map-preview-canvas {
+    display: block;
+    width: 220px;
+    height: 220px;
+    background: #000;
+    cursor: pointer;
+}
+.zh-skirmish-map-name {
+    margin-top: 7px;
+    color: #ffbe01;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+.zh-skirmish-slots-count {
+    margin-top: 2px;
+    color: #9cb2e8;
+    font-size: 11px;
+}
+.zh-skirmish-map-hint {
+    margin-top: 5px;
+    color: #7d8ec2;
+    font-size: 10px;
+    line-height: 1.3;
+}
+.zh-skirmish-options-bar {
+    display: grid;
+    grid-template-columns: 1.2fr 0.9fr 1.05fr 1.15fr;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+}
+.zh-opt-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.zh-opt-group label {
+    color: #ffbe01;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.zh-opt-speed input[type="range"] {
+    width: 100%;
+    accent-color: #ffbe01;
+    cursor: pointer;
+}
+.zh-opt-check {
+    justify-content: center;
+}
+.zh-skirmish-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #e8eefc !important;
+    font-size: 11.5px !important;
+    text-transform: none !important;
+    letter-spacing: 0.02em !important;
+    cursor: pointer;
+}
+.zh-skirmish-checkbox-label input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: #ffbe01;
+    cursor: pointer;
+}
+.zh-skirmish-bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    gap: 12px;
+    margin-top: 10px;
+}
+.zh-box-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.zh-box-header-row .zh-skirmish-col-title {
+    margin-bottom: 0;
+}
+.zh-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px 12px;
+}
+.zh-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #b4c4ef;
+    padding: 2px 4px;
+    border-bottom: 1px solid rgba(47, 55, 168, 0.35);
+}
+.zh-stat-row strong {
+    color: #ffbe01;
+    font-weight: 800;
+}
+.zh-intel-body {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.zh-intel-crest {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 1px 4px #000);
+}
+.zh-intel-text {
+    font-size: 11px;
+    color: #d6e0fa;
+    line-height: 1.35;
+}
+.zh-map-intel-line {
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px solid rgba(47, 55, 168, 0.45);
+    font-size: 10.5px;
+    color: #9cb2e8;
+}
+.zh-skirmish-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+}
+.zh-btn {
+    background: linear-gradient(180deg, #1b285c 0%, #0d163b 100%);
+    border: 1.5px solid #4556cc;
+    color: #f0f4ff;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 9px 24px;
+    border-radius: 1px;
+    transition: all 0.14s ease;
+}
+.zh-btn:hover,
+.zh-btn:focus-visible {
+    outline: none;
+    border-color: #ffbe01;
+    color: #ffbe01;
+    background: linear-gradient(180deg, #27387a 0%, #132054 100%);
+    box-shadow: 0 0 12px rgba(255, 190, 1, 0.25);
+}
+.zh-btn-primary,
+.zh-btn-secondary {
+    min-width: 220px;
+    font-size: 14px;
+    padding: 10px 28px;
+    margin-top: 0;
+}
+#sp-controls-panel #start-game {
+    width: auto;
+    min-width: 240px;
+    margin-top: 0;
+}
+.zh-btn-map {
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+}
+.zh-btn-mini {
+    padding: 3px 9px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+}
+/* Map Selection Modal */
+.zh-map-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.78);
+    padding: 16px;
+}
+.zh-map-modal[hidden] {
+    display: none !important;
+}
+.zh-map-modal-dialog {
+    width: min(820px, 96vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(3, 7, 20, 0.96);
+    border: 2px solid #2f37a8;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9);
+    padding: 14px 16px;
+    box-sizing: border-box;
+}
+.zh-map-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #ffbe01;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #2f37a8;
+    padding-bottom: 8px;
+}
+.zh-map-modal-controls {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 10px;
+}
+.zh-map-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+    overflow-y: auto;
+    max-height: 50vh;
+    padding-right: 4px;
+}
+.zh-map-pick-card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 6px;
+    background: rgba(8, 15, 36, 0.9);
+    border: 1.5px solid #26338c;
+    color: #e8eefc;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.12s ease, transform 0.1s ease;
+}
+.zh-map-pick-card:hover {
+    border-color: #6b7ef2;
+    transform: translateY(-1px);
+}
+.zh-map-pick-card.selected {
+    border-color: #ffbe01;
+    background: rgba(24, 34, 82, 0.95);
+    box-shadow: 0 0 10px rgba(255, 190, 1, 0.25);
+}
+.zh-map-pick-thumb {
+    width: 100%;
+    height: 86px;
+    object-fit: cover;
+    background: #040712;
+    border: 1px solid #1e286e;
+}
+.zh-map-pick-thumb.procedural-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #ffbe01;
+    text-transform: uppercase;
+}
+.zh-map-pick-title {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.zh-map-pick-sub {
+    font-size: 10px;
+    color: #9cb2e8;
+}
+.zh-map-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid #2f37a8;
+    padding-top: 10px;
+}
+@media (max-width: 820px) {
+    .zh-skirmish-top-grid,
+    .zh-skirmish-bottom-grid,
+    .zh-map-modal-controls {
+        grid-template-columns: 1fr;
+    }
+    .zh-skirmish-options-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .zh-skirmish-table-header,
+    .zh-slot-row {
+        grid-template-columns: minmax(110px, 1.2fr) 92px 96px 74px;
+    }
+    .zh-btn-primary,
+    .zh-btn-secondary,
+    #sp-controls-panel #start-game {
+        min-width: 140px;
+    }
+}

@@ -79,88 +79,148 @@
             </div>
 
             <!-- ============================================================== -->
-            <!-- 1. SINGLE PLAYER SETUP PANEL                                   -->
+            <!-- 1. SINGLE PLAYER SETUP PANEL (Classic C&C Generals / Zero Hour) -->
             <!-- ============================================================== -->
             <div id="sp-controls-panel">
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;">
-                    <div class="start-option" style="margin:0;">
-                        <label for="starting-units" style="font-size:10px;">Starting Units</label>
-                        <select id="starting-units" class="slot-select">
+                <div class="zh-skirmish-top-grid">
+                    <!-- Left: Authentic 4-Column Players / Color / Faction / Team Table -->
+                    <div class="zh-skirmish-players-panel">
+                        <div class="zh-skirmish-table-header">
+                            <span>Players</span>
+                            <span>Color</span>
+                            <span>Faction</span>
+                            <span>Team</span>
+                        </div>
+                        <div id="sp-slots-list" class="zh-skirmish-slots-list">
+                            <!-- Populated dynamically by renderSlotsUI('single') -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Map Preview & Select Map Trigger -->
+                    <div class="zh-skirmish-map-panel">
+                        <div class="zh-skirmish-col-title">Map Preview</div>
+                        <div class="zh-skirmish-preview-frame">
+                            <canvas id="sp-map-preview" class="zh-map-preview-canvas" width="220" height="220" onclick="handleMapPreviewClick(event, 'single')"></canvas>
+                        </div>
+                        <div id="sp-map-display-name" class="zh-skirmish-map-name">Tournament Desert</div>
+                        <div id="sp-slots-count" class="zh-skirmish-slots-count">4 Spawns (2 Active)</div>
+                        <div class="zh-skirmish-map-hint">Click a row, then click a numbered pin on the map to move its start position.</div>
+                        <button type="button" id="sp-select-map-btn" class="zh-btn zh-btn-map" onclick="openSkirmishMapModal()">Select Map</button>
+                    </div>
+                </div>
+
+                <!-- Middle Options Strip -->
+                <div class="zh-skirmish-options-bar">
+                    <div class="zh-opt-group zh-opt-speed">
+                        <label for="skirmish-game-speed">Game Speed: <span id="skirmish-game-speed-val">30</span></label>
+                        <input id="skirmish-game-speed" type="range" min="15" max="60" step="5" value="30" oninput="onSkirmishGameSpeedChange(this.value)">
+                    </div>
+                    <div class="zh-opt-group">
+                        <label for="starting-money">Starting Cash</label>
+                        <select id="starting-money" class="zh-skirmish-select">
+                            <option value="5000">$5,000</option>
+                            <option value="10000" selected>$10,000</option>
+                            <option value="20000">$20,000</option>
+                            <option value="50000">$50,000</option>
+                        </select>
+                    </div>
+                    <div class="zh-opt-group zh-opt-check">
+                        <label class="zh-skirmish-checkbox-label" for="limit-superweapons">
+                            <input type="checkbox" id="limit-superweapons">
+                            <span>Limit Superweapons</span>
+                        </label>
+                    </div>
+                    <div class="zh-opt-group">
+                        <label for="starting-units">Starting Units</label>
+                        <select id="starting-units" class="zh-skirmish-select">
                             <option value="dozer" selected>Authentic Zero Hour (1 Builder)</option>
                             <option value="small">Small Squad (Builder + Tank)</option>
                             <option value="large">Reinforced Force (2 Builders + 2 Tanks)</option>
                         </select>
                     </div>
-                    <div class="start-option" style="margin:0;">
-                        <label for="starting-money" style="font-size:10px;">Starting Money</label>
-                        <select id="starting-money" class="slot-select">
-                            <option value="1200">$1,200</option>
-                            <option value="2000">$2,000</option>
-                            <option value="5000">$5,000</option>
-                            <option value="10000" selected>$10,000</option>
-                        </select>
+                </div>
+
+                <!-- Bottom Info Bar: Career Skirmish Stats & Commander Intel -->
+                <div class="zh-skirmish-bottom-grid">
+                    <div class="zh-skirmish-stats-box">
+                        <div class="zh-box-header-row">
+                            <span class="zh-skirmish-col-title">Skirmish Stats</span>
+                            <button type="button" class="zh-btn zh-btn-mini" onclick="resetSkirmishStats()">Reset</button>
+                        </div>
+                        <div class="zh-stats-grid">
+                            <div class="zh-stat-row"><span>Best Win Streak</span><strong id="skirmish-stat-best-streak">0</strong></div>
+                            <div class="zh-stat-row"><span>Current Win Streak</span><strong id="skirmish-stat-cur-streak">0</strong></div>
+                            <div class="zh-stat-row"><span>Career Wins</span><strong id="skirmish-stat-wins">0</strong></div>
+                            <div class="zh-stat-row"><span>Career Losses</span><strong id="skirmish-stat-losses">0</strong></div>
+                        </div>
                     </div>
-                    <div class="start-option" style="margin:0;">
-                        <label for="map-environment" style="font-size:10px;">Theater of War</label>
-                        <select id="map-environment" class="slot-select" onchange="onMapSelectionChange('single')">
-                            <optgroup label="Official EA Skirmish Maps (Maps.big / MapsZH.big)">
-                                <option value="tournament_desert" selected>Tournament Desert (2-4P • Official EA Map)</option>
-                                <option value="scorched_earth">Scorched Earth (2-4P • Official EA Map)</option>
-                                <option value="desert_fury">Desert Fury (2-4P • Official EA Map)</option>
-                                <option value="golden_oasis">Golden Oasis (4P • Official EA Map)</option>
-                                <option value="barren_badlands">Barren Badlands (2-4P • Official EA Map)</option>
-                                <option value="flash_fire">Flash Fire (2-4P • Official EA Map)</option>
-                                <option value="winter_wolf">Winter Wolf (2-4P • Official EA Snow Map)</option>
-                                <option value="alpine_assault">Alpine Assault (2-4P • Official EA Snow Map)</option>
-                                <option value="final_crusade">Final Crusade (2-4P • Official EA Temperate Map)</option>
-                                <option value="heartland_shield">Heartland Shield (2-4P • Official EA Temperate Map)</option>
-                                <option value="lone_eagle">Lone Eagle (4P • Official EA Temperate Map)</option>
-                                <option value="twilight_flame">Twilight Flame (8P • Official EA Map)</option>
-                            </optgroup>
-                            <optgroup label="Procedural Theaters">
-                                <option value="desert">Desert Canyon (Middle East)</option>
-                                <option value="jungle">Tropical Jungle (Mekong Basin)</option>
-                                <option value="snow">Frozen Mountain (Siberian Tundra)</option>
-                                <option value="city">Small City Grid (Urban Warfare)</option>
-                                <option value="random">Procedural Warzone - Random Hills &amp; River</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div class="start-option" style="margin:0;">
-                        <label for="map-size" style="font-size:10px;">Battlefield Size</label>
-                        <select id="map-size" class="slot-select" onchange="onMapSizeChange('single')">
-                            <option value="900">Small (900x900 - 4 Spawns)</option>
-                            <option value="1500" selected>Medium (1500x1500 - 6 Spawns)</option>
-                            <option value="2200">Large (2200x2200 - 8 Spawns)</option>
-                            <option value="3000">Epic (3000x3000 - 8 Spawns)</option>
-                        </select>
+
+                    <div class="zh-skirmish-intel-box">
+                        <div class="zh-skirmish-col-title">Commander Intel</div>
+                        <div class="zh-intel-body">
+                            <img id="sp-intel-crest" class="zh-intel-crest" alt="" style="display:none;" />
+                            <div id="sp-faction-briefing" class="zh-intel-text">USA forces — High-tech composite armor, drones &amp; precision air support.</div>
+                        </div>
+                        <div id="sp-map-intel" class="zh-map-intel-line">Tournament Desert • Official EA Map (2–4 Players)</div>
                     </div>
                 </div>
 
-                <!-- Skirmish Map Preview & Slots Grid -->
-                <div class="setup-columns-grid">
-                    <!-- Left: Interactive Map Preview Canvas -->
-                    <div class="map-preview-container">
-                        <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px;">🗺️ TACTICAL MAP PREVIEW</div>
-                        <canvas id="sp-map-preview" class="map-preview-canvas" width="260" height="260" onclick="handleMapPreviewClick(event, 'single')"></canvas>
-                        <div style="font-size: 10px; color: #8f9e91; margin-top: 6px;">
-                            💡 Click any numbered marker on the map to assign that spawn location to your selected slot!
-                        </div>
-                    </div>
+                <!-- Footer Start / Back Action Row -->
+                <div class="zh-skirmish-footer">
+                    <button id="start-game" class="zh-btn zh-btn-primary" onclick="startGame()">Start</button>
+                    <button type="button" class="zh-btn zh-btn-secondary" onclick="showMainMenuScreen()">Back</button>
+                </div>
 
-                    <!-- Right: Player & AI Slots List -->
-                    <div class="slots-container">
-                        <div style="font-size: 11px; font-weight: bold; color: #55efc4; margin-bottom: 6px; display: flex; justify-content: space-between;">
-                            <span>COMMAND SLOTS & TEAMS</span>
-                            <span id="sp-slots-count" style="color: #c5b98e;">4 Spawns Available</span>
+                <!-- Map Selection Modal -->
+                <div id="skirmish-map-modal" class="zh-map-modal" hidden onclick="if (event.target === this) closeSkirmishMapModal()">
+                    <div class="zh-map-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="zh-map-modal-title">
+                        <div class="zh-map-modal-header">
+                            <span id="zh-map-modal-title">Select Skirmish Map</span>
+                            <button type="button" class="zh-btn zh-btn-mini" onclick="closeSkirmishMapModal()">X</button>
                         </div>
-                        <div id="sp-slots-list">
-                            <!-- Populated dynamically by initLobbySlots() -->
+                        <div class="zh-map-modal-controls">
+                            <div class="zh-opt-group">
+                                <label for="map-environment">Theater of War</label>
+                                <select id="map-environment" class="zh-skirmish-select" onchange="onMapSelectionChange('single')">
+                                    <optgroup label="Official EA Skirmish Maps (Maps.big / MapsZH.big)">
+                                        <option value="tournament_desert" selected>Tournament Desert (2-4P • Official EA Map)</option>
+                                        <option value="scorched_earth">Scorched Earth (2-4P • Official EA Map)</option>
+                                        <option value="desert_fury">Desert Fury (2-4P • Official EA Map)</option>
+                                        <option value="golden_oasis">Golden Oasis (4P • Official EA Map)</option>
+                                        <option value="barren_badlands">Barren Badlands (2-4P • Official EA Map)</option>
+                                        <option value="flash_fire">Flash Fire (2-4P • Official EA Map)</option>
+                                        <option value="winter_wolf">Winter Wolf (2-4P • Official EA Snow Map)</option>
+                                        <option value="alpine_assault">Alpine Assault (2-4P • Official EA Snow Map)</option>
+                                        <option value="final_crusade">Final Crusade (2-4P • Official EA Temperate Map)</option>
+                                        <option value="heartland_shield">Heartland Shield (2-4P • Official EA Temperate Map)</option>
+                                        <option value="lone_eagle">Lone Eagle (4P • Official EA Temperate Map)</option>
+                                        <option value="twilight_flame">Twilight Flame (8P • Official EA Map)</option>
+                                    </optgroup>
+                                    <optgroup label="Procedural Theaters">
+                                        <option value="desert">Desert Canyon (Middle East)</option>
+                                        <option value="jungle">Tropical Jungle (Mekong Basin)</option>
+                                        <option value="snow">Frozen Mountain (Siberian Tundra)</option>
+                                        <option value="city">Small City Grid (Urban Warfare)</option>
+                                        <option value="random">Procedural Warzone - Random Hills &amp; River</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="zh-opt-group">
+                                <label for="map-size">Battlefield Size</label>
+                                <select id="map-size" class="zh-skirmish-select" onchange="onMapSizeChange('single')">
+                                    <option value="900">Small (900x900 - 4 Spawns)</option>
+                                    <option value="1500" selected>Medium (1500x1500 - 6 Spawns)</option>
+                                    <option value="2200">Large (2200x2200 - 8 Spawns)</option>
+                                    <option value="3000">Epic (3000x3000 - 8 Spawns)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="skirmish-map-grid" class="zh-map-picker-grid"></div>
+                        <div class="zh-map-modal-footer">
+                            <button type="button" class="zh-btn zh-btn-primary" onclick="closeSkirmishMapModal()">Accept</button>
                         </div>
                     </div>
                 </div>
-
-                <button id="start-game" class="rts-btn" style="margin-top: 14px; width: 100%;" onclick="startGame()">START SKIRMISH</button>
             </div>
 
             <!-- ============================================================== -->

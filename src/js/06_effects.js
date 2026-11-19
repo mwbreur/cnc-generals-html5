@@ -2292,14 +2292,14 @@ function spawnWaypointMarker(pos, orderType = 'move') {
 // =========================================================================
 // USA SUPPLY DROP ZONE: C-130 HERCULES CRATE DELIVERY ($1,500 / $1,650)
 // =========================================================================
-function createC130FlyoverPlane() {
+function createC130FlyoverPlane(modelKey = 'c130') {
     let plane = null;
-    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['c130']) {
-        plane = createW3DVehicleMesh('c130', false);
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA[modelKey]) {
+        plane = createW3DVehicleMesh(modelKey, false);
     } else {
         plane = new THREE.Group();
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6c7a89, roughness: 0.55, metalness: 0.35 });
-        const wingMat = new THREE.MeshStandardMaterial({ color: 0x56616e, roughness: 0.6, metalness: 0.3 });
+        const bodyMat = new THREE.MeshStandardMaterial({ color: modelKey === 'china_bomber' ? 0x556b2f : 0x6c7a89, roughness: 0.55, metalness: 0.35 });
+        const wingMat = new THREE.MeshStandardMaterial({ color: modelKey === 'china_bomber' ? 0x455a24 : 0x56616e, roughness: 0.6, metalness: 0.3 });
         const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.5, 9.0), bodyMat);
         const wings = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.25, 2.2), wingMat);
         wings.position.set(0, 0.35, 0.5);
@@ -2324,7 +2324,7 @@ function triggerSupplyDropZoneDelivery(structure) {
     const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
     // 1. Official W3D C-130 Hercules Flyover Mesh (AvCargoPln.W3D)
-    const { plane, c130Props } = createC130FlyoverPlane();
+    const { plane, c130Props } = createC130FlyoverPlane('c130');
 
     const flightY = groundY + 16.5;
     const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 45);
@@ -2340,7 +2340,7 @@ function triggerSupplyDropZoneDelivery(structure) {
     const planeTracker = { mesh: plane, dirX: (endPos.x - startPos.x) / dirLen, dirZ: (endPos.z - startPos.z) / dirLen };
     if (typeof window !== 'undefined') window.activeSupplyPlanes.push(planeTracker);
 
-    if (typeof playAudio === 'function') playAudio('radio_chirp', {}, 'usa');
+    if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.7 }, 'usa');
     if (typeof showNotification === 'function') showNotification('✈ C-130 Supply Drop inbound!', 'info');
 
     let planeTick = 0;
@@ -2354,20 +2354,38 @@ function triggerSupplyDropZoneDelivery(structure) {
         const landX = dropCenter.x + offX;
         const landZ = dropCenter.z + offZ;
         const landY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(landX, landZ) : groundY;
+        if (typeof playAudio === 'function') playAudio('parachute_open', { volume: 0.7 }, 'usa');
 
         const crateGrp = new THREE.Group();
-        const boxMat = new THREE.MeshStandardMaterial({ color: 0x4b5d3b, roughness: 0.7 });
-        const strapMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.4 });
+        let proceduralBox = null, proceduralStrap = null, boxMat = null, strapMat = null;
+        if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['tech_supplyCrates']) {
+            const w3dCrate = createW3DBuildingMesh('tech_supplyCrates', false);
+            w3dCrate.scale.set(0.16, 0.16, 0.16);
+            crateGrp.add(w3dCrate);
+        } else {
+            boxMat = new THREE.MeshStandardMaterial({ color: 0x4b5d3b, roughness: 0.7 });
+            strapMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.4 });
+            proceduralBox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.5), boxMat);
+            proceduralStrap = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.22, 1.58), strapMat);
+            crateGrp.add(proceduralBox, proceduralStrap);
+        }
         const chuteMat = new THREE.MeshBasicMaterial({ color: 0xecf0f1, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
-
-        const box = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.5), boxMat);
-        const strap = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.22, 1.58), strapMat);
         const chute = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.8, 8, 1, true), chuteMat);
         chute.position.y = 3.2;
-        crateGrp.add(box, strap, chute);
+        crateGrp.add(chute);
 
         crateGrp.position.set(landX, flightY - 1.2, landZ);
         scene.add(crateGrp);
+
+        function disposeCrate() {
+            scene.remove(crateGrp);
+            chute.geometry.dispose();
+            chuteMat.dispose();
+            if (proceduralBox) proceduralBox.geometry.dispose();
+            if (proceduralStrap) proceduralStrap.geometry.dispose();
+            if (boxMat) boxMat.dispose();
+            if (strapMat) strapMat.dispose();
+        }
 
         let landed = false;
         let groundTicks = 0;
@@ -2394,9 +2412,7 @@ function triggerSupplyDropZoneDelivery(structure) {
                         if (interceptor) {
                             if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(crateGrp.position, 0xff4757, 2.2);
                             if (typeof showNotification === 'function') showNotification('⚠ Enemy forces intercepted a Supply Drop Zone crate!', 'warning');
-                            scene.remove(crateGrp);
-                            box.geometry.dispose(); strap.geometry.dispose(); chute.geometry.dispose();
-                            boxMat.dispose(); strapMat.dispose(); chuteMat.dispose();
+                            disposeCrate();
                             return false;
                         }
                     }
@@ -2414,9 +2430,7 @@ function triggerSupplyDropZoneDelivery(structure) {
                         if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(crateGrp.position, 0x2ecc71, 2.0);
                         if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(crateGrp.position.clone().add(new THREE.Vector3(0, 1.5, 0)), bonus);
                         if (typeof showNotification === 'function') showNotification(`📦 C-130 Supply Drop collected: +$${bonus}!`, 'success');
-                        scene.remove(crateGrp);
-                        box.geometry.dispose(); strap.geometry.dispose(); chute.geometry.dispose();
-                        boxMat.dispose(); strapMat.dispose(); chuteMat.dispose();
+                        disposeCrate();
                         return false;
                     }
                     return lifeTicks < 1200;
@@ -2464,13 +2478,14 @@ function triggerC130Paradrop(targetPos) {
     const dropCenter = targetPos.clone();
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
 
-    const { plane, c130Props } = createC130FlyoverPlane();
+    const { plane, c130Props } = createC130FlyoverPlane('c130');
     const flightY = groundY + 16.5;
     const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 45);
     const endPos = new THREE.Vector3(dropCenter.x + 95, flightY, dropCenter.z + 45);
     plane.position.copy(startPos);
     if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
     scene.add(plane);
+    if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.75 }, 'usa');
 
     const dirLen = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z) || 1;
     const planeTracker = {
@@ -2495,6 +2510,7 @@ function triggerC130Paradrop(targetPos) {
 
             if (!dropped && t >= 0.5) {
                 dropped = true;
+                if (typeof playAudio === 'function') playAudio('parachute_open', { volume: 0.75 }, 'usa');
                 for (let i = 0; i < 4; i++) {
                     const rPos = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 7, 0, (Math.random() - 0.5) * 7));
                     const rGround = typeof getTerrainHeight === 'function' ? getTerrainHeight(rPos.x, rPos.z) : groundY;
@@ -2533,11 +2549,92 @@ function triggerC130Paradrop(targetPos) {
 }
 window.triggerC130Paradrop = triggerC130Paradrop;
 
+function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
+    if (!targetPos || !scene) return;
+    const dropCenter = targetPos.clone();
+    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+
+    const { plane, c130Props } = createC130FlyoverPlane('c130');
+    const flightY = groundY + 18.0;
+    const startPos = new THREE.Vector3(dropCenter.x - 100, flightY, dropCenter.z - 42);
+    const endPos = new THREE.Vector3(dropCenter.x + 100, flightY, dropCenter.z + 42);
+    plane.position.copy(startPos);
+    if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
+    scene.add(plane);
+    if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.78 }, 'usa');
+
+    const dirLen = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z) || 1;
+    const planeTracker = { mesh: plane, dirX: (endPos.x - startPos.x) / dirLen, dirZ: (endPos.z - startPos.z) / dirLen };
+    if (typeof window !== 'undefined') {
+        if (!window.activeSupplyPlanes) window.activeSupplyPlanes = [];
+        window.activeSupplyPlanes.push(planeTracker);
+    }
+
+    let frame = 0;
+    const totalFrames = 320;
+    let dropped = false;
+
+    activeFX.push({
+        update() {
+            frame++;
+            const t = frame / totalFrames;
+            plane.position.lerpVectors(startPos, endPos, t);
+            for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.8;
+
+            if (!dropped && t >= 0.5) {
+                dropped = true;
+                if (typeof playAudio === 'function') playAudio('daisycutter_drop', { volume: 0.9 }, 'usa');
+                const canisterGrp = new THREE.Group();
+                const canisterMat = new THREE.MeshStandardMaterial({ color: 0x3b4d36, roughness: 0.45, metalness: 0.5 });
+                const canister = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 2.1, 10), canisterMat);
+                const chuteMat = new THREE.MeshBasicMaterial({ color: 0xf1ede0, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+                const chute = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.6, 8, 1, true), chuteMat);
+                chute.position.y = 2.4;
+                canisterGrp.add(canister, chute);
+                canisterGrp.position.set(dropCenter.x, flightY - 1.2, dropCenter.z);
+                scene.add(canisterGrp);
+
+                let dropTick = 0;
+                activeFX.push({
+                    update() {
+                        dropTick++;
+                        const dt = Math.min(1, dropTick / 68);
+                        canisterGrp.position.y = (flightY - 1.2) * (1 - dt) + (groundY + 0.6) * dt;
+                        canisterGrp.rotation.y += 0.03;
+                        if (dt < 1) return true;
+                        scene.remove(canisterGrp);
+                        canister.geometry.dispose();
+                        canisterMat.dispose();
+                        chute.geometry.dispose();
+                        chuteMat.dispose();
+                        if (typeof playAudio === 'function') playAudio('daisycutter_blast', { volume: 0.98 }, 'usa');
+                        if (typeof triggerScreenShake === 'function') triggerScreenShake(1.4);
+                        if (typeof spawnFuelAirExplosion === 'function') spawnFuelAirExplosion(dropCenter);
+                        else if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropCenter, 0xff7f50, 6.5, true);
+                        if (typeof spawnCraterDecal === 'function') spawnCraterDecal(dropCenter, 6.0, 600);
+                        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropCenter, 22.0, 650, 'EXPLOSIVE', pseudoAttacker);
+                        return false;
+                    }
+                });
+            }
+
+            if (frame < totalFrames) return true;
+            if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+                const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+                if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+            }
+            scene.remove(plane);
+            return false;
+        }
+    });
+}
+window.triggerC130FuelAirBomb = triggerC130FuelAirBomb;
+
 function triggerSpectreGunship(targetPos, pseudoAttacker) {
     if (!targetPos || !scene) return;
     const dropCenter = targetPos.clone();
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
-    const { plane, c130Props } = createC130FlyoverPlane();
+    const { plane, c130Props } = createC130FlyoverPlane('c130');
     const flightY = groundY + 18.0;
     const orbitRadius = 22.0;
     let angle = -Math.PI * 0.6;
@@ -2547,6 +2644,15 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
 
     plane.position.set(dropCenter.x + Math.cos(angle) * orbitRadius, flightY, dropCenter.z + Math.sin(angle) * orbitRadius);
     scene.add(plane);
+    if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.7 }, 'usa');
+
+    // Ground targeting ring while AC-130 Spectre circles overhead
+    const ringGeo = new THREE.RingGeometry(13.2, 14.0, 36);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3f34, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+    const targetRing = new THREE.Mesh(ringGeo, ringMat);
+    targetRing.position.set(dropCenter.x, groundY + 0.25, dropCenter.z);
+    scene.add(targetRing);
 
     const planeTracker = { mesh: plane, dirX: -Math.sin(angle), dirZ: Math.cos(angle) };
     if (typeof window !== 'undefined') {
@@ -2568,13 +2674,96 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
             planeTracker.dirX = -Math.sin(angle);
             planeTracker.dirZ = Math.cos(angle);
             for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.75;
+            ringMat.opacity = 0.28 + 0.22 * Math.sin(frame * 0.14);
 
-            if (frame % 48 === 24 && frame <= 520) {
+            // Rapid 25mm Gatling cannon strafe bursts
+            if (frame % 12 === 0 && frame <= 540) {
+                const strafePt = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
+                strafePt.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(strafePt.x, strafePt.z) : groundY;
+                if (typeof spawnBulletTracer === 'function') spawnBulletTracer(plane.position.clone(), strafePt, 0xffd32a, 2.8);
+                if (typeof spawnSparks === 'function') spawnSparks(strafePt, 0xffbe76, 6);
+                if (frame % 24 === 0 && typeof playAudio === 'function') playAudio('spectre_gatling', { volume: 0.75 }, 'usa');
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(strafePt, 4.0, 28, 'GATLING', pseudoAttacker);
+            }
+
+            // Heavy 105mm Howitzer shells
+            if (frame % 56 === 28 && frame <= 520) {
                 const scatter = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 14, 0, (Math.random() - 0.5) * 14));
                 scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : groundY;
                 if (typeof spawnBulletTracer === 'function') spawnBulletTracer(plane.position.clone(), scatter, 0xffbe76, 5);
                 if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true);
+                if (typeof playAudio === 'function') playAudio('spectre_howitzer', { volume: 0.9 }, 'usa');
                 if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 7.5, 130, 'EXPLOSIVE', pseudoAttacker);
+            }
+
+            if (frame < totalFrames) return true;
+            if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+                const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+                if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+            }
+            scene.remove(plane);
+            scene.remove(targetRing);
+            ringGeo.dispose();
+            ringMat.dispose();
+            return false;
+        }
+    });
+}
+window.triggerSpectreGunship = triggerSpectreGunship;
+
+function triggerChinaCarpetBomber(targetPos, pseudoAttacker) {
+    if (!targetPos || !scene) return;
+    const dropCenter = targetPos.clone();
+    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+
+    const { plane, c130Props } = createC130FlyoverPlane('china_bomber');
+    const flightY = groundY + 18.0;
+    const startPos = new THREE.Vector3(dropCenter.x - 95, flightY, dropCenter.z - 48);
+    const endPos = new THREE.Vector3(dropCenter.x + 95, flightY, dropCenter.z + 48);
+    plane.position.copy(startPos);
+    if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
+    scene.add(plane);
+    if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.78 }, 'china');
+
+    const dirLen = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z) || 1;
+    const planeTracker = { mesh: plane, dirX: (endPos.x - startPos.x) / dirLen, dirZ: (endPos.z - startPos.z) / dirLen };
+    if (typeof window !== 'undefined') {
+        if (!window.activeSupplyPlanes) window.activeSupplyPlanes = [];
+        window.activeSupplyPlanes.push(planeTracker);
+    }
+
+    let frame = 0;
+    const totalFrames = 260;
+    const droppedIdx = new Set();
+
+    activeFX.push({
+        update() {
+            frame++;
+            const t = frame / totalFrames;
+            plane.position.lerpVectors(startPos, endPos, t);
+            for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.8;
+
+            for (let b = 0; b < 7; b++) {
+                const triggerT = 0.36 + b * 0.045;
+                if (!droppedIdx.has(b) && t >= triggerT) {
+                    droppedIdx.add(b);
+                    const dropOrigin = plane.position.clone();
+                    const impactPos = dropCenter.clone().add(new THREE.Vector3((b - 3) * 5.2, 0, (b - 3) * 2.6));
+                    impactPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(impactPos.x, impactPos.z) : groundY;
+                    let bTick = 0;
+                    activeFX.push({
+                        update() {
+                            bTick++;
+                            if (bTick < 22) return true;
+                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPos, 0xff6348, 3.8, true);
+                            if (typeof spawnCraterDecal === 'function') spawnCraterDecal(impactPos, 3.2, 420);
+                            if (typeof playAudio === 'function') playAudio('carpet_bomb', { volume: 0.85 }, 'china');
+                            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(impactPos, 6.5, 135, 'EXPLOSIVE', pseudoAttacker);
+                            return false;
+                        }
+                    });
+                    if (typeof spawnGuidedBomb === 'function') spawnGuidedBomb(dropOrigin, impactPos, false, false);
+                }
             }
 
             if (frame < totalFrames) return true;
@@ -2587,7 +2776,7 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
         }
     });
 }
-window.triggerSpectreGunship = triggerSpectreGunship;
+window.triggerChinaCarpetBomber = triggerChinaCarpetBomber;
 
 function spawnPingEffect(pos) {
     if (!pos || typeof scene === 'undefined' || typeof activeFX === 'undefined') return;

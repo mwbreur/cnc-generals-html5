@@ -354,6 +354,70 @@ function playSuperweaponEvaAlert(swType, eventType = 'launched', faction = null)
     }
 }
 
+const BUILDING_SELECT_SFX_MAP = {
+    usa: {
+        center: 'sfx_select_usa_center', commandCenter: 'sfx_select_usa_center',
+        power: 'sfx_select_usa_power', coldFusionReactor: 'sfx_select_usa_power',
+        barracks: 'sfx_select_usa_barracks', factory: 'sfx_select_usa_factory',
+        supplyCenter: 'sfx_select_usa_supply', supplyDrop: 'sfx_select_usa_supplydrop',
+        airfield: 'sfx_select_usa_airfield', strategyCenter: 'sfx_select_usa_strategy',
+        patriot: 'sfx_patriot_select', detentionCamp: 'sfx_select_usa_detention',
+        particleCannon: 'sfx_select_usa_particle'
+    },
+    china: {
+        center: 'sfx_select_china_center', commandCenter: 'sfx_select_china_center',
+        power: 'sfx_select_china_power', nuclearReactor: 'sfx_select_china_power',
+        barracks: 'sfx_select_china_barracks', factory: 'sfx_select_china_factory',
+        supplyCenter: 'sfx_select_china_supply', airfield: 'sfx_select_china_airfield',
+        gatlingCannon: 'sfx_select_china_gatling', bunker: 'sfx_select_china_bunker',
+        speakerTower: 'sfx_select_china_speaker', propagandaCenter: 'sfx_select_china_propaganda',
+        nukeSilo: 'sfx_select_china_nuke', internetCenter: 'sfx_select_china_internet'
+    },
+    gla: {
+        center: 'sfx_select_gla_center', commandCenter: 'sfx_select_gla_center',
+        barracks: 'sfx_select_gla_barracks', factory: 'sfx_select_gla_factory',
+        supplyCenter: 'sfx_select_gla_supply', supplyStash: 'sfx_select_gla_supply',
+        tunnel: 'sfx_select_gla_tunnel', stingerSite: 'sfx_select_gla_stinger',
+        palace: 'sfx_select_gla_palace', blackMarket: 'sfx_select_gla_blackmarket',
+        scudStorm: 'sfx_select_gla_scud'
+    }
+};
+
+function playBuildingSelectSound(structureType, faction = null) {
+    if (!structureType) return false;
+    const fac = (faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
+    const normFac = ['usa', 'china', 'gla'].includes(fac) ? fac : 'usa';
+    const facMap = BUILDING_SELECT_SFX_MAP[normFac] || BUILDING_SELECT_SFX_MAP.usa;
+    let key = facMap[structureType];
+    if (!key) {
+        for (const f of ['usa', 'china', 'gla']) {
+            if (BUILDING_SELECT_SFX_MAP[f][structureType]) { key = BUILDING_SELECT_SFX_MAP[f][structureType]; break; }
+        }
+    }
+    return key ? playOfficialSound(key, 0.55) : false;
+}
+
+const _lastEvaAlertTimes = {};
+function playEvaAlert(eventName, faction = null) {
+    if (!eventName) return false;
+    const fac = (faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
+    const normFac = ['usa', 'china', 'gla'].includes(fac) ? fac : 'usa';
+    const throttled = ['insufficient_funds', 'low_power', 'unit_lost', 'unit_under_attack', 'base_under_attack'].includes(eventName);
+    const now = Date.now();
+    if (throttled && _lastEvaAlertTimes[eventName] && (now - _lastEvaAlertTimes[eventName]) < 4000) {
+        return false;
+    }
+    _lastEvaAlertTimes[eventName] = now;
+    const key = `eva_${normFac}_${eventName}`;
+    if (window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[key]) {
+        return playOfficialSound(key, 0.92, normFac);
+    }
+    if (eventName === 'unit_under_attack' || eventName === 'base_under_attack') {
+        return playOfficialSound('sfx_radar_alert', 0.85);
+    }
+    return false;
+}
+
 window.loadOfficialAudioGroup = loadOfficialAudioGroup;
 window.preloadSkirmishAudio = preloadSkirmishAudio;
 window.playOfficialSound = playOfficialSound;
@@ -361,3 +425,5 @@ window.playUnitVoice = playUnitVoice;
 window.playUnitReadySound = playUnitReadySound;
 window.playBuildingCompleteSound = playBuildingCompleteSound;
 window.playSuperweaponEvaAlert = playSuperweaponEvaAlert;
+window.playBuildingSelectSound = playBuildingSelectSound;
+window.playEvaAlert = playEvaAlert;

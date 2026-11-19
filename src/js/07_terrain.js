@@ -680,14 +680,19 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     }
     geo.computeVertexNormals();
 
-    // Compute rich macro vertex colors from height & slope (avoids stretching 128x128 minimap TGA across the 3D terrain)
+    const isOfficialTexMap = Boolean(officialMap && !activeCustomMap && officialMap.terrainDataUrl);
+    // Compute rich macro vertex colors from height & slope
     const normAttr = geo.attributes.normal;
     for (let i = 0; i < posAttr.count; i++) {
         const h = posAttr.getY(i);
         const ny = normAttr ? normAttr.getY(i) : 1.0;
         const slope = 1.0 - Math.max(0, Math.min(1, ny));
         let cr = 0.84, cg = 0.63, cb = 0.35;
-        if (effectiveTheme === 'jungle') {
+        if (isOfficialTexMap) {
+            // Neutral bright lighting modulation so retail BlendTileData + Terrain.big macro texture displays at full fidelity
+            const shade = Math.max(0.84, Math.min(1.06, 0.98 - slope * 0.24 + Math.min(0.06, Math.max(-0.06, h * 0.008))));
+            cr = shade; cg = shade; cb = shade;
+        } else if (effectiveTheme === 'jungle') {
             cr = 0.34; cg = 0.48; cb = 0.24;
             if (slope > 0.10) {
                 const t = Math.min(1, (slope - 0.10) * 4.0);
@@ -730,12 +735,71 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
         geo.setAttribute('color', new THREE.BufferAttribute(colorArr, 3));
     }
 
-    // High-resolution tiled ground texture (54x54 across map) for crisp close-up pebbles, ripples & grain
     const isCustom = Boolean(activeCustomMap || (mapType && mapType.startsWith('custom_')));
     let terrainTexture = null;
     if (isCustom) {
         terrainTexture = createCustomTerrainTexture(activeCustomMap);
+    } else if (isOfficialTexMap && typeof document !== 'undefined' && document.createElement) {
+        // Render authentic EA BlendTileData + Terrain.big + Roads map texture at 1024x1024 with subtle micro-grain detail
+        const macroCanvas = document.createElement('canvas');
+        macroCanvas.width = macroCanvas.height = 1024;
+        const mCtx = macroCanvas.getContext && macroCanvas.getContext('2d');
+        if (mCtx) {
+            mCtx.fillStyle = effectiveTheme === 'snow' ? '#dfe6ec' : effectiveTheme === 'jungle' ? '#50643a' : '#bfa87a';
+            mCtx.fillRect(0, 0, 1024, 1024);
+        }
+        terrainTexture = new THREE.CanvasTexture(macroCanvas);
+        terrainTexture.wrapS = terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
+        terrainTexture.repeat.set(1, 1);
+        terrainTexture.minFilter = THREE.LinearMipmapLinearFilter;
+        terrainTexture.magFilter = THREE.LinearFilter;
+        terrainTexture.generateMipmaps = true;
+
+        const applyMicroGrain = (ctx) => {
+            const grain = document.createElement('canvas');
+            grain.width = grain.height = 128;
+            const gCtx = grain.getContext('2d');
+            gCtx.fillStyle = '#ffffff';
+            gCtx.fillRect(0, 0, 128, 128);
+            let gs = 1337;
+            const gRand = () => { gs = (gs * 1664525 + 1013904223) >>> 0; return gs / 4294967296; };
+            for (let k = 0; k < 1400; k++) {
+                const gx = gRand() * 128, gy = gRand() * 128;
+                gCtx.fillStyle = gRand() > 0.45 ? 'rgba(95,85,70,0.28)' : 'rgba(255,255,255,0.22)';
+                gCtx.fillRect(gx, gy, 1.5, 1.5);
+            }
+            const drawPattern = (imgOrCan, alpha) => {
+                ctx.save();
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.globalAlpha = alpha;
+                const pat = ctx.createPattern(imgOrCan, 'repeat');
+                if (pat) {
+                    ctx.fillStyle = pat;
+                    ctx.fillRect(0, 0, 1024, 1024);
+                }
+                ctx.restore();
+                terrainTexture.needsUpdate = true;
+            };
+            if (effectiveTheme === 'desert' && window.RETAIL_DESERT_SAND_URI) {
+                const sandTile = new Image();
+                sandTile.onload = () => drawPattern(sandTile, 0.24);
+                sandTile.src = window.RETAIL_DESERT_SAND_URI;
+            } else {
+                drawPattern(grain, 0.20);
+            }
+        };
+
+        const macroImg = new Image();
+        macroImg.onload = function() {
+            if (mCtx) {
+                mCtx.drawImage(macroImg, 0, 0, 1024, 1024);
+                terrainTexture.needsUpdate = true;
+                applyMicroGrain(mCtx);
+            }
+        };
+        macroImg.src = officialMap.terrainDataUrl;
     } else if (typeof document !== 'undefined' && document.createElement) {
+        // High-resolution tiled ground texture (54x54 across map) for procedural theaters
         const tileCanvas = document.createElement('canvas');
         tileCanvas.width = tileCanvas.height = 512;
         const tCtx = tileCanvas.getContext && tileCanvas.getContext('2d');
@@ -812,8 +876,8 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
         terrainTexture = createTerrainTextureForMap(mapType);
     }
 
-    // On desert maps, upgrade the tiled ground texture to the crisp retail EA sand texture when available
-    if (effectiveTheme === 'desert' && !isCustom && window.RETAIL_DESERT_SAND_URI && typeof document !== 'undefined' && terrainTexture && terrainTexture.image) {
+    // On procedural desert maps, upgrade the tiled ground texture to the crisp retail EA sand texture when available
+    if (!isOfficialTexMap && effectiveTheme === 'desert' && !isCustom && window.RETAIL_DESERT_SAND_URI && typeof document !== 'undefined' && terrainTexture && terrainTexture.image) {
         const sandImg = new Image();
         sandImg.onload = function() {
             terrainTexture.image = sandImg;
@@ -823,8 +887,8 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
         sandImg.src = window.RETAIL_DESERT_SAND_URI;
     }
 
-    // Sample retail BlendTileData+Roads macro texture (or fallback TGA) into vertexColors, keeping high-res tiled map sharp
-    const macroUrl = (officialMap && !isCustom) ? (officialMap.terrainDataUrl || officialMap.tgaDataUrl) : null;
+    // For legacy maps lacking terrainDataUrl, sample macro TGA into vertexColors
+    const macroUrl = (officialMap && !isCustom && !isOfficialTexMap) ? officialMap.tgaDataUrl : null;
     if (macroUrl && typeof document !== 'undefined') {
         const aerialImg = new Image();
         aerialImg.onload = function() {

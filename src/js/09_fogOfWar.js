@@ -658,37 +658,43 @@ let unitRoster = {};
 
 function selectFaction(faction, button) {
     selectedFaction = faction;
-    refreshFactionRoster();
+    if (faction !== 'random' && factionCatalog[faction]) {
+        refreshFactionRoster();
+    }
     // Synchronize the top 3 big faction buttons
     document.querySelectorAll('.faction-card').forEach(card => {
             card.classList.toggle('active', card.getAttribute('data-faction') === faction);
     });
 
-    // Update faction overview description
+    // Update faction overview description & Skirmish briefing
+    let overviewText = 'Random — Faction assigned randomly at deployment (USA, China, or GLA).';
     const roster = factionCatalog[faction];
     if (roster) {
         const infantry = Object.values(roster.barracks).map(unit => unit[0]).join(', ');
         const vehicles = Object.values(roster.factory).map(unit => unit[0]).join(', ');
+        overviewText = `${roster.label} forces — Infantry: ${infantry}. Vehicles & aircraft: ${vehicles}. Support: ${roster.support.join(', ')}.`;
         const overviewEl = document.getElementById('faction-overview');
-        if (overviewEl) {
-            overviewEl.textContent = `${roster.label} forces — Infantry: ${infantry}. Vehicles & aircraft: ${vehicles}. Support: ${roster.support.join(', ')}.`;
-        }
+        if (overviewEl) overviewEl.textContent = overviewText;
     }
+    const spBriefingEl = document.getElementById('sp-faction-briefing');
+    if (spBriefingEl) spBriefingEl.textContent = overviewText;
 
     // Synchronize player/host slot 0 data model
     if (typeof spSlots !== 'undefined' && spSlots[0]) {
         spSlots[0].faction = faction;
     }
-    if (typeof mpSlots !== 'undefined' && mpSlots[0]) {
+    if (faction !== 'random' && typeof mpSlots !== 'undefined' && mpSlots[0]) {
         mpSlots[0].faction = faction;
     }
 
-    // Synchronize the small dropdown selection boxes
+    // Synchronize the dropdown selection boxes
     const spSelect = document.getElementById('single-slot-0-faction') || document.getElementById('sp-slot-0-faction');
     if (spSelect) spSelect.value = faction;
 
-    const mpSelect = document.getElementById('multiplayer-slot-0-faction') || document.getElementById('mp-slot-0-faction');
-    if (mpSelect) mpSelect.value = faction;
+    if (faction !== 'random') {
+        const mpSelect = document.getElementById('multiplayer-slot-0-faction') || document.getElementById('mp-slot-0-faction');
+        if (mpSelect) mpSelect.value = faction;
+    }
 
     if (typeof applyOfficialMenuArt === 'function') {
         applyOfficialMenuArt(faction);
@@ -1391,13 +1397,14 @@ function handleMapPreviewClick(e, mode) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const scaleX = rect.width ? (canvas.width / rect.width) : 1;
+    const scaleY = rect.height ? (canvas.height / rect.height) : 1;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
 
     const mapSize = parseInt(document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size').value, 10);
     const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
     const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
-    const slots = mode === 'single' ? spSlots : mpSlots;
 
     for (let sp of spawns) {
         const cx = (sp.x / mapSize + 0.5) * canvas.width;
@@ -1407,6 +1414,14 @@ function handleMapPreviewClick(e, mode) {
             updateSlot(mode, focusedSlotIdx, 'spawnId', sp.id);
             break;
         }
+    }
+}
+
+function updateLobbySlotsCount(mode, maxSpawns, slots) {
+    const countEl = document.getElementById(mode === 'single' ? 'sp-slots-count' : 'mp-slots-count');
+    if (countEl) {
+        const activeCount = slots.slice(0, maxSpawns).filter(s => s.active).length;
+        countEl.innerText = `${maxSpawns} Spawns (${activeCount} Active)`;
     }
 }
 
@@ -1420,7 +1435,7 @@ function initLobbySlots(mode) {
 
     slots.forEach((s, idx) => {
             if (idx < maxSpawns) {
-                if (idx < 2) s.active = true;
+                if (idx < 2) { s.active = true; s.closed = false; }
             } else {
                 s.active = false;
             }
@@ -1431,22 +1446,29 @@ function initLobbySlots(mode) {
     renderSlotsUI(mode);
     const canvasId = mode === 'single' ? 'sp-map-preview' : 'mp-map-preview';
     renderMapPreview(canvasId, mapType, mapSize, slots, true);
+    updateLobbySlotsCount(mode, maxSpawns, slots);
 
-    const countEl = document.getElementById(mode === 'single' ? 'sp-slots-count' : 'mp-slots-count');
-    if (countEl) countEl.innerText = `${maxSpawns} Spawns (${slots.filter(s => s.active).length} Active)`;
+    if (mode === 'single') {
+        updateSkirmishMapSummary();
+    }
 }
 
 function setFocusedSlot(mode, idx) {
     focusedSlotIdx = idx;
     const listEl = document.getElementById(mode === 'single' ? 'sp-slots-list' : 'mp-slots-list');
     if (!listEl) return;
+    if (mode === 'single') {
+        const rows = listEl.querySelectorAll('.zh-slot-row');
+        rows.forEach((r, i) => r.classList.toggle('focused', i === idx));
+        return;
+    }
     const rows = listEl.querySelectorAll('.slot-row');
     rows.forEach((r, i) => {
             if (i === idx) {
                 r.style.borderColor = '#55efc4';
                 r.style.boxShadow = '0 0 8px rgba(85,239,196,0.3)';
             } else {
-                const slots = mode === 'single' ? spSlots : mpSlots;
+                const slots = mpSlots;
                 r.style.borderColor = (slots[i] && slots[i].active) ? '#55efc4' : '#253327';
                 r.style.boxShadow = 'none';
             }
@@ -1463,6 +1485,77 @@ function renderSlotsUI(mode) {
     const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
 
     let html = '';
+    if (mode === 'single') {
+        for (let i = 0; i < maxSpawns; i++) {
+            const s = slots[i];
+            const isFocused = (focusedSlotIdx === i);
+            const curColorDef = getPlayerColorDef(s.color || PLAYER_COLORS[i % PLAYER_COLORS.length].id);
+            const curTeam = (s.team === 0 || s.team) ? s.team : 0;
+
+            html += `<div class="zh-slot-row ${isFocused ? 'focused' : ''} ${s.active ? '' : 'inactive-slot'}" onclick="setFocusedSlot('single', ${i});">`;
+
+            // Col 1: Players (editable name for slot 0; Open/Closed/Difficulty for slots 1-7)
+            html += `<div>`;
+            if (i === 0) {
+                const safeName = String(s.name || 'Player').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+                html += `<input id="sp-player-name" class="zh-skirmish-input" type="text" maxlength="20" value="${safeName}" onclick="event.stopPropagation(); setFocusedSlot('single', 0);" oninput="updateSlot('single', 0, 'name', this.value, true)">`;
+            } else {
+                const slotModeVal = !s.active ? (s.closed ? 'closed' : 'open') : (s.difficulty || 'medium');
+                html += `<select class="zh-skirmish-select" onclick="event.stopPropagation(); setFocusedSlot('single', ${i});" onmousedown="event.stopPropagation();" onchange="updateSkirmishSlotType(${i}, this.value)">
+                            <option value="open" ${slotModeVal === 'open' ? 'selected' : ''}>Open</option>
+                            <option value="closed" ${slotModeVal === 'closed' ? 'selected' : ''}>Closed</option>
+                            <option value="easy" ${slotModeVal === 'easy' ? 'selected' : ''}>Easy Army</option>
+                            <option value="medium" ${slotModeVal === 'medium' ? 'selected' : ''}>Medium Army</option>
+                            <option value="hard" ${slotModeVal === 'hard' ? 'selected' : ''}>Hard Army</option>
+                        </select>`;
+            }
+            html += `</div>`;
+
+            // Col 2: Color swatch + dropdown
+            html += `<div class="zh-color-cell">`;
+            html += `<span class="zh-color-swatch" style="background:${s.active ? curColorDef.css : '#263052'};"></span>`;
+            html += `<select class="zh-skirmish-select" ${!s.active ? 'disabled' : ''} onclick="event.stopPropagation(); setFocusedSlot('single', ${i});" onmousedown="event.stopPropagation();" onchange="updateSlot('single', ${i}, 'color', this.value)">`;
+            PLAYER_COLORS.forEach(c => {
+                    html += `<option value="${c.id}" ${curColorDef.id === c.id ? 'selected' : ''}>${c.label}</option>`;
+            });
+            html += `</select></div>`;
+
+            // Col 3: Faction
+            html += `<div>`;
+            if (i === 0) {
+                html += `<select id="single-slot-0-faction" class="zh-skirmish-select" onclick="event.stopPropagation(); setFocusedSlot('single', 0);" onmousedown="event.stopPropagation();" onchange="selectFaction(this.value); updateSlot('single', 0, 'faction', this.value);">
+                            <option value="usa" ${s.faction === 'usa' ? 'selected' : ''}>USA</option>
+                            <option value="china" ${s.faction === 'china' ? 'selected' : ''}>China</option>
+                            <option value="gla" ${s.faction === 'gla' ? 'selected' : ''}>GLA</option>
+                            <option value="random" ${s.faction === 'random' ? 'selected' : ''}>Random</option>
+                        </select>`;
+            } else {
+                html += `<select class="zh-skirmish-select" ${!s.active ? 'disabled' : ''} onclick="event.stopPropagation(); setFocusedSlot('single', ${i});" onmousedown="event.stopPropagation();" onchange="updateSlot('single', ${i}, 'faction', this.value)">
+                            <option value="random" ${s.faction === 'random' ? 'selected' : ''}>Random</option>
+                            <option value="usa" ${s.faction === 'usa' ? 'selected' : ''}>USA</option>
+                            <option value="china" ${s.faction === 'china' ? 'selected' : ''}>China</option>
+                            <option value="gla" ${s.faction === 'gla' ? 'selected' : ''}>GLA</option>
+                        </select>`;
+            }
+            html += `</div>`;
+
+            // Col 4: Team (None, 1, 2, 3, 4)
+            html += `<div>`;
+            html += `<select class="zh-skirmish-select" ${!s.active ? 'disabled' : ''} onclick="event.stopPropagation(); setFocusedSlot('single', ${i});" onmousedown="event.stopPropagation();" onchange="updateSlot('single', ${i}, 'team', parseInt(this.value, 10))">
+                        <option value="0" ${curTeam === 0 ? 'selected' : ''}>None</option>
+                        <option value="1" ${curTeam === 1 ? 'selected' : ''}>1</option>
+                        <option value="2" ${curTeam === 2 ? 'selected' : ''}>2</option>
+                        <option value="3" ${curTeam === 3 ? 'selected' : ''}>3</option>
+                        <option value="4" ${curTeam === 4 ? 'selected' : ''}>4</option>
+                    </select>`;
+            html += `</div>`;
+
+            html += `</div>`;
+        }
+        listEl.innerHTML = html;
+        return;
+    }
+
     for (let i = 0; i < maxSpawns; i++) {
         const s = slots[i];
         const isFocused = (focusedSlotIdx === i);
@@ -1496,7 +1589,6 @@ function renderSlotsUI(mode) {
                         <option value="usa" ${s.faction==='usa'?'selected':''}>USA Force</option>
                         <option value="china" ${s.faction==='china'?'selected':''}>China Force</option>
                         <option value="gla" ${s.faction==='gla'?'selected':''}>GLA Network</option>
-                        ${mode === 'single' ? `<option value="random" ${s.faction==='random'?'selected':''}>🎲 Random</option>` : ''}
                     </select>`;
         }
         html += `</div>`;
@@ -1547,7 +1639,27 @@ function renderSlotsUI(mode) {
     listEl.innerHTML = html;
 }
 
-function updateSlot(mode, slotIdx, field, value) {
+function updateSkirmishSlotType(slotIdx, val) {
+    const slot = spSlots[slotIdx];
+    if (!slot) return;
+    if (val === 'open' || val === 'closed') {
+        slot.active = false;
+        slot.closed = (val === 'closed');
+    } else {
+        slot.active = true;
+        slot.closed = false;
+        slot.difficulty = val;
+    }
+    const mapSize = parseInt(document.getElementById('map-size').value, 10);
+    const mapType = document.getElementById('map-environment').value;
+    const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
+    const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
+    renderSlotsUI('single');
+    renderMapPreview('sp-map-preview', mapType, mapSize, spSlots, true);
+    updateLobbySlotsCount('single', maxSpawns, spSlots);
+}
+
+function updateSlot(mode, slotIdx, field, value, skipRerender = false) {
     const slots = mode === 'single' ? spSlots : mpSlots;
     const targetSlot = slots[slotIdx];
     if (!targetSlot) return;
@@ -1566,11 +1678,18 @@ function updateSlot(mode, slotIdx, field, value) {
         applyPlayerColorToMaterials(getPlayerColorHex(value));
     }
 
+    if (skipRerender) return;
+
     renderSlotsUI(mode);
     const canvasId = mode === 'single' ? 'sp-map-preview' : 'mp-map-preview';
     const mapSize = parseInt(document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size').value, 10);
     const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
     renderMapPreview(canvasId, mapType, mapSize, slots, true);
+    if (mode === 'single') {
+        const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
+        const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
+        updateLobbySlotsCount('single', maxSpawns, slots);
+    }
 
     if (mode === 'multiplayer') {
         syncMpLobbyToPeer();
@@ -1589,12 +1708,202 @@ function onMapSelectionChange(mode) {
     }
 
     initLobbySlots(mode);
+    if (mode === 'single') {
+        const modal = document.getElementById('skirmish-map-modal');
+        if (modal && !modal.hidden) renderSkirmishMapPickerGrid();
+    }
     if (mode === 'multiplayer') syncMpLobbyToPeer();
 }
 
 function onMapSizeChange(mode) {
     initLobbySlots(mode);
     if (mode === 'multiplayer') syncMpLobbyToPeer();
+}
+
+function updateSkirmishMapSummary() {
+    if (typeof document === 'undefined') return;
+    const envEl = document.getElementById('map-environment');
+    const sizeEl = document.getElementById('map-size');
+    const mapType = (envEl && envEl.value) ? envEl.value : 'tournament_desert';
+    const mapSize = sizeEl ? (parseInt(sizeEl.value, 10) || 1500) : 1500;
+    const officialMap = (typeof window !== 'undefined' && window.OFFICIAL_SKIRMISH_MAPS) ? window.OFFICIAL_SKIRMISH_MAPS[mapType] : null;
+    const selectedOptText = (envEl && envEl.options && envEl.selectedIndex >= 0 && envEl.options[envEl.selectedIndex] && envEl.options[envEl.selectedIndex].text)
+        ? String(envEl.options[envEl.selectedIndex].text)
+        : String(mapType);
+
+    const nameEl = document.getElementById('sp-map-display-name');
+    if (nameEl) {
+        nameEl.textContent = officialMap ? officialMap.name : ((activeCustomMap && activeCustomMap.name) ? activeCustomMap.name : selectedOptText.split(' (')[0]);
+    }
+
+    const intelEl = document.getElementById('sp-map-intel');
+    if (intelEl) {
+        if (officialMap) {
+            const derricks = (officialMap.derricks || []).length;
+            const hospitals = (officialMap.hospitals || []).length;
+            const refineries = (officialMap.refineries || []).length;
+            const techParts = [];
+            if (derricks) techParts.push(`${derricks} Oil Derrick${derricks > 1 ? 's' : ''}`);
+            if (hospitals) techParts.push(`${hospitals} Hospital${hospitals > 1 ? 's' : ''}`);
+            if (refineries) techParts.push(`${refineries} Oil Refiner${refineries > 1 ? 'ies' : 'y'}`);
+            const techText = techParts.length ? ` • Tech: ${techParts.join(', ')}` : '';
+            intelEl.textContent = `${officialMap.name} • Official EA ${(officialMap.theme || 'desert').toUpperCase()} Map (${officialMap.maxPlayers || 4}P)${techText}`;
+        } else if (activeCustomMap && mapType.startsWith('custom_')) {
+            intelEl.textContent = `${activeCustomMap.name} • Custom Map (${mapSize}x${mapSize})`;
+        } else {
+            intelEl.textContent = `${selectedOptText} • Procedural Theater (${mapSize}x${mapSize})`;
+        }
+    }
+
+    const overviewEl = document.getElementById('faction-overview');
+    const briefingEl = document.getElementById('sp-faction-briefing');
+    if (briefingEl) {
+        const curFac = (spSlots[0] && spSlots[0].faction) || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+        if (curFac === 'random') {
+            briefingEl.textContent = 'Random — Faction assigned randomly at deployment (USA, China, or GLA).';
+        } else if (overviewEl && overviewEl.textContent) {
+            briefingEl.textContent = overviewEl.textContent;
+        }
+    }
+}
+
+function renderSkirmishMapPickerGrid() {
+    const gridEl = document.getElementById('skirmish-map-grid');
+    const envEl = document.getElementById('map-environment');
+    if (!gridEl) return;
+    const currentKey = envEl ? envEl.value : 'tournament_desert';
+    const items = [];
+
+    if (typeof window !== 'undefined' && window.OFFICIAL_SKIRMISH_MAPS) {
+        Object.keys(window.OFFICIAL_SKIRMISH_MAPS).forEach(key => {
+                const m = window.OFFICIAL_SKIRMISH_MAPS[key];
+                if (!m) return;
+                items.push({
+                    key,
+                    name: m.name || key,
+                    sub: `Official EA • ${m.maxPlayers || (m.spawns ? m.spawns.length : 4)}P • ${m.theme || 'desert'}`,
+                    thumb: m.terrainDataUrl || ''
+                });
+        });
+    }
+
+    [
+        { key: 'desert', name: 'Desert Canyon', sub: 'Procedural • Desert' },
+        { key: 'jungle', name: 'Tropical Jungle', sub: 'Procedural • Jungle' },
+        { key: 'snow', name: 'Frozen Mountain', sub: 'Procedural • Snow' },
+        { key: 'city', name: 'Small City Grid', sub: 'Procedural • Urban' },
+        { key: 'random', name: 'Procedural Warzone', sub: 'Procedural • Random' }
+    ].forEach(p => items.push({ key: p.key, name: p.name, sub: p.sub, thumb: '' }));
+
+    if (typeof savedCustomMaps !== 'undefined' && savedCustomMaps) {
+        Object.keys(savedCustomMaps).forEach(k => {
+                const cm = savedCustomMaps[k];
+                if (cm) items.push({ key: k, name: cm.name || k, sub: `Custom • ${cm.size || 1500}m`, thumb: '' });
+        });
+    }
+
+    gridEl.innerHTML = items.map(item => {
+            const selectedCls = item.key === currentKey ? 'selected' : '';
+            const safeKey = String(item.key).replace(/'/g, "\\'");
+            const thumbHtml = item.thumb
+                ? `<img class="zh-map-pick-thumb" src="${item.thumb}" alt="${item.name}" />`
+                : `<div class="zh-map-pick-thumb procedural-thumb">Procedural</div>`;
+            return `<button type="button" class="zh-map-pick-card ${selectedCls}" onclick="selectSkirmishMapFromModal('${safeKey}')">${thumbHtml}<div class="zh-map-pick-title">${item.name}</div><div class="zh-map-pick-sub">${item.sub}</div></button>`;
+    }).join('');
+}
+
+function selectSkirmishMapFromModal(mapKey) {
+    const envEl = document.getElementById('map-environment');
+    if (envEl) {
+        envEl.value = mapKey;
+        onMapSelectionChange('single');
+    }
+    renderSkirmishMapPickerGrid();
+}
+
+function openSkirmishMapModal() {
+    const modal = document.getElementById('skirmish-map-modal');
+    if (!modal) return;
+    renderSkirmishMapPickerGrid();
+    modal.hidden = false;
+}
+
+function closeSkirmishMapModal() {
+    const modal = document.getElementById('skirmish-map-modal');
+    if (modal) modal.hidden = true;
+}
+
+function onSkirmishGameSpeedChange(val) {
+    const num = Number(val) || 30;
+    const valEl = document.getElementById('skirmish-game-speed-val');
+    if (valEl) valEl.textContent = String(num);
+    if (typeof window !== 'undefined') {
+        window.skirmishGameSpeed = num;
+        window.gameSpeedMultiplier = Math.max(0.5, Math.min(2.0, num / 30));
+    }
+}
+
+const SKIRMISH_STATS_STORAGE_KEY = 'cnc_zh_skirmish_stats_v1';
+
+function readSkirmishStatsObj() {
+    try {
+        if (typeof localStorage === 'undefined') return { wins: 0, losses: 0, curStreak: 0, bestStreak: 0 };
+        const raw = localStorage.getItem(SKIRMISH_STATS_STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            return {
+                wins: Number(parsed.wins) || 0,
+                losses: Number(parsed.losses) || 0,
+                curStreak: Number(parsed.curStreak) || 0,
+                bestStreak: Number(parsed.bestStreak) || 0
+            };
+        }
+    } catch (_) {}
+    return { wins: 0, losses: 0, curStreak: 0, bestStreak: 0 };
+}
+
+function renderSkirmishStatsObj(stats) {
+    if (typeof document === 'undefined') return;
+    const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(val);
+    };
+    set('skirmish-stat-best-streak', stats.bestStreak);
+    set('skirmish-stat-cur-streak', stats.curStreak);
+    set('skirmish-stat-wins', stats.wins);
+    set('skirmish-stat-losses', stats.losses);
+}
+
+function loadSkirmishStats() {
+    renderSkirmishStatsObj(readSkirmishStatsObj());
+}
+
+function recordSkirmishOutcome(won) {
+    const stats = readSkirmishStatsObj();
+    if (won) {
+        stats.wins += 1;
+        stats.curStreak += 1;
+        if (stats.curStreak > stats.bestStreak) stats.bestStreak = stats.curStreak;
+    } else {
+        stats.losses += 1;
+        stats.curStreak = 0;
+    }
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(SKIRMISH_STATS_STORAGE_KEY, JSON.stringify(stats));
+        }
+    } catch (_) {}
+    renderSkirmishStatsObj(stats);
+}
+
+function resetSkirmishStats() {
+    const empty = { wins: 0, losses: 0, curStreak: 0, bestStreak: 0 };
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(SKIRMISH_STATS_STORAGE_KEY, JSON.stringify(empty));
+        }
+    } catch (_) {}
+    renderSkirmishStatsObj(empty);
 }
 
 

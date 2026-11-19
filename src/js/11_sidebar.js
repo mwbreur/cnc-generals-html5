@@ -461,8 +461,10 @@ function showMainMenuScreen() {
     if (!menu || !startCard || !mainMenuScreen || !setupScreen) return;
     menu.style.display = 'flex';
     menu.classList.remove('pause-mode');
+    menu.classList.remove('zh-skirmish-backdrop');
     menu.classList.add('main-menu-transparent');
     startCard.style.display = 'block';
+    startCard.classList.remove('zh-skirmish-card');
     startCard.classList.add('main-menu-active');
     mainMenuScreen.hidden = false;
     setupScreen.hidden = true;
@@ -793,6 +795,9 @@ function applyOfficialMenuArt(facOverride) {
         if (isMain) {
             startCard.style.backgroundImage = 'none';
             startCard.style.backgroundColor = 'transparent';
+        } else if (startCard.classList.contains('zh-skirmish-card')) {
+            startCard.style.backgroundImage = 'none';
+            startCard.style.backgroundColor = '';
         } else if (ui.mainMenuBackdrop) {
             const isMp = typeof currentStartMenuMode !== 'undefined' && currentStartMenuMode === 'multiplayer' && ui.mpLoadBackdrop;
             const backdropSrc = isMp ? ui.mpLoadBackdrop : ui.mainMenuBackdrop;
@@ -815,7 +820,9 @@ function applyOfficialMenuArt(facOverride) {
     setImg('menu-ruler-img', ui.mainMenuRuler);
     setImg('main-menu-ruler-a', ui.mainMenuRuler);
     setImg('main-menu-ruler-b', ui.mainMenuRuler);
-    setImg('menu-faction-crest', ui['logo_' + fac] || ui.logo_usa);
+    const activeCrestSrc = fac === 'random' ? ui.skirmishEmblem : (ui['logo_' + fac] || ui.logo_usa);
+    setImg('menu-faction-crest', activeCrestSrc);
+    setImg('sp-intel-crest', activeCrestSrc);
     setImg('fc-logo-usa', ui.logo_usa);
     setImg('fc-logo-china', ui.logo_china);
     setImg('fc-logo-gla', ui.logo_gla);
@@ -2927,6 +2934,7 @@ function produceUnit(type) {
     const effCost = getEffectiveUnitCost(type);
     if (playerResources < effCost) {
         showNotification(`Insufficient funds to train ${spec.name} ($${effCost} required).`, 'error');
+        if (typeof playEvaAlert === 'function') playEvaAlert('insufficient_funds');
         return;
     }
 
@@ -3047,6 +3055,7 @@ function executeStructureUpgradeOrAction(upg, structure) {
     if (upg.isAddon) {
         if (playerResources < upg.cost) {
             showNotification(`Insufficient funds to purchase ${upg.name} ($${upg.cost} required).`, 'error');
+            if (typeof playEvaAlert === 'function') playEvaAlert('insufficient_funds');
             return;
         }
         playerResources -= upg.cost;
@@ -3074,6 +3083,7 @@ function executeStructureUpgradeOrAction(upg, structure) {
             upgradeDecoyToRealStructure(structure);
         }
         playAudio('construction', {}, selectedFaction);
+        if (typeof playEvaAlert === 'function') playEvaAlert('upgrade_complete', selectedFaction);
         updateSidebar();
         return;
     }
@@ -3085,6 +3095,7 @@ function executeStructureUpgradeOrAction(upg, structure) {
         }
         if (playerResources < upg.cost) {
             showNotification(`Insufficient funds for ${upg.name} ($${upg.cost} required).`, 'error');
+            if (typeof playEvaAlert === 'function') playEvaAlert('insufficient_funds');
             return;
         }
         playerResources -= upg.cost;
@@ -3120,11 +3131,13 @@ function executeStructureUpgradeOrAction(upg, structure) {
     // Global research
     if (playerResources < upg.cost) {
         showNotification(`Insufficient funds to research ${upg.name} ($${upg.cost} required).`, 'error');
+        if (typeof playEvaAlert === 'function') playEvaAlert('insufficient_funds');
         return;
     }
     playerResources -= upg.cost;
     researchedTechs.add(upg.id);
     playAudio('construction', {}, selectedFaction);
+    if (typeof playEvaAlert === 'function') playEvaAlert('upgrade_complete', selectedFaction);
 
     // Immediate global stat application
     if (upg.id === 'compositeArmor') {
@@ -3723,6 +3736,7 @@ function processBuildingFunctions() {
                                     damageType: 'EXPLOSIVE',
                                     splashRadius: 1.5
                             });
+                            if (typeof playAudio === 'function') playAudio('stinger_fire', {}, 'gla');
                         }
                     }
                 }
@@ -4611,11 +4625,16 @@ function executeGeneralsPowerAt(pos) {
         showNotification(`★ Emergency Repair restored ${repaired} friendly asset(s)!`, 'success');
         return true;
     } else if (p === 'fuelAirBomb') {
-        playAudio('nuke_detonation');
-        if (typeof triggerScreenShake === 'function') triggerScreenShake(1.3);
-        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0xff7f50, 6.5, true);
-        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 22.0, 650, 'EXPLOSIVE', pseudoAttacker);
-        showNotification('★ Fuel Air Bomb (Daisy Cutter) detonated!', 'warning');
+        playAudio('radio_chirp', {}, 'usa');
+        if (typeof triggerC130FuelAirBomb === 'function') {
+            triggerC130FuelAirBomb(pos, pseudoAttacker);
+        } else {
+            playAudio('daisycutter_blast', {}, 'usa');
+            if (typeof triggerScreenShake === 'function') triggerScreenShake(1.3);
+            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0xff7f50, 6.5, true);
+            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 22.0, 650, 'EXPLOSIVE', pseudoAttacker);
+        }
+        showNotification('★ C-130 Fuel Air Bomb (Daisy Cutter) inbound!', 'warning');
         return true;
     } else if (p === 'leafletDrop') {
         playAudio('radio_chirp');
@@ -4678,31 +4697,17 @@ function executeGeneralsPowerAt(pos) {
     } else if (p === 'carpetBomber') {
         showNotification('★ PLA Carpet Bomber strike inbound!', 'warning');
         playAudio('radio_chirp', {}, 'china');
-        if (typeof activeFX !== 'undefined' && typeof scene !== 'undefined') {
-            const bomber = (typeof createHelixMesh === 'function') ? createHelixMesh(false) : new THREE.Group();
-            const startPos = pos.clone().add(new THREE.Vector3(-42, 26, -24));
-            const endPos = pos.clone().add(new THREE.Vector3(42, 26, 24));
-            bomber.position.copy(startPos);
-            if (typeof bomber.lookAt === 'function') bomber.lookAt(endPos);
-            scene.add(bomber);
-            let f = 0;
-            activeFX.push({
-                    life: 95,
-                    update() {
-                        f++;
-                        bomber.position.lerpVectors(startPos, endPos, f / 90);
-                        if (f >= 90) { scene.remove(bomber); return false; }
-                        return true;
-                    }
-            });
-        }
-        for (let i = -3; i <= 3; i++) {
-            setTimeout(() => {
-                    const dropPos = pos.clone().add(new THREE.Vector3(i * 4.5, 0, i * 2.5));
-                    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropPos, 0xff6348, 3.8, true);
-                    if (typeof playAudio === 'function') playAudio('explosion');
-                    if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropPos, 9.0, 210, 'EXPLOSIVE', pseudoAttacker);
-                }, 350 + (i + 3) * 180);
+        if (typeof triggerChinaCarpetBomber === 'function') {
+            triggerChinaCarpetBomber(pos, pseudoAttacker);
+        } else {
+            for (let i = -3; i <= 3; i++) {
+                setTimeout(() => {
+                        const dropPos = pos.clone().add(new THREE.Vector3(i * 4.5, 0, i * 2.5));
+                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropPos, 0xff6348, 3.8, true);
+                        if (typeof playAudio === 'function') playAudio('carpet_bomb', {}, 'china');
+                        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropPos, 9.0, 210, 'EXPLOSIVE', pseudoAttacker);
+                    }, 350 + (i + 3) * 180);
+            }
         }
         return true;
     } else if (p === 'artilleryBarrage') {
@@ -4854,7 +4859,7 @@ function showVictoryBanner() {
         rankEl.textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
     }
 
-    if (typeof playUSASound === 'function') playUSASound('victory');
+    if (typeof playAudio === 'function') playAudio('victory', {}, selectedFaction);
 }
 
 function showDefeatBanner() {
@@ -4870,7 +4875,7 @@ function showDefeatBanner() {
     const facEl = document.getElementById('defeat-faction-val');
     if (facEl) facEl.textContent = (typeof selectedFaction !== 'undefined' ? selectedFaction : 'USA').toUpperCase();
 
-    if (typeof playUSASound === 'function') playUSASound('defeat');
+    if (typeof playAudio === 'function') playAudio('defeat', {}, selectedFaction);
 }
 
 function dismissEndGameModal() {

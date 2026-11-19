@@ -432,7 +432,24 @@ function startGame() {
     aiDifficultyLevel = (document.getElementById('ai-difficulty') || {}).value || 'medium';
     aiFactionChosen = (document.getElementById('ai-faction') || {}).value || 'random';
 
-    if (typeof preloadSkirmishAudio === 'function') preloadSkirmishAudio(selectedFaction);
+    const speedVal = Number((document.getElementById('skirmish-game-speed') || {}).value) || 30;
+    const limitSwEl = document.getElementById('limit-superweapons');
+    if (typeof window !== 'undefined') {
+        window.skirmishGameSpeed = speedVal;
+        window.gameSpeedMultiplier = Math.max(0.5, Math.min(2.0, speedVal / 30));
+        window.limitSuperweapons = Boolean(limitSwEl && limitSwEl.checked);
+    }
+
+    const playerSlot = (typeof spSlots !== 'undefined') && (spSlots.find(s => s.active && s.isPlayer) || spSlots[0]);
+    const facPool = ['usa', 'china', 'gla'];
+    const slotFac = (playerSlot && playerSlot.faction) || selectedFaction;
+    const resolvedPlayerFaction = slotFac === 'random'
+        ? facPool[Math.floor(Math.random() * facPool.length)]
+        : slotFac;
+    if (typeof window !== 'undefined') window._resolvedSkirmishPlayerFaction = resolvedPlayerFaction;
+    selectedFaction = resolvedPlayerFaction;
+
+    if (typeof preloadSkirmishAudio === 'function') preloadSkirmishAudio(resolvedPlayerFaction);
 
     setupMapEnvironment(selectedEnv, selectedSize);
 
@@ -707,10 +724,20 @@ function setupGameDeployment() {
     choosingBaseLocation = false;
     document.getElementById('deployment-hint').style.display = 'none';
 
-    // Find player slot
+    // Find player slot & resolve Random / Team None (Free-for-All)
     const playerSlot = spSlots.find(s => s.active && s.isPlayer) || spSlots[0];
-    playerTeamId = playerSlot.team;
-    selectedFaction = playerSlot.faction;
+    const facList = ['usa', 'china', 'gla'];
+    let resolvedPlayerFaction = playerSlot.faction;
+    if (resolvedPlayerFaction === 'random') {
+        const preResolved = (typeof window !== 'undefined') ? window._resolvedSkirmishPlayerFaction : null;
+        resolvedPlayerFaction = (preResolved && facList.includes(preResolved))
+            ? preResolved
+            : facList[Math.floor(Math.random() * facList.length)];
+    }
+    if (typeof window !== 'undefined') window._resolvedSkirmishPlayerFaction = null;
+    selectedFaction = resolvedPlayerFaction;
+    refreshFactionRoster();
+    playerTeamId = (playerSlot.team && playerSlot.team > 0) ? playerSlot.team : (100 + playerSlot.id);
     if (typeof getPlayerColorHex === 'function' && typeof applyPlayerColorToMaterials === 'function') {
         window.selectedPlayerColor = playerSlot.color || 'blue';
         applyPlayerColorToMaterials(getPlayerColorHex(window.selectedPlayerColor));
@@ -722,13 +749,14 @@ function setupGameDeployment() {
     activeSlots.forEach(slot => {
             const spObj = spawns.find(p => p.id === slot.spawnId) || spawns[0];
             const spawnPos = new THREE.Vector3(spObj.x, getTerrainHeight(spObj.x, spObj.z), spObj.z);
+            const effectiveTeam = (slot.team && slot.team > 0) ? slot.team : (100 + slot.id);
 
             // Ensure every base has convenient resources nearby
             spawnSupplyCacheNearBase(spawnPos);
 
             if (slot.isPlayer) {
                 // Deploy Player base
-                deployBase(spawnPos, slot.faction, slot.team);
+                deployBase(spawnPos, resolvedPlayerFaction, effectiveTeam);
                 cameraRadius = selectedSize >= 2200 ? 280 : selectedSize >= 1400 ? 220 : 160;
                 cameraTarget.copy(spawnPos);
                 updateCameraPosition();
@@ -736,10 +764,9 @@ function setupGameDeployment() {
                 // Deploy AI Opponent / Ally base
                 let fac = slot.faction;
                 if (fac === 'random') {
-                    const facList = ['usa', 'china', 'gla'];
                     fac = facList[Math.floor(Math.random() * facList.length)];
                 }
-                deployEnemyBase(spawnPos, fac, 'ai_' + slot.id, slot.team, slot.difficulty, slot.color);
+                deployEnemyBase(spawnPos, fac, 'ai_' + slot.id, effectiveTeam, slot.difficulty, slot.color);
             }
     });
 

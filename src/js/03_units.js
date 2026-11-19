@@ -786,6 +786,9 @@ function createAuroraMesh(isEnemy = false) {
 }
 
 function createPilotMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['pilot']) {
+        return createW3DInfantryMesh('pilot', isEnemy);
+    }
     const g = new THREE.Group();
     g.scale.set(0.50, 0.50, 0.50);
     const suitMat = isEnemy ? matEnemyDark : matUSAColor;
@@ -1902,11 +1905,22 @@ function createTerroristMesh(isEnemy = false) {
     return g;
 }
 
-function createAngryMobMesh() {
+function createAngryMobMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['mob']) {
+        const mobGrp = new THREE.Group();
+        const offsets = [[-0.8, -0.6, 0.25], [0.8, -0.5, -0.35], [-0.5, 0.8, 0.6], [0.7, 0.7, -0.5]];
+        offsets.forEach(([ox, oz, rot]) => {
+            const fig = createW3DInfantryMesh('mob', isEnemy);
+            fig.position.set(ox, 0, oz);
+            fig.rotation.y = rot;
+            mobGrp.add(fig);
+        });
+        return mobGrp;
+    }
     const g = new THREE.Group();
     // 3 Angry mob rioters with Molotov cocktails
     for (let i = -1; i <= 1; i++) {
-        const rebel = createRebelMesh();
+        const rebel = createRebelMesh(isEnemy);
         rebel.position.set(i * 0.45, 0, (i % 2) * 0.3);
 
         // Molotov cocktail with flaming rag
@@ -1921,7 +1935,10 @@ function createAngryMobMesh() {
     return g;
 }
 
-function createHijackerMesh() {
+function createHijackerMesh(isEnemy = false) {
+    if (typeof createW3DInfantryMesh === 'function' && window.W3D_INFANTRY_DATA && window.W3D_INFANTRY_DATA['hijacker']) {
+        return createW3DInfantryMesh('hijacker', isEnemy);
+    }
     const g = new THREE.Group();
     const dark = new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.6 });
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.25, 8), dark);
