@@ -1720,7 +1720,8 @@ function onPointerUp(e) {
             rallyStructure.rallyPoint = groundPoint.clone();
             if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(groundPoint, 'rally');
             showNotification('Rally point established for ' + rallyStructure.type.toUpperCase() + '.', 'info');
-            playUSASound('radio_chirp');
+            if (typeof playAudio === 'function') playAudio('rally_set', { volume: 0.78 });
+            else playUSASound('radio_chirp');
             updateSidebar();
         }
         return;
@@ -1858,7 +1859,8 @@ function issueMoveCommand(e) {
             selectedStructure.rallyPoint = gHit.clone();
             if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(gHit, 'rally');
             showNotification('Rally point established for ' + selectedStructure.type.toUpperCase() + '.', 'info');
-            playUSASound('radio_chirp');
+            if (typeof playAudio === 'function') playAudio('rally_set', { volume: 0.78 });
+            else playUSASound('radio_chirp');
             updateSidebar();
             return;
         }
@@ -2056,9 +2058,9 @@ function issueMoveCommand(e) {
         }
     }
 
-    // 1b2. Check if right-clicking on a garrisonable civilian/world building with infantry!
-    const selectedInfForBld = units.filter(u => u.selected && isInfantryType(u.type));
-    if (selectedInfForBld.length > 0 && typeof worldBuildings !== 'undefined' && worldBuildings.length > 0) {
+    // 1b2. Check if right-clicking on a garrisonable civilian/world building (attack enemy garrison or embark friendly infantry)
+    const selectedForBld = units.filter(u => u.selected);
+    if (selectedForBld.length > 0 && typeof worldBuildings !== 'undefined' && worldBuildings.length > 0) {
         const wbMeshes = worldBuildings.map(wb => wb.mesh).filter(Boolean);
         const wbHits = wbMeshes.length ? raycaster.intersectObjects(wbMeshes, true) : [];
         if (wbHits.length > 0) {
@@ -2071,18 +2073,58 @@ function issueMoveCommand(e) {
             if (wbTarget && wbTarget.health > 0) {
                 const occupiedByEnemy = wbTarget.garrisoned && wbTarget.garrisoned.length > 0 && !isFriendly({ teamId: playerTeamId }, wbTarget);
                 if (occupiedByEnemy) {
+                    const combatUnits = selectedForBld.filter(u => !u.isBuilder && !['dozer', 'worker', 'supply', 'supplyTruck', 'truck', 'chinook'].includes(u.type));
+                    if (combatUnits.length > 0) {
+                        if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(wbTarget.position, 'attack');
+                        if (typeof playUnitVoice === 'function') {
+                            playUnitVoice(combatUnits[0].type, 'attack', combatUnits[0].faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+                        }
+                        const targetRadius = wbTarget.radius || 5.5;
+                        combatUnits.forEach((unit, idx) => {
+                                unit.combatTarget = wbTarget;
+                                unit.taskState = 'MovingToAttack';
+                                unit.embarkTarget = null;
+                                if (unit.isAir) {
+                                    unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'attacking';
+                                    unit.targetPosition.copy(wbTarget.position);
+                                    unit.patrolCenter.copy(wbTarget.position);
+                                } else {
+                                    const dist = unit.mesh.position.distanceTo(wbTarget.position);
+                                    const desiredRange = (unit.scanRange || 18) + targetRadius - 2.5;
+                                    if (dist > desiredRange) {
+                                        const approach = new THREE.Vector3().subVectors(wbTarget.position, unit.mesh.position).normalize();
+                                        const fanAngle = (idx % 5 - 2) * 0.22;
+                                        approach.applyAxisAngle(new THREE.Vector3(0, 1, 0), fanAngle);
+                                        const destX = wbTarget.position.x - approach.x * desiredRange;
+                                        const destZ = wbTarget.position.z - approach.z * desiredRange;
+                                        unit.targetPosition.set(destX, typeof getTerrainHeight === 'function' ? getTerrainHeight(destX, destZ) : 0, destZ);
+                                    } else {
+                                        unit.targetPosition.copy(unit.mesh.position);
+                                    }
+                                }
+                            });
+                        showNotification('Attacking enemy-garrisoned structure! Use fire, toxin, or flashbangs to clear occupants.', 'warning');
+                        return;
+                    }
                     showNotification('Building is garrisoned by hostile forces! Clear it with fire or toxins.', 'error');
                     return;
                 }
-                selectedInfForBld.forEach(inf => {
-                        inf.embarkTarget = wbTarget;
-                        inf.taskState = 'MovingToEmbark';
-                        inf.combatTarget = null;
-                        inf.targetPosition.copy(wbTarget.position);
-                });
-                showNotification(`Infantry ordered to garrison building (${(wbTarget.garrisoned || []).length}/${wbTarget.capacity} slots).`, 'info');
-                updateSidebar();
-                return;
+                const selectedInfForBld = selectedForBld.filter(u => isInfantryType(u.type));
+                if (selectedInfForBld.length > 0) {
+                    if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(wbTarget.position, 'garrison');
+                    if (typeof playUnitVoice === 'function') {
+                        playUnitVoice(selectedInfForBld[0].type, 'move', selectedInfForBld[0].faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+                    }
+                    selectedInfForBld.forEach(inf => {
+                            inf.embarkTarget = wbTarget;
+                            inf.taskState = 'MovingToEmbark';
+                            inf.combatTarget = null;
+                            inf.targetPosition.copy(wbTarget.position);
+                    });
+                    showNotification(`Infantry ordered to garrison building (${(wbTarget.garrisoned || []).length}/${wbTarget.capacity} slots).`, 'info');
+                    updateSidebar();
+                    return;
+                }
             }
         }
     }
@@ -2392,6 +2434,7 @@ function evaluateClickSelection(e) {
             if (wbTarget) {
                 selectedStructure = wbTarget;
                 activeSidebarTab = 'production';
+                if (typeof playAudio === 'function') playAudio('gui_blip', { volume: 0.65 });
                 updateSidebar();
                 return;
             }

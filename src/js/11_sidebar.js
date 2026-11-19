@@ -366,13 +366,16 @@ function renderRadarMinimap() {
 }
 
 function triggerTacticalBeacon() {
-    playUSASound('radio_chirp');
+    if (typeof playAudio === 'function') playAudio('rally_set', { volume: 0.75 });
+    else playUSASound('radio_chirp');
+    if (typeof playEvaAlert === 'function') playEvaAlert('beacon');
     showNotification('Tactical beacon placed. Coordinates transmitted to squad.', 'info');
     spawnPingEffect(cameraTarget);
 }
 
 function toggleSellMode() {
     isSellMode = !isSellMode;
+    if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.65 });
     document.getElementById('btn-sell')?.classList.toggle('active', isSellMode);
     document.body.style.cursor = isSellMode ? 'not-allowed' : 'default';
     showNotification(isSellMode ? '💰 SELL MODE: Click any structure to demolish for 50% refund' : 'Sell mode deactivated.', 'info');
@@ -651,7 +654,10 @@ function unloadTransportPassengers(transport) {
             }
     });
     if (count > 0) {
-        playAudio('click');
+        const hadWorldBuilding = targets.some(t => t.isWorldBuilding);
+        if (typeof playAudio === 'function') {
+            playAudio(hadWorldBuilding ? 'garrison_exit' : 'gui_click', { volume: 0.72 });
+        }
         showNotification(`Disembarked ${count} passenger(s)!`, 'info');
         updateSidebar();
     }
@@ -2868,10 +2874,20 @@ function sellStructure(structure) {
     const refund = Math.floor(cost * 0.5);
     playerResources += refund;
 
+    const sPos = (structure.position || (structure.mesh && structure.mesh.position)) ? (structure.position || structure.mesh.position).clone() : null;
     scene.remove(structure.mesh);
     const idx = structures.indexOf(structure);
     if (idx !== -1) structures.splice(idx, 1);
     if (selectedStructure === structure) selectedStructure = null;
+
+    if (typeof playAudio === 'function') {
+        playAudio('cash_up', { volume: 0.72 });
+        playAudio('debris_building', { volume: 0.65 });
+    }
+    if (sPos) {
+        if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(sPos.clone().add(new THREE.Vector3(0, 4.0, 0)), refund);
+        if (typeof spawnGroundDustPlume === 'function') spawnGroundDustPlume(sPos, 1.8);
+    }
 
     showNotification(`Demolished ${structure.type}. +$${refund} refunded.`, 'info');
     updateSidebar();
@@ -2987,7 +3003,7 @@ function produceUnit(type) {
             buildTime: spec.buildTime || (isInfantryType(type) ? 3.0 : 5.5)
     });
 
-    playUSASound('radio_chirp');
+    if (typeof playAudio === 'function') playAudio('cash_down', { volume: 0.55 });
     showNotification(`Queued: ${spec.name}${effCost < spec.cost ? ' (10% Refinery Discount)' : ''}`, 'info');
     updateSidebar();
 }
@@ -2997,7 +3013,10 @@ function cancelQueuedItem(structure, index) {
     const item = structure.productionQueue[index];
     playerResources += item.cost;
     structure.productionQueue.splice(index, 1);
-    playUSASound('radio_chirp');
+    if (typeof playAudio === 'function') {
+        playAudio('gui_combo', { volume: 0.65 });
+        playAudio('cash_up', { volume: 0.55 });
+    }
     showNotification(`Cancelled: ${item.name} (Refunded $${item.cost})`, 'info');
     updateSidebar();
 }
@@ -3307,21 +3326,32 @@ function upgradeDecoyToRealStructure(structure) {
 function triggerReconnaissanceScan(abilityId) {
     const targetPos = (typeof camera !== 'undefined' && camera.position) ? new THREE.Vector3(camera.position.x, 0, camera.position.z) : new THREE.Vector3(0, 0, 0);
     if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(targetPos, 110, 900);
-    playUSASound('radio_chirp');
+    if (abilityId === 'spyDrone' && typeof triggerSpyDronePower === 'function') {
+        triggerSpyDronePower(targetPos);
+    } else if (typeof playAudio === 'function') {
+        playAudio(abilityId === 'spyDrone' ? 'spy_drone' : 'radar_scan', { volume: 0.85 }, 'usa');
+    } else {
+        playUSASound('radio_chirp');
+    }
     showNotification(`${abilityId === 'spyDrone' ? 'Spy Drone' : 'Radar Van'} recon scan active over operational theater!`, 'info');
 }
 
 function triggerEmpPulseDisruption() {
     const targetPos = (typeof camera !== 'undefined' && camera.position) ? new THREE.Vector3(camera.position.x, 0, camera.position.z) : new THREE.Vector3(0, 0, 0);
+    if (typeof triggerEmpPulseFX === 'function') {
+        triggerEmpPulseFX(targetPos);
+    } else if (typeof playAudio === 'function') {
+        playAudio('emp_pulse', { volume: 0.9 }, 'china');
+    }
     if (typeof enemyUnits !== 'undefined') {
         enemyUnits.forEach(eu => {
                 if (eu.health > 0 && eu.mesh && eu.mesh.position.distanceTo(targetPos) < 40) {
                     eu.attackCooldown = 720; // Stunned for 12 seconds
-                    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(eu.mesh.position, 0x00f2fe, 1.5, false);
+                    if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(eu.mesh.position);
+                    else if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(eu.mesh.position, 0x00f2fe, 1.5, false, 'none');
                 }
         });
     }
-    playAudio('construction', {}, 'china');
     showNotification('EMP Disruption pulse discharged! Hostile systems in sector disabled for 12s.', 'info');
 }
 
@@ -3342,8 +3372,8 @@ function triggerSneakAttackTunnel() {
             buildProgress: 100,
             teamId: playerTeamId
     });
-    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(targetPos, 0x8b5a2b, 2.5, true);
-    playAudio('construction', {}, 'gla');
+    if (typeof triggerSneakAttackFX === 'function') triggerSneakAttackFX(targetPos);
+    else if (typeof playAudio === 'function') playAudio('sneak_attack', { volume: 0.9 }, 'gla');
     showNotification('Sneak Attack Network breached ground! Underground tunnel network established.', 'success');
 }
 
@@ -3808,9 +3838,11 @@ function processBuildingFunctions() {
                 enemyUnits.forEach(enemy => {
                         if (enemy.health > 0 && !enemy.isAir && enemy.mesh && enemy.mesh.position.distanceTo(mine.position) < 9) enemy.health -= dmg;
                 });
-                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(mine.position, 0xff4757, 2.0, true);
-                else if (typeof createImpactExplosion === 'function') createImpactExplosion(mine.position);
-                if (typeof playAudio === 'function') playAudio('explosion');
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(mine.position, 0xff4757, 2.0, true, 'mine_detonate');
+                else {
+                    if (typeof createImpactExplosion === 'function') createImpactExplosion(mine.position);
+                    if (typeof playAudio === 'function') playAudio('mine_detonate');
+                }
             }
     });
 
@@ -4172,13 +4204,16 @@ function processCameraScreenEdgePanning(clientX, clientY) {
 function triggerRallyPointMode() {
     if (selectedStructure) {
         if (selectedStructure.ownerId && selectedStructure.ownerId !== 'player') {
+            if (typeof playAudio === 'function') playAudio('gui_error', { volume: 0.65 });
             showNotification('Cannot set rally points on allied structures!', 'error');
             return;
         }
+        if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.65 });
         window.rallyPointPlacementStructure = selectedStructure;
         document.body.style.cursor = 'crosshair';
         showNotification('Click anywhere on battlefield to set Rally Point.', 'info');
     } else {
+        if (typeof playAudio === 'function') playAudio('gui_error', { volume: 0.65 });
         showNotification('Select a production building first to set its Rally Point.', 'warning');
     }
 }
@@ -4344,7 +4379,8 @@ function awardGeneralsXP(amount) {
         if (typeof showNotification === 'function') {
             showNotification(`★ PROMOTION! Reached General Rank ${generalsRank} (+${pts} Promotion Point${pts > 1 ? 's' : ''})! Click RANK or press P.`, 'success');
         }
-        if (typeof playAudio === 'function') playAudio('radio_chirp');
+        if (typeof playEvaAlert === 'function') playEvaAlert('general_promoted');
+        if (typeof playAudio === 'function') playAudio('unit_promoted', { volume: 0.85 });
     }
     updateGeneralsRankHUD();
 }
@@ -4481,7 +4517,7 @@ function unlockGeneralsPower(powerId) {
         });
     }
 
-    if (typeof playAudio === 'function') playAudio('radio_chirp');
+    if (typeof playAudio === 'function') playAudio('unit_promoted', { volume: 0.85 });
     if (typeof showNotification === 'function') showNotification(`★ Unlocked General Power: ${def.name}!`, 'success');
     updateGeneralsRankHUD();
     renderGeneralsPowersModal();
@@ -4532,9 +4568,11 @@ function activateGeneralsPower(powerType) {
     const readyTick = generalPowerCooldowns[powerType] || 0;
     if (curTick < readyTick) {
         const secsLeft = Math.ceil((readyTick - curTick) / 60);
+        if (typeof playAudio === 'function') playAudio('gui_error', { volume: 0.65 });
         showNotification(`${def ? def.name : powerType} recharging (${secsLeft}s remaining).`, 'warning');
         return;
     }
+    if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.65 });
     activeGeneralPower = powerType;
     if (typeof document !== 'undefined' && document.body) document.body.style.cursor = 'crosshair';
     showNotification(`${def ? def.name : powerType}: Click terrain or minimap to deploy (Right-click/Esc to cancel).`, 'info');
@@ -4558,16 +4596,25 @@ function executeGeneralsPowerAt(pos) {
     if (p === 'spySatellite' || p === 'spyDrone') {
         const scanRadius = p === 'spySatellite' ? 125 : 85;
         if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(pos, scanRadius, p === 'spyDrone' ? 3600 : 1800);
-        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00ffff, 3.5);
-        if (typeof spawnUnit === 'function' && p === 'spyDrone') {
-            const drone = spawnUnit('drone_scout', pos.clone());
-            if (drone) drone.detectsStealth = true;
+        if (p === 'spyDrone') {
+            if (typeof triggerSpyDronePower === 'function') {
+                triggerSpyDronePower(pos);
+            } else {
+                if (typeof spawnUnit === 'function') {
+                    const drone = spawnUnit('drone_scout', pos.clone());
+                    if (drone) drone.detectsStealth = true;
+                }
+                if (typeof playAudio === 'function') playAudio('spy_drone', { volume: 0.85 }, 'usa');
+            }
+        } else {
+            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00ffff, 3.5);
+            if (typeof playAudio === 'function') playAudio('radar_scan', { volume: 0.85 }, 'usa');
         }
-        playAudio('radio_chirp');
         showNotification(`★ ${def ? def.name : 'Recon'} deployed! Sector revealed & stealth detected.`, 'success');
         return true;
     } else if (p === 'paradrop') {
-        playAudio('radio_chirp');
+        if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.65 });
+        if (typeof playEvaAlert === 'function') playEvaAlert('reinforcements');
         if (typeof triggerC130Paradrop === 'function') {
             triggerC130Paradrop(pos);
         } else {
@@ -4581,25 +4628,29 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'a10Strike') {
         showNotification('★ A-10 Warthog flight inbound to target coordinates!', 'success');
-        playAudio('radio_chirp');
-        for (let i = 0; i < 2; i++) {
-            setTimeout(() => {
-                    const flyStart = pos.clone().add(new THREE.Vector3(-40 + i * 8, 22, -40));
-                    const flyEnd = pos.clone().add(new THREE.Vector3(40 + i * 8, 22, 40));
-                    for (let r = 0; r < 3; r++) {
-                        setTimeout(() => {
-                                const rPos = flyStart.clone().lerp(flyEnd, 0.4 + r * 0.15);
-                                const impact = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8));
-                                if (typeof spawnRocketProjectile === 'function') {
-                                    spawnRocketProjectile(rPos, impact, true, false, {
-                                            attacker: pseudoAttacker, target: null, targetPos: impact,
-                                            damage: 120, damageType: 'EXPLOSIVE', splashRadius: 6.5
-                                    });
-                                }
-                                if (typeof playUSASound === 'function') playUSASound('missile_launch');
-                            }, r * 150);
-                    }
-                }, i * 350);
+        if (typeof triggerA10Strike === 'function') {
+            triggerA10Strike(pos, pseudoAttacker);
+        } else {
+            if (typeof playAudio === 'function') playAudio('a10_dive', { volume: 0.85 }, 'usa');
+            for (let i = 0; i < 2; i++) {
+                setTimeout(() => {
+                        const flyStart = pos.clone().add(new THREE.Vector3(-40 + i * 8, 22, -40));
+                        const flyEnd = pos.clone().add(new THREE.Vector3(40 + i * 8, 22, 40));
+                        for (let r = 0; r < 3; r++) {
+                            setTimeout(() => {
+                                    const rPos = flyStart.clone().lerp(flyEnd, 0.4 + r * 0.15);
+                                    const impact = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8));
+                                    if (typeof spawnRocketProjectile === 'function') {
+                                        spawnRocketProjectile(rPos, impact, true, false, {
+                                                attacker: pseudoAttacker, target: null, targetPos: impact,
+                                                damage: 120, damageType: 'EXPLOSIVE', splashRadius: 6.5
+                                        });
+                                    }
+                                    if (typeof playAudio === 'function') playAudio('jet_missile', { volume: 0.78 }, 'usa');
+                                }, r * 150);
+                        }
+                    }, i * 350);
+            }
         }
         return true;
     } else if (p === 'emergencyRepair') {
@@ -4608,6 +4659,7 @@ function executeGeneralsPowerAt(pos) {
             units.forEach(u => {
                     if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(pos) <= 22) {
                         u.health = Math.min(u.maxHealth, u.health + Math.round(u.maxHealth * 0.65));
+                        if (typeof spawnSparks === 'function') spawnSparks(u.mesh.position, 0x2ed573, 5);
                         repaired++;
                     }
             });
@@ -4616,12 +4668,17 @@ function executeGeneralsPowerAt(pos) {
             structures.forEach(s => {
                     if (s.health > 0 && s.position && s.position.distanceTo(pos) <= 22) {
                         s.health = Math.min(s.maxHealth, s.health + Math.round(s.maxHealth * 0.5));
+                        if (typeof spawnSparks === 'function') spawnSparks(s.position, 0x2ed573, 6);
                         repaired++;
                     }
             });
         }
-        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.5);
-        playAudio('construction');
+        if (typeof triggerEmergencyRepairFX === 'function') {
+            triggerEmergencyRepairFX(pos);
+        } else {
+            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.5);
+            if (typeof playAudio === 'function') playAudio('emergency_repair', { volume: 0.85 });
+        }
         showNotification(`★ Emergency Repair restored ${repaired} friendly asset(s)!`, 'success');
         return true;
     } else if (p === 'fuelAirBomb') {
@@ -4637,8 +4694,9 @@ function executeGeneralsPowerAt(pos) {
         showNotification('★ C-130 Fuel Air Bomb (Daisy Cutter) inbound!', 'warning');
         return true;
     } else if (p === 'leafletDrop') {
-        playAudio('radio_chirp');
-        if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xffffff);
+        if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.65 });
+        if (typeof triggerLeafletDropFX === 'function') triggerLeafletDropFX(pos);
+        else if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xffffff);
         let stunned = 0;
         if (typeof enemyUnits !== 'undefined') {
             enemyUnits.forEach(e => {
@@ -4666,7 +4724,7 @@ function executeGeneralsPowerAt(pos) {
         }
         return true;
     } else if (p === 'clusterMines') {
-        playAudio('construction', {}, 'china');
+        if (typeof playAudio === 'function') playAudio('cluster_mines', { volume: 0.88 }, 'china');
         for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
             const dist = 3.0 + Math.random() * 7.5;
@@ -4712,13 +4770,17 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'artilleryBarrage') {
         showNotification('★ Heavy 152mm Artillery Barrage firing on coordinates!', 'warning');
-        playAudio('explosion');
-        for (let i = 0; i < 8; i++) {
-            setTimeout(() => {
-                    const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
-                    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff5722, 3.2, true);
-                    if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', pseudoAttacker);
-                }, i * 250);
+        if (typeof triggerArtilleryBarrageFX === 'function') {
+            triggerArtilleryBarrageFX(pos, pseudoAttacker);
+        } else {
+            if (typeof playAudio === 'function') playAudio('artillery_fire', { volume: 0.85 }, 'china');
+            for (let i = 0; i < 8; i++) {
+                setTimeout(() => {
+                        const scatter = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
+                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff5722, 3.2, true, 'expl_artillery');
+                        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', pseudoAttacker);
+                    }, i * 250);
+            }
         }
         return true;
     } else if (p === 'cashHack') {
@@ -4726,7 +4788,11 @@ function executeGeneralsPowerAt(pos) {
         const resEl = (typeof document !== 'undefined') ? document.getElementById('resource-display') : null;
         if (resEl) resEl.innerText = `$${playerResources}`;
         if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 3.0);
-        playAudio('radio_chirp', {}, 'china');
+        if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(pos.clone().add(new THREE.Vector3(0, 3.0, 0)), 1500);
+        if (typeof playAudio === 'function') {
+            playAudio('cash_hack', { volume: 0.9 }, 'china');
+            playAudio('cash_up', { volume: 0.72 });
+        }
         showNotification('★ Cash Hack complete! +$1,500 siphoned from hostile network.', 'success');
         return true;
     } else if (p === 'frenzy') {
@@ -4741,31 +4807,15 @@ function executeGeneralsPowerAt(pos) {
             });
         }
         if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0xff2222, 4.0);
-        playAudio('radio_chirp', {}, 'china');
+        if (typeof playAudio === 'function') playAudio('frenzy', { volume: 0.9 }, 'china');
         showNotification(`★ Frenzy activated on ${boosted} unit(s) (+30% combat speed & damage for 15s)!`, 'success');
         return true;
     } else if (p === 'empPulse') {
-        playAudio('orbital_beam');
-        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00d2ff, 7.0);
-        if (typeof activeFX !== 'undefined' && typeof scene !== 'undefined') {
-            const ring = new THREE.Mesh(
-                new THREE.RingGeometry(1.0, 2.4, 36),
-                new THREE.MeshBasicMaterial({ color: 0x00e5ff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
-            );
-            ring.rotation.x = -Math.PI / 2;
-            ring.position.set(pos.x, (typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : 0) + 0.5, pos.z);
-            scene.add(ring);
-            let ef = 0;
-            activeFX.push({
-                    life: 32,
-                    update() {
-                        ef++;
-                        ring.scale.setScalar(1 + ef * 0.45);
-                        ring.material.opacity = Math.max(0, 0.9 - ef / 32);
-                        if (ef >= 32) { scene.remove(ring); ring.geometry.dispose(); ring.material.dispose(); return false; }
-                        return true;
-                    }
-            });
+        if (typeof triggerEmpPulseFX === 'function') {
+            triggerEmpPulseFX(pos);
+        } else {
+            if (typeof playAudio === 'function') playAudio('emp_pulse', { volume: 0.9 });
+            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00d2ff, 7.0);
         }
         let disabled = 0;
         const until = Date.now() + 12000;
@@ -4773,6 +4823,7 @@ function executeGeneralsPowerAt(pos) {
             enemyUnits.forEach(e => {
                     if (e.health > 0 && !e.isInfantry && e.mesh && e.mesh.position.distanceTo(pos) <= 22) {
                         e.empDisabledUntil = until;
+                        if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(e.mesh.position);
                         disabled++;
                     }
             });
@@ -4782,6 +4833,7 @@ function executeGeneralsPowerAt(pos) {
             enemyStructures.forEach(s => {
                     if (s.health > 0 && s.position && s.position.distanceTo(pos) <= 22) {
                         s.disabledUntil = Math.max(s.disabledUntil || 0, tickUntil);
+                        if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(s.position);
                         disabled++;
                     }
             });
@@ -4790,16 +4842,22 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'rebelAmbush') {
         showNotification('★ Rebel Ambush cell surfacing from tunnels!', 'success');
-        playAudio('construction', {}, 'gla');
+        if (typeof triggerRebelAmbushFX === 'function') triggerRebelAmbushFX(pos);
+        else if (typeof playAudio === 'function') playAudio('rebel_ambush', { volume: 0.9 }, 'gla');
+        if (typeof playEvaAlert === 'function') playEvaAlert('reinforcements');
         for (let i = 0; i < 5; i++) {
             const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6));
             if (typeof spawnUnit === 'function') spawnUnit('rebel', rPos);
         }
         return true;
     } else if (p === 'anthraxBomb') {
-        playAudio('scud_detonation');
-        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0x2ecc71, 5.5, true);
-        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 18.0, 320, 'TOXIN', pseudoAttacker);
+        if (typeof triggerAnthraxBombFX === 'function') {
+            triggerAnthraxBombFX(pos, pseudoAttacker);
+        } else {
+            if (typeof playAudio === 'function') playAudio('anthrax_blast', { volume: 0.9 }, 'gla');
+            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0x2ecc71, 5.5, true, 'none');
+            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 18.0, 320, 'TOXIN', pseudoAttacker);
+        }
         for (let t = 1; t <= 4; t++) {
             setTimeout(() => {
                     if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 16.0, 95, 'TOXIN', pseudoAttacker);
@@ -4808,8 +4866,12 @@ function executeGeneralsPowerAt(pos) {
         showNotification('★ Anthrax Beta Bomb detonated! Toxic cloud lingering.', 'warning');
         return true;
     } else if (p === 'sneakAttack') {
-        playAudio('construction', {}, 'gla');
-        if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0x8b6b43);
+        if (typeof triggerSneakAttackFX === 'function') {
+            triggerSneakAttackFX(pos);
+        } else {
+            if (typeof playAudio === 'function') playAudio('sneak_attack', { volume: 0.9 }, 'gla');
+            if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0x8b6b43);
+        }
         if (typeof spawnUnit === 'function') {
             spawnUnit('rpg', pos.clone().add(new THREE.Vector3(-2, 0, 2)));
             spawnUnit('rpg', pos.clone().add(new THREE.Vector3(2, 0, 2)));
@@ -4832,7 +4894,7 @@ function executeGeneralsPowerAt(pos) {
             });
         }
         if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.0);
-        playAudio('radio_chirp', {}, 'gla');
+        if (typeof playAudio === 'function') playAudio('gps_scrambler', { volume: 0.9 }, 'gla');
         showNotification(`★ GPS Scrambler cloaked ${cloaked} friendly unit(s) for 30s!`, 'success');
         return true;
     }

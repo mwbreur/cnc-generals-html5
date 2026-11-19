@@ -1092,6 +1092,11 @@ function animate() {
                 const dist2D = Math.hypot(dPos.x - s.position.x, dPos.z - s.position.z);
                 const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 3.5;
                 if (s.dozerRef.taskState === 'Building' || dist2D <= buildThreshold) {
+                    if (s.dozerRef.taskState === 'Building' && buildingTick % 18 === 0 && s.position && typeof spawnSparks === 'function') {
+                        const sa = Math.random() * Math.PI * 2;
+                        const sr = (s.radius || 4.0) * 0.7;
+                        spawnSparks(s.position.clone().add(new THREE.Vector3(Math.cos(sa) * sr, 1.4, Math.sin(sa) * sr)), 0x74b9ff, 3);
+                    }
                     s.dozerRef.taskState = 'Building';
                     const OFFICIAL_STRUCTURE_BUILD_SECS = {
                         demoTrap: 5,
@@ -1666,6 +1671,7 @@ function animate() {
                             unit.embarkTarget = null;
                             if (transport.isWorldBuilding && typeof updateWorldBuildingGarrisonVisual === 'function') {
                                 updateWorldBuildingGarrisonVisual(transport);
+                                if (typeof playAudio === 'function') playAudio('garrison_enter', { volume: 0.78 });
                             }
                             showNotification(`${unit.type} entered ${transport.type} (${transport.garrisoned.length}/${cap}).`, 'success');
                             updateSidebar();
@@ -1992,6 +1998,23 @@ function animate() {
                 if (unit.airState !== 'landed' && unit.airState !== 'hovering') {
                     const targetY = groundY + cruiseAlt;
                     unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.08;
+                }
+
+                // Authentic Helicopter Rotor Downwash Dust & Fixed-Wing Contrails
+                if (unit.airState !== 'landed') {
+                    const alt = unit.mesh.position.y - groundY;
+                    if (isHeli && alt < 13.5 && (buildingTick + idx) % 10 === 0 && typeof spawnRotorDownwashDust === 'function') {
+                        spawnRotorDownwashDust(unit.mesh.position, unit.radius || 3.0);
+                    } else if (!isHeli && (buildingTick + idx) % 5 === 0 && typeof spawnJetContrailPuff === 'function') {
+                        const rY = unit.mesh.rotation.y || 0;
+                        const rightX = Math.cos(rY), rightZ = -Math.sin(rY);
+                        const fwdX = Math.sin(rY), fwdZ = Math.cos(rY);
+                        spawnJetContrailPuff({ x: unit.mesh.position.x + rightX * 2.1, y: unit.mesh.position.y + 0.1, z: unit.mesh.position.z + rightZ * 2.1 }, false);
+                        spawnJetContrailPuff({ x: unit.mesh.position.x - rightX * 2.1, y: unit.mesh.position.y + 0.1, z: unit.mesh.position.z - rightZ * 2.1 }, false);
+                        if (unit.airState === 'attacking') {
+                            spawnJetContrailPuff({ x: unit.mesh.position.x - fwdX * 1.8, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * 1.8 }, true);
+                        }
+                    }
                 }
 
                 return; // Skip ground obstacles/sliding
@@ -2331,11 +2354,29 @@ function animate() {
 
             // (Ground-unit soft repulsion is handled once per frame by separateGroundUnits())
 
-            // Vehicle dust & exhaust trail when moving on ground
-            if (!unit.isAir && !INFANTRY_TYPE_SET.has(unit.type) && unit.taskState === 'Moving' && (buildingTick + idx) % 12 === 0 && typeof spawnSmokePuff === 'function') {
+            // EMP / Cyber-Disabled Electric Arc Visuals
+            if (((unit.disabledUntil && buildingTick < unit.disabledUntil) || (unit.empDisabledUntil && Date.now() < unit.empDisabledUntil)) &&
+                (buildingTick + idx) % 28 === 0 && typeof spawnEMPDisableSparks === 'function') {
+                spawnEMPDisableSparks(unit.mesh.position);
+            }
+
+            // Vehicle terrain tread/wheel dust & diesel exhaust trail when moving on ground
+            if (!unit.isAir && !INFANTRY_TYPE_SET.has(unit.type) && unit.taskState === 'Moving' && typeof spawnTreadDustPuff === 'function') {
+                const isTracked = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(unit.type);
                 const rotY = unit.mesh.rotation.y || 0;
-                const rearPos = unit.mesh.position.clone().add(new THREE.Vector3(-Math.sin(rotY) * (unit.radius || 2.5) * 0.7, 0.35, -Math.cos(rotY) * (unit.radius || 2.5) * 0.7));
-                spawnSmokePuff(rearPos, 0xc4aa82, 0.55);
+                const fwdX = Math.sin(rotY), fwdZ = Math.cos(rotY);
+                const rightX = Math.cos(rotY), rightZ = -Math.sin(rotY);
+                const rLen = (unit.radius || 2.5) * 0.68;
+                if (isTracked && (buildingTick + idx) % 7 === 0) {
+                    const lat = (unit.radius || 2.5) * 0.45;
+                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen - rightX * lat, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen - rightZ * lat }, -fwdX, -fwdZ, null, 0.52);
+                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen + rightX * lat, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen + rightZ * lat }, -fwdX, -fwdZ, null, 0.52);
+                    if ((buildingTick + idx) % 21 === 0 && typeof spawnSmokePuff === 'function') {
+                        spawnSmokePuff(unit.mesh.position.clone().add(new THREE.Vector3(-fwdX * rLen, 1.35, -fwdZ * rLen)), 0x4b525c, 0.28);
+                    }
+                } else if (!isTracked && (buildingTick + idx) % 6 === 0) {
+                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen }, -fwdX, -fwdZ, null, 0.46);
+                }
             }
 
             // Prevent driving through buildings, trees, skyscrapers or map edges
@@ -2354,9 +2395,11 @@ function animate() {
             if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0x555555, 0.45);
             return;
         }
-        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0xff9f43, u.isAir ? 1.8 : 1.35, false);
+        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0xff9f43, u.isAir ? 1.85 : 1.4, true, 'expl_vehicle');
         else createImpactExplosion(pos);
-        if (typeof spawnSparks === 'function') spawnSparks(pos, 0xffa502, 10);
+        if (typeof playAudio === 'function') playAudio('debris_vehicle', { volume: 0.65 });
+        if (typeof spawnExplosionDebris === 'function') spawnExplosionDebris(pos, u.isAir ? 9 : 6, u.isAir ? 1.3 : 1.0, false);
+        if (typeof spawnLingeringSmokeColumn === 'function') spawnLingeringSmokeColumn(pos, 110, 0x1f242c);
         if (typeof spawnCraterDecal === 'function') spawnCraterDecal(pos, u.isAir ? 3.2 : 2.2, 320, 'explosive');
     }
 
@@ -2381,6 +2424,10 @@ function animate() {
         if (!container || !container.garrisoned || container.garrisoned.length === 0) return;
         const occupants = container.garrisoned.slice();
         container.garrisoned = [];
+        if (container.isWorldBuilding) {
+            if (typeof playAudio === 'function') playAudio('garrison_exit', { volume: 0.75 });
+            if (typeof updateWorldBuildingGarrisonVisual === 'function') updateWorldBuildingGarrisonVisual(container);
+        }
         const center = container.position || (container.mesh && container.mesh.position);
         if (!center) return;
         const exitDist = (container.radius || 5.0) + 2.5;
@@ -2407,8 +2454,10 @@ function animate() {
         structures = structures.filter(structure => {
                 if (structure.health > 0) return true;
                 if (structure.mesh) scene.remove(structure.mesh);
-                createImpactExplosion(structure.position || (structure.mesh && structure.mesh.position));
-                spawnExplosion(structure.position || (structure.mesh && structure.mesh.position), 0xff793f, 3.5);
+                const sPos = structure.position || (structure.mesh && structure.mesh.position);
+                if (typeof spawnBuildingDestructionFX === 'function' && sPos) spawnBuildingDestructionFX(sPos, structure.radius || 5.5, 0xff793f);
+                else createImpactExplosion(sPos);
+                if (typeof playEvaAlert === 'function') playEvaAlert('building_lost');
                 showNotification(`Friendly ${structure.type} destroyed!`, 'error');
                 if (structure.dozerRef) {
                     structure.dozerRef.taskState = 'Idle';
@@ -2433,8 +2482,8 @@ function animate() {
                 if (structure.health > 0) return true;
                 if (structure.mesh) scene.remove(structure.mesh);
                 const expPos = structure.position || (structure.mesh && structure.mesh.position);
-                createImpactExplosion(expPos);
-                spawnExplosion(expPos, 0xff4757, 4.0);
+                if (typeof spawnBuildingDestructionFX === 'function' && expPos) spawnBuildingDestructionFX(expPos, structure.radius || 5.5, 0xff4757);
+                else createImpactExplosion(expPos);
                 showNotification(`Hostile ${structure.type} eradicated!`, 'success');
                 evacuateGarrisonedUnits(structure);
                 units.forEach((unit, idx) => {
@@ -2451,8 +2500,8 @@ function animate() {
             evacuateGarrisonedUnits(wb);
             if (wb.mesh) scene.remove(wb.mesh);
             if (wb.position) {
-                createImpactExplosion(wb.position);
-                spawnExplosion(wb.position, 0xff793f, 3.2);
+                if (typeof spawnBuildingDestructionFX === 'function') spawnBuildingDestructionFX(wb.position, wb.radius || 5.5, 0xff793f);
+                else createImpactExplosion(wb.position);
             }
             if (typeof mapObstacles !== 'undefined' && Array.isArray(mapObstacles)) {
                 for (let oi = mapObstacles.length - 1; oi >= 0; oi--) {
@@ -2511,7 +2560,10 @@ function animate() {
                 });
                 return false;
         });
-        if (units.length !== previousUnitCount) updateHUD();
+        if (units.length !== previousUnitCount) {
+            if (typeof playEvaAlert === 'function') playEvaAlert('unit_lost');
+            updateHUD();
+        }
     }
 
     // Neutral Tech Buildings Periodic Effects:
@@ -2782,9 +2834,13 @@ function processEnemyMovement() {
                 const step = Math.min(dist2D, enemy.speed * combatDeltaScale);
                 enemy.mesh.position.x += dirX * step;
                 enemy.mesh.position.z += dirZ * step;
-                if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type) && (buildingTick + (enemy.netId || 0)) % 12 === 0 && typeof spawnSmokePuff === 'function') {
-                    const rearPos = enemy.mesh.position.clone().add(new THREE.Vector3(-dirX * (enemy.radius || 2.5) * 0.7, 0.35, -dirZ * (enemy.radius || 2.5) * 0.7));
-                    spawnSmokePuff(rearPos, 0xc4aa82, 0.55);
+                if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type) && typeof spawnTreadDustPuff === 'function') {
+                    const isTrackedEnemy = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(enemy.type);
+                    const tickOff = buildingTick + (enemy.netId ? String(enemy.netId).length : 0);
+                    if ((isTrackedEnemy && tickOff % 7 === 0) || (!isTrackedEnemy && tickOff % 6 === 0)) {
+                        const rLen = (enemy.radius || 2.5) * 0.68;
+                        spawnTreadDustPuff({ x: enemy.mesh.position.x - dirX * rLen, y: enemy.mesh.position.y, z: enemy.mesh.position.z - dirZ * rLen }, -dirX, -dirZ, null, isTrackedEnemy ? 0.54 : 0.46);
+                    }
                 }
 
                 // AI Anti-Stuck Watchdog: prevent dozers/units from vibrating forever against obstacles
@@ -3370,7 +3426,7 @@ function updateShellMapDemo(dt) {
                     spawnTracer(startPos, endPos, c.isEnemy ? 0xff5533 : 0xffdd55);
                 }
                 if (typeof spawnExplosion === 'function' && Math.random() < 0.45) {
-                    spawnExplosion(endPos, 1.4, 0xff8833);
+                    spawnExplosion(endPos, 0xff8833, 1.4, 'expl_small');
                 }
             }
         }

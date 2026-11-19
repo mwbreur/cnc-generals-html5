@@ -95,6 +95,286 @@ function _getFxSpriteTex(kind) {
 }
 
 // =========================================================================
+// TERRAIN DUST, CONTRAIL, DEBRIS, IMPACT, EMP & PROMOTION HELPERS
+// =========================================================================
+const _fxDebrisGeo = new THREE.BoxGeometry(0.36, 0.20, 0.52);
+const _fxDebrisMetalMat = new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.78, metalness: 0.45 });
+const _fxDebrisConcreteMat = new THREE.MeshStandardMaterial({ color: 0x4b4842, roughness: 0.92, metalness: 0.1 });
+
+function getTerrainDustColor() {
+    const mapKey = (typeof currentMapType !== 'undefined' && currentMapType) ? String(currentMapType).toLowerCase() : 'tournament_desert';
+    if (mapKey.includes('snow') || mapKey.includes('winter') || mapKey.includes('alpine')) return 0xe6eef6;
+    if (mapKey.includes('city')) return 0x7d848b;
+    if (mapKey.includes('jungle') || mapKey.includes('final_crusade') || mapKey.includes('heartland') || mapKey.includes('lone_eagle')) return 0x8c7d63;
+    return 0xc9ae82;
+}
+
+function spawnTreadDustPuff(pos, backX = 0, backZ = 0, color = null, size = 0.55) {
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 320) return;
+    const dustColor = color !== null ? color : getTerrainDustColor();
+    const tex = _getFxSpriteTex('smoke');
+    const mat = tex
+        ? new THREE.SpriteMaterial({ map: tex, color: dustColor, transparent: true, opacity: 0.52, depthWrite: false })
+        : new THREE.MeshBasicMaterial({ color: dustColor, transparent: true, opacity: 0.45 });
+    const mesh = tex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
+    const startS = size * (tex ? 2.4 : 0.85);
+    mesh.scale.set(startS, startS, startS);
+    mesh.position.set(pos.x + (Math.random() - 0.5) * 0.35, pos.y + 0.12, pos.z + (Math.random() - 0.5) * 0.35);
+    scene.add(mesh);
+
+    let life = 24;
+    const maxLife = 24;
+    const grow = 0.045 * startS;
+    activeFX.push({
+        mesh,
+        life,
+        update() {
+            life--;
+            const prog = 1 - life / maxLife;
+            const s = startS + prog * startS * 1.15;
+            mesh.scale.set(s, s, s);
+            mesh.position.x += backX * 0.04;
+            mesh.position.z += backZ * 0.04;
+            mesh.position.y += 0.014 + grow * 0.1;
+            mat.opacity = Math.max(0, (1 - prog) * 0.5);
+            if (life <= 0) {
+                scene.remove(mesh);
+                mat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+function spawnRotorDownwashDust(pos, radius = 3.0) {
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 300) return;
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : 0;
+    const col = getTerrainDustColor();
+    for (let i = 0; i < 3; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const r = radius * (0.45 + Math.random() * 0.55);
+        const dp = { x: pos.x + Math.cos(ang) * r, y: gY + 0.2, z: pos.z + Math.sin(ang) * r };
+        spawnTreadDustPuff(dp, Math.cos(ang) * 1.6, Math.sin(ang) * 1.6, col, 0.65);
+    }
+}
+
+function spawnJetContrailPuff(pos, isAfterburner = false) {
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 320) return;
+    const col = isAfterburner ? 0xff9f43 : 0xf4f8ff;
+    const tex = _getFxSpriteTex('smoke');
+    const mat = tex
+        ? new THREE.SpriteMaterial({ map: tex, color: col, transparent: true, opacity: isAfterburner ? 0.65 : 0.42, depthWrite: false })
+        : new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: isAfterburner ? 0.6 : 0.35 });
+    const mesh = tex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
+    const s0 = isAfterburner ? 0.65 : 0.48;
+    mesh.scale.set(s0, s0, s0);
+    mesh.position.copy(pos);
+    scene.add(mesh);
+
+    let life = isAfterburner ? 14 : 26;
+    const maxLife = life;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            const p = 1 - life / maxLife;
+            const s = s0 * (1 + p * (isAfterburner ? 0.9 : 1.5));
+            mesh.scale.set(s, s, s);
+            mat.opacity = (1 - p) * (isAfterburner ? 0.6 : 0.4);
+            if (life <= 0) {
+                scene.remove(mesh);
+                mat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+function spawnExplosionDebris(pos, count = 6, scale = 1.0, isBuilding = false) {
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 340) return;
+    const mat = isBuilding ? _fxDebrisConcreteMat : _fxDebrisMetalMat;
+    const total = Math.min(count, 12);
+    for (let i = 0; i < total; i++) {
+        const mesh = new THREE.Mesh(_fxDebrisGeo, mat);
+        const s = (0.65 + Math.random() * 0.9) * Math.min(2.2, scale);
+        mesh.scale.set(s, s * (0.7 + Math.random() * 0.5), s);
+        mesh.position.set(pos.x + (Math.random() - 0.5) * 1.2 * scale, (pos.y || 0) + 0.5, pos.z + (Math.random() - 0.5) * 1.2 * scale);
+        scene.add(mesh);
+
+        const ang = Math.random() * Math.PI * 2;
+        let vx = Math.cos(ang) * (0.16 + Math.random() * 0.32) * scale;
+        let vz = Math.sin(ang) * (0.16 + Math.random() * 0.32) * scale;
+        let vy = (0.28 + Math.random() * 0.42) * Math.min(1.8, scale);
+        const rx = (Math.random() - 0.5) * 0.28;
+        const ry = (Math.random() - 0.5) * 0.28;
+        let bounces = 0;
+        let life = 44 + Math.floor(Math.random() * 20);
+        activeFX.push({
+            life,
+            update() {
+                life--;
+                mesh.position.x += vx;
+                mesh.position.z += vz;
+                mesh.position.y += vy;
+                vy -= 0.028;
+                mesh.rotation.x += rx;
+                mesh.rotation.y += ry;
+                if (life % 7 === 0 && Math.random() < 0.45 && typeof spawnSmokePuff === 'function') {
+                    spawnSmokePuff(mesh.position, 0x353b44, 0.28 * scale);
+                }
+                const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(mesh.position.x, mesh.position.z) : 0;
+                if (mesh.position.y <= gY + 0.12) {
+                    mesh.position.y = gY + 0.12;
+                    if (bounces < 1 && Math.abs(vy) > 0.08) {
+                        bounces++;
+                        vy = -vy * 0.38;
+                        vx *= 0.55;
+                        vz *= 0.55;
+                    } else {
+                        vx = 0; vz = 0; vy = 0;
+                    }
+                }
+                if (life <= 0) {
+                    scene.remove(mesh);
+                    return false;
+                }
+                return true;
+            }
+        });
+    }
+}
+
+function spawnGroundDustPlume(pos, scale = 1.0) {
+    if (!pos || typeof scene === 'undefined') return;
+    const col = getTerrainDustColor();
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+    const rings = scale >= 2.0 ? 8 : 5;
+    for (let i = 0; i < rings; i++) {
+        const ang = (i / rings) * Math.PI * 2 + Math.random() * 0.35;
+        const dist = (0.8 + Math.random() * 0.9) * scale;
+        const dp = { x: pos.x + Math.cos(ang) * dist, y: gY + 0.15, z: pos.z + Math.sin(ang) * dist };
+        spawnTreadDustPuff(dp, Math.cos(ang) * 1.8 * Math.min(2.0, scale), Math.sin(ang) * 1.8 * Math.min(2.0, scale), col, 0.65 * Math.min(2.2, scale));
+    }
+}
+
+function spawnCannonImpactFX(pos, isHeavy = false, isHeroic = false, armorCat = 'heavy_vehicle') {
+    if (!pos || typeof scene === 'undefined') return;
+    const flashCol = isHeroic ? 0xff2a2a : (isHeavy ? 0xff9f43 : 0xffbe55);
+    spawnMuzzleFlash(pos, flashCol, isHeavy ? 0.72 : 0.48);
+    spawnSparks(pos, isHeroic ? 0xff4444 : 0xffd32a, isHeavy ? 10 : 6);
+    spawnTreadDustPuff(pos, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, getTerrainDustColor(), isHeavy ? 0.62 : 0.42);
+    if (typeof playAudio === 'function') {
+        const key = armorCat === 'building' ? 'impact_building' : (isHeavy ? 'expl_small' : 'impact_vehicle');
+        playAudio(key, { volume: isHeavy ? 0.55 : 0.42 });
+    }
+}
+
+function spawnBuildingDestructionFX(pos, radius = 5.5, color = 0xff793f) {
+    if (!pos || typeof scene === 'undefined') return;
+    const scale = Math.max(2.2, Math.min(3.8, (radius || 5.5) * 0.52));
+    spawnEnhancedExplosion(pos, color, scale, true, 'expl_building');
+    if (typeof playAudio === 'function') playAudio('debris_building', { volume: 0.78 });
+    if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
+    spawnExplosionDebris(pos, 10, 1.45, true);
+    spawnCraterDecal(pos, Math.max(3.4, radius * 0.72), 540, 'explosive');
+    spawnLingeringSmokeColumn(pos, 260, 0x22262b);
+
+    [140, 300].forEach((delay, idx) => {
+        setTimeout(() => {
+            if (typeof scene === 'undefined') return;
+            const subPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * radius * 0.85, 0.8 + idx * 0.6, (Math.random() - 0.5) * radius * 0.85));
+            spawnEnhancedExplosion(subPos, idx === 0 ? 0xff9f43 : 0xff5522, scale * 0.68, false, 'expl_small');
+            spawnExplosionDebris(subPos, 4, 1.1, true);
+        }, delay);
+    });
+}
+
+function spawnEMPDisableSparks(pos) {
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 340) return;
+    const baseY = (pos.y || 0) + 1.1;
+    const pts = [];
+    for (let i = 0; i < 6; i++) {
+        const ang = (i / 5) * Math.PI * 2;
+        const r = 0.85 + Math.random() * 1.1;
+        pts.push(new THREE.Vector3(pos.x + Math.cos(ang) * r, baseY + (Math.random() - 0.3) * 1.8, pos.z + Math.sin(ang) * r));
+    }
+    const arcGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    const arcMat = new THREE.LineBasicMaterial({ color: 0x38e8ff, transparent: true, opacity: 0.95 });
+    const arcLine = new THREE.Line(arcGeo, arcMat);
+    scene.add(arcLine);
+    spawnSparks({ x: pos.x, y: baseY, z: pos.z }, 0x38e8ff, 4);
+
+    let life = 12;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            arcMat.opacity = Math.max(0, life / 12);
+            if (life <= 0) {
+                scene.remove(arcLine);
+                arcGeo.dispose();
+                arcMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+function spawnPromotionFX(pos, rank = 1) {
+    if (!pos || typeof scene === 'undefined') return;
+    const p = (pos.mesh && pos.mesh.position) ? pos.mesh.position : (pos.position || pos);
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return;
+    if (typeof playAudio === 'function') playAudio('unit_promoted', { volume: 0.82 });
+    const col = rank >= 3 ? 0xffd32a : (rank === 2 ? 0xffc048 : 0xffeaa7);
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(p.x, p.z) : (p.y || 0);
+    spawnMuzzleFlash({ x: p.x, y: gY + 1.6, z: p.z }, col, 1.1 + rank * 0.25);
+    spawnSparks({ x: p.x, y: gY + 0.8, z: p.z }, col, 8 + rank * 4);
+
+    if (typeof THREE.RingGeometry !== 'function') return;
+    const ringGeo = new THREE.RingGeometry(0.6, 1.05, 24);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(p.x, gY + 0.35, p.z);
+    scene.add(ring);
+
+    let life = 28;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            const prog = 1 - life / 28;
+            ring.scale.setScalar(1 + prog * 3.4);
+            ring.position.y += 0.04;
+            ringMat.opacity = Math.max(0, (1 - prog) * 0.95);
+            if (life <= 0) {
+                scene.remove(ring);
+                ringGeo.dispose();
+                ringMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+if (typeof window !== 'undefined') {
+    window.getTerrainDustColor = getTerrainDustColor;
+    window.spawnTreadDustPuff = spawnTreadDustPuff;
+    window.spawnRotorDownwashDust = spawnRotorDownwashDust;
+    window.spawnJetContrailPuff = spawnJetContrailPuff;
+    window.spawnExplosionDebris = spawnExplosionDebris;
+    window.spawnGroundDustPlume = spawnGroundDustPlume;
+    window.spawnCannonImpactFX = spawnCannonImpactFX;
+    window.spawnBuildingDestructionFX = spawnBuildingDestructionFX;
+    window.spawnEMPDisableSparks = spawnEMPDisableSparks;
+    window.spawnPromotionFX = spawnPromotionFX;
+}
+
+// =========================================================================
 
 // VISUAL WEAPON EFFECTS & MULTI-STAGE PARTICLE SYSTEMS
 // =========================================================================
@@ -294,8 +574,10 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
 
                 const expColor = (!this.isToxin && this.isHeroic) ? 0xff2222 : (this.isToxin ? 0x2ed573 : 0xff4757);
                 const expScale = this.isHeroic ? (this.isHeavy ? 2.5 : 1.45) : (this.isHeavy ? 2.2 : 1.2);
-                spawnEnhancedExplosion(this.toPos, expColor, expScale, this.isHeavy);
-                if (this.metadata && typeof this.metadata.onImpact === 'function') {
+                const hasCustomImpactSfx = !!(this.metadata && typeof this.metadata.onImpact === 'function');
+                const expSound = hasCustomImpactSfx ? 'none' : (this.isToxin ? 'anthrax_blast' : (this.isHeavy ? 'expl_artillery' : 'expl_missile'));
+                spawnEnhancedExplosion(this.toPos, expColor, expScale, this.isHeavy, expSound);
+                if (hasCustomImpactSfx) {
                     this.metadata.onImpact(this.toPos);
                 }
                 if (this.isToxin) {
@@ -632,8 +914,12 @@ function spawnLingeringSmokeColumn(pos, duration = 240, color = 0x2d3436) {
 }
 
 // Multi-stage Particle Explosion (C&C Generals style)
-function spawnEnhancedExplosion(pos, color = 0xffa502, scale = 1.0, isHeavy = false) {
-    playUSASound(isHeavy ? 'aurora_bomb' : 'explosion');
+function spawnEnhancedExplosion(pos, color = 0xffa502, scale = 1.0, isHeavy = false, soundType = null) {
+    if (soundType !== 'none') {
+        const chosenSfx = soundType || (isHeavy ? 'expl_artillery' : 'expl_small');
+        if (typeof playAudio === 'function') playAudio(chosenSfx);
+        else if (typeof playUSASound === 'function') playUSASound(chosenSfx);
+    }
 
     const fireTex = _getFxSpriteTex('fireball');
     const flashTex = _getFxSpriteTex('flash');
@@ -687,9 +973,17 @@ function spawnEnhancedExplosion(pos, color = 0xffa502, scale = 1.0, isHeavy = fa
     scene.add(ring);
 
     // 3. Shrapnel & incandescent sparks
-    spawnSparks(pos, color, isHeavy ? 26 : 14);
+    spawnSparks(pos, color, isHeavy ? 22 : 12);
 
-    // 4. Heavy billows of black smoke
+    // 4. Radial ground dust ejecta & flying shrapnel chunks on medium/heavy explosions
+    if (isHeavy || scale >= 1.5) {
+        spawnGroundDustPlume(pos, Math.min(2.6, scale));
+    }
+    if (scale >= 1.4) {
+        spawnExplosionDebris(pos, isHeavy ? 6 : 3, Math.min(2.0, scale), false);
+    }
+
+    // 5. Heavy billows of black smoke
     for (let i = 0; i < (isHeavy ? 7 : 4); i++) {
         setTimeout(() => {
                 const offset = new THREE.Vector3((Math.random() - 0.5) * 1.6 * scale, (0.4 + Math.random() * 0.9) * scale, (Math.random() - 0.5) * 1.6 * scale);
@@ -735,12 +1029,12 @@ function spawnEnhancedExplosion(pos, color = 0xffa502, scale = 1.0, isHeavy = fa
     });
 }
 
-function spawnExplosion(pos, color = 0xffa502) {
-    spawnEnhancedExplosion(pos, color, 1.0, false);
+function spawnExplosion(pos, color = 0xffa502, scale = 1.0, soundType = null) {
+    spawnEnhancedExplosion(pos, color, scale, scale >= 2.2, soundType);
 }
 
 function spawnHeavyExplosion(pos, isToxin = false) {
-    spawnEnhancedExplosion(pos, isToxin ? 0x2ed573 : 0xff4757, 2.2, true);
+    spawnEnhancedExplosion(pos, isToxin ? 0x2ed573 : 0xff4757, 2.2, true, isToxin ? 'anthrax_blast' : 'expl_artillery');
     if (isToxin) {
         spawnLingeringToxinCloud(pos);
     } else {
@@ -907,11 +1201,13 @@ function spawnToxinSprayBurst(fromPos, toPos) {
 }
 
 // Aurora Hypersonic Fuel-Air Bomb Detonation (Gigantic double shockwave + scorched crater)
-function spawnFuelAirExplosion(pos) {
-    playUSASound('aurora_bomb');
+function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb') {
+    if (soundType !== 'none') {
+        playUSASound(soundType);
+    }
 
     // 1. Massive expanding fireball
-    spawnEnhancedExplosion(pos, 0xff793f, 3.2, true);
+    spawnEnhancedExplosion(pos, 0xff793f, 3.2, true, 'none');
 
     // 2. Extra wide secondary supersonic shockwave ring
     const ringGeo = new THREE.RingGeometry(1.0, 3.5, 32);
@@ -1230,6 +1526,7 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
     if (typeof playSuperweaponEvaAlert === 'function') {
         playSuperweaponEvaAlert('particleCannon', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
     }
+    if (typeof playOfficialSound === 'function') playOfficialSound('sfx_particle_charge', 0.85);
     playAudio('orbital_beam');
     if (typeof triggerScreenShake === 'function') triggerScreenShake(1.1);
 
@@ -1460,6 +1757,7 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                 }
                 if (life % 14 === 0) {
                     spawnParticleFirePatch(group.position);
+                    if (life % 70 === 0 && typeof playAudio === 'function') playAudio('particle_annihilate', { volume: 0.72 });
                 }
 
                 if (life <= 0) {
@@ -1474,7 +1772,7 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                         scene.remove(uplinkGroup);
                         uplinkGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
                     }
-                    spawnEnhancedExplosion(group.position, 0x00d2d3, 3.0, true);
+                    spawnEnhancedExplosion(group.position, 0x00d2d3, 3.0, true, 'particle_annihilate');
                     spawnCraterDecal(group.position, 4.2, 480);
                     return false;
                 }
@@ -1488,6 +1786,8 @@ function animateNukeStrike(siloPos, targetPos) {
         playSuperweaponEvaAlert('nukeSilo', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'china');
     }
     playAudio('superweapon_siren');
+    playAudio('nuke_doors', { volume: 0.85 }, 'china');
+    setTimeout(() => { if (typeof playAudio === 'function') playAudio('nuke_launch', { volume: 0.9 }, 'china'); }, 280);
 
     // Target Warning Hazard Reticle on the Ground
     const warnGroup = new THREE.Group();
@@ -1554,6 +1854,7 @@ function animateNukeStrike(siloPos, targetPos) {
                         phase = 'descent';
                         missileGroup.position.set(targetPos.x, 105, targetPos.z);
                         missileGroup.rotation.x = Math.PI; // point straight down
+                        if (typeof playAudio === 'function') playAudio('shell_whistle', { volume: 0.85 });
                     }
                 } else if (phase === 'descent') {
                     missileGroup.position.y -= 3.4;
@@ -1759,12 +2060,14 @@ function animateScudStormStrike(stormPos, targetPos) {
 
                 if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(launchOrigin, 0xffa502, 1.2);
                 if (typeof spawnSmokePuff === 'function') spawnSmokePuff(launchOrigin, 0xdcdde1, 1.1);
+                if (i % 2 === 0 && typeof playAudio === 'function') playAudio('scud_launch', { volume: 0.72 }, 'gla');
                 spawnRocketProjectile(launchOrigin, subTarget, true, true, {
                     onImpact: (impactPos) => {
                         playAudio('scud_detonation');
+                        setTimeout(() => { if (typeof playAudio === 'function') playAudio('anthrax_hiss', { volume: 0.65 }, 'gla'); }, 220);
                         if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(impactPos, 22, 300);
                         if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
-                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPos, 0x2ecc71, 3.2, true);
+                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPos, 0x2ecc71, 3.2, true, 'none');
                         enemyUnits.forEach(enemy => {
                             if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(impactPos) <= 11.5) {
                                 if (typeof applyCalculatedDamage === 'function') {
@@ -2227,65 +2530,94 @@ function undeployNukeCannonOutriggers(cannon) {
 window.deployNukeCannonOutriggers = deployNukeCannonOutriggers;
 window.undeployNukeCannonOutriggers = undeployNukeCannonOutriggers;
 
-// Tactical Ground Waypoint Marker & Beacon (Move, Attack, Rally)
+// Authentic C&C Generals Tactical Ground Waypoint Markers (Move / Attack / Garrison / Rally)
 function spawnWaypointMarker(pos, orderType = 'move') {
-    if (!pos) return;
+    if (!pos || typeof scene === 'undefined') return;
     const group = new THREE.Group();
-    const yPos = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) + 0.15 : pos.y + 0.15;
+    const yPos = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) + 0.22 : (pos.y || 0) + 0.22;
     group.position.set(pos.x, yPos, pos.z);
 
-    const color = orderType === 'attack' ? 0xff2222 : orderType === 'rally' ? 0xf1c40f : 0x00ffcc;
+    const isAttack = (orderType === 'attack' || orderType === 'attackMove');
+    const isRally = (orderType === 'rally');
+    const isGarrison = (orderType === 'garrison');
+    const color = isAttack ? 0xff2a2a : isRally ? 0xf1c40f : isGarrison ? 0x2ecc71 : 0x38ff5a;
 
-    // 1. Expanding ground ripple ring
-    const ringGeo = new THREE.RingGeometry(0.7, 1.15, 32);
-    const ringMat = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+    // 1. Primary ground ring (shrinks inward for Move/Garrison like Generals; pulses for Attack)
+    const ringGeo = new THREE.RingGeometry(0.85, 1.35, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthWrite: false });
     const ringMesh = new THREE.Mesh(ringGeo, ringMat);
     ringMesh.rotation.x = -Math.PI / 2;
+    if (isGarrison) ringMesh.scale.setScalar(2.4);
+    else if (!isAttack) ringMesh.scale.setScalar(1.65);
     group.add(ringMesh);
 
-    // 2. Crosshair reticle ticks
-    const tickGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(-1.8, 0.05, 0), new THREE.Vector3(1.8, 0.05, 0),
-            new THREE.Vector3(0, 0.05, -1.8), new THREE.Vector3(0, 0.05, 1.8)
-    ]);
-    const tickMat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.9 });
+    // 2. Crisp ground chevron / crosshair brackets
+    const pts = isAttack
+        ? [
+            new THREE.Vector3(-1.7, 0.05, 0), new THREE.Vector3(-0.7, 0.05, 0),
+            new THREE.Vector3(0.7, 0.05, 0), new THREE.Vector3(1.7, 0.05, 0),
+            new THREE.Vector3(0, 0.05, -1.7), new THREE.Vector3(0, 0.05, -0.7),
+            new THREE.Vector3(0, 0.05, 0.7), new THREE.Vector3(0, 0.05, 1.7)
+        ]
+        : [
+            new THREE.Vector3(-1.3, 0.05, -0.4), new THREE.Vector3(-1.3, 0.05, -1.3),
+            new THREE.Vector3(-1.3, 0.05, -1.3), new THREE.Vector3(-0.4, 0.05, -1.3),
+            new THREE.Vector3(1.3, 0.05, 0.4), new THREE.Vector3(1.3, 0.05, 1.3),
+            new THREE.Vector3(1.3, 0.05, 1.3), new THREE.Vector3(0.4, 0.05, 1.3),
+            new THREE.Vector3(-1.3, 0.05, 0.4), new THREE.Vector3(-1.3, 0.05, 1.3),
+            new THREE.Vector3(-1.3, 0.05, 1.3), new THREE.Vector3(-0.4, 0.05, 1.3),
+            new THREE.Vector3(1.3, 0.05, -0.4), new THREE.Vector3(1.3, 0.05, -1.3),
+            new THREE.Vector3(1.3, 0.05, -1.3), new THREE.Vector3(0.4, 0.05, -1.3)
+        ];
+    const tickGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    const tickMat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.92 });
     const crosshair = new THREE.LineSegments(tickGeo, tickMat);
     group.add(crosshair);
 
-    // 3. Vertical beacon light beam shooting upwards
-    const beamGeo = new THREE.CylinderGeometry(0.12, 0.35, 18, 16, 1, true);
-    const beamMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
-    const beamMesh = new THREE.Mesh(beamGeo, beamMat);
-    beamMesh.position.y = 9.0;
-    group.add(beamMesh);
+    // 3. Only Rally markers keep a short golden tactical pole; Move/Attack stay low-profile on the terrain
+    let beamMesh = null, beamGeo = null, beamMat = null;
+    if (isRally) {
+        beamGeo = new THREE.CylinderGeometry(0.10, 0.24, 7.5, 10, 1, true);
+        beamMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false });
+        beamMesh = new THREE.Mesh(beamGeo, beamMat);
+        beamMesh.position.y = 3.75;
+        group.add(beamMesh);
+    }
 
     scene.add(group);
 
     let life = 0;
-    const maxLife = 40;
-
+    const maxLife = isAttack ? 34 : 30;
     activeFX.push({
-            update() {
-                life++;
-                const t = life / maxLife;
-                ringMesh.scale.addScalar(0.045);
-                ringMat.opacity = Math.max(0, 0.95 * (1.0 - t));
-                tickMat.opacity = Math.max(0, 0.9 * (1.0 - t));
-                beamMat.opacity = Math.max(0, 0.65 * (1.0 - t));
-                group.position.y += 0.02;
-
-                if (life >= maxLife) {
-                    scene.remove(group);
-                    ringGeo.dispose();
-                    ringMat.dispose();
-                    tickGeo.dispose();
-                    tickMat.dispose();
-                    beamGeo.dispose();
-                    beamMat.dispose();
-                    return false;
-                }
-                return true;
+        update() {
+            life++;
+            const t = life / maxLife;
+            if (isAttack) {
+                ringMesh.scale.setScalar(1.0 + Math.sin(life * 0.45) * 0.25 + t * 0.4);
+            } else if (isGarrison) {
+                const s = 2.4 * (1 - t * 0.55);
+                ringMesh.scale.set(s, s, 1);
+            } else {
+                const s = Math.max(0.35, 1.65 * (1 - t * 0.72));
+                ringMesh.scale.set(s, s, 1);
+                crosshair.scale.setScalar(Math.max(0.4, 1.15 - t * 0.65));
             }
+            ringMat.opacity = Math.max(0, 0.95 * (1.0 - t));
+            tickMat.opacity = Math.max(0, 0.92 * (1.0 - t));
+            if (beamMat) beamMat.opacity = Math.max(0, 0.65 * (1.0 - t));
+
+            if (life >= maxLife) {
+                scene.remove(group);
+                ringGeo.dispose();
+                ringMat.dispose();
+                tickGeo.dispose();
+                tickMat.dispose();
+                if (beamGeo) beamGeo.dispose();
+                if (beamMat) beamMat.dispose();
+                return false;
+            }
+            return true;
+        }
     });
 }
 
@@ -2609,8 +2941,8 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
                         chuteMat.dispose();
                         if (typeof playAudio === 'function') playAudio('daisycutter_blast', { volume: 0.98 }, 'usa');
                         if (typeof triggerScreenShake === 'function') triggerScreenShake(1.4);
-                        if (typeof spawnFuelAirExplosion === 'function') spawnFuelAirExplosion(dropCenter);
-                        else if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropCenter, 0xff7f50, 6.5, true);
+                        if (typeof spawnFuelAirExplosion === 'function') spawnFuelAirExplosion(dropCenter, 'none');
+                        else if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropCenter, 0xff7f50, 6.5, true, 'none');
                         if (typeof spawnCraterDecal === 'function') spawnCraterDecal(dropCenter, 6.0, 600);
                         if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropCenter, 22.0, 650, 'EXPLOSIVE', pseudoAttacker);
                         return false;
@@ -2691,7 +3023,7 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
                 const scatter = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 14, 0, (Math.random() - 0.5) * 14));
                 scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : groundY;
                 if (typeof spawnBulletTracer === 'function') spawnBulletTracer(plane.position.clone(), scatter, 0xffbe76, 5);
-                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true);
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true, 'none');
                 if (typeof playAudio === 'function') playAudio('spectre_howitzer', { volume: 0.9 }, 'usa');
                 if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 7.5, 130, 'EXPLOSIVE', pseudoAttacker);
             }
@@ -2755,7 +3087,7 @@ function triggerChinaCarpetBomber(targetPos, pseudoAttacker) {
                         update() {
                             bTick++;
                             if (bTick < 22) return true;
-                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPos, 0xff6348, 3.8, true);
+                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPos, 0xff6348, 3.8, true, 'none');
                             if (typeof spawnCraterDecal === 'function') spawnCraterDecal(impactPos, 3.2, 420);
                             if (typeof playAudio === 'function') playAudio('carpet_bomb', { volume: 0.85 }, 'china');
                             if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(impactPos, 6.5, 135, 'EXPLOSIVE', pseudoAttacker);
@@ -2787,6 +3119,7 @@ function spawnPingEffect(pos) {
         if (!Array.isArray(window.minimapAlertPings)) window.minimapAlertPings = [];
         window.minimapAlertPings.push({ x, z, life: 90, maxLife: 90, color: '#00f2fe' });
     }
+    if (typeof playAudio === 'function') playAudio('rally_set', { volume: 0.78 });
 
     const ringGeo = new THREE.RingGeometry(1.0, 1.55, 24);
     ringGeo.rotateX(-Math.PI / 2);
@@ -2796,14 +3129,366 @@ function spawnPingEffect(pos) {
     ring.renderOrder = 8;
     scene.add(ring);
 
-    let life = 54;
+    const ring2Geo = new THREE.RingGeometry(0.45, 0.8, 24);
+    ring2Geo.rotateX(-Math.PI / 2);
+    const ring2Mat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
+    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+    ring2.position.set(x, y + 0.05, z);
+    ring2.renderOrder = 8;
+    scene.add(ring2);
+
+    const beamGeo = new THREE.CylinderGeometry(0.14, 0.32, 16, 12, 1, true);
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false });
+    const beam = new THREE.Mesh(beamGeo, beamMat);
+    beam.position.set(x, y + 8, z);
+    scene.add(beam);
+
+    let life = 72;
     activeFX.push({
         life,
         update() {
             life--;
-            const prog = 1 - life / 54;
-            ring.scale.setScalar(1 + prog * 4.2);
-            ringMat.opacity = 0.95 * (1 - prog);
+            const prog = 1 - life / 72;
+            const pulse = prog % 0.5 * 2;
+            ring.scale.setScalar(1 + pulse * 4.5);
+            ringMat.opacity = (1 - prog) * (1 - pulse * 0.5) * 0.95;
+            ring2.scale.setScalar(0.8 + prog * 6.0);
+            ring2Mat.opacity = Math.max(0, (1 - prog) * 0.85);
+            beamMat.opacity = Math.max(0, (1 - prog) * 0.6);
+            if (life <= 0) {
+                scene.remove(ring); ringGeo.dispose(); ringMat.dispose();
+                scene.remove(ring2); ring2Geo.dispose(); ring2Mat.dispose();
+                scene.remove(beam); beamGeo.dispose(); beamMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+window.spawnPingEffect = spawnPingEffect;
+
+// =========================================================================
+// GENERAL POWERS AUTHENTIC RETAIL VISUAL & AUDIO STRIKE TRIGGERS
+// =========================================================================
+function triggerA10Strike(targetPos, pseudoAttacker) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const target = targetPos.clone();
+    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(target.x, target.z) : 0;
+
+    for (let i = 0; i < 2; i++) {
+        setTimeout(() => {
+            if (typeof scene === 'undefined') return;
+            const latOffset = (i === 0 ? -4.5 : 4.5);
+            const startPos = new THREE.Vector3(target.x - 105 + latOffset, groundY + 26, target.z - 105 - latOffset);
+            const diveApex = new THREE.Vector3(target.x + latOffset * 0.6, groundY + 9.5, target.z - latOffset * 0.6);
+            const exitPos = new THREE.Vector3(target.x + 110 + latOffset, groundY + 28, target.z + 110 - latOffset);
+
+            let plane = null;
+            if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['a10_warthog']) {
+                plane = createW3DVehicleMesh('a10_warthog', false);
+            } else {
+                plane = new THREE.Group();
+            }
+            plane.position.copy(startPos);
+            if (typeof plane.lookAt === 'function') plane.lookAt(diveApex);
+            scene.add(plane);
+            if (i === 0 && typeof playAudio === 'function') {
+                playAudio('a10_dive', { volume: 0.92 }, 'usa');
+                playAudio('a10_flyby', { volume: 0.72 }, 'usa');
+            }
+
+            let frame = 0;
+            const totalFrames = 175;
+            const firedMissiles = new Set();
+            activeFX.push({
+                update() {
+                    frame++;
+                    const t = frame / totalFrames;
+                    if (t < 0.5) {
+                        const dt = t * 2;
+                        plane.position.lerpVectors(startPos, diveApex, dt);
+                        if (typeof plane.lookAt === 'function') plane.lookAt(diveApex.x + 2, diveApex.y - 2, diveApex.z + 2);
+                    } else {
+                        const ct = (t - 0.5) * 2;
+                        plane.position.lerpVectors(diveApex, exitPos, ct);
+                        if (typeof plane.lookAt === 'function') plane.lookAt(exitPos);
+                    }
+
+                    if (frame % 4 === 0 && t > 0.15 && t < 0.85) {
+                        spawnJetContrailPuff(plane.position.clone().add(new THREE.Vector3(-2.8, 0.2, 0)), false);
+                        spawnJetContrailPuff(plane.position.clone().add(new THREE.Vector3(2.8, 0.2, 0)), false);
+                    }
+
+                    // 30mm GAU-8 Avenger cannon strafe during dive approach
+                    if (t >= 0.24 && t <= 0.48 && frame % 4 === 0) {
+                        const hitPt = target.clone().add(new THREE.Vector3((Math.random() - 0.5) * 9, 0, (Math.random() - 0.5) * 9));
+                        hitPt.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(hitPt.x, hitPt.z) : groundY;
+                        spawnBulletTracer(plane.position.clone(), hitPt, 0xffd32a, 3.0);
+                        spawnSparks(hitPt, 0xffa502, 5);
+                        if (frame % 8 === 0 && typeof playAudio === 'function') playAudio('gatling_fire', { volume: 0.65 }, 'usa');
+                        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(hitPt, 4.0, 26, 'GATLING', pseudoAttacker);
+                    }
+
+                    // Launch 3 Maverick AGM-65 missiles per A-10
+                    [0.30, 0.37, 0.44].forEach((trigT, mIdx) => {
+                        if (!firedMissiles.has(mIdx) && t >= trigT) {
+                            firedMissiles.add(mIdx);
+                            const impact = target.clone().add(new THREE.Vector3((Math.random() - 0.5) * 9.5, 0, (Math.random() - 0.5) * 9.5));
+                            impact.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(impact.x, impact.z) : groundY;
+                            if (typeof spawnRocketProjectile === 'function') {
+                                spawnRocketProjectile(plane.position.clone(), impact, true, false, {
+                                    attacker: pseudoAttacker,
+                                    target: null,
+                                    targetPos: impact,
+                                    damage: 120,
+                                    damageType: 'EXPLOSIVE',
+                                    splashRadius: 6.5
+                                });
+                            }
+                            if (typeof playAudio === 'function') playAudio('jet_missile', { volume: 0.78 }, 'usa');
+                        }
+                    });
+
+                    if (frame < totalFrames) return true;
+                    scene.remove(plane);
+                    return false;
+                }
+            });
+        }, i * 320);
+    }
+}
+
+function triggerSpyDronePower(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const center = targetPos.clone();
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(center.x, center.z) : 0;
+    if (typeof playAudio === 'function') playAudio('spy_drone', { volume: 0.85 }, 'usa');
+
+    let drone = null;
+    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['spy_drone']) {
+        drone = createW3DVehicleMesh('spy_drone', false);
+    } else {
+        drone = new THREE.Group();
+    }
+    const prop = drone.getObjectByName ? (drone.getObjectByName('PROPELLER') || drone.getObjectByName('avspydrone.propeller')) : null;
+    drone.position.set(center.x, gY + 18, center.z);
+    scene.add(drone);
+
+    const ringGeo = new THREE.RingGeometry(4.5, 5.2, 32);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false });
+    const scanRing = new THREE.Mesh(ringGeo, ringMat);
+    scanRing.position.set(center.x, gY + 0.35, center.z);
+    scene.add(scanRing);
+
+    let life = 900;
+    let angle = 0;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            angle += 0.03;
+            const ox = center.x + Math.cos(angle) * 6.5;
+            const oz = center.z + Math.sin(angle) * 6.5;
+            const nx = center.x + Math.cos(angle + 0.05) * 6.5;
+            const nz = center.z + Math.sin(angle + 0.05) * 6.5;
+            drone.position.set(ox, gY + 18 + Math.sin(angle * 2) * 0.5, oz);
+            if (typeof drone.lookAt === 'function') drone.lookAt(nx, drone.position.y, nz);
+            if (prop && prop.rotation) prop.rotation.z += 0.85;
+            const pulse = 1 + ((900 - life) % 60) / 60 * 4.5;
+            scanRing.scale.setScalar(pulse);
+            ringMat.opacity = Math.max(0, 0.72 * (1 - ((900 - life) % 60) / 60));
+            if (life <= 0) {
+                scene.remove(drone);
+                scene.remove(scanRing);
+                ringGeo.dispose();
+                ringMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+function triggerEmpPulseFX(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+    if (typeof playAudio === 'function') playAudio('emp_pulse', { volume: 0.92 });
+    spawnMuzzleFlash({ x: targetPos.x, y: gY + 1.5, z: targetPos.z }, 0x00e5ff, 5.5);
+
+    const sphereGeo = new THREE.SphereGeometry(2.5, 20, 16);
+    const sphereMat = new THREE.MeshBasicMaterial({ color: 0x38e8ff, transparent: true, opacity: 0.55, wireframe: false });
+    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+    sphere.position.set(targetPos.x, gY + 0.8, targetPos.z);
+    scene.add(sphere);
+
+    const ringGeo = new THREE.RingGeometry(1.0, 2.6, 36);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x8beeff, side: THREE.DoubleSide, transparent: true, opacity: 0.92, depthWrite: false });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(targetPos.x, gY + 0.45, targetPos.z);
+    scene.add(ring);
+
+    let life = 40;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            const prog = 1 - life / 40;
+            sphere.scale.setScalar(1 + prog * 9.0);
+            sphereMat.opacity = Math.max(0, (1 - prog) * 0.5);
+            ring.scale.setScalar(1 + prog * 11.5);
+            ringMat.opacity = Math.max(0, (1 - prog) * 0.92);
+            if (life <= 0) {
+                scene.remove(sphere); sphereGeo.dispose(); sphereMat.dispose();
+                scene.remove(ring); ringGeo.dispose(); ringMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+function triggerArtilleryBarrageFX(targetPos, pseudoAttacker) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    if (typeof playAudio === 'function') playAudio('artillery_fire', { volume: 0.85 }, 'china');
+    for (let i = 0; i < 8; i++) {
+        setTimeout(() => {
+            if (typeof scene === 'undefined') return;
+            const scatter = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 18, 0, (Math.random() - 0.5) * 18));
+            scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : 0;
+            if (i % 2 === 0 && typeof playAudio === 'function') playAudio('shell_whistle', { volume: 0.55 });
+            setTimeout(() => {
+                if (typeof scene === 'undefined') return;
+                spawnEnhancedExplosion(scatter, 0xff5722, 3.0, true, 'expl_artillery');
+                spawnCraterDecal(scatter, 2.8, 420);
+                if (typeof triggerScreenShake === 'function') triggerScreenShake(0.45);
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', pseudoAttacker);
+            }, 240);
+        }, i * 260);
+    }
+}
+
+function triggerAnthraxBombFX(targetPos, pseudoAttacker) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const impact = targetPos.clone();
+    impact.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(impact.x, impact.z) : 0;
+    const dropFrom = new THREE.Vector3(impact.x - 16, impact.y + 42, impact.z - 12);
+    if (typeof playAudio === 'function') playAudio('shell_whistle', { volume: 0.78 });
+
+    const bombGeo = new THREE.CylinderGeometry(0.45, 0.35, 2.2, 8);
+    const bombMat = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.4, metalness: 0.6 });
+    const bomb = new THREE.Mesh(bombGeo, bombMat);
+    bomb.position.copy(dropFrom);
+    if (typeof bomb.lookAt === 'function') bomb.lookAt(impact);
+    scene.add(bomb);
+
+    let tick = 0;
+    activeFX.push({
+        update() {
+            tick++;
+            const t = Math.min(1, tick / 28);
+            bomb.position.lerpVectors(dropFrom, impact, t);
+            if (tick % 3 === 0) spawnSmokePuff(bomb.position, 0x2ecc71, 0.45);
+            if (t < 1) return true;
+            scene.remove(bomb); bombGeo.dispose(); bombMat.dispose();
+            if (typeof playAudio === 'function') playAudio('anthrax_blast', { volume: 0.95 }, 'gla');
+            setTimeout(() => { if (typeof playAudio === 'function') playAudio('anthrax_hiss', { volume: 0.75 }, 'gla'); }, 180);
+            if (typeof triggerScreenShake === 'function') triggerScreenShake(0.9);
+            spawnEnhancedExplosion(impact, 0x2ecc71, 4.8, true, 'none');
+            spawnCraterDecal(impact, 5.2, 560, 'toxin');
+            spawnLingeringToxinCloud(impact);
+            for (let k = 0; k < 4; k++) {
+                const a = (k / 4) * Math.PI * 2;
+                spawnLingeringToxinCloud(impact.clone().add(new THREE.Vector3(Math.cos(a) * 6.5, 0, Math.sin(a) * 6.5)));
+            }
+            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(impact, 18.0, 320, 'TOXIN', pseudoAttacker);
+            return false;
+        }
+    });
+}
+
+function triggerLeafletDropFX(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const dropCenter = targetPos.clone();
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+    const { plane, c130Props } = createC130FlyoverPlane('c130');
+    const flightY = gY + 19.0;
+    const startPos = new THREE.Vector3(dropCenter.x - 90, flightY, dropCenter.z - 40);
+    const endPos = new THREE.Vector3(dropCenter.x + 90, flightY, dropCenter.z + 40);
+    plane.position.copy(startPos);
+    if (typeof plane.lookAt === 'function') plane.lookAt(endPos);
+    scene.add(plane);
+    if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.72 }, 'usa');
+
+    let frame = 0;
+    let released = false;
+    activeFX.push({
+        update() {
+            frame++;
+            const t = frame / 240;
+            plane.position.lerpVectors(startPos, endPos, t);
+            for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.8;
+            if (!released && t >= 0.48) {
+                released = true;
+                if (typeof playAudio === 'function') playAudio('parachute_open', { volume: 0.75 });
+                const paperGeo = new THREE.PlaneGeometry(0.65, 0.42);
+                const paperMat = new THREE.MeshBasicMaterial({ color: 0xfaf7e8, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
+                let remainingSheets = 28;
+                for (let k = 0; k < 28; k++) {
+                    const sheet = new THREE.Mesh(paperGeo, paperMat);
+                    sheet.position.set(
+                        dropCenter.x + (Math.random() - 0.5) * 18,
+                        flightY - 2 - Math.random() * 4,
+                        dropCenter.z + (Math.random() - 0.5) * 18
+                    );
+                    scene.add(sheet);
+                    const sway = Math.random() * Math.PI * 2;
+                    let sLife = 110;
+                    activeFX.push({
+                        update() {
+                            sLife--;
+                            sheet.position.y -= 0.16;
+                            sheet.position.x += Math.sin(sLife * 0.12 + sway) * 0.12;
+                            sheet.rotation.x += 0.08;
+                            sheet.rotation.z += 0.1;
+                            if (sLife <= 0 || sheet.position.y <= gY + 0.15) {
+                                scene.remove(sheet);
+                                if (--remainingSheets <= 0) { paperGeo.dispose(); paperMat.dispose(); }
+                                return false;
+                            }
+                            return true;
+                        }
+                    });
+                }
+            }
+            if (frame < 240) return true;
+            scene.remove(plane);
+            return false;
+        }
+    });
+}
+
+function triggerEmergencyRepairFX(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+    if (typeof playAudio === 'function') playAudio('emergency_repair', { volume: 0.92 });
+    const ringGeo = new THREE.RingGeometry(1.5, 2.8, 36);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x2ed573, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(targetPos.x, gY + 0.4, targetPos.z);
+    scene.add(ring);
+    spawnSparks({ x: targetPos.x, y: gY + 0.8, z: targetPos.z }, 0x2ed573, 18);
+
+    let life = 38;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            const p = 1 - life / 38;
+            ring.scale.setScalar(1 + p * 8.5);
+            ringMat.opacity = Math.max(0, (1 - p) * 0.9);
             if (life <= 0) {
                 scene.remove(ring);
                 ringGeo.dispose();
@@ -2814,4 +3499,28 @@ function spawnPingEffect(pos) {
         }
     });
 }
-window.spawnPingEffect = spawnPingEffect;
+
+function triggerRebelAmbushFX(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    if (typeof playAudio === 'function') playAudio('rebel_ambush', { volume: 0.92 }, 'gla');
+    spawnGroundDustPlume(targetPos, 1.8);
+}
+
+function triggerSneakAttackFX(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    if (typeof playAudio === 'function') playAudio('sneak_attack', { volume: 0.92 }, 'gla');
+    spawnGroundDustPlume(targetPos, 2.2);
+    spawnExplosionDebris(targetPos, 7, 1.2, true);
+}
+
+if (typeof window !== 'undefined') {
+    window.triggerA10Strike = triggerA10Strike;
+    window.triggerSpyDronePower = triggerSpyDronePower;
+    window.triggerEmpPulseFX = triggerEmpPulseFX;
+    window.triggerArtilleryBarrageFX = triggerArtilleryBarrageFX;
+    window.triggerAnthraxBombFX = triggerAnthraxBombFX;
+    window.triggerLeafletDropFX = triggerLeafletDropFX;
+    window.triggerEmergencyRepairFX = triggerEmergencyRepairFX;
+    window.triggerRebelAmbushFX = triggerRebelAmbushFX;
+    window.triggerSneakAttackFX = triggerSneakAttackFX;
+}

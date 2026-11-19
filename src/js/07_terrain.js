@@ -9,13 +9,16 @@ const mapObstacles = []; // Solid obstacles with collision (trees, rocks, buildi
 const worldBuildings = []; // Garrisonable civilian buildings & bunkers on the map
 window.worldBuildings = worldBuildings;
 
-function registerWorldBuilding(mesh, x, y, z, angle = 0, radius = 6.0, isBunker = false) {
+function registerWorldBuilding(mesh, x, y, z, angle = 0, radius = 6.0, isBunker = false, modelKey = null) {
     if (!mesh) return null;
     const bld = {
         type: isBunker ? 'civilianBunker' : 'civilianBuilding',
         isWorldBuilding: true,
         isNeutral: true,
         mesh: mesh,
+        baseMesh: mesh,
+        modelKey: modelKey || null,
+        yPos: (mesh && mesh.position) ? mesh.position.y : y,
         position: new THREE.Vector3(x, y, z),
         rotationY: angle || 0,
         radius: radius,
@@ -26,10 +29,43 @@ function registerWorldBuilding(mesh, x, y, z, angle = 0, radius = 6.0, isBunker 
         ownerId: null,
         teamId: 0,
         faction: null,
-        _garrisonVisual: null
+        _garrisonVisual: null,
+        _garrisonW3DMesh: null,
+        _usingOfficialGarrisonModel: false,
+        _garrisonColorHex: null,
+        _lastGarrisonCount: 0
     };
     worldBuildings.push(bld);
     return bld;
+}
+
+function _createGarrisonPipSprite(occupied, capacity, hexColor) {
+    if (typeof THREE === 'undefined' || typeof THREE.Sprite !== 'function' || typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 34;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(10, 14, 18, 0.85)';
+        ctx.fillRect(4, 4, canvas.width - 8, canvas.height - 8);
+        const colHex = '#' + (hexColor >>> 0).toString(16).padStart(6, '0');
+        ctx.strokeStyle = colHex;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+        const slots = Math.max(1, Math.min(10, capacity || 8));
+        const slotW = (canvas.width - 20) / slots;
+        for (let i = 0; i < slots; i++) {
+            ctx.fillStyle = i < occupied ? colHex : 'rgba(255, 255, 255, 0.22)';
+            ctx.fillRect(10 + i * slotW, 9, Math.max(4, slotW - 3), canvas.height - 18);
+        }
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+    const spr = new THREE.Sprite(mat);
+    spr.name = 'garrisonPipSprite';
+    spr.scale.set(6.2, 1.35, 1);
+    return spr;
 }
 
 function updateWorldBuildingGarrisonVisual(bld) {
@@ -39,13 +75,27 @@ function updateWorldBuildingGarrisonVisual(bld) {
             bld.mesh.remove(bld._garrisonVisual);
             bld._garrisonVisual.traverse(c => {
                     if (c.geometry && typeof c.geometry.dispose === 'function') c.geometry.dispose();
-                    if (c.material && typeof c.material.dispose === 'function') c.material.dispose();
+                    if (c.material) {
+                        if (c.material.map && typeof c.material.map.dispose === 'function') c.material.map.dispose();
+                        if (typeof c.material.dispose === 'function') c.material.dispose();
+                    }
             });
             bld._garrisonVisual = null;
+        }
+        if (bld._usingOfficialGarrisonModel && bld.baseMesh) {
+            const parent = (bld.mesh && bld.mesh.parent) || (typeof mapPropsGroup !== 'undefined' ? mapPropsGroup : null) || (typeof scene !== 'undefined' ? scene : null);
+            if (parent && bld.mesh !== bld.baseMesh) parent.remove(bld.mesh);
+            bld.baseMesh.visible = true;
+            if (parent && (!bld.baseMesh.parent || (parent.children && !parent.children.includes(bld.baseMesh)))) parent.add(bld.baseMesh);
+            bld.mesh = bld.baseMesh;
+            bld._garrisonW3DMesh = null;
+            bld._usingOfficialGarrisonModel = false;
+            bld._garrisonColorHex = null;
         }
         bld.ownerId = null;
         bld.teamId = 0;
         bld.faction = null;
+        bld._lastGarrisonCount = 0;
         return;
     }
 
@@ -53,6 +103,43 @@ function updateWorldBuildingGarrisonVisual(bld) {
     bld.ownerId = occupant.ownerId || 'player';
     bld.teamId = occupant.teamId || 1;
     bld.faction = occupant.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
+
+    const isPlayerTeam = (typeof playerTeamId !== 'undefined') ? (bld.teamId === playerTeamId) : (bld.teamId === 1);
+    const defaultFactionHex = (bld.faction === 'china') ? 0xe74c3c : (bld.faction === 'gla') ? 0x2ecc71 : 0x1e90ff;
+    const flagColor = isPlayerTeam
+        ? ((typeof window !== 'undefined' && window.selectedPlayerColorHex) ? window.selectedPlayerColorHex : defaultFactionHex)
+        : ((typeof window !== 'undefined' && window.activeEnemyColorHex) ? window.activeEnemyColorHex : 0xdc2626);
+
+    const gKey = bld.modelKey ? (bld.modelKey + '_g') : null;
+    const hasOfficialGarrisonModel = Boolean(gKey && typeof window !== 'undefined' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA[gKey] && typeof createW3DBuildingMesh === 'function');
+
+    if (hasOfficialGarrisonModel && (!bld._usingOfficialGarrisonModel || bld._garrisonColorHex !== flagColor)) {
+        if (bld._garrisonVisual) {
+            bld.mesh.remove(bld._garrisonVisual);
+            bld._garrisonVisual.traverse(c => {
+                    if (c.geometry && typeof c.geometry.dispose === 'function') c.geometry.dispose();
+                    if (c.material) {
+                        if (c.material.map && typeof c.material.map.dispose === 'function') c.material.map.dispose();
+                        if (typeof c.material.dispose === 'function') c.material.dispose();
+                    }
+            });
+            bld._garrisonVisual = null;
+        }
+        const parent = (bld.mesh && bld.mesh.parent) || (typeof mapPropsGroup !== 'undefined' ? mapPropsGroup : null) || (typeof scene !== 'undefined' ? scene : null);
+        if (parent && bld.mesh && bld.mesh !== bld.baseMesh) {
+            parent.remove(bld.mesh);
+        } else if (parent && bld.baseMesh && bld.baseMesh.parent === parent) {
+            parent.remove(bld.baseMesh);
+        }
+        const gMesh = createW3DBuildingMesh(gKey, !isPlayerTeam, null, flagColor);
+        gMesh.position.set(bld.position.x, bld.yPos !== undefined ? bld.yPos : bld.position.y, bld.position.z);
+        gMesh.rotation.y = bld.rotationY || 0;
+        if (parent) parent.add(gMesh);
+        bld.mesh = gMesh;
+        bld._garrisonW3DMesh = gMesh;
+        bld._usingOfficialGarrisonModel = true;
+        bld._garrisonColorHex = flagColor;
+    }
 
     if (!bld._garrisonVisual) {
         const grp = new THREE.Group();
@@ -63,53 +150,52 @@ function updateWorldBuildingGarrisonVisual(bld) {
         grp.scale.set(1 / sx, 1 / sy, 1 / sz);
 
         const r = (bld.radius || 5.5) * 0.92;
-        const sandMat = new THREE.MeshStandardMaterial({ color: 0x9c8964, roughness: 0.95, metalness: 0.05 });
-        const wireMat = new THREE.MeshStandardMaterial({ color: 0x6c757d, roughness: 0.5, metalness: 0.75 });
-        const flagColor = (bld.teamId !== 1) ? 0xdc2626 :
-        (bld.faction === 'china' ? 0xe74c3c : bld.faction === 'gla' ? 0x2ecc71 : 0x1e90ff);
-        const flagMat = new THREE.MeshStandardMaterial({ color: flagColor, roughness: 0.55, side: THREE.DoubleSide });
-        const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a3f44, metalness: 0.7, roughness: 0.4 });
+        if (!hasOfficialGarrisonModel) {
+            const sandMat = new THREE.MeshStandardMaterial({ color: 0x9c8964, roughness: 0.95, metalness: 0.05 });
+            const wireMat = new THREE.MeshStandardMaterial({ color: 0x6c757d, roughness: 0.5, metalness: 0.75 });
+            const flagMat = new THREE.MeshStandardMaterial({ color: flagColor, roughness: 0.55, side: THREE.DoubleSide });
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a3f44, metalness: 0.7, roughness: 0.4 });
 
-        // Perimeter sandbag walls + barbed wire coils on all 4 sides
-        for (let side = 0; side < 4; side++) {
-            const ang = side * (Math.PI / 2);
-            const wallGrp = new THREE.Group();
-            wallGrp.rotation.y = ang;
+            // Fallback sandbag walls + barbed wire coils when no official _G.W3D exists
+            for (let side = 0; side < 4; side++) {
+                const ang = side * (Math.PI / 2);
+                const wallGrp = new THREE.Group();
+                wallGrp.rotation.y = ang;
 
-            const bag = new THREE.Mesh(new THREE.BoxGeometry(r * 1.45, 0.72, 0.55), sandMat);
-            bag.position.set(0, 0.36, r);
-            bag.castShadow = true;
-            bag.receiveShadow = true;
-            wallGrp.add(bag);
+                const bag = new THREE.Mesh(new THREE.BoxGeometry(r * 1.45, 0.72, 0.55), sandMat);
+                bag.position.set(0, 0.36, r);
+                bag.castShadow = true;
+                bag.receiveShadow = true;
+                wallGrp.add(bag);
 
-            const bagTop = new THREE.Mesh(new THREE.BoxGeometry(r * 1.25, 0.42, 0.44), sandMat);
-            bagTop.position.set(0, 0.88, r);
-            bagTop.castShadow = true;
-            wallGrp.add(bagTop);
+                const bagTop = new THREE.Mesh(new THREE.BoxGeometry(r * 1.25, 0.42, 0.44), sandMat);
+                bagTop.position.set(0, 0.88, r);
+                bagTop.castShadow = true;
+                wallGrp.add(bagTop);
 
-            // Coiled barbed wire loops in front of the sandbags
-            if (typeof THREE.TorusGeometry === 'function') {
-                const coils = 4;
-                for (let ci = 0; ci < coils; ci++) {
-                    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 6, 10), wireMat);
-                    coil.position.set((ci - (coils - 1) * 0.5) * (r * 0.36), 0.35, r + 0.65);
-                    coil.rotation.y = Math.PI / 2 + 0.25;
-                    wallGrp.add(coil);
+                if (typeof THREE.TorusGeometry === 'function') {
+                    const coils = 4;
+                    for (let ci = 0; ci < coils; ci++) {
+                        const coil = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 6, 10), wireMat);
+                        coil.position.set((ci - (coils - 1) * 0.5) * (r * 0.36), 0.35, r + 0.65);
+                        coil.rotation.y = Math.PI / 2 + 0.25;
+                        wallGrp.add(coil);
+                    }
                 }
+                grp.add(wallGrp);
             }
-            grp.add(wallGrp);
-        }
 
-        // Faction garrison flag banner
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6.8, 6), poleMat);
-        pole.position.set(r * 0.45, 3.4, r * 0.45);
-        const flag = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 0.08), flagMat);
-        flag.position.set(r * 0.45 + 0.9, 6.2, r * 0.45);
-        grp.add(pole, flag);
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 6.8, 6), poleMat);
+            pole.position.set(r * 0.45, 3.4, r * 0.45);
+            const flag = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 0.08), flagMat);
+            flag.position.set(r * 0.45 + 0.9, 6.2, r * 0.45);
+            grp.add(pole);
+            grp.add(flag);
+        }
 
         // Subtle garrison glow + viewing/firing range ring on the ground
         if (typeof THREE.PointLight === 'function') {
-            const gLight = new THREE.PointLight(flagColor, 1.6, 20);
+            const gLight = new THREE.PointLight(flagColor, 1.5, 20);
             gLight.position.set(0, 4.2, 0);
             grp.add(gLight);
         }
@@ -124,10 +210,17 @@ function updateWorldBuildingGarrisonVisual(bld) {
                 new THREE.MeshBasicMaterial({ color: flagColor, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
             );
             rangeRing.rotation.x = -Math.PI / 2;
-            rangeRing.position.y = 0.18;
+            rangeRing.position.y = 0.22;
             rangeRing.name = 'garrisonRangeRing';
             grp.add(rangeRing);
         }
+
+        const pipSpr = _createGarrisonPipSprite(bld.garrisoned.length, bld.capacity || 8, flagColor);
+        if (pipSpr) {
+            pipSpr.position.set(0, bld.type === 'civilianBunker' ? 6.2 : 8.8, 0);
+            grp.add(pipSpr);
+        }
+        bld._lastGarrisonCount = bld.garrisoned.length;
 
         bld.mesh.add(grp);
         bld._garrisonVisual = grp;
@@ -142,6 +235,23 @@ function updateWorldBuildingGarrisonVisual(bld) {
             }
             existingRing.geometry.dispose();
             existingRing.geometry = new THREE.RingGeometry(viewRange - 0.35, viewRange, 48);
+        }
+        if (bld._lastGarrisonCount !== bld.garrisoned.length || bld._garrisonColorHex !== flagColor) {
+            const oldPip = bld._garrisonVisual.getObjectByName && bld._garrisonVisual.getObjectByName('garrisonPipSprite');
+            if (oldPip) {
+                bld._garrisonVisual.remove(oldPip);
+                if (oldPip.material) {
+                    if (oldPip.material.map && typeof oldPip.material.map.dispose === 'function') oldPip.material.map.dispose();
+                    if (typeof oldPip.material.dispose === 'function') oldPip.material.dispose();
+                }
+            }
+            const nextPip = _createGarrisonPipSprite(bld.garrisoned.length, bld.capacity || 8, flagColor);
+            if (nextPip) {
+                nextPip.position.set(0, bld.type === 'civilianBunker' ? 6.2 : 8.8, 0);
+                bld._garrisonVisual.add(nextPip);
+            }
+            bld._lastGarrisonCount = bld.garrisoned.length;
+            bld._garrisonColorHex = flagColor;
         }
     }
 }
@@ -1230,11 +1340,20 @@ function spawnMapProps(theme, mapSize) {
                     mapPropsGroup.add(pine);
                     mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 2.0 });
                 } else if (theme === 'city') {
-                    const building = createCitySkyscraperMesh();
+                    const urbanKeys = ['civilian_euro', 'civilian_soviet', 'civilian_house2'];
+                    const uKey = urbanKeys[Math.abs(Math.round(p.x + p.z)) % urbanKeys.length];
+                    let building = null;
+                    let usedKey = null;
+                    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA[uKey]) {
+                        building = createW3DBuildingMesh(uKey, false);
+                        usedKey = uKey;
+                    } else {
+                        building = createCitySkyscraperMesh();
+                    }
                     building.position.set(p.x, py, p.z);
                     mapPropsGroup.add(building);
                     mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 5.5 });
-                    registerWorldBuilding(building, p.x, py, p.z, 0, 5.5, false);
+                    registerWorldBuilding(building, p.x, py, p.z, 0, 5.5, false, usedKey);
                 }
         });
     }
@@ -1288,16 +1407,25 @@ function spawnMapProps(theme, mapSize) {
             });
         }
         if (Array.isArray(offMap.buildings)) {
-            const civPool = ['civilian_house1', 'civilian_house2', 'civilian_hangar'];
+            const mapTheme = ((offMap.theme || theme || '') + '').toLowerCase();
+            const civPool = mapTheme === 'desert'
+                ? ['civilian_desert_house', 'civilian_house1', 'civilian_house2', 'civilian_hangar']
+                : mapTheme === 'snow'
+                    ? ['civilian_chalet', 'civilian_soviet', 'civilian_cottage', 'civilian_hangar']
+                    : mapTheme === 'city'
+                        ? ['civilian_euro', 'civilian_house2', 'civilian_soviet', 'civilian_hangar']
+                        : ['civilian_cottage', 'civilian_house1', 'civilian_house2', 'civilian_hangar'];
             offMap.buildings.forEach((bld, bIdx) => {
                     const bx = bld[0] * mapSize, bz = bld[1] * mapSize;
                     const angle = bld[2] || 0;
                     const kind = bld[3] || 'civilian';
                     const by = getTerrainHeight(bx, bz);
                     let mesh = null;
+                    let usedModelKey = null;
                     let yPos = by;
                     if (kind === 'bunker' && typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['civilian_bunker']) {
                         mesh = createW3DBuildingMesh('civilian_bunker', false);
+                        usedModelKey = 'civilian_bunker';
                         yPos = by - 1.2; // Seat sloped bunker skirt into hillside
                     } else if (kind === 'bunker' && typeof createChinaBunker === 'function') {
                         mesh = createChinaBunker(false);
@@ -1306,6 +1434,7 @@ function spawnMapProps(theme, mapSize) {
                         const civKey = civPool[bIdx % civPool.length];
                         if (window.W3D_BUILDING_DATA[civKey]) {
                             mesh = createW3DBuildingMesh(civKey, false);
+                            usedModelKey = civKey;
                         }
                     }
                     if (!mesh) {
@@ -1329,7 +1458,7 @@ function spawnMapProps(theme, mapSize) {
                     mapPropsGroup.add(mesh);
                     const wbRadius = kind === 'bunker' ? 5.0 : 6.0;
                     mapObstacles.push({ position: new THREE.Vector3(bx, by, bz), radius: wbRadius });
-                    registerWorldBuilding(mesh, bx, by, bz, angle, wbRadius, kind === 'bunker');
+                    registerWorldBuilding(mesh, bx, by, bz, angle, wbRadius, kind === 'bunker', usedModelKey);
             });
         }
     } else {
@@ -1422,12 +1551,28 @@ function spawnMapProps(theme, mapSize) {
             } else if (theme === 'city') {
                 const roll = Math.random();
                 if (Math.abs(x - mapSize * 0.06) > 35) {
-                    if (roll > 0.4) {
+                    if (roll > 0.7) {
                         const building = createCitySkyscraperMesh();
                         building.position.set(x, y, z);
                         mapPropsGroup.add(building);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 5.5 });
-                        registerWorldBuilding(building, x, y, z, 0, 5.5, false);
+                        registerWorldBuilding(building, x, y, z, 0, 5.5, false, null);
+                    } else if (roll > 0.4) {
+                        const urbanKeys = ['civilian_euro', 'civilian_soviet', 'civilian_house2'];
+                        const uKey = urbanKeys[Math.abs(Math.round(x + z)) % urbanKeys.length];
+                        let building = null;
+                        let usedKey = null;
+                        if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA[uKey]) {
+                            building = createW3DBuildingMesh(uKey, false);
+                            building.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2);
+                            usedKey = uKey;
+                        } else {
+                            building = createCitySkyscraperMesh();
+                        }
+                        building.position.set(x, y, z);
+                        mapPropsGroup.add(building);
+                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 5.5 });
+                        registerWorldBuilding(building, x, y, z, building.rotation.y, 5.5, false, usedKey);
                     } else if (roll > 0.2) {
                         const light = createStreetLightMesh();
                         light.position.set(x, y, z);

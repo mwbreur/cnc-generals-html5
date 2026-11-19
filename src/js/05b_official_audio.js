@@ -402,18 +402,23 @@ function playEvaAlert(eventName, faction = null) {
     if (!eventName) return false;
     const fac = (faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa') || 'usa').toLowerCase();
     const normFac = ['usa', 'china', 'gla'].includes(fac) ? fac : 'usa';
-    const throttled = ['insufficient_funds', 'low_power', 'unit_lost', 'unit_under_attack', 'base_under_attack'].includes(eventName);
+    const throttled = ['insufficient_funds', 'low_power', 'unit_lost', 'building_lost', 'unit_under_attack', 'base_under_attack', 'reinforcements'].includes(eventName);
     const now = Date.now();
     if (throttled && _lastEvaAlertTimes[eventName] && (now - _lastEvaAlertTimes[eventName]) < 4000) {
         return false;
     }
     _lastEvaAlertTimes[eventName] = now;
     const key = `eva_${normFac}_${eventName}`;
+    if (eventName === 'unit_under_attack' || eventName === 'base_under_attack') {
+        playOfficialSound('sfx_radar_alert', 0.85);
+    }
     if (window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[key]) {
         return playOfficialSound(key, 0.92, normFac);
     }
-    if (eventName === 'unit_under_attack' || eventName === 'base_under_attack') {
-        return playOfficialSound('sfx_radar_alert', 0.85);
+    if (typeof loadOfficialAudioGroup === 'function') {
+        loadOfficialAudioGroup(normFac).then(entries => {
+            if (entries && entries[key]) playOfficialSound(key, 0.92, normFac);
+        });
     }
     return false;
 }

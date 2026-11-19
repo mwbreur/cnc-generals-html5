@@ -1182,4 +1182,79 @@ vm.runInContext(`
 `, sandbox);
 console.log("✓ Verified deterministic replay parity across two seeded 120-tick Skirmish runs.");
 
+// 20. Verify Weapon/Special FX, Retail Garrison _G Models, and General Powers
+vm.runInContext(`
+    {
+        resetEntireBattlefieldState();
+        setupMapEnvironment('tournament_desert', 1500);
+
+        // Check retail aircraft models (A-10 Warthog & Spy Drone)
+        ['a10_warthog', 'spy_drone'].forEach(k => {
+            if (!window.W3D_VEHICLE_DATA[k]) throw new Error('Missing W3D_VEHICLE_DATA entry: ' + k);
+            const m = createW3DVehicleMesh(k, false);
+            if (!m || !m.children || m.children.length === 0) throw new Error('Empty W3D mesh for ' + k);
+        });
+
+        // Check all retail civilian base + _g fortified garrison models
+        const civBases = [
+            'civilian_bunker', 'civilian_house1', 'civilian_house2', 'civilian_hangar',
+            'civilian_desert_house', 'civilian_chalet', 'civilian_soviet', 'civilian_cottage', 'civilian_euro'
+        ];
+        civBases.forEach(k => {
+            if (!window.W3D_BUILDING_DATA[k]) throw new Error('Missing base civilian model: ' + k);
+            if (!window.W3D_BUILDING_DATA[k + '_g']) throw new Error('Missing garrison _g model: ' + k + '_g');
+            const mBase = createW3DBuildingMesh(k, false);
+            const mGar = createW3DBuildingMesh(k + '_g', false, null, 0x2ecc71);
+            if (!mBase || !mBase.children.length || !mGar || !mGar.children.length) {
+                throw new Error('Failed instantiating civilian or _g mesh: ' + k);
+            }
+        });
+
+        // Check world building garrison model swap + evacuation restore + FLAME clearing
+        const cPos = new THREE.Vector3(30, 0, 30);
+        const rawMesh = createW3DBuildingMesh('civilian_desert_house', false);
+        mapPropsGroup.add(rawMesh);
+        const wb = registerWorldBuilding(rawMesh, cPos.x, 0, cPos.z, 0, 6.0, false, 'civilian_desert_house');
+        const ranger = spawnUnit('infantry', cPos.clone(), null, 'usa');
+        ranger.garrisonedIn = wb;
+        wb.garrisoned.push(ranger);
+        updateWorldBuildingGarrisonVisual(wb);
+        if (!wb._usingOfficialGarrisonModel || wb.mesh === wb.baseMesh) {
+            throw new Error('Expected official _G.W3D swap when garrisoned!');
+        }
+        const dragon = spawnEnemyUnit('flameTank', cPos.clone().add(new THREE.Vector3(5, 0, 0)), null, 'china');
+        applyCalculatedDamage(dragon, wb, 80, 'FLAME');
+        if (wb.garrisoned.length !== 0 || wb._usingOfficialGarrisonModel || wb.mesh !== wb.baseMesh) {
+            throw new Error('Expected FLAME attack to clear garrison and restore base civilian mesh!');
+        }
+
+        // Check General Powers & UI FX handlers
+        const origSetTimeout = sandboxSetTimeoutBackup = typeof setTimeout === 'function' ? setTimeout : null;
+        try {
+            if (typeof globalThis !== 'undefined') setTimeout = () => 0;
+        } catch(_) {}
+        const allPowers = [
+            'spyDrone', 'spySatellite', 'paradrop', 'emergencyRepair', 'leafletDrop',
+            'clusterMines', 'cashHack', 'frenzy', 'empPulse', 'rebelAmbush',
+            'sneakAttack', 'gpsScrambler', 'a10Strike', 'artilleryBarrage', 'anthraxBomb',
+            'fuelAirBomb', 'spectreGunship', 'carpetBomber'
+        ];
+        allPowers.forEach(pName => {
+            activeGeneralPower = pName;
+            generalPowerCooldowns[pName] = 0;
+            const ok = executeGeneralsPowerAt(new THREE.Vector3(10, 0, 10));
+            if (!ok) throw new Error('executeGeneralsPowerAt returned false for ' + pName);
+        });
+        triggerReconnaissanceScan('spyDrone');
+        triggerEmpPulseDisruption();
+        triggerSneakAttackTunnel();
+        spawnExplosionDebris(new THREE.Vector3(0, 0, 0), 4, 1.0, false);
+        spawnBuildingDestructionFX(new THREE.Vector3(0, 0, 0), 5.0, 'usa');
+        spawnPromotionFX(ranger.mesh.position, 2);
+        showNotification('Test error alert', 'error');
+        if (origSetTimeout) { try { setTimeout = origSetTimeout; } catch(_) {} }
+    }
+`, sandbox);
+console.log("✓ Verified retail A-10/SpyDrone/civilian _G models, garrison clearing & swap, General Powers, and FX.");
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

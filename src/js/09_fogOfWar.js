@@ -746,11 +746,20 @@ function setSidebarTab(tab) {
     updateSidebar();
 }
 
+let _lastErrorGuiSoundAt = 0;
+
 function showNotification(msg, type = 'info') {
     const ticker = document.getElementById('tactical-message');
     if (ticker) {
         ticker.textContent = msg;
         ticker.style.color = type === 'error' ? '#ff7675' : type === 'success' ? '#55efc4' : '#ffd86b';
+    }
+    if (type === 'error' && typeof playAudio === 'function') {
+        const now = Date.now();
+        if (now - _lastErrorGuiSoundAt > 650) {
+            _lastErrorGuiSoundAt = now;
+            playAudio('gui_error', { volume: 0.45 });
+        }
     }
 }
 
@@ -1642,6 +1651,7 @@ function renderSlotsUI(mode) {
 function updateSkirmishSlotType(slotIdx, val) {
     const slot = spSlots[slotIdx];
     if (!slot) return;
+    if (typeof playAudio === 'function') playAudio('gui_combo', { volume: 0.55 });
     if (val === 'open' || val === 'closed') {
         slot.active = false;
         slot.closed = (val === 'closed');
@@ -1812,7 +1822,10 @@ function renderSkirmishMapPickerGrid() {
     }).join('');
 }
 
+let _lastSliderGuiSoundAt = 0;
+
 function selectSkirmishMapFromModal(mapKey) {
+    if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.6 });
     const envEl = document.getElementById('map-environment');
     if (envEl) {
         envEl.value = mapKey;
@@ -1822,6 +1835,7 @@ function selectSkirmishMapFromModal(mapKey) {
 }
 
 function openSkirmishMapModal() {
+    if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.6 });
     const modal = document.getElementById('skirmish-map-modal');
     if (!modal) return;
     renderSkirmishMapPickerGrid();
@@ -1829,11 +1843,19 @@ function openSkirmishMapModal() {
 }
 
 function closeSkirmishMapModal() {
+    if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.6 });
     const modal = document.getElementById('skirmish-map-modal');
     if (modal) modal.hidden = true;
 }
 
 function onSkirmishGameSpeedChange(val) {
+    if (typeof playAudio === 'function') {
+        const now = Date.now();
+        if (now - _lastSliderGuiSoundAt > 90) {
+            _lastSliderGuiSoundAt = now;
+            playAudio('gui_slider', { volume: 0.35 });
+        }
+    }
     const num = Number(val) || 30;
     const valEl = document.getElementById('skirmish-game-speed-val');
     if (valEl) valEl.textContent = String(num);
