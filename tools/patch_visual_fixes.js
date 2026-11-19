@@ -607,6 +607,63 @@ injectMissingSubmeshesFromW3D('usa_strategyCenter', 'ABStrategy.W3D', /abstrateg
 injectMissingSubmeshesFromW3D('usa_detentionCamp', 'ABPrison.W3D', /abprison\.building__tex_atgradient/i);
 injectMissingSubmeshesFromW3D('gla_commandCenter', 'UBCmdHQ.W3D', /ubcmdhq\.ubcmdhq__tex_atgradient/i);
 
+// 6c. Patch exact W3D pivot quaternions on ALL buildings whose submesh pivots have non-identity W3D rotations
+// (Fixes floating/90-deg-misoriented HOUSECOLOR01 on usa_supplyCenter, HOUSECOLOR02 on usa_patriot,
+//  NBINTRNTCNTR2/ROOF_* on china_internetCenter, banners/tarps/turrets across USA/China/GLA/Tech/Civilian buildings)
+function patchAllBuildingPivotQuatsFromW3D(buildingKey, w3dFile, skipBoneNames = null) {
+    const bObj = W3D_BUILDING_DATA[buildingKey];
+    if (!bObj) return 0;
+    const raw = parseRawW3d(w3dFile, { includeQuats: true });
+    const rawByName = new Map(raw.pivots.map(p => [p[0].toUpperCase(), p]));
+    let patched = 0;
+    for (let i = 0; i < bObj.p.length; i++) {
+        const cur = bObj.p[i];
+        const pname = cur[0].toUpperCase();
+        if (skipBoneNames && skipBoneNames.has(pname)) continue;
+        // Skip flag segments already patched above
+        if (/^HOUSECOLOR0[2-6]$/.test(pname) && cur.length >= 9) continue;
+        const sp = rawByName.get(pname);
+        if (sp && sp.length >= 9) {
+            bObj.p[i] = [cur[0], cur[1], cur[2], cur[3], cur[4], sp[5], sp[6], sp[7], sp[8]];
+            patched++;
+        }
+    }
+    return patched;
+}
+
+const fullQuatPatchTargets = [
+    ['usa_supplyCenter', 'ABSupplyCt.W3D'],
+    ['usa_patriot', 'ABPatriot.W3D'],
+    ['usa_barracks', 'ABBARRACKS.W3D'],
+    ['usa_factory', 'ABWarFact.W3D'],
+    ['usa_strategyCenter', 'ABStrategy.W3D'],
+    ['usa_particleCannon', 'ABSDILink.W3D'],
+    ['usa_detentionCamp', 'ABPrison.W3D'],
+    ['china_commandCenter', 'NBConYard.W3D'],
+    ['china_barracks', 'NBBarracks.W3D'],
+    ['china_factory', 'NBWarFact.W3D'],
+    ['china_airfield', 'NBAirfield.W3D'],
+    ['china_gatlingCannon', 'NBGattling.W3D'],
+    ['china_speakerTower', 'NBPTower.W3D'],
+    ['china_propagandaCenter', 'NBPCenter.W3D'],
+    ['china_nukeSilo', 'NBNMissle.W3D'],
+    ['china_internetCenter', 'NBIntCnt.W3D'],
+    ['gla_commandCenter', 'UBCmdHQ.W3D'],
+    ['gla_supplyCenter', 'UBSupply.W3D'],
+    ['gla_barracks', 'UBBarracks.W3D'],
+    ['gla_factory', 'UBArmDeal.W3D'],
+    ['gla_blackMarket', 'UBBlackMkt.W3D'],
+    ['gla_scudStorm', 'UBScudStrm.W3D'],
+    ['gla_hole', 'UBHole.W3D'],
+    ['tech_hospital', 'ZBHospital.W3D'],
+    ['tech_oilDerrick', 'ZBODerrick.W3D']
+];
+let totalQuatPivotsPatched = 0;
+for (const [bKey, w3dFile] of fullQuatPatchTargets) {
+    totalQuatPivotsPatched += patchAllBuildingPivotQuatsFromW3D(bKey, w3dFile);
+}
+console.log(`Patched ${totalQuatPivotsPatched} retail W3D pivot quaternions across ${fullQuatPatchTargets.length} faction & tech buildings.`);
+
 // 7. Patch supply_drop_crate (PMUNCrate03.W3D)
 const crateParsed = parseRawW3d('PMUNCrate03.W3D', {
     dropRe: null,
