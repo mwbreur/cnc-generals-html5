@@ -651,6 +651,13 @@ function initAICommanders() {
         const startMoneyEl = typeof document !== 'undefined' ? document.getElementById('starting-money') : null;
         const lobbyMoney = startMoneyEl ? parseInt(startMoneyEl.value, 10) : 10000;
         const startCredits = (!isNaN(lobbyMoney) && lobbyMoney > 0) ? lobbyMoney : (difficulty === 'hard' ? 12000 : difficulty === 'easy' ? 7500 : 10000);
+        // Place rally point 28 units in front of basePos toward map center (never behind CC or into map border)
+        const toCenter = new THREE.Vector3(-basePos.x, 0, -basePos.z);
+        if (toCenter.lengthSq() < 1) toCenter.set(1, 0, 1);
+        toCenter.normalize();
+        const rallyPos = basePos.clone().addScaledVector(toCenter, 28);
+        rallyPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(rallyPos.x, rallyPos.z) : (basePos.y || 0);
+
         aiCommanders[ownerId] = {
             ownerId: ownerId,
             teamId: teamId,
@@ -658,7 +665,8 @@ function initAICommanders() {
             colorHex: colorHex,
             difficulty: difficulty,
             basePos: basePos.clone(),
-            rallyPoint: basePos.clone().add(new THREE.Vector3(16, 0, 16)),
+            rallyPoint: rallyPos,
+            candidateEnemySpawns: candidateWaypoints.map(wp => wp.clone()),
 
             // Zero Hour Economy & Base Building State (AIPlayer.cpp / AISkirmishPlayer.cpp)
             resources: startCredits,
@@ -1221,11 +1229,14 @@ function processEnemyAIEngine() {
                 const victimPos = recentlyAttackedAsset.position || (recentlyAttackedAsset.mesh && recentlyAttackedAsset.mesh.position);
                 if (attackerPos && victimPos) {
                     const retDist = victimPos.distanceTo(attackerPos);
-                    if (retDist <= ZERO_HOUR_AI_DATA.maxRetaliateDistance) {
+                    const isBaseUnderAttack = victimPos.distanceTo(cmd.basePos) <= 55;
+                    if (retDist <= ZERO_HOUR_AI_DATA.maxRetaliateDistance || isBaseUnderAttack) {
                         shareTeamDiscovery(cmd.teamId, attacker, false);
+                        const rallyRadius = isBaseUnderAttack ? 72 : ZERO_HOUR_AI_DATA.retaliateFriendsRadius;
                         combatUnits.forEach(ally => {
-                                if (!ally.combatTarget && ally.mesh.position.distanceTo(victimPos) <= ZERO_HOUR_AI_DATA.retaliateFriendsRadius) {
+                                if (!ally.combatTarget && ally.mesh.position.distanceTo(victimPos) <= rallyRadius) {
                                     ally.combatTarget = attacker;
+                                    ally._releasedForAttack = true;
                                     assignAIGroundRoute(ally, attackerPos, attacker);
                                 }
                         });
@@ -1245,8 +1256,8 @@ function processEnemyAIEngine() {
             });
 
             const elapsedSec = (Date.now() - (cmd.matchStartTime || (typeof matchStartTime !== 'undefined' ? matchStartTime : Date.now()))) / 1000;
-            const attackDelays = { easy: 300, medium: 180, hard: 120 };
-            const attackDelaySec = attackDelays[cmd.difficulty] || 180;
+            const attackDelays = { easy: 150, medium: 90, hard: 60 };
+            const attackDelaySec = attackDelays[cmd.difficulty] || 90;
             const canLaunchOffensive = elapsedSec >= attackDelaySec;
 
             if (canLaunchOffensive && !cmd.hasAnnouncedOffensive) {
@@ -1263,22 +1274,50 @@ function processEnemyAIEngine() {
             if (!cmd.stagingTeam) cmd.stagingTeam = [];
             cmd.stagingTeam = cmd.stagingTeam.filter(id => combatUnits.some(u => u.netId === id));
             const targetWaveSize = ZERO_HOUR_AI_DATA.maxStrikeTeamSize[cmd.difficulty] || 4;
-            if (canLaunchOffensive && cmd.stagingTeam.length >= targetWaveSize && (cmd.discoveredEnemyTargets.length > 0 || cmd.discoveredEnemyBases.length > 0)) {
+            const hasKnownEnemy = (cmd.discoveredEnemyTargets.length > 0 || cmd.discoveredEnemyBases.length > 0);
+            const waveWaitTicks = (cmd.stagingTeam.length >= 2 && canLaunchOffensive) ? (cmd.attackWaveTimer = (cmd.attackWaveTimer || 0) + 1) : (cmd.attackWaveTimer = 0);
+            const waveReady = canLaunchOffensive && (cmd.stagingTeam.length >= targetWaveSize || (cmd.stagingTeam.length >= Math.max(2, targetWaveSize - 1) && waveWaitTicks >= 60));
+
+            if (waveReady) {
+                // If scouts haven't found an enemy base yet, pick a search-and-destroy sweep point (enemy spawn) so AI never huddles forever!
+                let sweepTarget = null;
+                if (!hasKnownEnemy) {
+                    const spawnPool = (cmd.candidateEnemySpawns && cmd.candidateEnemySpawns.length > 0) ? cmd.candidateEnemySpawns : cmd.unexploredWaypoints;
+                    if (spawnPool && spawnPool.length > 0) {
+                        cmd._sweepIdx = ((cmd._sweepIdx || 0) + 1) % spawnPool.length;
+                        sweepTarget = spawnPool[cmd._sweepIdx].clone();
+                    }
+                }
                 // Release staging team into active offensive wave!
                 cmd.stagingTeam.forEach(id => {
                         const member = combatUnits.find(u => u.netId === id);
-                        if (member) member._releasedForAttack = true;
+                        if (member) {
+                            member._releasedForAttack = true;
+                            if (sweepTarget) {
+                                member._sweepTarget = sweepTarget.clone();
+                                assignAIGroundRoute(member, member._sweepTarget);
+                            }
+                        }
                 });
                 cmd.stagingTeam = [];
+                cmd.attackWaveTimer = 0;
             }
 
-            combatUnits.forEach(enemy => {
+            const hashSlotId = (id) => {
+                if (typeof id === 'number' && Number.isFinite(id)) return Math.abs(Math.floor(id));
+                const s = String(id || '1');
+                let h = 0;
+                for (let ci = 0; ci < s.length; ci++) h = ((h * 31) + s.charCodeAt(ci)) | 0;
+                return Math.abs(h);
+            };
+
+            combatUnits.forEach((enemy, enemyIdx) => {
                     if (enemy.isScout && !enemy.combatTarget) return;
 
                     // If unit is already engaged in active combat with valid hostile target:
                     if (enemy.combatTarget && enemy.combatTarget.health > 0 && !isFriendly(enemy, enemy.combatTarget)) {
                         const targetPos = enemy.combatTarget.position || enemy.combatTarget.mesh.position;
-                        if (!canLaunchOffensive && targetPos && enemy.mesh.position.distanceTo(cmd.basePos) > 45) {
+                        if (!canLaunchOffensive && targetPos && enemy.mesh.position.distanceTo(cmd.basePos) > 55) {
                             enemy.combatTarget = null;
                         } else {
                             if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
@@ -1309,17 +1348,36 @@ function processEnemyAIEngine() {
                         return;
                     }
 
+                    // Active search-and-destroy sweep when wave launched before enemy base was sighted
+                    if (enemy._releasedForAttack && enemy._sweepTarget && !hasKnownEnemy) {
+                        if (enemy.mesh.position.distanceTo(enemy._sweepTarget) <= 14) {
+                            enemy._sweepTarget = null;
+                        } else if (!enemy.waypoints || enemy.waypoints.length === 0) {
+                            if (enemy.mesh.position.distanceTo(enemy.targetPosition) <= 4) {
+                                assignAIGroundRoute(enemy, enemy._sweepTarget);
+                            }
+                        }
+                        return;
+                    }
+
                     // Hold in staging rally area until wave is full or offensive grace expires
                     const isStaging = cmd.stagingTeam.includes(enemy.netId) && !enemy._releasedForAttack;
-                    if (!canLaunchOffensive || isStaging || (cmd.discoveredEnemyBases.length === 0 && cmd.discoveredEnemyTargets.length === 0)) {
+                    if (!canLaunchOffensive || isStaging || !hasKnownEnemy) {
                         if (enemy.waypoints && enemy.waypoints.length > 0) return;
-                        const slotIdx = (enemy.netId || 1);
+                        const slotIdx = hashSlotId(enemy.netId !== undefined ? enemy.netId : enemyIdx);
                         const slotAng = (slotIdx % 12) * (Math.PI * 2 / 12);
-                        const slotR = 5.5 + ((slotIdx >> 2) % 3) * 4.5;
-                        const stagedSpot = new THREE.Vector3(cmd.rallyPoint.x + Math.cos(slotAng) * slotR, cmd.rallyPoint.y || 0, cmd.rallyPoint.z + Math.sin(slotAng) * slotR);
-                        if (enemy.mesh.position.distanceTo(stagedSpot) > 5) {
+                        const slotR = 7.5 + ((slotIdx >> 2) % 3) * 5.0;
+                        const sx = cmd.rallyPoint.x + Math.cos(slotAng) * slotR;
+                        const sz = cmd.rallyPoint.z + Math.sin(slotAng) * slotR;
+                        const sy = typeof getTerrainHeight === 'function' ? getTerrainHeight(sx, sz) : (cmd.rallyPoint.y || 0);
+                        const stagedSpot = new THREE.Vector3(sx, sy, sz);
+                        // Wide arrival deadzone (9.5u) so staged units stop cleanly instead of circling their CC!
+                        if (enemy.mesh.position.distanceTo(stagedSpot) > 9.5) {
                             assignAIGroundRoute(enemy, stagedSpot);
                             enemy.taskState = 'Moving';
+                        } else {
+                            enemy.targetPosition.copy(enemy.mesh.position);
+                            enemy.taskState = 'Idle';
                         }
                         return;
                     }
