@@ -2753,7 +2753,7 @@ window.addEventListener('keydown', e => {
 });
 
 function isInfantryType(type) {
-    return ['infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'blacklotus', 'lotus', 'hijacker', 'mob'].includes(type);
+    return ['infantry', 'ranger', 'redguard', 'tankhunter', 'rocket', 'missiledefender', 'rpg', 'rebel', 'terrorist', 'pathfinder', 'hacker', 'burton', 'jarmen', 'blacklotus', 'lotus', 'hijacker', 'mob'].includes(type);
 }
 
 function orderSelectedTransportsToUnload() {
@@ -3575,7 +3575,10 @@ function processBuildingFunctions() {
                         if (gantry) gantry.rotation.x = -0.15 - chargeRatio * 0.75; // Elevate 9 Scuds toward vertical launch angle
                     } else if (structure.type === 'particleCannon') {
                         const glowLight = getCachedNode(structure.mesh, 'particleCannonGlowLight');
-                        if (glowLight) glowLight.intensity = 0.6 + chargeRatio * 2.2;
+                        if (glowLight) {
+            if (glowLight.material) glowLight.material.opacity = 0.18 + chargeRatio * 0.6;
+            else glowLight.intensity = 0.6 + chargeRatio * 2.2;
+        }
                         const ring = getCachedNode(structure.mesh, 'particleAcceleratorRing');
                         if (ring && ring.material) ring.material.emissiveIntensity = 0.4 + chargeRatio * 1.4;
                         const fan1 = getCachedNode(structure.mesh, 'FAN01');
@@ -3810,7 +3813,7 @@ function processBuildingFunctions() {
                 units.forEach(unit => {
                         const matchingUnit = structure.type === 'airfield'
                         ? ['chinook', 'comanche', 'raptor', 'mig', 'stealthfighter', 'aurora'].includes(unit.type)
-                        : !['chinook', 'comanche', 'raptor', 'mig', 'stealthfighter', 'aurora', 'infantry', 'redguard', 'tankhunter', 'rocket', 'rpg', 'rebel', 'terrorist', 'worker', 'dozer'].includes(unit.type);
+                        : !['chinook', 'comanche', 'raptor', 'mig', 'stealthfighter', 'aurora', 'infantry', 'redguard', 'tankhunter', 'rocket', 'missiledefender', 'rpg', 'rebel', 'terrorist', 'worker', 'dozer'].includes(unit.type);
                         if (matchingUnit && unit.health > 0 && unit.health < unit.maxHealth && unit.mesh.position.distanceTo(structure.position) < 16) {
                             unit.health = Math.min(unit.maxHealth, unit.health + 3);
                         }

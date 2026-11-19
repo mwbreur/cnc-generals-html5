@@ -1400,4 +1400,45 @@ vm.runInContext(`
 `, sandbox);
 console.log("✓ Verified all 11 retail visual, model, terrain, base orientation, flag wind, and Composite Armor fixes.");
 
+// --- 22. Audio distance attenuation, Missile Defender fire sound, stealth visibility, no runtime PointLights ---
+{
+    const srcDir = path.join(__dirname, 'src', 'js');
+    const rd = f => fs.readFileSync(path.join(srcDir, f), 'utf8');
+    const audioSrc = rd('05_audio.js');
+    const helperStart = audioSrc.indexOf('const SPATIAL_AUDIO_NEAR');
+    const helperEnd = audioSrc.indexOf('function playAudio(');
+    if (helperStart < 0 || helperEnd < helperStart) throw new Error('Spatial audio helper missing from 05_audio.js');
+    const aud = {
+        cameraTarget: { x: 0, y: 0, z: 0 }, cameraRadius: 115,
+        camera: { matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] } }
+    };
+    vm.createContext(aud);
+    vm.runInContext(audioSrc.slice(helperStart, helperEnd) + '\nthis.fn = computeSpatialAudio;', aud);
+    const near = aud.fn({ x: 20, y: 0, z: 0 });
+    const mid = aud.fn({ x: 200, y: 0, z: 0 });
+    const far = aud.fn({ x: 900, y: 0, z: 0 });
+    if (!(near.gain > mid.gain && mid.gain > 0 && !mid.cull)) throw new Error('Expected distance falloff near > mid > 0');
+    if (!far.cull) throw new Error('Expected far-away explosions to be culled');
+    if (!(aud.fn({ x: 150, y: 0, z: 0 }).pan > 0 && aud.fn({ x: -150, y: 0, z: 0 }).pan < 0)) throw new Error('Expected stereo pan by screen side');
+
+    const combatSrc = rd('12_combat.js');
+    if (!/\['rocket', 'missiledefender', 'rpg', 'tankhunter'\]\.includes\(attacker\.type\)/.test(combatSrc)) {
+        throw new Error('Missile Defender must use the rocket weapon branch (fire sound)');
+    }
+    if (!/playAudio\('missile_defender'/.test(combatSrc)) throw new Error('Missile Defender fire sound call missing');
+    if (!/impactSound: attacker\.type === 'tomahawk' \? 'expl_tomahawk'/.test(combatSrc)) throw new Error('Tomahawk retail impact sound missing');
+    const catalog = JSON.parse(fs.readFileSync(path.join(__dirname, 'src', 'audio', 'global.json'), 'utf8'));
+    ['sfx_expl_tomahawk', 'sfx_missile_defender', 'sfx_missile_defender_1', 'sfx_missile_defender_2'].forEach(k => {
+        if (!catalog[k]) throw new Error('Missing retail audio key ' + k);
+    });
+    const loopSrc = rd('14_gameLoop.js');
+    if (!/c\._stealthOwnMat/.test(loopSrc)) throw new Error('Stealth must use per-mesh cloned materials');
+    if (!/FRIENDLY_STEALTH_OPACITY_MIN = 0\.5/.test(loopSrc)) throw new Error('Friendly stealth opacity must match retail 50%+');
+    ['02b_w3d_models.js', '07_terrain.js', '06_effects.js', '04_buildings.js', '03_units.js'].forEach(f => {
+        const code = rd(f).split(/\r?\n/).filter(l => l.length < 400 && !/^\s*\/\//.test(l)).join('\n');
+        if (/new THREE\.PointLight\(/.test(code)) throw new Error(f + ' creates a PointLight (causes shader recompile frame spikes)');
+    });
+}
+console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire sound, Tomahawk retail impact, retail stealth visibility, and light-free glow (no frame-spike recompiles).");
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

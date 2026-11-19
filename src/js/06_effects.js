@@ -267,7 +267,7 @@ function spawnCannonImpactFX(pos, isHeavy = false, isHeroic = false, armorCat = 
     spawnTreadDustPuff(pos, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, getTerrainDustColor(), isHeavy ? 0.62 : 0.42);
     if (typeof playAudio === 'function') {
         const key = armorCat === 'building' ? 'impact_building' : (isHeavy ? 'expl_small' : 'impact_vehicle');
-        playAudio(key, { volume: isHeavy ? 0.55 : 0.42 });
+        playAudio(key, { volume: isHeavy ? 0.55 : 0.42, pos });
     }
 }
 
@@ -275,7 +275,7 @@ function spawnBuildingDestructionFX(pos, radius = 5.5, color = 0xff793f) {
     if (!pos || typeof scene === 'undefined') return;
     const scale = Math.max(2.2, Math.min(3.8, (radius || 5.5) * 0.52));
     spawnEnhancedExplosion(pos, color, scale, true, 'expl_building');
-    if (typeof playAudio === 'function') playAudio('debris_building', { volume: 0.78 });
+    if (typeof playAudio === 'function') playAudio('debris_building', { volume: 0.78, pos });
     if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
     spawnExplosionDebris(pos, 10, 1.45, true);
     spawnCraterDecal(pos, Math.max(3.4, radius * 0.72), 540, 'explosive');
@@ -575,8 +575,12 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
                 const expColor = (!this.isToxin && this.isHeroic) ? 0xff2222 : (this.isToxin ? 0x2ed573 : 0xff4757);
                 const expScale = this.isHeroic ? (this.isHeavy ? 2.5 : 1.45) : (this.isHeavy ? 2.2 : 1.2);
                 const hasCustomImpactSfx = !!(this.metadata && typeof this.metadata.onImpact === 'function');
-                const expSound = hasCustomImpactSfx ? 'none' : (this.isToxin ? 'anthrax_blast' : (this.isHeavy ? 'expl_artillery' : 'expl_missile'));
+                const impactSfx = this.metadata && this.metadata.impactSound;
+                const expSound = hasCustomImpactSfx ? 'none' : (impactSfx || (this.isToxin ? 'anthrax_blast' : (this.isHeavy ? 'expl_artillery' : 'expl_missile')));
                 spawnEnhancedExplosion(this.toPos, expColor, expScale, this.isHeavy, expSound);
+                if (this.metadata && this.metadata.impactShake && typeof triggerScreenShake === 'function') {
+                    triggerScreenShake(this.metadata.impactShake);
+                }
                 if (hasCustomImpactSfx) {
                     this.metadata.onImpact(this.toPos);
                 }
@@ -917,8 +921,8 @@ function spawnLingeringSmokeColumn(pos, duration = 240, color = 0x2d3436) {
 function spawnEnhancedExplosion(pos, color = 0xffa502, scale = 1.0, isHeavy = false, soundType = null) {
     if (soundType !== 'none') {
         const chosenSfx = soundType || (isHeavy ? 'expl_artillery' : 'expl_small');
-        if (typeof playAudio === 'function') playAudio(chosenSfx);
-        else if (typeof playUSASound === 'function') playUSASound(chosenSfx);
+        if (typeof playAudio === 'function') playAudio(chosenSfx, { pos });
+        else if (typeof playUSASound === 'function') playUSASound(chosenSfx, { pos });
     }
 
     const fireTex = _getFxSpriteTex('fireball');
@@ -1203,7 +1207,7 @@ function spawnToxinSprayBurst(fromPos, toPos) {
 // Aurora Hypersonic Fuel-Air Bomb Detonation (Gigantic double shockwave + scorched crater)
 function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb') {
     if (soundType !== 'none') {
-        playUSASound(soundType);
+        playUSASound(soundType, { pos });
     }
 
     // 1. Massive expanding fireball

@@ -42,8 +42,15 @@ function preloadSkirmishAudio(faction = null) {
     return Promise.all([loadOfficialAudioGroup('global'), loadOfficialAudioGroup(['usa','china','gla'].includes(playerFaction) ? playerFaction : 'usa')]);
 }
 
-function playOfficialAudioBuffer(ctx, buffer, volume) {
+// SAGE AudioSettings.ini SampleCount3D = 25: never more than 25 simultaneous world (3D) samples
+const MAX_WORLD_SAMPLES = 25;
+let _activeWorldSamples = 0;
+const _lastWorldSoundTime = {};
+
+function playOfficialAudioBuffer(ctx, buffer, volume, pan = null) {
     if (!ctx || !buffer) return false;
+    const isWorld = (typeof pan === 'number');
+    if (isWorld && _activeWorldSamples >= MAX_WORLD_SAMPLES) return false;
     try {
         if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(() => {});
         const src = ctx.createBufferSource();
@@ -51,7 +58,18 @@ function playOfficialAudioBuffer(ctx, buffer, volume) {
         const gain = ctx.createGain();
         gain.gain.value = volume;
         src.connect(gain);
-        gain.connect(ctx.destination);
+        let tail = gain;
+        if (isWorld && typeof ctx.createStereoPanner === 'function') {
+            const panner = ctx.createStereoPanner();
+            panner.pan.value = pan;
+            gain.connect(panner);
+            tail = panner;
+        }
+        tail.connect(ctx.destination);
+        if (isWorld) {
+            _activeWorldSamples++;
+            src.onended = () => { _activeWorldSamples = Math.max(0, _activeWorldSamples - 1); };
+        }
         src.start(0);
         return true;
     } catch (e) {
@@ -100,9 +118,15 @@ function playOfficialAudioElementFallback(data, volume) {
     }
 }
 
-function playOfficialSound(soundKey, volume = 0.85, faction = null) {
+function playOfficialSound(soundKey, volume = 0.85, faction = null, pan = null) {
     if (!soundKey) return false;
     const clampedVol = Math.max(0, Math.min(1, volume));
+    if (typeof pan === 'number') {
+        // Retail "Limit" behaviour: don't stack identical world sounds within a few ms
+        const nowMs = Date.now();
+        if (_lastWorldSoundTime[soundKey] && (nowMs - _lastWorldSoundTime[soundKey]) < 45) return true;
+        _lastWorldSoundTime[soundKey] = nowMs;
+    }
     const play = () => {
         const data = window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey];
         if (!data) return false;
@@ -113,18 +137,18 @@ function playOfficialSound(soundKey, volume = 0.85, faction = null) {
                 return playOfficialAudioElementFallback(data, clampedVol);
             }
             if (cached && cached.duration !== undefined) {
-                return playOfficialAudioBuffer(ctx, cached, clampedVol);
+                return playOfficialAudioBuffer(ctx, cached, clampedVol, pan);
             }
             if (cached && typeof cached.then === 'function') {
                 cached.then(buf => {
-                    if (buf) playOfficialAudioBuffer(ctx, buf, clampedVol);
+                    if (buf) playOfficialAudioBuffer(ctx, buf, clampedVol, pan);
                     else playOfficialAudioElementFallback(data, clampedVol);
                 });
                 return true;
             }
             const decodePromise = decodeOfficialAudioData(ctx, data).then(buf => {
                 window.OFFICIAL_AUDIO_CACHE[soundKey] = buf;
-                playOfficialAudioBuffer(ctx, buf, clampedVol);
+                playOfficialAudioBuffer(ctx, buf, clampedVol, pan);
                 return buf;
             }).catch(() => {
                 window.OFFICIAL_AUDIO_CACHE[soundKey] = 'fallback';

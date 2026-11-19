@@ -46,6 +46,42 @@ function isUSASoundAllowed() {
     return isAudioAllowed('usa', 'usa');
 }
 
+// UI / global announcements that must never be distance-attenuated
+const UI_AUDIO_TYPES = new Set([
+    'click', 'gui_click', 'gui_combo', 'gui_blip', 'gui_msg', 'gui_error', 'gui_slider', 'cash_up', 'cash_down',
+    'rally_set', 'rally_fail', 'radar_alert', 'radio_chirp', 'radar_on', 'radar_off', 'acknowledge', 'construction',
+    'unit_promoted', 'superweapon_siren', 'scud_storm_volley', 'nuke_doors', 'nuke_launch', 'nuke_detonation',
+    'orbital_beam', 'victory', 'defeat', 'power_down', 'power_up', 'crate_pickup', 'speaker_pulse'
+]);
+
+// SAGE AudioSettings.ini: 3D sounds fade with distance from the microphone (camera focus point) and are culled
+// below MinSampleVolume. World units here are scaled to the default camera radius (~115).
+const SPATIAL_AUDIO_NEAR = 70;
+const SPATIAL_AUDIO_FAR = 340;
+const SPATIAL_AUDIO_MIN_GAIN = 0.03;
+function computeSpatialAudio(pos) {
+    if (!pos || typeof cameraTarget === 'undefined' || !cameraTarget) return null;
+    const dx = pos.x - cameraTarget.x;
+    const dz = pos.z - cameraTarget.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    let gain = 1;
+    if (dist > SPATIAL_AUDIO_NEAR) {
+        const t = Math.min(1, (dist - SPATIAL_AUDIO_NEAR) / (SPATIAL_AUDIO_FAR - SPATIAL_AUDIO_NEAR));
+        gain = Math.pow(1 - t, 1.6);
+    }
+    // Zooming in on the action boosts 3D volume slightly (ZoomSoundVolumePercentageAmount = 20%)
+    const radius = (typeof cameraRadius === 'number') ? cameraRadius : 115;
+    const zoomBonus = 0.8 + 0.2 * Math.max(0, Math.min(1, (425 - radius) / (425 - 130)));
+    gain *= zoomBonus;
+    if (gain < SPATIAL_AUDIO_MIN_GAIN) return { cull: true, gain: 0, pan: 0 };
+    let pan = 0;
+    if (typeof camera !== 'undefined' && camera && camera.matrixWorld && camera.matrixWorld.elements) {
+        const e = camera.matrixWorld.elements;
+        pan = Math.max(-0.85, Math.min(0.85, (dx * e[0] + dz * e[2]) / 110));
+    }
+    return { cull: false, gain, pan };
+}
+
 function playAudio(type, options = {}, faction = null) {
     if (!isAudioAllowed(type, faction)) return;
 
@@ -79,7 +115,8 @@ function playAudio(type, options = {}, faction = null) {
             burton_rifle: 'sfx_burton_rifle',
             sniper_rifle: 'sfx_sniper_rifle',
             jarmen_snipe: 'sfx_jarmen_snipe',
-            missile_defender: 'sfx_missile_defender',
+            missile_defender: ['sfx_missile_defender', 'sfx_missile_defender_1', 'sfx_missile_defender_2'],
+            expl_tomahawk: 'sfx_expl_tomahawk',
             tankhunter_rocket: 'sfx_tankhunter_rocket',
             rpg_launch: ['sfx_rpg_launch_0', 'sfx_rpg_launch_1'],
             buggy_rocket: ['sfx_buggy_rocket_0', 'sfx_buggy_rocket_1', 'sfx_buggy_rocket_2'],
@@ -93,7 +130,7 @@ function playAudio(type, options = {}, faction = null) {
             aurora_bomb: 'sfx_daisycutter_blast',
             daisycutter_drop: 'sfx_daisycutter_drop',
             daisycutter_blast: 'sfx_daisycutter_blast',
-            carpet_bomb: ['sfx_carpet_bomb_0', 'sfx_carpet_bomb_1', 'sfx_carpet_bomb_2'],
+            carpet_bomb: ['sfx_carpet_bomb_0', 'sfx_carpet_bomb_1', 'sfx_carpet_bomb_2', 'sfx_expl_carpet_3'],
             spectre_gatling: ['sfx_spectre_gatling_0', 'sfx_spectre_gatling_1', 'sfx_spectre_gatling_2'],
             spectre_howitzer: ['sfx_spectre_howitzer_0', 'sfx_spectre_howitzer_1'],
             c130_flyover: 'sfx_c130_flyover',
@@ -104,7 +141,7 @@ function playAudio(type, options = {}, faction = null) {
             expl_vehicle: ['sfx_expl_vehicle_0', 'sfx_expl_vehicle_1', 'sfx_expl_vehicle_2'],
             expl_building: ['sfx_expl_building_0', 'sfx_expl_building_1'],
             expl_artillery: ['sfx_expl_artillery_0', 'sfx_expl_artillery_1', 'sfx_expl_artillery_2'],
-            expl_fire: ['sfx_expl_fire_0', 'sfx_expl_fire_1'],
+            expl_fire: ['sfx_expl_fire_0', 'sfx_expl_fire_1', 'sfx_expl_fire_2'],
             expl_flashbang: ['sfx_expl_flashbang_0', 'sfx_expl_flashbang_1'],
             expl_neutron: ['sfx_expl_neutron_0', 'sfx_expl_neutron_1'],
             expl_mininuke: 'sfx_expl_mininuke',
@@ -177,8 +214,16 @@ function playAudio(type, options = {}, faction = null) {
         };
         const mapped = officialMap[type];
         const soundKey = Array.isArray(mapped) ? mapped[Math.floor(Math.random() * mapped.length)] : mapped;
-        if (soundKey && playOfficialSound(soundKey, options.volume || 0.90)) {
-            return;
+        if (soundKey) {
+            // Authentic SAGE-style 3D world audio: volume falls off with distance from the camera "microphone"
+            // and sounds pan left/right; far-away fighting is quieter and eventually culled.
+            const worldPos = options.pos || (UI_AUDIO_TYPES.has(type) ? null : window._sfxPos);
+            const spatial = worldPos ? computeSpatialAudio(worldPos) : null;
+            if (spatial && spatial.cull) return;
+            const baseVol = options.volume || 0.90;
+            if (playOfficialSound(soundKey, spatial ? baseVol * spatial.gain : baseVol, null, spatial ? spatial.pan : null)) {
+                return;
+            }
         }
     }
 

@@ -3043,29 +3043,55 @@ function processEnemyMovement() {
 const STATIONARY_STEALTH_UNITS = new Set(['pathfinder', 'jarmen', 'burton', 'blacklotus', 'hijacker']);
 const ALWAYS_STEALTH_UNITS = new Set(['stealthfighter', 'drone_scout']);
 
-function setMeshStealthOpacity(mesh, cloaked) {
-    if (!mesh || mesh._stealthOpacityApplied === cloaked) return;
+// Retail StealthUpdate: FriendlyOpacityMin = 50% .. FriendlyOpacityMax = 100% (owner/allies always see their stealthed units,
+// shimmering between those values). Enemies see nothing until the unit is revealed (firing / detector).
+const FRIENDLY_STEALTH_OPACITY_MIN = 0.5;
+const FRIENDLY_STEALTH_OPACITY_MAX = 0.85;
+
+function setMeshStealthOpacity(mesh, cloaked, animTimeSec = 0) {
+    if (!mesh) return;
+    // Per-mesh clone of shared W3D cached materials so cloaking ONE unit never turns every unit of that type translucent
+    const shimmer = cloaked
+        ? FRIENDLY_STEALTH_OPACITY_MIN + (FRIENDLY_STEALTH_OPACITY_MAX - FRIENDLY_STEALTH_OPACITY_MIN) * (0.5 + 0.5 * Math.sin(animTimeSec * 2.4 + (mesh.id || 0)))
+        : 1;
+    if (mesh._stealthOpacityApplied === cloaked && (!cloaked || Math.abs((mesh._stealthShimmer || 0) - shimmer) < 0.02)) return;
     mesh._stealthOpacityApplied = cloaked;
+    mesh._stealthShimmer = shimmer;
     mesh.traverse(c => {
         if (!c.isMesh || !c.material) return;
+        if (cloaked && !c._stealthOwnMat) {
+            const src = c.material;
+            if (Array.isArray(src)) {
+                c.material = src.map(m => { const cl = m.clone(); cl.userData = Object.assign({}, cl.userData, { _shared: false }); return cl; });
+            } else {
+                c.material = src.clone();
+                c.material.userData = Object.assign({}, c.material.userData, { _shared: false });
+            }
+            c._stealthOwnMat = true;
+        }
+        if (!c._stealthOwnMat) return;
         const mats = Array.isArray(c.material) ? c.material : [c.material];
         for (let i = 0; i < mats.length; i++) {
             const m = mats[i];
             if (!m) continue;
+            if (m.userData._origOpacity === undefined) {
+                m.userData._origOpacity = m.opacity !== undefined ? m.opacity : 1.0;
+                m.userData._origTransparent = !!m.transparent;
+                m.userData._origDepthWrite = m.depthWrite;
+            }
             if (cloaked) {
-                if (m.userData._origOpacity === undefined) {
-                    m.userData._origOpacity = m.opacity !== undefined ? m.opacity : 1.0;
-                    m.userData._origTransparent = !!m.transparent;
-                }
                 m.transparent = true;
-                m.opacity = 0.42;
-            } else if (m.userData && m.userData._origOpacity !== undefined) {
+                m.opacity = m.userData._origOpacity * shimmer;
+                m.depthWrite = true;
+            } else {
                 m.opacity = m.userData._origOpacity;
                 m.transparent = m.userData._origTransparent;
+                m.depthWrite = m.userData._origDepthWrite;
             }
         }
     });
 }
+
 
 function updateStealthAndDetection() {
     const allUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined') ? [...units, ...enemyUnits] : [];
@@ -3155,7 +3181,9 @@ function updateStealthAndDetection() {
             const u = units[i];
             if (!u || !u.mesh || u.health <= 0) continue;
             const cloaked = !!(u.isStealthed && !(u.revealedUntil && u.revealedUntil > buildingTick));
-            setMeshStealthOpacity(u.mesh, cloaked);
+            // Owner always sees their own stealthed units (translucent shimmer); only enemies lose sight of them
+            if (cloaked && !u.garrisonedIn && !u.mesh.visible && u.health > 0) u.mesh.visible = true;
+            setMeshStealthOpacity(u.mesh, cloaked, performance.now() * 0.001);
         }
     }
     if (typeof structures !== 'undefined') {
@@ -3163,7 +3191,7 @@ function updateStealthAndDetection() {
             const s = structures[i];
             if (!s || !s.mesh || s.health <= 0) continue;
             const cloaked = !!(s.isStealthed && !(s.revealedUntil && s.revealedUntil > buildingTick));
-            setMeshStealthOpacity(s.mesh, cloaked);
+            setMeshStealthOpacity(s.mesh, cloaked, performance.now() * 0.001);
         }
     }
 }

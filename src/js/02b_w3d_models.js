@@ -723,10 +723,14 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         ringWrapper.add(accelRing);
         root.add(ringWrapper);
 
-        const pitGlow = new THREE.PointLight(0x00e5ff, 1.8, 32);
-        pitGlow.name = 'particleCannonGlowLight';
-        pitGlow.position.set(0, 11.5, 24.6);
-        root.add(pitGlow);
+        // Glow is a light-free additive sprite: PointLights force scene-wide shader recompiles (frame spikes) in r128.
+        if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+            const pitGlow = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+            pitGlow.name = 'particleCannonGlowLight';
+            pitGlow.scale.set(14, 14, 1);
+            pitGlow.position.set(0, 11.5, 24.6);
+            root.add(pitGlow);
+        }
     } else if (buildingKey === 'usa_commandCenter') {
         // Official EA Radar Lattice Tower + Spinning Parabolic Dish (ABBtCmdHQ_AC.W3D)
         if (window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_commandCenter_radar']) {
@@ -860,9 +864,12 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
             if (b) b.rotation.z = -Math.PI / 2;
         });
     } else if (buildingKey === 'china_power') {
-        const coreLight = new THREE.PointLight(0x2ed573, 1.8, 28);
-        coreLight.position.set(0, 22, 0);
-        root.add(coreLight);
+        if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+            const coreLight = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x2ed573, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+            coreLight.scale.set(12, 12, 1);
+            coreLight.position.set(0, 22, 0);
+            root.add(coreLight);
+        }
     } else if (buildingKey === 'china_nukeSilo') {
         const l38 = root.getObjectByName('LINE38');
         if (l38) { l38.rotation.z = Math.PI / 2; l38.position.y = 14; }

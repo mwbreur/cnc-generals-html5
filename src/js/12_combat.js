@@ -525,7 +525,19 @@ function checkVeterancyPromotion(unit) {
     }
 }
 
+// Wrapper: publishes the firing unit's world position so every sound played during this shot is
+// distance-attenuated / panned relative to the camera (garrisoned units use their building position).
 function executeWeaponFire(attacker, target) {
+    const sfxSrc = attacker && attacker.mesh ? attacker.mesh.position : null;
+    window._sfxPos = sfxSrc || null;
+    try {
+        return executeWeaponFireInner(attacker, target);
+    } finally {
+        window._sfxPos = null;
+    }
+}
+
+function executeWeaponFireInner(attacker, target) {
     // Never fire weapon or deal damage to friendly teammates / allies or invalid air/ground targets!
     if (!attacker || !target || isFriendly(attacker, target) || !canUnitTarget(attacker, target)) {
         if (attacker && attacker.combatTarget === target) attacker.combatTarget = null;
@@ -546,7 +558,7 @@ function executeWeaponFire(attacker, target) {
         // Artillery & Heavy Siege Missiles
         'tomahawk': 420, 'scud': 600, 'inferno': 240, 'nukecannon': 450, 'nuketank': 450,
         // Anti-Tank & Rocket Troops / Base Defenses
-        'rocket': 60, 'rpg': 60, 'tankhunter': 60, 'patriot': 120, 'stingerSite': 120,
+        'rocket': 60, 'missiledefender': 60, 'rpg': 60, 'tankhunter': 60, 'patriot': 120, 'stingerSite': 120,
         // Standard Infantry Rifle Bursts
         'ranger': 60, 'redguard': 60, 'rebel': 60, 'infantry': 60, 'burton': 50,
         // High-Caliber Snipers
@@ -610,10 +622,13 @@ function executeWeaponFire(attacker, target) {
         attacker._gatlingSpinVel = 0.55;
     }
 
-    // Firing uncloaks stealth units briefly (~1.5s) unless Burton uses his silent knife at point-blank
-    if (attacker.isStealthed) {
+    // Firing uncloaks stealth units for their retail StealthDelay (INIZH.big StealthUpdate; 60 ticks = 1 s).
+    // Pathfinder keeps stealth while attacking (only MOVING breaks it); Burton's silent knife kill stays hidden.
+    if (attacker.isStealthed && attacker.type !== 'pathfinder') {
+        const curT = (typeof buildingTick !== 'undefined' ? buildingTick : 0);
+        const STEALTH_DELAY_TICKS = { stealthfighter: 90, burton: 120, blacklotus: 150, jarmen: 120, hijacker: 30, comanche: 90 };
         attacker.isStealthed = false;
-        attacker.revealedUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 90;
+        attacker.revealedUntil = curT + (STEALTH_DELAY_TICKS[attacker.type] || 90);
     }
 
     // Authentic Heroic Tracers (Heroic rank units fire intense red laser tracers & scaled flashes!)
@@ -694,7 +709,7 @@ function executeWeaponFire(attacker, target) {
                     });
                 }, r * 80);
         }
-    } else if (['rocket', 'rpg', 'tankhunter'].includes(attacker.type)) {
+    } else if (['rocket', 'missiledefender', 'rpg', 'tankhunter'].includes(attacker.type)) {
         // Shoulder-fired rockets (Tracked for Point Defense Laser interception; apRockets applied in applyCalculatedDamage)
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff9f43, 0.5 * heroicScale);
         spawnRocketProjectile(muzzlePos, targetPos, false, attacker.type === 'rpg' || attacker.type === 'tankhunter', {
@@ -706,7 +721,7 @@ function executeWeaponFire(attacker, target) {
         });
         if (attacker.type === 'rpg') playAudio('rpg_launch', {}, 'gla');
         else if (attacker.type === 'tankhunter') playAudio('tankhunter_rocket', {}, 'china');
-        else if (typeof playUSASound === 'function') playUSASound('missile_defender');
+        else playAudio('missile_defender', {}, 'usa');
     } else if (['tomahawk', 'scud'].includes(attacker.type)) {
         // SCUD Launcher must elevate its launch rail into firing position before launching
         if (attacker.type === 'scud') {
@@ -731,6 +746,8 @@ function executeWeaponFire(attacker, target) {
                 damage: mDmg,
                 damageType: 'EXPLOSIVE',
                 splashRadius: mSplash,
+                impactSound: attacker.type === 'tomahawk' ? 'expl_tomahawk' : null,
+                impactShake: attacker.type === 'tomahawk' ? 1.6 : 0,
                 missileTemplate: tomMissileNode
         });
         if (attacker.type === 'tomahawk') playUSASound('tomahawk_launch');

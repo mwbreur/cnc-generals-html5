@@ -199,11 +199,8 @@ function updateWorldBuildingGarrisonVisual(bld) {
         }
 
         // Subtle garrison glow + viewing/firing range ring on the ground
-        if (typeof THREE.PointLight === 'function') {
-            const gLight = new THREE.PointLight(flagColor, 1.5, 20);
-            gLight.position.set(0, 4.2, 0);
-            grp.add(gLight);
-        }
+        // NOTE: no THREE.PointLight here. Adding/removing a light changes NUM_POINT_LIGHTS and forces a synchronous
+        // recompile of every material in the scene (1s+ frame stall). The range ring + pips convey garrison state.
         let viewRange = 30;
         for (let gi = 0; gi < bld.garrisoned.length; gi++) {
             const gu = bld.garrisoned[gi];
