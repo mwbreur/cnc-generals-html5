@@ -338,7 +338,7 @@ function parseOfficialMap(mapKey, meta) {
 
     // 2. Locate HeightMapData, BlendTileData, ObjectsList, and PolygonTriggers chunks
     let hmChunkPos = -1;
-    let blendPos = -1, blendEnd = -1;
+    let blendPos = -1, blendEnd = -1, blendVer = 0;
     let objListPos = -1, objListEnd = -1;
     let trigPos = -1, trigEnd = -1;
     let scanPos = pos;
@@ -353,6 +353,7 @@ function parseOfficialMap(mapKey, meta) {
         } else if (cname === 'BlendTileData') {
             blendPos = dataStart;
             blendEnd = dataStart + csz;
+            blendVer = cver;
         } else if (cname === 'ObjectsList') {
             objListPos = dataStart;
             objListEnd = dataStart + csz;
@@ -605,100 +606,244 @@ function parseOfficialMap(mapKey, meta) {
         }
     }
 
-    // 5c. Bake 384x384 Retail Terrain Texture from BlendTileData + Terrain.big + Roads
+    // 5c. Bake 512x512 Retail Terrain Texture from BlendTileData (tileNdx + quarterTileUv + blendTileNdx + extraBlendTileNdx + cliffInfoNdx) + Terrain.big + Roads
     let terrainDataUrl = '';
     if (blendPos > 0 && blendPos < blendEnd) {
-        const N = decomp.readInt32LE(blendPos);
-        // Find TextureClass array start by locating numTexClasses right before first TextureClass
+        let bp = blendPos;
+        const N = decomp.readInt32LE(bp); bp += 4;
+        const tileNdxOff = bp; bp += N * 2;
+        const blendNdxOff = bp; bp += N * 2;
+        const extraNdxOff = blendVer >= 6 ? bp : -1;
+        if (blendVer >= 6) bp += N * 2;
+        const cliffNdxOff = bp; bp += N * 2;
+        const cliffByteWidth = blendVer === 7 ? Math.floor((W + 1) / 8) : Math.ceil(W / 8);
+        const cliffStateOff = bp;
+        if (blendVer >= 7) bp += H * cliffByteWidth;
+
+        const numBitmapTiles = decomp.readInt32LE(bp); bp += 4;
+        const numBlendedTiles = decomp.readInt32LE(bp); bp += 4;
+        const numCliffInfo = decomp.readInt32LE(bp); bp += 4;
+        const numTexClasses = decomp.readInt32LE(bp); bp += 4;
         const texClasses = [];
-        let tcStart = -1;
-        for (let probe = blendPos + 4 + N * 8; probe + 26 < blendEnd; probe++) {
-            const cnt = decomp.readInt32LE(probe);
-            if (cnt > 0 && cnt < 128 && decomp.readInt32LE(probe + 4) === 0) {
-                const nTiles = decomp.readInt32LE(probe + 8);
-                const width = decomp.readInt32LE(probe + 12);
-                const sLen = decomp.readUInt16LE(probe + 20);
-                if (nTiles > 0 && nTiles <= 256 && width > 0 && width <= 16 && sLen > 2 && sLen < 48 && probe + 22 + sLen <= blendEnd) {
-                    const candidate = decomp.toString('ascii', probe + 22, probe + 22 + sLen);
-                    if (/^[A-Za-z0-9_]+$/.test(candidate)) {
-                        tcStart = probe;
-                        break;
-                    }
+        for (let i = 0; i < numTexClasses && bp + 18 <= blendEnd; i++) {
+            const firstTile = decomp.readInt32LE(bp); bp += 4;
+            const numTiles = decomp.readInt32LE(bp); bp += 4;
+            const width = decomp.readInt32LE(bp); bp += 4;
+            bp += 4; // legacy isGDI
+            const nLen = decomp.readUInt16LE(bp); bp += 2;
+            const name = decomp.toString('ascii', bp, bp + nLen); bp += nLen;
+            const file = TERRAIN_ASSETS.terrainClassToFile[name.toLowerCase()] || '';
+            const tga = TERRAIN_ASSETS.getTga(file);
+            texClasses.push({ firstTile, numTiles, width, name, tga });
+        }
+        if (bp + 8 <= blendEnd) {
+            bp += 4; // numEdgeTiles
+            const numEdgeClasses = decomp.readInt32LE(bp); bp += 4;
+            for (let i = 0; i < numEdgeClasses && bp + 14 <= blendEnd; i++) {
+                bp += 12;
+                const nLen = decomp.readUInt16LE(bp); bp += 2 + nLen;
+            }
+        }
+        const blendedTiles = [{ blendNdx: 0, shape: 0, custom: -1 }];
+        for (let i = 1; i < numBlendedTiles && bp + 18 <= blendEnd; i++) {
+            const bNdx = decomp.readInt32LE(bp);
+            const horiz = decomp[bp + 4];
+            const vert = decomp[bp + 5];
+            const rightDiag = decomp[bp + 6];
+            const leftDiag = decomp[bp + 7];
+            const inverted = decomp[bp + 8];
+            const longDiag = decomp[bp + 9];
+            const custom = decomp.readInt32LE(bp + 10);
+            bp += 18;
+            let shape = 0;
+            if (horiz !== 0) shape = 0;
+            else if (vert !== 0) shape = 1;
+            else if (rightDiag !== 0) shape = longDiag !== 0 ? 5 : 3;
+            else if (leftDiag !== 0) shape = longDiag !== 0 ? 4 : 2;
+            if ((inverted & 1) !== 0) shape += 6;
+            blendedTiles.push({ blendNdx: bNdx, shape, custom });
+        }
+        const cliffInfos = [{ tileIndex: 0, u0: 0, v0: 0, u1: 0, v1: 0, u2: 0, v2: 0, u3: 0, v3: 0 }];
+        for (let i = 1; i < numCliffInfo && bp + 38 <= blendEnd; i++) {
+            cliffInfos.push({
+                tileIndex: decomp.readInt32LE(bp),
+                u0: decomp.readFloatLE(bp + 4), v0: decomp.readFloatLE(bp + 8),
+                u1: decomp.readFloatLE(bp + 12), v1: decomp.readFloatLE(bp + 16),
+                u2: decomp.readFloatLE(bp + 20), v2: decomp.readFloatLE(bp + 24),
+                u3: decomp.readFloatLE(bp + 28), v3: decomp.readFloatLE(bp + 32)
+            });
+            bp += 38;
+        }
+
+        const evalBlendAlpha = (shape, cu, cv) => {
+            const inv = shape >= 6;
+            const base = inv ? shape - 6 : shape;
+            let h = cu, v = cv;
+            if (base === 0) {
+                if (!inv) h = 1 - h;
+                return 1 - Math.max(0, Math.min(1, h));
+            }
+            if (base === 1) {
+                if (!inv) v = 1 - v;
+                return 1 - Math.max(0, Math.min(1, v));
+            }
+            const rightD = base === 3 || base === 5;
+            const longD = base === 4 || base === 5;
+            if (rightD) h = 1 - h;
+            if (!inv) v = 1 - v;
+            v += h;
+            if (longD) v -= 64 / 63;
+            return 1 - Math.max(0, Math.min(1, v));
+        };
+
+        // Precompute a 4x4 box-filtered mip (8x8 texel average per sample) for each quarter-tile (tileId) on demand.
+        // Matches WorldHeightMap's macro mip sampling (sentifold tileAtlas.ts) so the macro map captures smooth
+        // tile color gradients and exact blend transitions with zero 3-world-unit Nyquist pebble aliasing blotches,
+        // while the 2048px canvas pattern + dual-scale GPU detail/cliff shader render crisp 1:1 retail texels up close.
+        const quarterTileMipCache = new Map();
+        const getQuarterTileMip4x4 = (tileId) => {
+            let mip = quarterTileMipCache.get(tileId);
+            if (mip) return mip;
+            const baseTileId = tileId >> 2;
+            let cls = texClasses[0];
+            for (let c = 0; c < texClasses.length; c++) {
+                if (baseTileId >= texClasses[c].firstTile && baseTileId < texClasses[c].firstTile + texClasses[c].numTiles) {
+                    cls = texClasses[c];
+                    break;
                 }
             }
-        }
-        if (tcStart !== -1) {
-            let bp = tcStart;
-            const numTexClasses = decomp.readInt32LE(bp); bp += 4;
-            for (let i = 0; i < numTexClasses && bp + 18 <= blendEnd; i++) {
-                const firstTile = decomp.readInt32LE(bp); bp += 4;
-                const numTiles = decomp.readInt32LE(bp); bp += 4;
-                const width = decomp.readInt32LE(bp); bp += 4;
-                bp += 4; // isGDI
-                const nLen = decomp.readUInt16LE(bp); bp += 2;
-                const name = decomp.toString('ascii', bp, bp + nLen); bp += nLen;
-                const file = TERRAIN_ASSETS.terrainClassToFile[name.toLowerCase()] || '';
-                const tga = TERRAIN_ASSETS.getTga(file);
-                texClasses.push({ firstTile, numTiles, width, name, tga });
+            mip = new Float32Array(16 * 4);
+            if (!cls || !cls.tga) {
+                for (let i = 0; i < 16; i++) {
+                    mip[i * 4] = 180; mip[i * 4 + 1] = 150; mip[i * 4 + 2] = 105; mip[i * 4 + 3] = 255;
+                }
+                quarterTileMipCache.set(tileId, mip);
+                return mip;
             }
-        }
+            const localTile = Math.max(0, baseTileId - cls.firstTile);
+            const tw = Math.max(1, cls.width || 1);
+            const tileCol = localTile % tw;
+            const tileRow = Math.floor(localTile / tw) % tw;
+            const tileW = cls.tga.w / tw;
+            const tileH = cls.tga.h / tw;
+            const minU = (tileId & 1) !== 0 ? 0.5 : 0.0;
+            const maxU = (tileId & 1) !== 0 ? 1.0 : 0.5;
+            const minV = (tileId & 2) !== 0 ? 0.0 : 0.5;
+            const maxV = (tileId & 2) !== 0 ? 0.5 : 1.0;
+            const qx0 = Math.floor((tileCol + minU) * tileW);
+            const qy0 = Math.floor((tileRow + minV) * tileH);
+            const qw = Math.max(4, Math.floor((maxU - minU) * tileW));
+            const qh = Math.max(4, Math.floor((maxV - minV) * tileH));
+            for (let gy = 0; gy < 4; gy++) {
+                const yStart = qy0 + Math.floor((gy / 4) * qh);
+                const yEnd = Math.min(cls.tga.h, qy0 + Math.max(yStart - qy0 + 1, Math.floor(((gy + 1) / 4) * qh)));
+                for (let gx = 0; gx < 4; gx++) {
+                    const xStart = qx0 + Math.floor((gx / 4) * qw);
+                    const xEnd = Math.min(cls.tga.w, qx0 + Math.max(xStart - qx0 + 1, Math.floor(((gx + 1) / 4) * qw)));
+                    let sr = 0, sg = 0, sb = 0, sa = 0, cnt = 0;
+                    for (let ty = yStart; ty < yEnd; ty++) {
+                        for (let tx = xStart; tx < xEnd; tx++) {
+                            const si = (ty * cls.tga.w + tx) * 4;
+                            sr += cls.tga.rgba[si];
+                            sg += cls.tga.rgba[si + 1];
+                            sb += cls.tga.rgba[si + 2];
+                            sa += cls.tga.rgba[si + 3];
+                            cnt++;
+                        }
+                    }
+                    const di = (gy * 4 + gx) * 4;
+                    mip[di] = sr / (cnt || 1);
+                    mip[di + 1] = sg / (cnt || 1);
+                    mip[di + 2] = sb / (cnt || 1);
+                    mip[di + 3] = sa / (cnt || 1);
+                }
+            }
+            quarterTileMipCache.set(tileId, mip);
+            return mip;
+        };
+
+        const sampleTileIdRgba = (tileId, cu, cv) => {
+            const mip = getQuarterTileMip4x4(tileId);
+            const fx = Math.max(0, Math.min(3, cu * 3));
+            const fy = Math.max(0, Math.min(3, cv * 3));
+            const x0 = Math.min(2, Math.floor(fx)), x1 = x0 + 1, wx = fx - x0;
+            const y0 = Math.min(2, Math.floor(fy)), y1 = y0 + 1, wy = fy - y0;
+            const i00 = (y0 * 4 + x0) * 4, i10 = (y0 * 4 + x1) * 4;
+            const i01 = (y1 * 4 + x0) * 4, i11 = (y1 * 4 + x1) * 4;
+            const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy), w01 = (1 - wx) * wy, w11 = wx * wy;
+            return [
+                mip[i00] * w00 + mip[i10] * w10 + mip[i01] * w01 + mip[i11] * w11,
+                mip[i00 + 1] * w00 + mip[i10 + 1] * w10 + mip[i01 + 1] * w01 + mip[i11 + 1] * w11,
+                mip[i00 + 2] * w00 + mip[i10 + 2] * w10 + mip[i01 + 2] * w01 + mip[i11 + 2] * w11,
+                mip[i00 + 3] * w00 + mip[i10 + 3] * w10 + mip[i01 + 3] * w01 + mip[i11 + 3] * w11
+            ];
+        };
+
         if (texClasses.length > 0) {
-            const TEX_RES = 512;
+            const TEX_RES = 768;
             const rgba = Buffer.alloc(TEX_RES * TEX_RES * 4);
-            const cliffOff = blendPos + 4 + N * 6;
-            const sampleCellRgb = (cx, cy, uWorld, vWorld) => {
+            const evalCellAt = (cx, cy, cu, cv) => {
                 const cellIdx = cy * W + cx;
-                const tileIdx = decomp.readUInt16LE(blendPos + 4 + cellIdx * 2) >> 2;
-                let cls = texClasses[0];
-                for (let c = 0; c < texClasses.length; c++) {
-                    if (tileIdx >= texClasses[c].firstTile && tileIdx < texClasses[c].firstTile + texClasses[c].numTiles) {
-                        cls = texClasses[c];
-                        break;
+                const tileId = decomp.readInt16LE(tileNdxOff + cellIdx * 2);
+                const base = sampleTileIdRgba(tileId, cu, cv);
+                let r = base[0], g = base[1], b = base[2];
+
+                const bNdx = decomp.readInt16LE(blendNdxOff + cellIdx * 2);
+                if (bNdx > 0 && bNdx < blendedTiles.length) {
+                    const bInfo = blendedTiles[bNdx];
+                    if (bInfo.custom < 0) {
+                        const bSample = sampleTileIdRgba(bInfo.blendNdx, cu, cv);
+                        const a = evalBlendAlpha(bInfo.shape, cu, cv) * (bSample[3] / 255);
+                        r = r * (1 - a) + bSample[0] * a;
+                        g = g * (1 - a) + bSample[1] * a;
+                        b = b * (1 - a) + bSample[2] * a;
                     }
                 }
-                let r = 180, g = 150, b = 105;
-                if (cls && cls.tga) {
-                    const sub = Math.max(0, tileIdx - cls.firstTile);
-                    const tw = Math.max(1, cls.width || 1);
-                    const subX = sub % tw;
-                    const subY = Math.floor(sub / tw) % tw;
-                    const tileW = cls.tga.w / tw;
-                    const tileH = cls.tga.h / tw;
-                    const u = uWorld - Math.floor(uWorld);
-                    const v = vWorld - Math.floor(vWorld);
-                    const tx = Math.min(cls.tga.w - 1, Math.floor(subX * tileW + u * tileW));
-                    const ty = Math.min(cls.tga.h - 1, Math.floor(subY * tileH + v * tileH));
-                    const si = (ty * cls.tga.w + tx) * 4;
-                    r = cls.tga.rgba[si]; g = cls.tga.rgba[si + 1]; b = cls.tga.rgba[si + 2];
+                if (extraNdxOff > 0) {
+                    const eNdx = decomp.readInt16LE(extraNdxOff + cellIdx * 2);
+                    if (eNdx > 0 && eNdx < blendedTiles.length) {
+                        const eInfo = blendedTiles[eNdx];
+                        if (eInfo.custom < 0) {
+                            const eSample = sampleTileIdRgba(eInfo.blendNdx, cu, cv);
+                            const a = evalBlendAlpha(eInfo.shape, cu, cv) * (eSample[3] / 255);
+                            r = r * (1 - a) + eSample[0] * a;
+                            g = g * (1 - a) + eSample[1] * a;
+                            b = b * (1 - a) + eSample[2] * a;
+                        }
+                    }
                 }
-                if (decomp[cliffOff + cellIdx] > 0) {
-                    r *= 0.72; g *= 0.70; b *= 0.68;
+                if (blendVer >= 7) {
+                    const isCliff = (decomp[cliffStateOff + cy * cliffByteWidth + (cx >> 3)] & (1 << (cx & 7))) !== 0;
+                    if (isCliff) {
+                        r *= 0.85; g *= 0.83; b *= 0.80;
+                    }
                 }
                 return [r, g, b];
             };
+
             for (let py = 0; py < TEX_RES; py++) {
                 const normY = py / (TEX_RES - 1);
                 const fy = border + (1 - normY) * (playH - 1);
-                const sy0 = Math.min(H - 1, Math.max(0, Math.floor(fy)));
-                const sy1 = Math.min(H - 1, sy0 + 1);
-                const wy = fy - sy0;
-                const vWorld = normY * 24;
+                const cy = Math.min(H - 2, Math.max(0, Math.floor(fy)));
+                const cv = fy - cy;
                 for (let px = 0; px < TEX_RES; px++) {
                     const normX = px / (TEX_RES - 1);
                     const fx = border + normX * (playW - 1);
-                    const sx0 = Math.min(W - 1, Math.max(0, Math.floor(fx)));
-                    const sx1 = Math.min(W - 1, sx0 + 1);
-                    const wx = fx - sx0;
-                    const uWorld = normX * 24;
-                    const c00 = sampleCellRgb(sx0, sy0, uWorld, vWorld);
-                    const c10 = sampleCellRgb(sx1, sy0, uWorld, vWorld);
-                    const c01 = sampleCellRgb(sx0, sy1, uWorld, vWorld);
-                    const c11 = sampleCellRgb(sx1, sy1, uWorld, vWorld);
-                    const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy), w01 = (1 - wx) * wy, w11 = wx * wy;
+                    const cx = Math.min(W - 2, Math.max(0, Math.floor(fx)));
+                    const cu = fx - cx;
+                    // Smooth 2x2 sub-cell supersampling across cell boundaries
+                    const c0 = evalCellAt(cx, cy, cu, cv);
+                    const cX = evalCellAt(Math.min(W - 2, cx + 1), cy, cu, cv);
+                    const cY = evalCellAt(cx, Math.min(H - 2, cy + 1), cu, cv);
+                    const bx = Math.max(0, (cu - 0.65) / 0.35) * 0.35;
+                    const by = Math.max(0, (cv - 0.65) / 0.35) * 0.35;
+                    const r = c0[0] * (1 - bx - by) + cX[0] * bx + cY[0] * by;
+                    const g = c0[1] * (1 - bx - by) + cX[1] * bx + cY[1] * by;
+                    const b = c0[2] * (1 - bx - by) + cX[2] * bx + cY[2] * by;
                     const di = (py * TEX_RES + px) * 4;
-                    rgba[di] = Math.round(c00[0] * w00 + c10[0] * w10 + c01[0] * w01 + c11[0] * w11);
-                    rgba[di + 1] = Math.round(c00[1] * w00 + c10[1] * w10 + c01[1] * w01 + c11[1] * w11);
-                    rgba[di + 2] = Math.round(c00[2] * w00 + c10[2] * w10 + c01[2] * w01 + c11[2] * w11);
+                    rgba[di] = Math.round(r);
+                    rgba[di + 1] = Math.round(g);
+                    rgba[di + 2] = Math.round(b);
                     rgba[di + 3] = 255;
                 }
             }
@@ -791,41 +936,61 @@ for (const meta of OFFICIAL_MAP_LIST) {
     officialMaps[meta.id] = parseOfficialMap(meta.id, meta);
 }
 
-// Extract crisp 256x256 seamless retail ground detail tiles from Terrain.big / TerrainZH.big
-function encodeRetailTile256(tgaName) {
+// Extract crisp 1:1 native 256x256 seamless retail ground detail tiles from Terrain.big / TerrainZH.big
+// using the sharpest 4x4 (256x256) retail TGA sheets with seamless edge-wrapping & micro-contrast enhancement.
+function encodeRetailTile256(tgaName, contrastBoost = 1.35) {
     const tga = TERRAIN_ASSETS.getTga(tgaName);
     if (!tga) throw new Error(`Missing retail terrain tile: ${tgaName}`);
     const outSz = 256;
-    const rgba = Buffer.alloc(outSz * outSz * 4);
+    const raw = Buffer.alloc(outSz * outSz * 4);
+    let sumR = 0, sumG = 0, sumB = 0;
+    const n = outSz * outSz;
     for (let y = 0; y < outSz; y++) {
-        const sy = (y / outSz) * tga.h;
-        const y0 = Math.floor(sy) % tga.h;
-        const y1 = (y0 + 1) % tga.h;
-        const wy = sy - Math.floor(sy);
+        const y0 = y % tga.h;
         for (let x = 0; x < outSz; x++) {
-            const sx = (x / outSz) * tga.w;
-            const x0 = Math.floor(sx) % tga.w;
-            const x1 = (x0 + 1) % tga.w;
-            const wx = sx - Math.floor(sx);
-            const i00 = (y0 * tga.w + x0) * 4, i10 = (y0 * tga.w + x1) * 4;
-            const i01 = (y1 * tga.w + x0) * 4, i11 = (y1 * tga.w + x1) * 4;
-            const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy), w01 = (1 - wx) * wy, w11 = wx * wy;
+            const x0 = x % tga.w;
+            const si = (y0 * tga.w + x0) * 4;
             const di = (y * outSz + x) * 4;
-            rgba[di] = Math.round(tga.rgba[i00] * w00 + tga.rgba[i10] * w10 + tga.rgba[i01] * w01 + tga.rgba[i11] * w11);
-            rgba[di + 1] = Math.round(tga.rgba[i00 + 1] * w00 + tga.rgba[i10 + 1] * w10 + tga.rgba[i01 + 1] * w01 + tga.rgba[i11 + 1] * w11);
-            rgba[di + 2] = Math.round(tga.rgba[i00 + 2] * w00 + tga.rgba[i10 + 2] * w10 + tga.rgba[i01 + 2] * w01 + tga.rgba[i11 + 2] * w11);
-            rgba[di + 3] = 255;
+            raw[di] = tga.rgba[si];
+            raw[di + 1] = tga.rgba[si + 1];
+            raw[di + 2] = tga.rgba[si + 2];
+            raw[di + 3] = 255;
+            sumR += raw[di]; sumG += raw[di + 1]; sumB += raw[di + 2];
+        }
+    }
+    const meanR = sumR / n, meanG = sumG / n, meanB = sumB / n;
+    // Seamless toroidal cross-fade border (16px) + micro-contrast around mean color
+    const rgba = Buffer.alloc(outSz * outSz * 4);
+    const border = 16;
+    for (let y = 0; y < outSz; y++) {
+        const wy = y < border ? (y / border) : 1.0;
+        const oppY = (y + (outSz >> 1)) % outSz;
+        for (let x = 0; x < outSz; x++) {
+            const wx = x < border ? (x / border) : 1.0;
+            const oppX = (x + (outSz >> 1)) % outSz;
+            const i00 = (y * outSz + x) * 4;
+            const i10 = (y * outSz + oppX) * 4;
+            const i01 = (oppY * outSz + x) * 4;
+            const i11 = (oppY * outSz + oppX) * 4;
+            const w00 = wx * wy, w10 = (1 - wx) * wy, w01 = wx * (1 - wy), w11 = (1 - wx) * (1 - wy);
+            for (let c = 0; c < 3; c++) {
+                const meanC = c === 0 ? meanR : (c === 1 ? meanG : meanB);
+                const val = raw[i00 + c] * w00 + raw[i10 + c] * w10 + raw[i01 + c] * w01 + raw[i11 + c] * w11;
+                const boosted = meanC + (val - meanC) * contrastBoost;
+                rgba[i00 + c] = Math.max(0, Math.min(255, Math.round(boosted)));
+            }
+            rgba[i00 + 3] = 255;
         }
     }
     return encodeRgbPngDataUrl(rgba, outSz, outSz, 0xff);
 }
 
 const RETAIL_TERRAIN_TILES = {
-    desert: encodeRetailTile256('TLSand01a.tga'),
-    jungle: encodeRetailTile256('TGGrass02.tga'),
-    snow: encodeRetailTile256('TLSnow01a.tga'),
-    city: encodeRetailTile256('TMDirt01a.tga'),
-    cliff: encodeRetailTile256('rock01.tga')
+    desert: encodeRetailTile256('tmsand11a.tga', 1.45),
+    jungle: encodeRetailTile256('tmgras08a.tga', 1.30),
+    snow: encodeRetailTile256('tmsnow03b.tga', 1.45),
+    city: encodeRetailTile256('tmdirt12a.tga', 1.35),
+    cliff: encodeRetailTile256('tmrock01a.tga', 1.35)
 };
 const retailSandUri = RETAIL_TERRAIN_TILES.desert;
 

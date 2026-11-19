@@ -894,13 +894,15 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     if (isCustom) {
         terrainTexture = createCustomTerrainTexture(activeCustomMap);
     } else if (isOfficialTexMap && typeof document !== 'undefined' && document.createElement) {
-        // Render authentic EA BlendTileData + Terrain.big + Roads map texture at 1024x1024 (micro-detail applied via GPU shader)
+        // Render authentic EA BlendTileData + Terrain.big + Roads map texture at 2048x2048 with both
+        // baked 16x16 retail tile overlay AND multi-scale GPU detail/cliff shader for crisp close-up ground.
+        const MACRO_CANVAS_RES = 2048;
         const macroCanvas = document.createElement('canvas');
-        macroCanvas.width = macroCanvas.height = 1024;
+        macroCanvas.width = macroCanvas.height = MACRO_CANVAS_RES;
         const mCtx = macroCanvas.getContext && macroCanvas.getContext('2d');
         if (mCtx) {
             mCtx.fillStyle = effectiveTheme === 'snow' ? '#dfe6ec' : effectiveTheme === 'jungle' ? '#50643a' : '#bfa87a';
-            mCtx.fillRect(0, 0, 1024, 1024);
+            mCtx.fillRect(0, 0, MACRO_CANVAS_RES, MACRO_CANVAS_RES);
         }
         terrainTexture = new THREE.CanvasTexture(macroCanvas);
         terrainTexture.wrapS = terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
@@ -909,16 +911,45 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
         terrainTexture.magFilter = THREE.LinearFilter;
         terrainTexture.generateMipmaps = true;
 
+        const detailKeyForMacro = (effectiveTheme === 'snow' || effectiveTheme === 'jungle' || effectiveTheme === 'city') ? effectiveTheme : 'desert';
+        const detailUriForMacro = (typeof window !== 'undefined' && window.RETAIL_TERRAIN_TILES && window.RETAIL_TERRAIN_TILES[detailKeyForMacro]) || null;
+        let loadedMacroImg = null;
+        let loadedTileImg = null;
+        const compositeOfficialMacroCanvas = () => {
+            if (!mCtx || !loadedMacroImg) return;
+            mCtx.globalCompositeOperation = 'source-over';
+            mCtx.globalAlpha = 1.0;
+            mCtx.imageSmoothingEnabled = true;
+            mCtx.imageSmoothingQuality = 'high';
+            mCtx.drawImage(loadedMacroImg, 0, 0, MACRO_CANVAS_RES, MACRO_CANVAS_RES);
+            if (loadedTileImg && typeof mCtx.createPattern === 'function') {
+                const pat = mCtx.createPattern(loadedTileImg, 'repeat');
+                if (pat) {
+                    mCtx.save();
+                    mCtx.globalCompositeOperation = 'overlay';
+                    mCtx.globalAlpha = 0.42;
+                    mCtx.fillStyle = pat;
+                    mCtx.fillRect(0, 0, MACRO_CANVAS_RES, MACRO_CANVAS_RES);
+                    mCtx.restore();
+                }
+            }
+            terrainTexture.needsUpdate = true;
+        };
+
         const macroImg = new Image();
         macroImg.onload = function() {
-            if (mCtx) {
-                mCtx.imageSmoothingEnabled = true;
-                mCtx.imageSmoothingQuality = 'high';
-                mCtx.drawImage(macroImg, 0, 0, 1024, 1024);
-                terrainTexture.needsUpdate = true;
-            }
+            loadedMacroImg = macroImg;
+            compositeOfficialMacroCanvas();
         };
         macroImg.src = officialMap.terrainDataUrl;
+        if (detailUriForMacro) {
+            const dImg = new Image();
+            dImg.onload = function() {
+                loadedTileImg = dImg;
+                compositeOfficialMacroCanvas();
+            };
+            dImg.src = detailUriForMacro;
+        }
     } else if (typeof document !== 'undefined' && document.createElement) {
         // High-resolution tiled ground texture (54x54 across map) for procedural theaters
         const tileCanvas = document.createElement('canvas');
@@ -1066,37 +1097,58 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     if (terrainTexture && 'anisotropy' in terrainTexture) {
         terrainTexture.anisotropy = 16;
     }
+    const detailTex = (typeof _getRetailTerrainDetailTex === 'function') ? _getRetailTerrainDetailTex(procDetailKey) : null;
+    const cliffTex = (typeof _getRetailTerrainDetailTex === 'function') ? _getRetailTerrainDetailTex('cliff') : null;
+    const detailRepeat = Math.max(48.0, Math.round(mapSize / 22));
+    if (detailTex && detailTex.repeat) {
+        detailTex.repeat.set(detailRepeat, detailRepeat);
+    }
+    // Use high-frequency repeating detailTex for bumpMap instead of the coarse macro terrainTexture
+    // so close-up terrain surface relief has 8192x8192 effective texel density instead of 512px blocks.
     const terrainMat = new THREE.MeshStandardMaterial({
             map: terrainTexture,
             vertexColors: !isCustom,
-            bumpMap: terrainTexture,
-            bumpScale: 0.42,
-            roughness: effectiveTheme === 'snow' ? 0.75 : effectiveTheme === 'city' ? 0.85 : 0.92,
-            metalness: effectiveTheme === 'snow' ? 0.15 : effectiveTheme === 'city' ? 0.1 : 0.05
+            bumpMap: detailTex || terrainTexture,
+            bumpScale: detailTex ? 0.18 : 0.25,
+            roughness: effectiveTheme === 'snow' ? 0.78 : effectiveTheme === 'city' ? 0.86 : 0.93,
+            metalness: effectiveTheme === 'snow' ? 0.12 : effectiveTheme === 'city' ? 0.08 : 0.04
     });
-    const detailTex = (typeof _getRetailTerrainDetailTex === 'function') ? _getRetailTerrainDetailTex(procDetailKey) : null;
-    const cliffTex = (typeof _getRetailTerrainDetailTex === 'function') ? _getRetailTerrainDetailTex('cliff') : null;
     if ((isOfficialTexMap || isCustom) && detailTex && cliffTex && typeof document !== 'undefined') {
-        const detailRepeat = Math.max(36.0, Math.round(mapSize / 26));
-        const detailStrength = effectiveTheme === 'snow' ? 0.55 : 0.78;
-        terrainMat.customProgramCacheKey = () => 'terrain_detail_v1_' + procDetailKey;
+        const detailStrength = effectiveTheme === 'snow' ? 0.85 : 1.05;
+        const meanMap = {
+            desert: [0.82, 0.65, 0.30],
+            jungle: [0.40, 0.48, 0.18],
+            snow:   [0.83, 0.82, 0.75],
+            city:   [0.78, 0.63, 0.36]
+        };
+        const mRgb = meanMap[procDetailKey] || meanMap.desert;
+        const uDetailMean = (typeof THREE.Vector3 === 'function') ? new THREE.Vector3(mRgb[0], mRgb[1], mRgb[2]) : { x: mRgb[0], y: mRgb[1], z: mRgb[2] };
+        const uCliffMean = (typeof THREE.Vector3 === 'function') ? new THREE.Vector3(0.78, 0.66, 0.46) : { x: 0.78, y: 0.66, z: 0.46 };
+        terrainMat.customProgramCacheKey = () => 'terrain_detail_v2_' + procDetailKey;
         terrainMat.onBeforeCompile = (shader) => {
             shader.uniforms.uDetailMap = { value: detailTex };
             shader.uniforms.uCliffMap = { value: cliffTex };
             shader.uniforms.uDetailRepeat = { value: detailRepeat };
             shader.uniforms.uDetailStrength = { value: detailStrength };
+            shader.uniforms.uDetailMean = { value: uDetailMean };
+            shader.uniforms.uCliffMean = { value: uCliffMean };
             shader.vertexShader = shader.vertexShader
-                .replace('#include <common>', '#include <common>\nvarying float vTerrainSlope;')
-                .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTerrainSlope = 1.0 - clamp( normal.y, 0.0, 1.0 );');
+                .replace('#include <common>', '#include <common>\nvarying float vTerrainSlope;\nvarying vec2 vTerrainUv;')
+                .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTerrainSlope = 1.0 - clamp( normal.y, 0.0, 1.0 );\nvTerrainUv = uv;');
             shader.fragmentShader = shader.fragmentShader
-                .replace('#include <common>', '#include <common>\nuniform sampler2D uDetailMap;\nuniform sampler2D uCliffMap;\nuniform float uDetailRepeat;\nuniform float uDetailStrength;\nvarying float vTerrainSlope;')
+                .replace('#include <common>', '#include <common>\nuniform sampler2D uDetailMap;\nuniform sampler2D uCliffMap;\nuniform float uDetailRepeat;\nuniform float uDetailStrength;\nuniform vec3 uDetailMean;\nuniform vec3 uCliffMean;\nvarying float vTerrainSlope;\nvarying vec2 vTerrainUv;')
                 .replace('#include <map_fragment>', `#include <map_fragment>
-                    vec2 dUv = vUv * uDetailRepeat;
-                    vec3 dTex = texture2D( uDetailMap, dUv ).rgb;
-                    vec3 cTex = texture2D( uCliffMap, dUv * 0.65 ).rgb;
-                    float slopeMix = smoothstep( 0.16, 0.42, vTerrainSlope );
-                    vec3 detailTint = mix( vec3( 1.0 ) + ( dTex - vec3( 0.5 ) ) * uDetailStrength, cTex * 1.15, slopeMix * 0.65 );
-                    diffuseColor.rgb = clamp( diffuseColor.rgb * detailTint, 0.0, 1.0 );
+                    vec2 dUv1 = vTerrainUv * uDetailRepeat;
+                    vec2 dUv2 = mat2( 0.80, -0.60, 0.60, 0.80 ) * ( vTerrainUv * ( uDetailRepeat * 2.85 ) );
+                    vec3 dTex1 = texture2D( uDetailMap, dUv1 ).rgb - uDetailMean;
+                    vec3 dTex2 = texture2D( uDetailMap, dUv2 ).rgb - uDetailMean;
+                    vec3 groundDelta = ( dTex1 * 0.72 + dTex2 * 0.48 ) * uDetailStrength;
+                    vec3 cTex1 = texture2D( uCliffMap, dUv1 * 0.75 ).rgb - uCliffMean;
+                    vec3 cTex2 = texture2D( uCliffMap, dUv2 * 0.55 ).rgb - uCliffMean;
+                    vec3 cliffDelta = ( cTex1 * 0.85 + cTex2 * 0.55 ) * ( uDetailStrength * 1.15 );
+                    float slopeMix = smoothstep( 0.12, 0.36, vTerrainSlope );
+                    vec3 finalDelta = mix( groundDelta, cliffDelta, slopeMix );
+                    diffuseColor.rgb = clamp( diffuseColor.rgb * ( vec3( 1.0 ) + finalDelta * 0.85 ) + finalDelta * 0.14, 0.0, 1.0 );
                 `);
         };
     }
