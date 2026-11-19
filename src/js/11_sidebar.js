@@ -362,17 +362,19 @@ function renderRadarMinimap() {
             const vDir = renderRadarMinimap._vDir;
             if (typeof vCorner.unproject === 'function') {
                 const groundY = (typeof cameraTarget !== 'undefined' && cameraTarget && Number.isFinite(cameraTarget.y)) ? cameraTarget.y : 0;
-                const maxRayDist = mapSize * 1.35;
-                const ndcCorners = [[-1, 1], [1, 1], [1, -1], [-1, -1]];
+                const camRad = (typeof cameraRadius === 'number' && Number.isFinite(cameraRadius)) ? cameraRadius : 60;
+                const maxRayDist = Math.min(mapSize * 0.55, Math.max(28, camRad * 1.85));
+                // Compact playable-viewport inset (excludes bottom command bar & horizon stretch)
+                const ndcCorners = [[-0.62, 0.50], [0.62, 0.50], [0.62, -0.52], [-0.62, -0.52]];
                 const pts = [];
                 for (let ci = 0; ci < 4; ci++) {
                     vCorner.set(ndcCorners[ci][0], ndcCorners[ci][1], 0.5).unproject(camera);
                     vDir.copy(vCorner).sub(camera.position).normalize();
                     let t;
-                    if (vDir.y < -0.03) {
+                    if (vDir.y < -0.05) {
                         t = Math.min(maxRayDist, Math.max(1, (groundY - camera.position.y) / vDir.y));
                     } else {
-                        t = maxRayDist * 0.75;
+                        t = maxRayDist * 0.8;
                     }
                     const wx = camera.position.x + vDir.x * t;
                     const wz = camera.position.z + vDir.z * t;
