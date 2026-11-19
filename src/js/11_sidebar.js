@@ -345,18 +345,74 @@ function renderRadarMinimap() {
         }
     }
 
-    // 11. Draw Camera Viewport Frustum Rectangle (Classic C&C Generals White/Gold View Box)
+    // 11. Draw Camera Viewport Frustum Trapezoid (Authentic C&C Generals SAGE W3DRadar::drawViewBox)
     if (camera) {
-        const camX = toRX(cameraTarget.x);
-        const camZ = toRZ(cameraTarget.z);
-        const viewW = (cameraRadius / mapSize) * w * 1.4;
-        const viewH = (cameraRadius / mapSize) * h * 0.9;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.lineWidth = 2.5;
-        ctx.strokeRect(camX - viewW/2, camZ - viewH/2, viewW, viewH);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.2;
-        ctx.strokeRect(camX - viewW/2, camZ - viewH/2, viewW, viewH);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(1, 1, w - 2, h - 2);
+        ctx.clip();
+
+        let drewTrapezoid = false;
+        if (typeof THREE !== 'undefined' && camera.position && camera.projectionMatrixInverse && typeof THREE.Vector3 === 'function') {
+            if (!renderRadarMinimap._vCorner) {
+                renderRadarMinimap._vCorner = new THREE.Vector3();
+                renderRadarMinimap._vDir = new THREE.Vector3();
+            }
+            const vCorner = renderRadarMinimap._vCorner;
+            const vDir = renderRadarMinimap._vDir;
+            if (typeof vCorner.unproject === 'function') {
+                const groundY = (typeof cameraTarget !== 'undefined' && cameraTarget && Number.isFinite(cameraTarget.y)) ? cameraTarget.y : 0;
+                const maxRayDist = mapSize * 1.35;
+                const ndcCorners = [[-1, 1], [1, 1], [1, -1], [-1, -1]];
+                const pts = [];
+                for (let ci = 0; ci < 4; ci++) {
+                    vCorner.set(ndcCorners[ci][0], ndcCorners[ci][1], 0.5).unproject(camera);
+                    vDir.copy(vCorner).sub(camera.position).normalize();
+                    let t;
+                    if (vDir.y < -0.03) {
+                        t = Math.min(maxRayDist, Math.max(1, (groundY - camera.position.y) / vDir.y));
+                    } else {
+                        t = maxRayDist * 0.75;
+                    }
+                    const wx = camera.position.x + vDir.x * t;
+                    const wz = camera.position.z + vDir.z * t;
+                    if (!Number.isFinite(wx) || !Number.isFinite(wz)) break;
+                    pts.push([toRX(wx), toRZ(wz)]);
+                }
+                if (pts.length === 4) {
+                    ctx.beginPath();
+                    ctx.moveTo(pts[0][0], pts[0][1]);
+                    ctx.lineTo(pts[1][0], pts[1][1]);
+                    ctx.lineTo(pts[2][0], pts[2][1]);
+                    ctx.lineTo(pts[3][0], pts[3][1]);
+                    ctx.closePath();
+
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+                    ctx.lineWidth = 2.6;
+                    ctx.lineJoin = 'miter';
+                    ctx.stroke();
+
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.3;
+                    ctx.stroke();
+                    drewTrapezoid = true;
+                }
+            }
+        }
+
+        if (!drewTrapezoid) {
+            const camX = toRX(cameraTarget.x);
+            const camZ = toRZ(cameraTarget.z);
+            const viewW = (cameraRadius / mapSize) * w * 1.4;
+            const viewH = (cameraRadius / mapSize) * h * 0.9;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(camX - viewW/2, camZ - viewH/2, viewW, viewH);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(camX - viewW/2, camZ - viewH/2, viewW, viewH);
+        }
+        ctx.restore();
     }
 
     // Subtle outer border frame
