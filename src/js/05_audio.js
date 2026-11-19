@@ -55,34 +55,38 @@ const UI_AUDIO_TYPES = new Set([
 ]);
 
 // SAGE AudioSettings.ini: 3D sounds fade with distance from the microphone (camera focus point) and are culled
-// below MinSampleVolume. World units here are scaled to the default camera radius (~115).
-const SPATIAL_AUDIO_NEAR = 70;
-const SPATIAL_AUDIO_FAR = 340;
-const SPATIAL_AUDIO_MIN_GAIN = 0.03;
+// below MinSampleVolume. Distances scale with cameraRadius (default Skirmish radius is 220 on 1500 maps, 280 on 2200 maps)
+// so units visible anywhere on the player's screen play at full volume and only off-screen battles attenuate.
+const SPATIAL_AUDIO_NEAR = 180;
+const SPATIAL_AUDIO_FAR = 720;
+const SPATIAL_AUDIO_MIN_GAIN = 0.04;
 function computeSpatialAudio(pos) {
     if (!pos || typeof cameraTarget === 'undefined' || !cameraTarget) return null;
+    if (!Number.isFinite(pos.x) || !Number.isFinite(pos.z) || !Number.isFinite(cameraTarget.x) || !Number.isFinite(cameraTarget.z)) {
+        return null;
+    }
     const dx = pos.x - cameraTarget.x;
     const dz = pos.z - cameraTarget.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
+    const radius = (typeof cameraRadius === 'number' && Number.isFinite(cameraRadius)) ? cameraRadius : 220;
+    const nearDist = Math.max(SPATIAL_AUDIO_NEAR, radius * 0.90);
+    const farDist = Math.max(SPATIAL_AUDIO_FAR, radius * 3.10);
+    if (dist >= farDist) return { cull: true, gain: 0, pan: 0 };
     let gain = 1;
-    if (dist > SPATIAL_AUDIO_NEAR) {
-        const t = Math.min(1, (dist - SPATIAL_AUDIO_NEAR) / (SPATIAL_AUDIO_FAR - SPATIAL_AUDIO_NEAR));
-        gain = Math.pow(1 - t, 1.6);
+    if (dist > nearDist) {
+        const t = Math.min(1, (dist - nearDist) / Math.max(1, farDist - nearDist));
+        gain = Math.pow(1 - t, 1.45);
     }
-    // Zooming in on the action boosts 3D volume slightly (ZoomSoundVolumePercentageAmount = 20%)
-    const radius = (typeof cameraRadius === 'number') ? cameraRadius : 115;
-    const zoomBonus = 0.8 + 0.2 * Math.max(0, Math.min(1, (425 - radius) / (425 - 130)));
+    // Zooming in closer boosts 3D volume slightly (ZoomSoundVolumePercentageAmount = 20%)
+    const zoomBonus = 0.85 + 0.15 * Math.max(0, Math.min(1, (425 - radius) / (425 - 130)));
     gain *= zoomBonus;
     if (gain < SPATIAL_AUDIO_MIN_GAIN) return { cull: true, gain: 0, pan: 0 };
     let pan = 0;
-    // Retail shrouded dampening: sounds originating inside fogged/unexplored terrain are muffled
-    if (typeof isPositionVisible === 'function' && !isPositionVisible(pos.x, pos.z)) {
-        gain *= 0.55;
-        if (gain < SPATIAL_AUDIO_MIN_GAIN) return { cull: true, gain: 0, pan: 0 };
-    }
     if (typeof camera !== 'undefined' && camera && camera.matrixWorld && camera.matrixWorld.elements) {
         const e = camera.matrixWorld.elements;
-        pan = Math.max(-0.85, Math.min(0.85, (dx * e[0] + dz * e[2]) / 110));
+        if (Number.isFinite(e[0]) && Number.isFinite(e[2])) {
+            pan = Math.max(-0.80, Math.min(0.80, (dx * e[0] + dz * e[2]) / Math.max(140, radius * 0.85)));
+        }
     }
     return { cull: false, gain, pan };
 }

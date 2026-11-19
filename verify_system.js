@@ -1415,8 +1415,8 @@ console.log("✓ Verified all 11 retail visual, model, terrain, base orientation
     vm.createContext(aud);
     vm.runInContext(audioSrc.slice(helperStart, helperEnd) + '\nthis.fn = computeSpatialAudio;', aud);
     const near = aud.fn({ x: 20, y: 0, z: 0 });
-    const mid = aud.fn({ x: 200, y: 0, z: 0 });
-    const far = aud.fn({ x: 900, y: 0, z: 0 });
+    const mid = aud.fn({ x: 350, y: 0, z: 0 });
+    const far = aud.fn({ x: 950, y: 0, z: 0 });
     if (!(near.gain > mid.gain && mid.gain > 0 && !mid.cull)) throw new Error('Expected distance falloff near > mid > 0');
     if (!far.cull) throw new Error('Expected far-away explosions to be culled');
     if (!(aud.fn({ x: 150, y: 0, z: 0 }).pan > 0 && aud.fn({ x: -150, y: 0, z: 0 }).pan < 0)) throw new Error('Expected stereo pan by screen side');

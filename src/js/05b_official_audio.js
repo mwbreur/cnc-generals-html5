@@ -42,36 +42,57 @@ function preloadSkirmishAudio(faction = null) {
     return Promise.all([loadOfficialAudioGroup('global'), loadOfficialAudioGroup(['usa','china','gla'].includes(playerFaction) ? playerFaction : 'usa')]);
 }
 
-// SAGE AudioSettings.ini SampleCount3D = 25: never more than 25 simultaneous world (3D) samples
-const MAX_WORLD_SAMPLES = 25;
-let _activeWorldSamples = 0;
+// SAGE AudioSettings.ini SampleCount3D = 25: cap simultaneous world (3D) samples using wall-clock expiration
+// timestamps (never rely on AudioBufferSourceNode.onended, which can fail to fire in Chromium when V8/Oilpan
+// garbage-collects an unreferenced source wrapper or while AudioContext is suspended, which would otherwise
+// permanently saturate the counter at 25 and mute all weapon sounds).
+const MAX_WORLD_SAMPLES = 28;
+const _activeWorldSampleEnds = [];
+const _liveSourceNodes = [];
 const _lastWorldSoundTime = {};
 
 function playOfficialAudioBuffer(ctx, buffer, volume, pan = null) {
     if (!ctx || !buffer) return false;
-    const isWorld = (typeof pan === 'number');
-    if (isWorld && _activeWorldSamples >= MAX_WORLD_SAMPLES) return false;
+    const isWorld = (typeof pan === 'number' && Number.isFinite(pan));
+    const nowMs = Date.now();
+    if (isWorld) {
+        while (_activeWorldSampleEnds.length > 0 && _activeWorldSampleEnds[0] <= nowMs) {
+            _activeWorldSampleEnds.shift();
+        }
+        if (_activeWorldSampleEnds.length >= MAX_WORLD_SAMPLES) return true;
+    }
     try {
         if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(() => {});
         const src = ctx.createBufferSource();
         src.buffer = buffer;
-        // Retail PitchShift: +/-5% random pitch so repeated shots don't sound identical
-        if (isWorld && src.playbackRate) src.playbackRate.value = 0.95 + Math.random() * 0.10;
+        // Retail PitchShift: +/-4% random pitch so repeated shots don't sound identical
+        if (isWorld && src.playbackRate && typeof src.playbackRate.value === 'number') {
+            src.playbackRate.value = 0.96 + Math.random() * 0.08;
+        }
         const gain = ctx.createGain();
-        gain.gain.value = volume;
+        gain.gain.value = Number.isFinite(volume) ? volume : 0.85;
         src.connect(gain);
         let tail = gain;
-        if (isWorld && typeof ctx.createStereoPanner === 'function') {
-            const panner = ctx.createStereoPanner();
-            panner.pan.value = pan;
-            gain.connect(panner);
-            tail = panner;
+        if (isWorld && typeof ctx.createStereoPanner === 'function' && Math.abs(pan) > 0.01) {
+            try {
+                const panner = ctx.createStereoPanner();
+                if (panner && panner.pan) {
+                    panner.pan.value = Math.max(-1, Math.min(1, pan));
+                    gain.connect(panner);
+                    tail = panner;
+                }
+            } catch (panErr) {}
         }
         tail.connect(ctx.destination);
         if (isWorld) {
-            _activeWorldSamples++;
-            src.onended = () => { _activeWorldSamples = Math.max(0, _activeWorldSamples - 1); };
+            const durMs = Math.min(1800, Math.max(120, ((buffer && typeof buffer.duration === 'number' && buffer.duration > 0) ? buffer.duration : 0.45) * 1000));
+            _activeWorldSampleEnds.push(nowMs + durMs);
+            if (_activeWorldSampleEnds.length > 1) _activeWorldSampleEnds.sort((a, b) => a - b);
         }
+        // Hold a strong JS reference to active source nodes in a bounded ring buffer so V8/Oilpan GC
+        // never collects an AudioBufferSourceNode mid-playback.
+        _liveSourceNodes.push(src);
+        if (_liveSourceNodes.length > 36) _liveSourceNodes.shift();
         src.start(0);
         return true;
     } catch (e) {
@@ -173,6 +194,47 @@ function ensurePcmWavBuffer(bytes) {
     return out;
 }
 
+function createAudioBufferFromPcmWav(ctx, pcmArrayBuffer) {
+    if (!ctx || typeof ctx.createBuffer !== 'function' || !pcmArrayBuffer || pcmArrayBuffer.byteLength < 44) return null;
+    try {
+        const dv = new DataView(pcmArrayBuffer);
+        if (dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) return null;
+        let fmt = 0, channels = 1, sampleRate = 22050, bitsPerSample = 16, dataOffset = 0, dataSize = 0;
+        let pos = 12;
+        while (pos + 8 <= pcmArrayBuffer.byteLength) {
+            const id = dv.getUint32(pos, false);
+            const sz = dv.getUint32(pos + 4, true);
+            if (id === 0x666d7420) {
+                fmt = dv.getUint16(pos + 8, true);
+                channels = dv.getUint16(pos + 10, true) || 1;
+                sampleRate = dv.getUint32(pos + 12, true) || 22050;
+                bitsPerSample = dv.getUint16(pos + 22, true) || 16;
+            } else if (id === 0x64617461) {
+                dataOffset = pos + 8;
+                dataSize = Math.min(sz, pcmArrayBuffer.byteLength - dataOffset);
+                break;
+            }
+            pos += 8 + ((sz + 1) & ~1);
+        }
+        if (fmt !== 1 || bitsPerSample !== 16 || !dataOffset || dataSize < 2) return null;
+        const totalFrames = Math.floor(dataSize / (channels * 2));
+        if (totalFrames <= 0) return null;
+        const audioBuf = ctx.createBuffer(channels, totalFrames, sampleRate);
+        if (!audioBuf || typeof audioBuf.getChannelData !== 'function') return null;
+        for (let ch = 0; ch < channels; ch++) {
+            const chanData = audioBuf.getChannelData(ch);
+            let samplePos = dataOffset + ch * 2;
+            const stride = channels * 2;
+            for (let i = 0; i < totalFrames; i++, samplePos += stride) {
+                chanData[i] = dv.getInt16(samplePos, true) / 32768.0;
+            }
+        }
+        return audioBuf;
+    } catch (e) {
+        return null;
+    }
+}
+
 function decodeOfficialAudioData(ctx, data) {
     if (typeof data === 'string' && data.startsWith('data:')) {
         const commaIdx = data.indexOf(',');
@@ -181,10 +243,18 @@ function decodeOfficialAudioData(ctx, data) {
             const bin = atob(b64);
             const bytes = new Uint8Array(bin.length);
             for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            return ctx.decodeAudioData(ensurePcmWavBuffer(bytes));
+            const pcmWav = ensurePcmWavBuffer(bytes);
+            const directBuf = createAudioBufferFromPcmWav(ctx, pcmWav);
+            if (directBuf) return Promise.resolve(directBuf);
+            return ctx.decodeAudioData(pcmWav);
         }
     }
-    return fetch(data).then(r => r.arrayBuffer()).then(buf => ctx.decodeAudioData(ensurePcmWavBuffer(new Uint8Array(buf))));
+    return fetch(data).then(r => r.arrayBuffer()).then(buf => {
+        const pcmWav = ensurePcmWavBuffer(new Uint8Array(buf));
+        const directBuf = createAudioBufferFromPcmWav(ctx, pcmWav);
+        if (directBuf) return directBuf;
+        return ctx.decodeAudioData(pcmWav);
+    });
 }
 
 const MAX_AUDIO_FALLBACK_POOL = 8;
