@@ -91,6 +91,7 @@ jobs:
           cp index.html _site/
           cp -r assets/data _site/assets/
           cp -r src/audio _site/src/
+          cp -r src/vendor _site/src/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

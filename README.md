@@ -119,17 +119,41 @@ The build script reads the HTML/CSS source and JavaScript modules, validates the
 
 The build script is intentionally simple and does not currently provide a production bundler, code splitting, minification, or asset hashing.
 
-### Run locally
+### Run locally / Off-Grid LAN (Single-Player & LAN Multiplayer)
 
-For development, serve the repository over HTTP rather than relying on a `file://` URL. For example, if Python is installed:
+Everything required to play — 3D models, textures, maps, cameos, audio, Three.js, and PeerJS — is bundled locally in the repository (`src/vendor/`). **No internet connection and no `npm install` are required.**
+
+On one host computer (with Node.js 20+ installed):
 
 ```bash
-python -m http.server 8000
+git clone https://github.com/mwbreur/cnc-generals-html5.git
+cd cnc-generals-html5
+npm run lan
 ```
 
-Then open [http://localhost:8000](http://localhost:8000).
+`npm run lan` uses only Node.js built-in modules and automatically:
+1. Builds `index.html` and `assets/data/` if they are not already built.
+2. Starts a local HTTP server on port `8080` (override with `--port=3000`) and prints your LAN URL (for example `http://192.168.1.42:8080`).
+3. Starts a built-in zero-dependency **LAN WebSocket room relay** (`/lan-ws`) on the same port.
 
-Some browser features, especially WebRTC and audio playback, require a secure context or a user interaction. Localhost is treated as a secure context by modern browsers.
+**How players join on a local network:**
+- Other players on the same Wi-Fi or Ethernet network just open the printed LAN URL (`http://<host-ip>:8080`) in any modern browser (Chrome, Edge, Firefox) — no software to install on player PCs.
+- When the game is served by `npm run lan`, multiplayer **automatically detects** the local LAN server (`/api/lan-status`) and routes rooms over your local network with zero configuration. When hosted on GitHub Pages or static hosting, it automatically uses the PeerJS cloud broker instead.
+
+### Updating bundled Three.js / PeerJS (when online)
+
+Local vendor files live in `src/vendor/` (`three.min.js` and `peerjs.min.js`). When you have an internet connection and want to refresh or update them:
+
+```bash
+npm run update-vendor
+# Or pin specific versions:
+node tools/update_vendor.js --three=0.128.0 --peerjs=1.5.4
+npm run build
+```
+
+> **Note:** The renderer targets Three.js `r128` (`0.128.0`) UMD APIs; stick to `0.128.0` unless migrating the renderer.
+
+Alternatively, for single-player development only, you can still serve the built files with any static HTTP server (such as `python -m http.server 8000`) and open [http://localhost:8000](http://localhost:8000). Opening `index.html` directly via `file://` is not supported because browsers block `fetch()` for local `src/audio/*.json` catalogs.
 
 ## Build output and large files
 

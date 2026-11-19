@@ -1,0 +1,19 @@
+{
+  "updatedAt": "2026-11-19T15:12:18.031Z",
+  "libraries": {
+    "three": {
+      "version": "0.128.0",
+      "file": "src/vendor/three.min.js",
+      "bytes": 603445,
+      "integrity": "sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"
+    },
+    "peerjs": {
+      "version": "1.5.4",
+      "file": "src/vendor/peerjs.min.js",
+      "bytes": 92865,
+      "integrity": "sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"
+    }
+  }
+}

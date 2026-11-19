@@ -6,6 +6,8 @@
   "private": true,
   "scripts": {
     "build": "node build.js",
+    "lan": "node scripts/lan_server.mjs",
+    "update-vendor": "node tools/update_vendor.js",
     "lint": "node tools/lint_js.js",
     "test": "node tools/lint_js.js && node verify_system.js && node tools/validate_audio_catalog.js && node tools/test_audio_loader.js && node build.js && node tools/validate_audio_catalog.js",
     "e2e": "node scripts/e2e_smoke.mjs"

@@ -204,40 +204,94 @@ function copyHostRoomCode() {
     });
 }
 
-// --- PEERJS HOST INITIALIZATION ---
-function initHostPeer() {
-    if (typeof Peer === 'undefined') {
-        const statusEl = document.getElementById('mp-host-status');
-        if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">⚠️ PeerJS CDN offline or blocked. Check network connection.</span>';
-        return;
+// --- AUTOMATIC OFF-GRID LAN RELAY DETECTION & ADAPTER ---
+let _lanServerProbePromise = null;
+function detectLanServer() {
+    if (_lanServerProbePromise) return _lanServerProbePromise;
+    if (typeof window === 'undefined' || typeof fetch !== 'function' || typeof WebSocket !== 'function' || !window.location || !/^https?:$/.test(window.location.protocol)) {
+        _lanServerProbePromise = Promise.resolve(null);
+        return _lanServerProbePromise;
     }
+    _lanServerProbePromise = new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(null), 1500);
+        fetch('/api/lan-status', { cache: 'no-store' })
+            .then(r => (r && r.ok ? r.json() : null))
+            .then(data => {
+                clearTimeout(timer);
+                if (data && data.ok && data.mode === 'lan') {
+                    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const wsPath = data.wsPath || '/lan-ws';
+                    resolve({ wsUrl: `${proto}//${window.location.host}${wsPath}` });
+                } else {
+                    resolve(null);
+                }
+            })
+            .catch(() => {
+                clearTimeout(timer);
+                resolve(null);
+            });
+    });
+    return _lanServerProbePromise;
+}
 
-    cleanupPeerSession();
+function createLanRelayConnection(ws) {
+    const handlers = { data: [], close: [], open: [] };
+    const conn = {
+        open: ws.readyState === 1,
+        isLanRelay: true,
+        on(event, fn) {
+            if (handlers[event]) handlers[event].push(fn);
+        },
+        send(payload) {
+            if (!conn.open || ws.readyState !== 1) return;
+            try {
+                ws.send(JSON.stringify({ _lan: 'data', payload }));
+            } catch (err) {
+                console.warn('LAN relay send error:', err);
+            }
+        },
+        close() {
+            conn.open = false;
+            try { ws.close(); } catch (_) {}
+        },
+        _emit(event, arg) {
+            if (event === 'close') conn.open = false;
+            (handlers[event] || []).forEach(fn => {
+                try { fn(arg); } catch (e) { console.error(e); }
+            });
+        }
+    };
+    return conn;
+}
 
-    const randToken = generateRoomToken(6);
-    currentRoomCode = 'CNC-' + randToken;
-    const peerId = 'cnc-gen-' + randToken;
-
-    const codeInput = document.getElementById('mp-host-room-code');
-    const statusEl = document.getElementById('mp-host-status');
-    if (codeInput) codeInput.value = currentRoomCode;
-    if (statusEl) statusEl.innerHTML = 'Establishing room on PeerJS broker...';
-
+function initHostPeerLan(lanInfo, statusEl) {
     try {
-        netPeer = new Peer(peerId, { debug: 1 });
-
-        netPeer.on('open', (id) => {
+        const ws = new WebSocket(lanInfo.wsUrl);
+        let activeConn = null;
+        netPeer = {
+            destroy() {
+                try { ws.close(); } catch (_) {}
+            }
+        };
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ _lan: 'host', room: currentRoomCode }));
+        };
+        ws.onmessage = (ev) => {
+            let msg;
+            try { msg = JSON.parse(ev.data); } catch (_) { return; }
+            if (!msg || typeof msg !== 'object') return;
+            if (msg._lan === 'hosted') {
                 isMultiplayerHost = true;
                 if (statusEl) {
-                    statusEl.innerHTML = `🟢 Room <strong>${currentRoomCode}</strong> created. Share this code with your challenger and wait for connection.`;
+                    statusEl.innerHTML = `🟢 <strong>[LAN]</strong> Room <strong>${escapeHtml(currentRoomCode)}</strong> created. Share this code with your LAN challenger and wait for connection.`;
                 }
-        });
-
-        netPeer.on('connection', (conn) => {
-                netConn = conn;
-                setupNetDataConnection(conn);
+            } else if (msg._lan === 'peer_connected') {
+                activeConn = createLanRelayConnection(ws);
+                activeConn.open = true;
+                netConn = activeConn;
+                setupNetDataConnection(activeConn);
                 if (statusEl) {
-                    statusEl.innerHTML = `🟢 <strong>CHALLENGER CONNECTED!</strong> Opponent ready. Click "LAUNCH MULTIPLAYER BATTLE" to deploy.`;
+                    statusEl.innerHTML = `🟢 <strong>[LAN] CHALLENGER CONNECTED!</strong> Opponent ready. Click "LAUNCH MULTIPLAYER BATTLE" to deploy.`;
                 }
                 const launchBtn = document.getElementById('mp-launch-btn');
                 if (launchBtn) {
@@ -247,31 +301,147 @@ function initHostPeer() {
                     launchBtn.style.borderColor = '#55efc4';
                     launchBtn.style.color = '#55efc4';
                 }
-        });
-
-        netPeer.on('error', (err) => {
-                console.warn('Peer error:', err);
-                if (err.type === 'unavailable-id') {
-                    // ID collision, re-roll
+            } else if (msg._lan === 'data' && activeConn) {
+                activeConn._emit('data', msg.payload);
+            } else if (msg._lan === 'peer_disconnected' && activeConn) {
+                activeConn._emit('close');
+            } else if (msg._lan === 'error') {
+                if (msg.code === 'unavailable-id') {
                     setTimeout(initHostPeer, 500);
                 } else if (statusEl) {
-                    statusEl.innerHTML = `<span style="color:#ff6b6b;">Peer notice: ${err.message || err.type}</span>`;
+                    statusEl.innerHTML = `<span style="color:#ff6b6b;">LAN notice: ${escapeHtml(msg.message || 'error')}</span>`;
                 }
-        });
+            }
+        };
+        ws.onclose = () => {
+            if (activeConn) activeConn._emit('close');
+        };
+        ws.onerror = () => {
+            if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to connect to local LAN server.</span>';
+        };
     } catch (err) {
-        console.error('Peer init error:', err);
-        if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to initialize PeerJS.</span>';
+        console.error('LAN host init error:', err);
+        if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to initialize LAN host session.</span>';
     }
 }
 
-// --- PEERJS CLIENT JOIN INITIALIZATION ---
-function joinConnectToHost() {
-    if (typeof Peer === 'undefined') {
-        const statusEl = document.getElementById('mp-join-status');
-        if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">⚠️ PeerJS library offline. Check internet connection.</span>';
-        return;
+function joinConnectToHostLan(lanInfo, statusEl) {
+    try {
+        const ws = new WebSocket(lanInfo.wsUrl);
+        let activeConn = null;
+        netPeer = {
+            destroy() {
+                try { ws.close(); } catch (_) {}
+            }
+        };
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ _lan: 'join', room: currentRoomCode }));
+        };
+        ws.onmessage = (ev) => {
+            let msg;
+            try { msg = JSON.parse(ev.data); } catch (_) { return; }
+            if (!msg || typeof msg !== 'object') return;
+            if (msg._lan === 'joined') {
+                activeConn = createLanRelayConnection(ws);
+                activeConn.open = true;
+                netConn = activeConn;
+                setupNetDataConnection(activeConn);
+                isMultiplayerHost = false;
+                if (statusEl) {
+                    statusEl.innerHTML = `🟢 <strong>[LAN] CONNECTED TO HOST!</strong> Waiting for host to launch the battle...`;
+                }
+                broadcastNetPacket({
+                    type: 'handshake',
+                    clientFaction: selectedFaction
+                });
+            } else if (msg._lan === 'data' && activeConn) {
+                activeConn._emit('data', msg.payload);
+            } else if (msg._lan === 'peer_disconnected' && activeConn) {
+                activeConn._emit('close');
+            } else if (msg._lan === 'error') {
+                if (statusEl) {
+                    statusEl.innerHTML = `<span style="color:#ff6b6b;">LAN join failed: ${escapeHtml(msg.message || 'Room not found')}</span>`;
+                }
+            }
+        };
+        ws.onclose = () => {
+            if (activeConn) activeConn._emit('close');
+        };
+        ws.onerror = () => {
+            if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to reach local LAN server.</span>';
+        };
+    } catch (err) {
+        console.error('LAN join error:', err);
+        if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to connect to local LAN server.</span>';
     }
+}
 
+// --- PEERJS / LAN HOST INITIALIZATION ---
+function initHostPeer() {
+    cleanupPeerSession();
+
+    const randToken = generateRoomToken(6);
+    currentRoomCode = 'CNC-' + randToken;
+    const peerId = 'cnc-gen-' + randToken;
+
+    const codeInput = document.getElementById('mp-host-room-code');
+    const statusEl = document.getElementById('mp-host-status');
+    if (codeInput) codeInput.value = currentRoomCode;
+    if (statusEl) statusEl.innerHTML = 'Establishing room...';
+
+    detectLanServer().then((lanInfo) => {
+        if (lanInfo) {
+            initHostPeerLan(lanInfo, statusEl);
+            return;
+        }
+        if (typeof Peer === 'undefined') {
+            if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">⚠️ PeerJS offline and no local LAN server detected. Run <code>npm run lan</code> for off-grid multiplayer.</span>';
+            return;
+        }
+        if (statusEl) statusEl.innerHTML = 'Establishing room on PeerJS broker...';
+        try {
+            netPeer = new Peer(peerId, { debug: 1 });
+
+            netPeer.on('open', (id) => {
+                    isMultiplayerHost = true;
+                    if (statusEl) {
+                        statusEl.innerHTML = `🟢 Room <strong>${currentRoomCode}</strong> created. Share this code with your challenger and wait for connection.`;
+                    }
+            });
+
+            netPeer.on('connection', (conn) => {
+                    netConn = conn;
+                    setupNetDataConnection(conn);
+                    if (statusEl) {
+                        statusEl.innerHTML = `🟢 <strong>CHALLENGER CONNECTED!</strong> Opponent ready. Click "LAUNCH MULTIPLAYER BATTLE" to deploy.`;
+                    }
+                    const launchBtn = document.getElementById('mp-launch-btn');
+                    if (launchBtn) {
+                        launchBtn.disabled = false;
+                        launchBtn.style.opacity = '1';
+                        launchBtn.style.cursor = 'pointer';
+                        launchBtn.style.borderColor = '#55efc4';
+                        launchBtn.style.color = '#55efc4';
+                    }
+            });
+
+            netPeer.on('error', (err) => {
+                    console.warn('Peer error:', err);
+                    if (err.type === 'unavailable-id') {
+                        setTimeout(initHostPeer, 500);
+                    } else if (statusEl) {
+                        statusEl.innerHTML = `<span style="color:#ff6b6b;">Peer notice: ${err.message || err.type}</span>`;
+                    }
+            });
+        } catch (err) {
+            console.error('Peer init error:', err);
+            if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to initialize PeerJS.</span>';
+        }
+    });
+}
+
+// --- PEERJS / LAN CLIENT JOIN INITIALIZATION ---
+function joinConnectToHost() {
     const input = document.getElementById('mp-join-input');
     const rawCode = (input.value || '').trim().toUpperCase();
     if (!rawCode) {
@@ -288,36 +458,45 @@ function joinConnectToHost() {
 
     cleanupPeerSession();
 
-    try {
-        netPeer = new Peer({ debug: 1 });
+    detectLanServer().then((lanInfo) => {
+        if (lanInfo) {
+            joinConnectToHostLan(lanInfo, statusEl);
+            return;
+        }
+        if (typeof Peer === 'undefined') {
+            if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">⚠️ PeerJS offline and no local LAN server detected. Run <code>npm run lan</code> for off-grid multiplayer.</span>';
+            return;
+        }
+        try {
+            netPeer = new Peer({ debug: 1 });
 
-        netPeer.on('open', (myId) => {
-                netConn = netPeer.connect(targetPeerId, { reliable: true });
-                setupNetDataConnection(netConn);
+            netPeer.on('open', (myId) => {
+                    netConn = netPeer.connect(targetPeerId, { reliable: true });
+                    setupNetDataConnection(netConn);
 
-                netConn.on('open', () => {
-                        isMultiplayerHost = false;
-                        if (statusEl) {
-                            statusEl.innerHTML = `🟢 <strong>CONNECTED TO HOST!</strong> Waiting for host to launch the battle...`;
-                        }
-                        // Send handshake with client faction
-                        broadcastNetPacket({
-                                type: 'handshake',
-                                clientFaction: selectedFaction
-                        });
-                });
-        });
+                    netConn.on('open', () => {
+                            isMultiplayerHost = false;
+                            if (statusEl) {
+                                statusEl.innerHTML = `🟢 <strong>CONNECTED TO HOST!</strong> Waiting for host to launch the battle...`;
+                            }
+                            broadcastNetPacket({
+                                    type: 'handshake',
+                                    clientFaction: selectedFaction
+                            });
+                    });
+            });
 
-        netPeer.on('error', (err) => {
-                console.warn('Join error:', err);
-                if (statusEl) {
-                    statusEl.innerHTML = `<span style="color:#ff6b6b;">Connection failed: Could not reach host ${currentRoomCode}. Verify room code.</span>`;
-                }
-        });
-    } catch (e) {
-        console.error('Join error:', e);
-        if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to connect to PeerJS broker.</span>';
-    }
+            netPeer.on('error', (err) => {
+                    console.warn('Join error:', err);
+                    if (statusEl) {
+                        statusEl.innerHTML = `<span style="color:#ff6b6b;">Connection failed: Could not reach host ${currentRoomCode}. Verify room code.</span>`;
+                    }
+            });
+        } catch (e) {
+            console.error('Join error:', e);
+            if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to connect to PeerJS broker.</span>';
+        }
+    });
 }
 
 // --- DATA CHANNEL PACKET HANDLERS ---
