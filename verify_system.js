@@ -127,6 +127,7 @@ const THREE = {
         this.computeLineDistances = () => {};
     },
     BufferGeometry: function() {
+        this.attributes = { position: { array: new Float32Array(0), count: 0, needsUpdate: false } }; 
         this.setAttribute = () => {};
         this.setIndex = () => {};
         this.setFromPoints = () => this;
@@ -134,10 +135,10 @@ const THREE = {
         this.computeVertexNormals = () => {};
     },
     Float32BufferAttribute: function(arr, itemSize) { this.array = arr; this.itemSize = itemSize; },
-    BoxGeometry: function() { this.dispose = () => {}; },
-    CylinderGeometry: function() { this.dispose = () => {}; },
-    SphereGeometry: function() { this.dispose = () => {}; },
-    ConeGeometry: function() { this.dispose = () => {}; },
+    BoxGeometry: function() { this.dispose = () => {}; this.attributes = { position: { array: new Float32Array(0), count: 0, needsUpdate: false } }; },
+    CylinderGeometry: function() { this.dispose = () => {}; this.attributes = { position: { array: new Float32Array(0), count: 0, needsUpdate: false } }; },
+    SphereGeometry: function() { this.dispose = () => {}; this.attributes = { position: { array: new Float32Array(0), count: 0, needsUpdate: false } }; },
+    ConeGeometry: function() { this.dispose = () => {}; this.attributes = { position: { array: new Float32Array(0), count: 0, needsUpdate: false } }; },
     PlaneGeometry: function() {
         this.dispose = () => {};
         this.rotateX = () => {};
@@ -1646,5 +1647,59 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");
+
+// 24. Ghost-Passenger Regression Test (issue #7): destroyed transports must evacuate occupants
+vm.runInContext(`
+    {
+        resetEntireBattlefieldState();
+        setupMapEnvironment('tournament_desert', 1500);
+        isMultiplayerActive = false;
+        isMatchActive = true;
+        const transport = spawnUnit('humvee', new THREE.Vector3(10, 0, 10), 'usa');
+        if (!transport || !transport.garrisoned) throw new Error('Ghost-test: failed to spawn humvee transport');
+        const passengers = [];
+        for (let i = 0; i < 2; i++) {
+            const p = spawnUnit('ranger', new THREE.Vector3(12 + i * 2, 0, 12), 'usa');
+            p.garrisonedIn = transport;
+            p.mesh.visible = false;
+            p.taskState = 'Idle';
+            transport.garrisoned.push(p);
+            passengers.push(p);
+        }
+        const crawler = spawnEnemyUnit('crawler', new THREE.Vector3(80, 0, 80), null, 'china');
+        if (!crawler) throw new Error('Ghost-test: failed to spawn enemy crawler');
+        const enemyPassengers = crawler.garrisoned.slice();
+        if (enemyPassengers.length !== 4) throw new Error('Ghost-test: expected 4 auto-garrisoned redguards, got ' + enemyPassengers.length);
+        transport.health = 0;
+        crawler.health = 0;
+        animate();
+        if (units.indexOf(transport) !== -1) throw new Error('Ghost-test: dead player transport not removed from units');
+        if (enemyUnits.indexOf(crawler) !== -1) throw new Error('Ghost-test: dead enemy crawler not removed from enemyUnits');
+        passengers.forEach(function(p) {
+            if (units.indexOf(p) === -1) throw new Error('Ghost-test: evacuated passenger dropped from roster');
+            if (p.health <= 0) throw new Error('Ghost-test: passenger should survive transport destruction');
+            if (p.garrisonedIn) throw new Error('Ghost-test: passenger still garrisonedIn destroyed transport (invisible ghost)');
+            if (!p.mesh.visible) throw new Error('Ghost-test: evacuated passenger still invisible (untargetable ghost)');
+        });
+        enemyPassengers.forEach(function(p) {
+            if (enemyUnits.indexOf(p) === -1) throw new Error('Ghost-test: evacuated enemy passenger dropped from roster');
+            if (p.garrisonedIn) throw new Error('Ghost-test: enemy passenger still garrisonedIn destroyed crawler (ghost)');
+            if (!p.mesh.visible) throw new Error('Ghost-test: evacuated enemy passenger still invisible (ghost)');
+        });
+        const ic = { type: 'internetCenter', mesh: new THREE.Group(), position: new THREE.Vector3(-60, 0, -60), health: 100, maxHealth: 100, radius: 5, garrisoned: [], productionQueue: [{ name: 'Ranger', cost: 300 }] };
+        const gi = spawnUnit('ranger', new THREE.Vector3(-60, 0, -60), 'usa');
+        gi.garrisonedIn = ic; gi.mesh.visible = false; gi.taskState = 'Idle';
+        ic.garrisoned.push(gi);
+        structures.push(ic);
+        const resBefore = playerResources;
+        sellStructure(ic);
+        if (structures.indexOf(ic) !== -1) throw new Error('Ghost-test: sold structure not removed');
+        if (gi.garrisonedIn || !gi.mesh.visible) throw new Error('Ghost-test: sellStructure left a garrisoned ghost passenger');
+        const expectedRefund = Math.floor((getStructureCost('internetCenter') || 500) * 0.5) + 300;
+        if (playerResources !== resBefore + expectedRefund) throw new Error('Ghost-test: sellStructure must refund 50% build cost plus queued items (expected ' + (resBefore + expectedRefund) + ', got ' + playerResources + ')');
+        resetEntireBattlefieldState();
+    }
+`, sandbox);
+console.log("\u2713 Verified destroyed transports evacuate garrisoned passengers (no invisible ghosts) and sellStructure disembarks + refunds queue (issue #7).");
 
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

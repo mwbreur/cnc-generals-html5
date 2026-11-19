@@ -2586,6 +2586,9 @@ function animate() {
     if (enemyUnits.some(e => e.health <= 0)) {
         enemyUnits = enemyUnits.filter(enemy => {
                 if (enemy.health > 0) return true;
+                // Issue #7: evacuate garrisoned occupants before removal so they don't become
+                // invisible, untargetable ghosts that keep the victory check from resolving.
+                if (enemy.garrisoned && enemy.garrisoned.length > 0) evacuateGarrisonedUnits(enemy);
                 scene.remove(enemy.mesh);
                 spawnUnitDeathFX(enemy);
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
@@ -2700,6 +2703,8 @@ function animate() {
         const pendingPilotEjects = [];
         units = units.filter(unit => {
                 if (unit.health > 0) return true;
+                // Issue #7: evacuate garrisoned occupants before removal (no invisible ghosts).
+                if (unit.garrisoned && unit.garrisoned.length > 0) evacuateGarrisonedUnits(unit);
                 removeSelectionCircle(unit);
                 if (unit.drone && unit.drone.mesh) {
                     scene.remove(unit.drone.mesh);

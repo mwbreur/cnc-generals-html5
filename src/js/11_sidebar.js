@@ -2951,6 +2951,15 @@ function sellStructure(structure) {
     const refund = Math.floor(cost * 0.5);
     playerResources += refund;
 
+    // Issue #7: disembark garrisoned passengers and refund queued production before demolition
+    // (mirrors the destruction path, which evacuates garrisons; cancelQueuedItem refunds queue items).
+    if (structure.garrisoned && structure.garrisoned.length > 0) unloadTransportPassengers(structure);
+    let queueRefund = 0;
+    if (structure.productionQueue && structure.productionQueue.length > 0) {
+        structure.productionQueue.forEach(item => { queueRefund += item.cost || 0; });
+        structure.productionQueue = [];
+    }
+    playerResources += queueRefund;
     const sPos = (structure.position || (structure.mesh && structure.mesh.position)) ? (structure.position || structure.mesh.position).clone() : null;
     scene.remove(structure.mesh);
     const idx = structures.indexOf(structure);
@@ -2962,11 +2971,11 @@ function sellStructure(structure) {
         playAudio('debris_building', { volume: 0.65 });
     }
     if (sPos) {
-        if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(sPos.clone().add(new THREE.Vector3(0, 4.0, 0)), refund);
+        if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(sPos.clone().add(new THREE.Vector3(0, 4.0, 0)), refund + queueRefund);
         if (typeof spawnGroundDustPlume === 'function') spawnGroundDustPlume(sPos, 1.8);
     }
 
-    showNotification(`Demolished ${structure.type}. +$${refund} refunded.`, 'info');
+    showNotification(`Demolished ${structure.type}. +$${refund} refunded.${queueRefund > 0 ? ` +$${queueRefund} queued production refunded.` : ''}`, 'info');
     updateSidebar();
 }
 
