@@ -207,8 +207,13 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
         group.add(rocketBody);
     }
 
-    const glowMat = new THREE.MeshBasicMaterial({ color: isToxin ? 0x7bed9f : 0xff793f, transparent: true, opacity: 0.9 });
-    const motorGlow = new THREE.Mesh(new THREE.SphereGeometry(isHeavy ? 0.45 : 0.2, 6, 6), glowMat);
+    const isHeroic = !!(metadata && metadata.attacker && metadata.attacker.veterancy >= 3);
+    const glowColor = isHeroic
+        ? (isHeavy ? 0xff5522 : 0xff1e1e)
+        : (isToxin ? 0x7bed9f : 0xff793f);
+    const glowRadius = (isHeavy ? 0.45 : 0.2) * (isHeroic ? 1.45 : 1.0);
+    const glowMat = new THREE.MeshBasicMaterial({ color: glowColor, transparent: true, opacity: 0.9 });
+    const motorGlow = new THREE.Mesh(new THREE.SphereGeometry(glowRadius, 6, 6), glowMat);
     motorGlow.position.z = isHeavy ? -1.4 : -0.45;
     group.add(motorGlow);
 
@@ -228,6 +233,7 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
         speed: speed,
         isHeavy: isHeavy,
         isToxin: isToxin,
+        isHeroic: isHeroic,
         metadata: metadata,
         intercepted: false,
         update() {
@@ -267,8 +273,12 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
                 this.group.position.copy(this.curPos);
             }
 
-            if (Math.random() < 0.85) {
-                spawnSmokePuff(this.group.position, this.isToxin ? 0x2ed573 : 0x747d8c, 0.25);
+            if (Math.random() < (this.isHeroic ? 0.95 : 0.85)) {
+                const trailColor = this.isHeroic
+                    ? (this.isHeavy ? 0xff5522 : 0xf10e0e)
+                    : (this.isToxin ? 0x2ed573 : 0x747d8c);
+                const trailSize = this.isHeroic ? (this.isHeavy ? 0.42 : 0.35) : 0.25;
+                spawnSmokePuff(this.group.position, trailColor, trailSize);
             }
 
             if (alpha >= 1.0) {
@@ -282,7 +292,9 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
                 const mIdx = activeMissiles.indexOf(this);
                 if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
 
-                spawnEnhancedExplosion(this.toPos, this.isToxin ? 0x2ed573 : 0xff4757, this.isHeavy ? 2.2 : 1.2, this.isHeavy);
+                const expColor = (!this.isToxin && this.isHeroic) ? 0xff2222 : (this.isToxin ? 0x2ed573 : 0xff4757);
+                const expScale = this.isHeroic ? (this.isHeavy ? 2.5 : 1.45) : (this.isHeavy ? 2.2 : 1.2);
+                spawnEnhancedExplosion(this.toPos, expColor, expScale, this.isHeavy);
                 if (this.metadata && typeof this.metadata.onImpact === 'function') {
                     this.metadata.onImpact(this.toPos);
                 }
@@ -331,7 +343,7 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
     activeMissiles.push(missileObj);
 }
 
-function spawnGuidedBomb(fromPos, toPos, isFuelAir = false) {
+function spawnGuidedBomb(fromPos, toPos, isFuelAir = false, isHeroic = false) {
     const bombMat = new THREE.MeshStandardMaterial({
             color: isFuelAir ? 0xff4757 : 0x2f3542,
             roughness: 0.4,
@@ -355,6 +367,7 @@ function spawnGuidedBomb(fromPos, toPos, isFuelAir = false) {
             distTraveled: 0,
             speed: speed,
             isFuelAir: isFuelAir,
+            isHeroic: isHeroic,
             update() {
                 if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
                     this.toPos.copy(this.metadata.target.mesh.position);
@@ -367,8 +380,8 @@ function spawnGuidedBomb(fromPos, toPos, isFuelAir = false) {
                 const alpha = Math.min(1.0, this.distTraveled / Math.max(0.1, this.distTotal));
                 this.mesh.position.lerpVectors(this.fromPos, this.toPos, alpha);
 
-                if (Math.random() < 0.6) {
-                    spawnSmokePuff(this.mesh.position, 0xced6e0, 0.2);
+                if (Math.random() < (this.isHeroic ? 0.85 : 0.6)) {
+                    spawnSmokePuff(this.mesh.position, this.isHeroic ? 0xf10e0e : 0xced6e0, this.isHeroic ? 0.32 : 0.2);
                 }
 
                 if (alpha >= 1.0) {

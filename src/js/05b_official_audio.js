@@ -73,6 +73,33 @@ function decodeOfficialAudioData(ctx, data) {
     return fetch(data).then(r => r.arrayBuffer()).then(buf => ctx.decodeAudioData(buf));
 }
 
+const MAX_AUDIO_FALLBACK_POOL = 8;
+window.OFFICIAL_AUDIO_POOL = window.OFFICIAL_AUDIO_POOL || [];
+let _officialAudioPoolIdx = 0;
+
+function playOfficialAudioElementFallback(data, volume) {
+    if (typeof Audio !== 'function' || !data) return false;
+    try {
+        let el;
+        if (window.OFFICIAL_AUDIO_POOL.length < MAX_AUDIO_FALLBACK_POOL) {
+            el = new Audio(data);
+            window.OFFICIAL_AUDIO_POOL.push(el);
+        } else {
+            el = window.OFFICIAL_AUDIO_POOL[_officialAudioPoolIdx % MAX_AUDIO_FALLBACK_POOL];
+            _officialAudioPoolIdx = (_officialAudioPoolIdx + 1) % MAX_AUDIO_FALLBACK_POOL;
+            if (typeof el.pause === 'function') el.pause();
+            el.src = data;
+            el.currentTime = 0;
+        }
+        el.volume = volume;
+        const result = el.play();
+        if (result && result.catch) result.catch(() => {});
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function playOfficialSound(soundKey, volume = 0.85, faction = null) {
     if (!soundKey) return false;
     const clampedVol = Math.max(0, Math.min(1, volume));
@@ -82,11 +109,17 @@ function playOfficialSound(soundKey, volume = 0.85, faction = null) {
         const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
         if (ctx && typeof ctx.decodeAudioData === 'function') {
             const cached = window.OFFICIAL_AUDIO_CACHE[soundKey];
+            if (cached === 'fallback') {
+                return playOfficialAudioElementFallback(data, clampedVol);
+            }
             if (cached && cached.duration !== undefined) {
                 return playOfficialAudioBuffer(ctx, cached, clampedVol);
             }
             if (cached && typeof cached.then === 'function') {
-                cached.then(buf => { if (buf) playOfficialAudioBuffer(ctx, buf, clampedVol); });
+                cached.then(buf => {
+                    if (buf) playOfficialAudioBuffer(ctx, buf, clampedVol);
+                    else playOfficialAudioElementFallback(data, clampedVol);
+                });
                 return true;
             }
             const decodePromise = decodeOfficialAudioData(ctx, data).then(buf => {
@@ -94,13 +127,14 @@ function playOfficialSound(soundKey, volume = 0.85, faction = null) {
                 playOfficialAudioBuffer(ctx, buf, clampedVol);
                 return buf;
             }).catch(() => {
-                delete window.OFFICIAL_AUDIO_CACHE[soundKey];
+                window.OFFICIAL_AUDIO_CACHE[soundKey] = 'fallback';
+                playOfficialAudioElementFallback(data, clampedVol);
                 return null;
             });
             window.OFFICIAL_AUDIO_CACHE[soundKey] = decodePromise;
             return true;
         }
-        return false;
+        return playOfficialAudioElementFallback(data, clampedVol);
     };
     if (window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey]) return play();
     loadOfficialAudioGroup(getOfficialAudioGroup(soundKey, faction)).then(play);

@@ -17,8 +17,10 @@ const context = {
         return { ok: true, json: async () => entries };
     },
     Audio: function Audio(data) {
+        this.src = data;
         this.data = data;
-        this.play = () => { played.push(data); return Promise.resolve(); };
+        this.pause = () => {};
+        this.play = () => { played.push(this.src || this.data); return Promise.resolve(); };
     },
     console
 };
@@ -86,7 +88,52 @@ vm.runInContext(fs.readFileSync(path.join(root, 'src/js/05b_official_audio.js'),
     if (embeddedFetches !== 0 || !embedded.window.OFFICIAL_AUDIO_DATA.voice_china_dozer_create) {
         throw new Error('Embedded audio catalog did not load without a network request');
     }
-    console.log('Audio loader checks passed: lazy startup, faction-specific builder voices, valid voice selection, request caching, and offline embedded catalogs.');
+
+    let decodeCalls = 0;
+    let startedSources = 0;
+    let webAudioFallbackCount = 0;
+    const mockCtx = {
+        state: 'running',
+        destination: {},
+        decodeAudioData: () => {
+            decodeCalls++;
+            return Promise.resolve({ duration: 0.5 });
+        },
+        createBufferSource: () => ({
+            buffer: null,
+            connect() {},
+            start() { startedSources++; }
+        }),
+        createGain: () => ({
+            gain: { value: 1 },
+            connect() {}
+        })
+    };
+    const webAudioCtx = vm.createContext({
+        window: { OFFICIAL_AUDIO_EMBEDDED: { china } },
+        atob: b64 => Buffer.from(b64, 'base64').toString('binary'),
+        Uint8Array,
+        getAudioContext: () => mockCtx,
+        Audio: function Audio() {
+            webAudioFallbackCount++;
+            throw new Error('Web Audio path must not instantiate HTMLAudioElement');
+        },
+        fetch: () => { throw new Error('Embedded Web Audio catalog must not fetch'); },
+        URL,
+        document: { baseURI: 'file:///game.html' },
+        console
+    });
+    vm.runInContext(fs.readFileSync(path.join(root, 'src/js/05b_official_audio.js'), 'utf8'), webAudioCtx);
+    await webAudioCtx.loadOfficialAudioGroup('china');
+    webAudioCtx.window.playOfficialSound('voice_china_dozer_create', 0.8);
+    await new Promise(resolve => setImmediate(resolve));
+    webAudioCtx.window.playOfficialSound('voice_china_dozer_create', 0.8);
+    await new Promise(resolve => setImmediate(resolve));
+    if (decodeCalls !== 1 || startedSources !== 2 || webAudioFallbackCount !== 0) {
+        throw new Error(`Web Audio playback check failed (decodeCalls=${decodeCalls}, startedSources=${startedSources}, audioElements=${webAudioFallbackCount})`);
+    }
+
+    console.log('Audio loader checks passed: lazy startup, faction-specific builder voices, valid voice selection, request caching, Web Audio zero-element caching, and offline embedded catalogs.');
 })().catch(error => {
     console.error(error);
     process.exitCode = 1;

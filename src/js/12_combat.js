@@ -127,11 +127,14 @@ function processCombatScanning() {
                         const fallbackMuzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
                         const muzzleL = m1 ? m1.getWorldPosition(new THREE.Vector3()) : fallbackMuzzle;
                         const muzzleR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : null;
-                        spawnMuzzleFlash(muzzleL, 0xffa502, 0.4);
-                        spawnBulletTracer(muzzleL, tPos, 0xf1c40f, 2.8);
+                        const isHeroicOverlord = (unit.veterancy >= 3);
+                        const gatFlashColor = isHeroicOverlord ? 0xff1111 : 0xffa502;
+                        const gatTracerColor = isHeroicOverlord ? 0xff1a1a : 0xf1c40f;
+                        spawnMuzzleFlash(muzzleL, gatFlashColor, isHeroicOverlord ? 0.55 : 0.4);
+                        spawnBulletTracer(muzzleL, tPos, gatTracerColor, isHeroicOverlord ? 3.8 : 2.8);
                         if (muzzleR) {
-                            spawnMuzzleFlash(muzzleR, 0xffa502, 0.4);
-                            spawnBulletTracer(muzzleR, tPos, 0xf1c40f, 2.8);
+                            spawnMuzzleFlash(muzzleR, gatFlashColor, isHeroicOverlord ? 0.55 : 0.4);
+                            spawnBulletTracer(muzzleR, tPos, gatTracerColor, isHeroicOverlord ? 3.8 : 2.8);
                         }
                         if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
                         applyCalculatedDamage(unit, bestTarget, 16, 'GATLING');
@@ -586,10 +589,11 @@ function executeWeaponFire(attacker, target) {
         attacker.revealedUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 90;
     }
 
-    // Authentic Heroic Tracers (Heroic rank units fire intense red laser tracers!)
-    const isHeroic = (attacker.veterancy === 3);
-    const heroicTracerColor = 0xff2222;
+    // Authentic Heroic Tracers (Heroic rank units fire intense red laser tracers & scaled flashes!)
+    const isHeroic = (attacker.veterancy >= 3);
+    const heroicTracerColor = 0xff1a1a;
     const heroicFlashColor = 0xff1111;
+    const heroicScale = isHeroic ? 1.35 : 1.0;
 
     // --- SIGNATURE C&C GENERALS WEAPON EFFECTS & DAMAGE APPLICATION ---
 
@@ -597,10 +601,10 @@ function executeWeaponFire(attacker, target) {
         // Overlord Tank DUAL CANNONS!
         const muzzleL = getMuzzleWorldPosition(attacker, -0.45);
         const muzzleR = getMuzzleWorldPosition(attacker, 0.45);
-        spawnMuzzleFlash(muzzleL, isHeroic ? heroicFlashColor : 0xffa502, 0.9);
-        spawnMuzzleFlash(muzzleR, isHeroic ? heroicFlashColor : 0xffa502, 0.9);
-        spawnBulletTracer(muzzleL, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 4.2);
-        spawnBulletTracer(muzzleR, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 4.2);
+        spawnMuzzleFlash(muzzleL, isHeroic ? heroicFlashColor : 0xffa502, 0.9 * heroicScale);
+        spawnMuzzleFlash(muzzleR, isHeroic ? heroicFlashColor : 0xffa502, 0.9 * heroicScale);
+        spawnBulletTracer(muzzleL, targetPos, isHeroic ? heroicTracerColor : 0xffb142, 4.2 * heroicScale);
+        spawnBulletTracer(muzzleR, targetPos, isHeroic ? heroicTracerColor : 0xffb142, 4.2 * heroicScale);
         playAudio('overlord_cannon', {}, 'china');
         applyCalculatedDamage(attacker, target, 80, 'ARMOR_PIERCING');
 
@@ -623,8 +627,8 @@ function executeWeaponFire(attacker, target) {
             for (let b = 0; b < 3; b++) {
                 setTimeout(() => {
                         const gPos = (b % 2 === 0) ? gatPosL : gatPosR;
-                        spawnMuzzleFlash(gPos, 0xffa502, 0.35);
-                        spawnBulletTracer(gPos, targetPos, 0xf1c40f, 2.8);
+                        spawnMuzzleFlash(gPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35 * heroicScale);
+                        spawnBulletTracer(gPos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 2.8 * heroicScale);
                     }, b * 50);
             }
             if (typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
@@ -651,7 +655,7 @@ function executeWeaponFire(attacker, target) {
         for (let r = 0; r < rCount; r++) {
             setTimeout(() => {
                     const mPos = getMuzzleWorldPosition(attacker, (r % 2 === 0 ? -0.25 : 0.25));
-                    spawnMuzzleFlash(mPos, 0xff9f43, 0.4);
+                    spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xff9f43, 0.4 * heroicScale);
                     spawnRocketProjectile(mPos, targetPos, false, false, {
                             attacker: attacker,
                             target: target,
@@ -663,7 +667,7 @@ function executeWeaponFire(attacker, target) {
         }
     } else if (['rocket', 'rpg', 'tankhunter'].includes(attacker.type)) {
         // Shoulder-fired rockets (Tracked for Point Defense Laser interception; apRockets applied in applyCalculatedDamage)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff9f43, 0.5);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff9f43, 0.5 * heroicScale);
         spawnRocketProjectile(muzzlePos, targetPos, false, attacker.type === 'rpg' || attacker.type === 'tankhunter', {
                 attacker: attacker,
                 target: target,
@@ -687,7 +691,7 @@ function executeWeaponFire(attacker, target) {
         const launchNode = tomMissileNode || scudMuzzle;
         const launchPos = launchNode ? launchNode.getWorldPosition(new THREE.Vector3()) : muzzlePos;
         if (tomMissileNode) tomMissileNode.visible = false;
-        spawnMuzzleFlash(launchPos, isHeroic ? heroicFlashColor : 0xff793f, 1.2);
+        spawnMuzzleFlash(launchPos, isHeroic ? heroicFlashColor : 0xff793f, 1.2 * heroicScale);
         const mDmg = attacker.type === 'scud' ? 300 : 150;
         const mSplash = attacker.type === 'tomahawk' ? 7.5 : 5.5;
         spawnRocketProjectile(launchPos, targetPos, true, attacker.type === 'scud', {
@@ -702,8 +706,8 @@ function executeWeaponFire(attacker, target) {
         if (attacker.type === 'scud') playAudio('scud_launch', {}, 'gla');
     } else if (attacker.type === 'inferno') {
         // Inferno Cannon Long-Range Incendiary Napalm Artillery
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff5252, 1.2);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5.5);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff5252, 1.2 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5.5 * heroicScale);
         playAudio('china_cannon', {}, 'china');
         const impactPos = targetPos.clone();
         setTimeout(() => {
@@ -723,8 +727,8 @@ function executeWeaponFire(attacker, target) {
         deployNukeCannonOutriggers(attacker);
         const isNeutron = !!(attacker.neutronShells && attacker.ammoMode !== 'nuclear');
         const shellColor = isNeutron ? 0x00f2fe : 0x10ac84;
-        spawnMuzzleFlash(muzzlePos, shellColor, 1.6);
-        spawnBulletTracer(muzzlePos, targetPos, shellColor, 6.5);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : shellColor, 1.6 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, shellColor, 6.5 * heroicScale);
         playAudio('nuke_artillery', {}, 'china');
 
         const impactPos = targetPos.clone();
@@ -784,8 +788,8 @@ function executeWeaponFire(attacker, target) {
         applyNukeCannonImpact();
     } else if (['battlemaster'].includes(attacker.type)) {
         // China 152mm Smoothbore Cannon (uraniumShells applied in applyCalculatedDamage)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.1);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 3.8);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff793f, 1.1 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffb142, 3.8 * heroicScale);
         playAudio('china_cannon', {}, 'china');
         if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
             if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
@@ -793,8 +797,8 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, 60, 'ARMOR_PIERCING');
     } else if (['gatlingTank', 'gatlingCannon', 'gatling'].includes(attacker.type)) {
         // China Twin 20mm Rotary Gatling Cannon (chainGuns applied in applyCalculatedDamage)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 4.5);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 4.5 * heroicScale);
         playAudio('gatling_fire', {}, 'china');
         applyCalculatedDamage(attacker, target, 15, 'GATLING');
     } else if (attacker.type === 'dragonTank') {
@@ -804,8 +808,8 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, 24, 'FLAME');
     } else if (['rebel', 'technical'].includes(attacker.type)) {
         // GLA Kalashnikov AK-47 & Technical Heavy MG (apBullets applied in applyCalculatedDamage)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xf1c40f, 0.4);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xe67e22, 3.0);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xf1c40f, 0.4 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xe67e22, 3.0 * heroicScale);
         playAudio('ak47', {}, 'gla');
         let baseMG = (attacker.type === 'technical' ? 18 : 15);
         if (attacker.type === 'technical' && attacker.salvageLevel >= 1) {
@@ -816,27 +820,27 @@ function executeWeaponFire(attacker, target) {
         // USA Raptor Air-Superiority Fighter: Dual AMRAAM Guided Missiles!
         const mPosL = getMuzzleWorldPosition(attacker, -0.65);
         const mPosR = getMuzzleWorldPosition(attacker, 0.65);
-        spawnMuzzleFlash(mPosL, 0xff9f43, 0.5);
-        spawnMuzzleFlash(mPosR, 0xff9f43, 0.5);
+        spawnMuzzleFlash(mPosL, isHeroic ? heroicFlashColor : 0xff9f43, 0.5 * heroicScale);
+        spawnMuzzleFlash(mPosR, isHeroic ? heroicFlashColor : 0xff9f43, 0.5 * heroicScale);
         spawnRocketProjectile(mPosL, targetPos, false, false, { attacker, target, damage: 60, damageType: 'EXPLOSIVE', splashRadius: 2.0 });
         setTimeout(() => spawnRocketProjectile(mPosR, targetPos, false, false, { attacker, target, damage: 60, damageType: 'EXPLOSIVE', splashRadius: 2.0 }), 100);
         playUSASound('comanche_missile');
     } else if (attacker.type === 'stealthfighter') {
         // USA Stealth Fighter: Laser-Guided Precision Bunker-Buster Bomb!
-        spawnMuzzleFlash(muzzlePos, 0x00d2d3, 0.6);
-        spawnGuidedBomb(muzzlePos, targetPos, false);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0x00d2d3, 0.6 * heroicScale);
+        spawnGuidedBomb(muzzlePos, targetPos, false, isHeroic);
         playUSASound('comanche_missile');
         setTimeout(() => applyCalculatedDamage(attacker, target, 150, 'EXPLOSIVE'), 400);
     } else if (attacker.type === 'aurora') {
         // USA Aurora Hypersonic Bomber: Fuel-Air Cluster Bomb with Massive Shockwave!
-        spawnMuzzleFlash(muzzlePos, 0x00d2d3, 1.2);
-        spawnGuidedBomb(muzzlePos, targetPos, true);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0x00d2d3, 1.2 * heroicScale);
+        spawnGuidedBomb(muzzlePos, targetPos, true, isHeroic);
         playUSASound('aurora_bomb');
         setTimeout(() => applyCalculatedDamage(attacker, target, 220, 'EXPLOSIVE'), 500);
     } else if (attacker.type === 'comanche') {
         // USA Comanche Attack Helicopter: 20mm Rotary Cannon + Hellfire Missiles!
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 3.0);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 3.0 * heroicScale);
         const mPosL = getMuzzleWorldPosition(attacker, -0.5);
         const mPosR = getMuzzleWorldPosition(attacker, 0.5);
         setTimeout(() => spawnRocketProjectile(mPosL, targetPos, false, false, { attacker, target, damage: 35, damageType: 'EXPLOSIVE' }), 80);
@@ -850,8 +854,8 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, 25, 'SMALL_ARMS');
     } else if (attacker.type === 'paladin') {
         // USA Paladin Tank: High-Velocity 120mm Tank Cannon (PDL runs autonomously on defense!)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffb142, 3.5 * heroicScale);
         playUSASound('paladin_cannon');
         if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('toxinShells')) {
             if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(targetPos);
@@ -861,8 +865,8 @@ function executeWeaponFire(attacker, target) {
         // Quad Cannon 4x23mm Autocannon Salvo (apBullets applied in applyCalculatedDamage)
         [-0.22, 0.22].forEach(xOff => {
                 const mPos = getMuzzleWorldPosition(attacker, xOff);
-                spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
-                spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.5);
+                spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35 * heroicScale);
+                spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.5 * heroicScale);
         });
         let qDmg = 24;
         if (attacker.salvageLevel >= 1) qDmg = Math.round(qDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
@@ -870,8 +874,8 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, qDmg, 'GATLING');
     } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
         // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry, Jarmen Kell also snipes vehicle drivers!)
-        spawnMuzzleFlash(muzzlePos, 0xffffff, 0.3);
-        spawnLaserBeam(muzzlePos, targetPos, 0xffffff, 2);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffffff, 0.3 * heroicScale);
+        spawnLaserBeam(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffffff, isHeroic ? 3.2 : 2);
         if (typeof playUSASound === 'function') playUSASound('sniper_rifle');
         const tArmor = getArmorCategory(target);
         if (attacker.type === 'jarmen' && (tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh && !target.isUnmanned) {
@@ -900,8 +904,8 @@ function executeWeaponFire(attacker, target) {
             if (typeof triggerScreenShake === 'function') triggerScreenShake(0.8);
             applyCalculatedDamage(attacker, target, 350, 'EXPLOSIVE');
         } else {
-            spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
-            spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.8);
+            spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45 * heroicScale);
+            spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 2.8 * heroicScale);
             playUSASound('machine_gun');
             applyCalculatedDamage(attacker, target, 45, 'SMALL_ARMS');
         }
@@ -998,8 +1002,8 @@ function executeWeaponFire(attacker, target) {
         // GLA Angry Mob: Multi-tracer AK-47 volley + Molotov Cocktails!
         [-0.35, 0, 0.35].forEach(off => {
                 const mPos = getMuzzleWorldPosition(attacker, off);
-                spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35);
-                spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.2);
+                spawnMuzzleFlash(mPos, isHeroic ? heroicFlashColor : 0xffa502, 0.35 * heroicScale);
+                spawnBulletTracer(mPos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.2 * heroicScale);
         });
         playAudio('ak47', {}, 'gla');
         const mobDmg = 30;
@@ -1007,8 +1011,8 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, 15, 'FLAME');
     } else if (['tank', 'crusader', 'scorpion', 'marauder'].includes(attacker.type)) {
         // Tank Cannon (Crusader 60, Marauder 45, Scorpion 20 per INIZH.big)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.75 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xffb142, 3.5 * heroicScale);
         if (['tank', 'crusader'].includes(attacker.type)) playUSASound('cannon');
         else playAudio('china_cannon', {}, 'gla');
         let tkDmg = (attacker.type === 'scorpion') ? 20 : (attacker.type === 'marauder') ? 45 : 60;
@@ -1016,8 +1020,8 @@ function executeWeaponFire(attacker, target) {
             tkDmg = Math.round(tkDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
             // Marauder twin cannon visuals on scrap upgrade
             const mPosR = getMuzzleWorldPosition(attacker, 0.3);
-            spawnMuzzleFlash(mPosR, isHeroic ? heroicFlashColor : 0xffa502, 0.75);
-            spawnBulletTracer(mPosR, targetPos, isHeroic ? heroicTracerColor : 0xff4757, 3.5);
+            spawnMuzzleFlash(mPosR, isHeroic ? heroicFlashColor : 0xffa502, 0.75 * heroicScale);
+            spawnBulletTracer(mPosR, targetPos, isHeroic ? heroicTracerColor : 0xffb142, 3.5 * heroicScale);
         } else if (attacker.type === 'scorpion' && (attacker.salvageLevel >= 1 || (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket')))) {
             // Secondary Scorpion Rocket (from turret rocket rack; apRockets applied in applyCalculatedDamage)
             const rackNode = getCachedNode(attacker.mesh, 'WEAPONA01') || getCachedNode(attacker.mesh, 'MISSLERACK01');
@@ -1033,8 +1037,8 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, tkDmg, 'ARMOR_PIERCING');
     } else if (attacker.type === 'humvee') {
         // USA Humvee Heavy .50 Machine Gun
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.5);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.45 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf39c12, 2.5 * heroicScale);
         playUSASound('machine_gun');
         let vehDmg = 12;
         if (typeof units !== 'undefined' && units.includes(attacker)) {
@@ -1050,8 +1054,8 @@ function executeWeaponFire(attacker, target) {
         applyCalculatedDamage(attacker, target, vehDmg, 'SMALL_ARMS');
     } else {
         // Infantry Rifle / Carbine burst (apBullets applied in applyCalculatedDamage)
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.25);
-        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 1.8);
+        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xffa502, 0.25 * heroicScale);
+        spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xf1c40f, 1.8 * heroicScale);
         if (typeof playUSASound === 'function') playUSASound('machine_gun');
         applyCalculatedDamage(attacker, target, 15, 'SMALL_ARMS');
     }
