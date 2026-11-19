@@ -795,6 +795,15 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     if (mapPropsGroup) { scene.remove(mapPropsGroup); mapPropsGroup = null; }
     mapObstacles.length = 0;
     worldBuildings.length = 0;
+    if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+    if (typeof _pathfindGridState !== 'undefined' && _pathfindGridState) {
+        _pathfindGridState._baseCells = null;
+        _pathfindGridState._baseKey = '';
+    }
+    if (typeof window !== 'undefined') {
+        window._minimapTerrainBg = null;
+        window._minimapTerrainKey = '';
+    }
     supplyPoints.forEach(sp => { if (sp.mesh) scene.remove(sp.mesh); });
     supplyPoints.length = 0;
 
@@ -1576,10 +1585,11 @@ function spawnMapProps(theme, mapSize) {
         ? Math.min(32, Math.floor(mapSize * 0.035))
         : (mapSize > 1000 ? 110 : mapSize > 600 ? 75 : 45);
         const bound = mapSize * 0.42;
+        const propRng = (typeof simRandom === 'function') ? simRandom : Math.random;
 
         for (let i = 0; i < count; i++) {
-            const x = (Math.random() - 0.5) * 2 * bound;
-            const z = (Math.random() - 0.5) * 2 * bound;
+            const x = (propRng() - 0.5) * 2 * bound;
+            const z = (propRng() - 0.5) * 2 * bound;
             const y = getTerrainHeight(x, z);
 
             // Do not spawn in water
@@ -1596,7 +1606,7 @@ function spawnMapProps(theme, mapSize) {
             if (mapBridges.some(br => Math.hypot(x - br.position.x, z - br.position.z) < br.width + 6)) continue;
 
             if (theme === 'desert') {
-                const roll = Math.random();
+                const roll = propRng();
                 if (roll > 0.6) {
                     const palm = createPalmTreeMesh();
                     palm.position.set(x, y, z);
@@ -1615,12 +1625,12 @@ function spawnMapProps(theme, mapSize) {
                 } else {
                     const pipe = createPipelineMesh(20);
                     pipe.position.set(x, y, z);
-                    pipe.rotation.y = Math.random() * Math.PI;
+                    pipe.rotation.y = propRng() * Math.PI;
                     mapPropsGroup.add(pipe);
                     mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 3.5 });
                 }
             } else if (theme === 'jungle') {
-                const roll = Math.random();
+                const roll = propRng();
                 if (roll > 0.45) {
                     const tree = createJungleTreeMesh();
                     tree.position.set(x, y, z);
@@ -1641,7 +1651,7 @@ function spawnMapProps(theme, mapSize) {
                     mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
                 }
             } else if (theme === 'snow') {
-                const roll = Math.random();
+                const roll = propRng();
                 if (roll > 0.45) {
                     const pine = createSnowPineMesh();
                     pine.position.set(x, y, z);
@@ -1659,7 +1669,7 @@ function spawnMapProps(theme, mapSize) {
                     mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
                 }
             } else if (theme === 'city') {
-                const roll = Math.random();
+                const roll = propRng();
                 if (Math.abs(x - mapSize * 0.06) > 35) {
                     if (roll > 0.7) {
                         const building = createCitySkyscraperMesh();
@@ -1674,7 +1684,7 @@ function spawnMapProps(theme, mapSize) {
                         let usedKey = null;
                         if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA[uKey]) {
                             building = createW3DBuildingMesh(uKey, false);
-                            building.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2);
+                            building.rotation.y = Math.floor(propRng() * 4) * (Math.PI / 2);
                             usedKey = uKey;
                         } else {
                             building = createCitySkyscraperMesh();
@@ -1690,7 +1700,7 @@ function spawnMapProps(theme, mapSize) {
                     } else {
                         const wreck = createWreckCarMesh();
                         wreck.position.set(x, y, z);
-                        wreck.rotation.y = Math.random() * Math.PI * 2;
+                        wreck.rotation.y = propRng() * Math.PI * 2;
                         mapPropsGroup.add(wreck);
                         mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.5 });
                     }

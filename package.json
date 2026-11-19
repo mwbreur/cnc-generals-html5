@@ -1,0 +1,13 @@
+{
+  "name": "cnc-generals-html5",
+  "version": "1.0.0",
+  "description": "Command & Conquer: Generals & Zero Hour — HTML5 Skirmish & P2P Multiplayer Edition",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "lint": "node tools/lint_js.js",
+    "test": "node verify_system.js && node tools/validate_audio_catalog.js && node tools/test_audio_loader.js",
+    "e2e": "node scripts/e2e_smoke.mjs"
+  }
+}

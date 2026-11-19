@@ -1535,4 +1535,67 @@ console.log("✓ Verified all 11 retail visual, model, terrain, base orientation
 }
 console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire sound, Tomahawk retail impact, retail stealth visibility, and light-free glow (no frame-spike recompiles).");
 
+// --- 23. DOM uniqueness, button types, multiplayer protocol schema/authority/sequencing, and deterministic procedural map props ---
+{
+    const bodyHtml = fs.readFileSync(path.join(__dirname, 'src', 'html', 'body.html'), 'utf8');
+    const idRe = /\bid="([^"]+)"/g;
+    const seenIds = new Set();
+    let idMatch;
+    while ((idMatch = idRe.exec(bodyHtml)) !== null) {
+        if (seenIds.has(idMatch[1])) {
+            throw new Error(`Duplicate DOM id="${idMatch[1]}" found in src/html/body.html`);
+        }
+        seenIds.add(idMatch[1]);
+    }
+    const untypedButtons = bodyHtml.match(/<button(?![^>]*\btype=)/g) || [];
+    if (untypedButtons.length > 0) {
+        throw new Error(`Found ${untypedButtons.length} <button> elements without explicit type= attribute in src/html/body.html`);
+    }
+
+    vm.runInContext(`
+        // 1. Validate multiplayer packet schema & authority rules
+        if (typeof validateNetworkPacket !== 'function') throw new Error('validateNetworkPacket missing!');
+        if (validateNetworkPacket(null).valid) throw new Error('Expected null packet to be rejected');
+        if (validateNetworkPacket({ type: 'unknown_op' }).valid) throw new Error('Expected unknown packet type to be rejected');
+        if (validateNetworkPacket({ type: 'state_sync', u: [], s: [] }, true).valid) {
+            throw new Error('Expected host receiver to reject client-forged state_sync packet');
+        }
+        if (!validateNetworkPacket({ type: 'state_sync', v: 2, seq: 10, u: [], s: [] }, false).valid) {
+            throw new Error('Expected client receiver to accept valid host state_sync packet');
+        }
+        if (validateNetworkPacket({ type: 'move_units', unitNetIds: ['U1'], targetPos: { x: NaN, y: 0, z: 0 } }, true).valid) {
+            throw new Error('Expected move_units with NaN coordinates to be rejected');
+        }
+
+        // 2. Verify out-of-order state_sync sequence rejection
+        isMultiplayerHost = false;
+        isMultiplayerActive = true;
+        cleanupPeerSession();
+        const accepted1 = handleNetworkPacket({ type: 'state_sync', v: 2, seq: 5, u: [], s: [] });
+        const rejectedStale = handleNetworkPacket({ type: 'state_sync', v: 2, seq: 4, u: [], s: [] });
+        if (accepted1 === false || rejectedStale !== false) {
+            throw new Error('Expected stale state_sync seq=4 after seq=5 to be rejected!');
+        }
+        isMultiplayerActive = false;
+
+        // 3. Verify 6-char room code generation
+        const tok = generateRoomToken(6);
+        if (typeof tok !== 'string' || tok.length !== 6 || !/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(tok)) {
+            throw new Error('Invalid 6-char room token: ' + tok);
+        }
+
+        // 4. Verify deterministic procedural map prop placement across two seeded runs
+        setSimSeed(777777);
+        setupMapEnvironment('jungle', 900);
+        const obsRun1 = mapObstacles.map(o => o.position.x.toFixed(2) + ',' + o.position.z.toFixed(2)).join('|');
+        setSimSeed(777777);
+        setupMapEnvironment('jungle', 900);
+        const obsRun2 = mapObstacles.map(o => o.position.x.toFixed(2) + ',' + o.position.z.toFixed(2)).join('|');
+        if (!obsRun1 || obsRun1 !== obsRun2) {
+            throw new Error('Procedural map obstacles should be 100% deterministic under setSimSeed!');
+        }
+    `, sandbox);
+}
+console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");
+
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

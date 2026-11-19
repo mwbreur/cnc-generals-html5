@@ -598,13 +598,36 @@ function deployBase(position, faction = selectedFaction, team = playerTeamId) {
     updateSidebar();
 }
 
+function disposeSceneNodeSafe(node) {
+    if (!node) return;
+    if (typeof scene !== 'undefined' && scene && typeof scene.remove === 'function') {
+        scene.remove(node);
+    }
+    if (typeof node.traverse === 'function') {
+        node.traverse(c => {
+            if (c.geometry && (!c.geometry.userData || !c.geometry.userData._shared) && typeof c.geometry.dispose === 'function') {
+                c.geometry.dispose();
+            }
+            if (c.material) {
+                const mats = Array.isArray(c.material) ? c.material : [c.material];
+                for (let mi = 0; mi < mats.length; mi++) {
+                    const m = mats[mi];
+                    if (m && (!m.userData || !m.userData._shared) && typeof m.dispose === 'function') {
+                        m.dispose();
+                    }
+                }
+            }
+        });
+    }
+}
+
 function resetEntireBattlefieldState(mapSize = 1500) {
     if (typeof cleanupShellMapDemo === 'function') cleanupShellMapDemo();
     // 1. Deselect everything and reset cursors & blueprint states
     if (typeof selectedStructure !== 'undefined') selectedStructure = null;
     if (typeof selectedSupplyPoint !== 'undefined') selectedSupplyPoint = null;
     if (typeof blueprintMesh !== 'undefined' && blueprintMesh) {
-        if (typeof scene !== 'undefined') scene.remove(blueprintMesh);
+        disposeSceneNodeSafe(blueprintMesh);
         blueprintMesh = null;
         activeBlueprintType = null;
     }
@@ -616,61 +639,86 @@ function resetEntireBattlefieldState(mapSize = 1500) {
 
     // 2. Clear previous battle structures
     if (typeof structures !== 'undefined') {
-        structures.forEach(s => { if (s.mesh && typeof scene !== 'undefined') scene.remove(s.mesh); });
+        structures.forEach(s => {
+            if (s._progressBarEl && s._progressBarEl.parentElement) s._progressBarEl.parentElement.removeChild(s._progressBarEl);
+            disposeSceneNodeSafe(s.mesh);
+        });
         structures.length = 0;
     }
     if (typeof enemyStructures !== 'undefined') {
-        enemyStructures.forEach(es => { if (es.mesh && typeof scene !== 'undefined') scene.remove(es.mesh); });
+        enemyStructures.forEach(es => {
+            if (es._progressBarEl && es._progressBarEl.parentElement) es._progressBarEl.parentElement.removeChild(es._progressBarEl);
+            disposeSceneNodeSafe(es.mesh);
+        });
         enemyStructures.length = 0;
     }
     if (typeof window.neutralStructures !== 'undefined' && window.neutralStructures) {
-        window.neutralStructures.forEach(ns => { if (ns.mesh && typeof scene !== 'undefined') scene.remove(ns.mesh); });
+        window.neutralStructures.forEach(ns => { disposeSceneNodeSafe(ns.mesh); });
         window.neutralStructures.length = 0;
     } else {
         window.neutralStructures = [];
     }
 
-    // 3. Clear previous battle units
+    // 3. Clear previous battle units (including trajectoryLines, drones, and selection circles)
     if (typeof units !== 'undefined') {
         units.forEach(u => {
-                if (u.mesh && typeof scene !== 'undefined') scene.remove(u.mesh);
-                if (u.selectionCircle && typeof scene !== 'undefined') scene.remove(u.selectionCircle);
+            if (u.drone && u.drone.mesh) disposeSceneNodeSafe(u.drone.mesh);
+            if (u.trajectoryLine) disposeSceneNodeSafe(u.trajectoryLine);
+            if (u.selectionCircle) disposeSceneNodeSafe(u.selectionCircle);
+            disposeSceneNodeSafe(u.mesh);
         });
         units.length = 0;
     }
     if (typeof enemyUnits !== 'undefined') {
         enemyUnits.forEach(eu => {
-                if (eu.mesh && typeof scene !== 'undefined') scene.remove(eu.mesh);
-                if (eu.selectionCircle && typeof scene !== 'undefined') scene.remove(eu.selectionCircle);
+            if (eu.drone && eu.drone.mesh) disposeSceneNodeSafe(eu.drone.mesh);
+            if (eu.trajectoryLine) disposeSceneNodeSafe(eu.trajectoryLine);
+            if (eu.selectionCircle) disposeSceneNodeSafe(eu.selectionCircle);
+            disposeSceneNodeSafe(eu.mesh);
         });
         enemyUnits.length = 0;
     }
 
-    // 4. Clear projectiles, explosions, debris, active FX, missiles, supply planes, and control groups
+    // 4. Clear projectiles, explosions, debris, active FX, missiles, supply planes, scrap crates, landmines, and control groups
     if (typeof projectiles !== 'undefined') {
-        projectiles.forEach(p => { if (p.mesh && typeof scene !== 'undefined') scene.remove(p.mesh); });
+        projectiles.forEach(p => { disposeSceneNodeSafe(p.mesh); });
         projectiles.length = 0;
     }
     if (typeof debrisList !== 'undefined') {
-        debrisList.forEach(d => { if (d.mesh && typeof scene !== 'undefined') scene.remove(d.mesh); });
+        debrisList.forEach(d => { disposeSceneNodeSafe(d.mesh); });
         debrisList.length = 0;
     }
     if (typeof activeFX !== 'undefined' && Array.isArray(activeFX)) {
-        activeFX.forEach(fx => { if (fx && fx.mesh && typeof scene !== 'undefined') scene.remove(fx.mesh); });
+        activeFX.forEach(fx => { if (fx && fx.mesh) disposeSceneNodeSafe(fx.mesh); });
         activeFX.length = 0;
     }
     if (typeof activeMissiles !== 'undefined' && Array.isArray(activeMissiles)) {
-        activeMissiles.forEach(m => { if (m && m.mesh && typeof scene !== 'undefined') scene.remove(m.mesh); });
+        activeMissiles.forEach(m => { if (m && m.mesh) disposeSceneNodeSafe(m.mesh); });
         activeMissiles.length = 0;
+    }
+    if (typeof activeScrapCrates !== 'undefined' && Array.isArray(activeScrapCrates)) {
+        activeScrapCrates.forEach(c => { if (c && c.mesh) disposeSceneNodeSafe(c.mesh); });
+        activeScrapCrates.length = 0;
+    }
+    if (typeof landmines !== 'undefined' && Array.isArray(landmines)) {
+        landmines.forEach(m => { if (m && m.mesh) disposeSceneNodeSafe(m.mesh); });
+        landmines.length = 0;
     }
     if (typeof window !== 'undefined') {
         if (Array.isArray(window.activeSupplyPlanes)) {
-            window.activeSupplyPlanes.forEach(p => { if (p && p.mesh && typeof scene !== 'undefined') scene.remove(p.mesh); });
+            window.activeSupplyPlanes.forEach(p => { if (p && p.mesh) disposeSceneNodeSafe(p.mesh); });
             window.activeSupplyPlanes.length = 0;
         }
         window.activeParticleCannonTarget = null;
         window.activeParticleCannonPlayerOwned = false;
         window.activeParticleCannonControl = false;
+        window._minimapTerrainBg = null;
+        window._minimapTerrainKey = '';
+    }
+    if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+    if (typeof _pathfindGridState !== 'undefined' && _pathfindGridState) {
+        _pathfindGridState._baseCells = null;
+        _pathfindGridState._baseKey = '';
     }
     if (typeof controlGroups !== 'undefined' && controlGroups) {
         for (let g = 1; g <= 9; g++) controlGroups[g] = [];

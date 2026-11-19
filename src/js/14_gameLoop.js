@@ -312,15 +312,21 @@ function separateGroundUnits(list) {
 const CRUSHER_TANK_SET = new Set(['crusader', 'paladin', 'battlemaster', 'overlord', 'marauder', 'scorpion', 'tank']);
 const INFANTRY_TYPE_SET = new Set(['ranger', 'missiledefender', 'pathfinder', 'burton', 'pilot', 'redguard', 'tankhunter', 'hacker', 'lotus', 'blacklotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'hijacker', 'worker', 'infantry', 'rocket']);
 
+let _rafLoopId = 0;
+let _simTimeAccumSec = 0;
+
 function animate() {
-    requestAnimationFrame(animate);
+    _rafLoopId = requestAnimationFrame(animate);
 
     const nowTime = performance.now();
-    const dt = (window._lastCombatFrameTime && nowTime > window._lastCombatFrameTime)
+    const rawDt = (window._lastCombatFrameTime && nowTime > window._lastCombatFrameTime)
     ? Math.min(0.1, (nowTime - window._lastCombatFrameTime) / 1000)
     : (1 / 60);
     window._lastCombatFrameTime = nowTime;
     const speedMul = (typeof window !== 'undefined' && typeof window.gameSpeedMultiplier === 'number' && isFinite(window.gameSpeedMultiplier)) ? window.gameSpeedMultiplier : 1.0;
+    const fixedStepDt = (typeof SIM_FIXED_DT === 'number' && SIM_FIXED_DT > 0) ? SIM_FIXED_DT : (1 / 30);
+    _simTimeAccumSec = Math.min(_simTimeAccumSec + rawDt * speedMul, fixedStepDt * 4);
+    const dt = rawDt;
     combatDeltaScale = Math.max(0.25, Math.min(4.0, dt * 60 * speedMul));
 
     const animTime = nowTime * 0.003;
@@ -2344,7 +2350,7 @@ function animate() {
                                 unit.taskState = 'Idle';
                                 unit.targetPosition.copy(unit.mesh.position);
                             } else {
-                                const rndA = Math.random() * Math.PI * 2;
+                                const rndA = ((typeof simRandom === 'function') ? simRandom() : Math.random()) * Math.PI * 2;
                                 unit.mesh.position.x += Math.cos(rndA) * 1.5;
                                 unit.mesh.position.z += Math.sin(rndA) * 1.5;
                             }
@@ -2512,7 +2518,8 @@ function animate() {
                 scene.remove(enemy.mesh);
                 spawnUnitDeathFX(enemy);
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
-                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
+                const scrapRoll = (typeof simRandom === 'function') ? simRandom() : Math.random();
+                if (scrapRoll < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
                 }
                 units.forEach((unit, idx) => {
@@ -2654,7 +2661,8 @@ function animate() {
                     }
                 }
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
-                if (Math.random() < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(unit.type))) {
+                const uScrapRoll = (typeof simRandom === 'function') ? simRandom() : Math.random();
+                if (uScrapRoll < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(unit.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);
                 }
                 enemyUnits.forEach(enemy => {

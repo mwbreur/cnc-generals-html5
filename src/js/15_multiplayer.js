@@ -8,6 +8,125 @@ let currentRoomCode = '';
 let mpOpponentFaction = 'china';
 let netIdSequence = 100;
 
+const MP_PROTOCOL_VERSION = 2;
+const MP_ALLOWED_FACTIONS = new Set(['usa', 'china', 'gla', 'random']);
+let _mpTxSeq = 0;
+let _mpLastRxSeq = 0;
+let _mpLastRxStateSeq = 0;
+let _mpRateWindowStart = 0;
+let _mpRateWindowCount = 0;
+const MP_RATE_LIMIT_PER_SEC = 120;
+
+function generateRoomToken(length = 6) {
+    const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Unambiguous uppercase alphanumeric (32 chars)
+    let token = '';
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+        const bytes = new Uint8Array(length);
+        crypto.getRandomValues(bytes);
+        for (let i = 0; i < length; i++) token += alphabet[bytes[i] & 31];
+    } else {
+        for (let i = 0; i < length; i++) token += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    return token;
+}
+
+function resetMultiplayerTransportState() {
+    _mpTxSeq = 0;
+    _mpLastRxSeq = 0;
+    _mpLastRxStateSeq = 0;
+    _mpRateWindowStart = 0;
+    _mpRateWindowCount = 0;
+}
+
+function cleanupPeerSession() {
+    if (netConn) {
+        try { if (typeof netConn.removeAllListeners === 'function') netConn.removeAllListeners(); } catch (e) {}
+        try { netConn.close(); } catch (e) {}
+        netConn = null;
+    }
+    if (netPeer) {
+        try { if (typeof netPeer.removeAllListeners === 'function') netPeer.removeAllListeners(); } catch (e) {}
+        try { netPeer.destroy(); } catch (e) {}
+        netPeer = null;
+    }
+    resetMultiplayerTransportState();
+}
+window.cleanupPeerSession = cleanupPeerSession;
+
+function validateNetworkPacket(packet, isHostReceiver = false) {
+    if (!packet || typeof packet !== 'object' || typeof packet.type !== 'string') {
+        return { valid: false, reason: 'invalid_envelope' };
+    }
+    if (packet.v !== undefined && packet.v !== MP_PROTOCOL_VERSION) {
+        return { valid: false, reason: 'protocol_version_mismatch' };
+    }
+    if (packet.seq !== undefined && (!Number.isInteger(packet.seq) || packet.seq < 0)) {
+        return { valid: false, reason: 'invalid_sequence' };
+    }
+    // Host-only authoritative packet types that a client peer is never allowed to forge
+    const hostOnlyTypes = new Set(['lobby_sync', 'start_battle', 'state_sync', 'host_left', 'unit_damage']);
+    if (isHostReceiver && hostOnlyTypes.has(packet.type)) {
+        return { valid: false, reason: 'authority_violation' };
+    }
+    const isFiniteVec = (v) => Boolean(v && typeof v === 'object' && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z));
+    switch (packet.type) {
+        case 'handshake':
+            if (typeof packet.clientFaction !== 'string' || !MP_ALLOWED_FACTIONS.has(packet.clientFaction.toLowerCase())) {
+                return { valid: false, reason: 'invalid_faction' };
+            }
+            return { valid: true };
+        case 'lobby_sync':
+            if (!Array.isArray(packet.slots)) return { valid: false, reason: 'invalid_slots' };
+            return { valid: true };
+        case 'start_battle':
+            if (typeof packet.mapType !== 'string' || !Number.isFinite(packet.mapSize) || !Number.isFinite(packet.money)) {
+                return { valid: false, reason: 'invalid_start_config' };
+            }
+            return { valid: true };
+        case 'move_units':
+            if (!Array.isArray(packet.unitNetIds) || packet.unitNetIds.length > 200 || !isFiniteVec(packet.targetPos)) {
+                return { valid: false, reason: 'invalid_move_units' };
+            }
+            return { valid: true };
+        case 'attack_target':
+            if (!Array.isArray(packet.unitNetIds) || packet.unitNetIds.length > 200 || typeof packet.targetNetId !== 'string') {
+                return { valid: false, reason: 'invalid_attack_target' };
+            }
+            return { valid: true };
+        case 'spawn_unit':
+            if (typeof packet.unitType !== 'string' || typeof packet.netId !== 'string' || !isFiniteVec(packet.position)) {
+                return { valid: false, reason: 'invalid_spawn_unit' };
+            }
+            return { valid: true };
+        case 'build_structure':
+            if (typeof packet.structType !== 'string' || typeof packet.netId !== 'string' || !isFiniteVec(packet.position)) {
+                return { valid: false, reason: 'invalid_build_structure' };
+            }
+            return { valid: true };
+        case 'unit_damage':
+            if (typeof packet.targetNetId !== 'string' || !Number.isFinite(packet.remainingHealth)) {
+                return { valid: false, reason: 'invalid_unit_damage' };
+            }
+            return { valid: true };
+        case 'state_sync':
+            if (!Array.isArray(packet.u) || !Array.isArray(packet.s)) {
+                return { valid: false, reason: 'invalid_state_sync' };
+            }
+            return { valid: true };
+        case 'chat':
+            if (typeof packet.sender !== 'string' || typeof packet.text !== 'string' || packet.text.length > 240) {
+                return { valid: false, reason: 'invalid_chat' };
+            }
+            return { valid: true };
+        case 'host_left':
+        case 'client_left':
+            return { valid: true };
+        default:
+            return { valid: false, reason: 'unknown_packet_type' };
+    }
+}
+window.validateNetworkPacket = validateNetworkPacket;
+
 // --- DEDICATED SKIRMISH, MULTIPLAYER, AND EDITOR SCREENS ---
 let currentStartMenuMode = 'single';
 
@@ -93,13 +212,11 @@ function initHostPeer() {
         return;
     }
 
-    if (netPeer) {
-        try { netPeer.destroy(); } catch (e) {}
-    }
+    cleanupPeerSession();
 
-    const randNum = Math.floor(1000 + Math.random() * 9000);
-    currentRoomCode = 'CNC-' + randNum;
-    const peerId = 'cnc-gen-' + randNum;
+    const randToken = generateRoomToken(6);
+    currentRoomCode = 'CNC-' + randToken;
+    const peerId = 'cnc-gen-' + randToken;
 
     const codeInput = document.getElementById('mp-host-room-code');
     const statusEl = document.getElementById('mp-host-status');
@@ -167,11 +284,9 @@ function joinConnectToHost() {
     currentRoomCode = 'CNC-' + cleanCode;
 
     const statusEl = document.getElementById('mp-join-status');
-    if (statusEl) statusEl.innerHTML = `Connecting to host room <strong>${currentRoomCode}</strong>...`;
+    if (statusEl) statusEl.innerHTML = `Connecting to host room <strong>${escapeHtml(currentRoomCode)}</strong>...`;
 
-    if (netPeer) {
-        try { netPeer.destroy(); } catch (e) {}
-    }
+    cleanupPeerSession();
 
     try {
         netPeer = new Peer({ debug: 1 });
@@ -257,8 +372,11 @@ function syncMpLobbyToPeer() {
 }
 
 function broadcastNetPacket(packet) {
-    if (netConn && netConn.open) {
+    if (netConn && netConn.open && packet && typeof packet === 'object') {
         try {
+            packet.v = MP_PROTOCOL_VERSION;
+            packet.seq = ++_mpTxSeq;
+            packet.ts = Math.round(typeof performance !== 'undefined' ? performance.now() : Date.now());
             netConn.send(packet);
         } catch (e) {
             console.error('Packet broadcast error:', e);
@@ -267,7 +385,32 @@ function broadcastNetPacket(packet) {
 }
 
 function handleNetworkPacket(packet) {
-    if (!packet || !packet.type) return;
+    // 1. Per-second token-bucket rate limiter
+    const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (nowMs - _mpRateWindowStart > 1000) {
+        _mpRateWindowStart = nowMs;
+        _mpRateWindowCount = 0;
+    }
+    if (++_mpRateWindowCount > MP_RATE_LIMIT_PER_SEC) {
+        console.warn('Multiplayer rate limit exceeded; dropping excess packet');
+        return false;
+    }
+
+    // 2. Schema, protocol version & host-authority validation
+    const check = validateNetworkPacket(packet, isMultiplayerHost);
+    if (!check.valid) {
+        console.warn('Rejected invalid multiplayer packet:', check.reason);
+        return false;
+    }
+
+    // 3. Sequence ordering: drop stale out-of-order state_sync snapshots
+    if (typeof packet.seq === 'number') {
+        if (packet.type === 'state_sync') {
+            if (packet.seq <= _mpLastRxStateSeq) return false;
+            _mpLastRxStateSeq = packet.seq;
+        }
+        if (packet.seq > _mpLastRxSeq) _mpLastRxSeq = packet.seq;
+    }
 
     if (packet.type === 'handshake') {
         mpOpponentFaction = packet.clientFaction || 'china';
@@ -478,6 +621,11 @@ function startMultiplayerMatch(isHost, config) {
     isMultiplayerActive = true;
     isMultiplayerHost = isHost;
 
+    // Seed deterministic simulation PRNG from host match seed so both peers share identical RNG stream
+    const matchSeed = (Number(config.seed) >>> 0) || 424242;
+    if (typeof setSimSeed === 'function') setSimSeed(matchSeed);
+    if (typeof randomMapSeed !== 'undefined') randomMapSeed = matchSeed;
+
     // Apply synced game configuration
     currentMapType = config.mapType;
     currentMapSize = config.mapSize;
@@ -611,7 +759,12 @@ function handleChatInputKeyDown(e) {
 }
 
 function escapeHtml(str) {
-    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 window.addEventListener('keydown', (e) => {
@@ -788,14 +941,7 @@ function leaveMultiplayerSessionToMenu() {
     const modal = document.getElementById('host-disconnected-modal');
     if (modal) modal.style.display = 'none';
 
-    if (netConn) {
-        try { netConn.close(); } catch (e) {}
-        netConn = null;
-    }
-    if (netPeer) {
-        try { netPeer.destroy(); } catch (e) {}
-        netPeer = null;
-    }
+    cleanupPeerSession();
 
     isMultiplayerActive = false;
     isMultiplayerHost = false;

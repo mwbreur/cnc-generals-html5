@@ -898,15 +898,31 @@ function updateSidebar() {
 
     const powerBar = document.getElementById('power-bar-fill');
     const powerNums = document.getElementById('power-nums');
+    const cbPowerNums = document.getElementById('cb-power-nums');
+    const cbPowerLeds = document.getElementById('cb-power-leds');
     const powerText = document.getElementById('power-status-text');
 
     if (selectedFaction === 'gla') {
         if (powerText) powerText.textContent = '⚡ POWER: NONE NEEDED (GLA)';
         if (powerNums) powerNums.textContent = 'N/A';
+        if (cbPowerNums) cbPowerNums.textContent = 'N/A';
         if (powerBar) { powerBar.style.width = '100%'; powerBar.classList.remove('low'); }
+        if (cbPowerLeds) cbPowerLeds.innerHTML = '';
     } else {
         const percent = Math.min(100, Math.round((produced / Math.max(1, consumed)) * 100));
         if (powerNums) powerNums.textContent = `${produced} / ${consumed}`;
+        if (cbPowerNums) cbPowerNums.textContent = `${produced}/${consumed}`;
+        if (cbPowerLeds) {
+            const totalLeds = 12;
+            const activeLeds = Math.max(0, Math.min(totalLeds, Math.round((percent / 100) * totalLeds)));
+            const ledColor = produced < consumed ? '#e74c3c' : '#2ecc71';
+            let ledHtml = '';
+            for (let li = 0; li < totalLeds; li++) {
+                const isLit = (totalLeds - 1 - li) < activeLeds;
+                ledHtml += `<div class="cb-power-led${isLit ? ' lit' : ''}" style="background:${isLit ? ledColor : 'rgba(255,255,255,0.08)'};"></div>`;
+            }
+            cbPowerLeds.innerHTML = ledHtml;
+        }
         if (powerBar) {
             powerBar.style.width = `${Math.min(100, percent)}%`;
             if (produced < consumed) powerBar.classList.add('low');
@@ -4416,8 +4432,11 @@ window.onPlayerKillReward = onPlayerKillReward;
 
 function updateGeneralsRankHUD() {
     if (typeof document === 'undefined') return;
+    const starText = '★'.repeat(generalsRank) + '☆'.repeat(5 - generalsRank);
     const starsEl = document.getElementById('generals-rank');
-    if (starsEl) starsEl.textContent = '★'.repeat(generalsRank) + '☆'.repeat(5 - generalsRank);
+    if (starsEl) starsEl.textContent = starText;
+    const cbStarsEl = document.getElementById('cb-generals-rank');
+    if (cbStarsEl) cbStarsEl.textContent = starText;
     const badgeEl = document.getElementById('gp-points-badge');
     if (badgeEl) {
         if (generalsPoints > 0) {

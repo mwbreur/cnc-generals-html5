@@ -2947,3 +2947,20 @@ body.control-bar-collapsed #generals-command-bar {
         min-width: 140px;
     }
 }
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible {
+    outline: 2px solid #55efc4;
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

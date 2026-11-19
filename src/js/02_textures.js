@@ -1,4 +1,10 @@
 function init() {
+    if (typeof THREE === 'undefined') {
+        const msg = document.getElementById('tactical-message');
+        if (msg) msg.textContent = '3D engine (Three.js) unavailable — please check your internet connection and reload.';
+        console.error('Three.js failed to load from primary and fallback CDNs.');
+        return;
+    }
     const container = document.getElementById('canvas-container');
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0c10);
@@ -67,8 +73,22 @@ function init() {
     window.addEventListener('keyup', e => { keysPressed[e.key.toLowerCase()] = false; });
     window.addEventListener('resize', onWindowResize);
     window.addEventListener('contextmenu', e => e.preventDefault());
+    if (renderer && renderer.domElement && typeof renderer.domElement.addEventListener === 'function') {
+        renderer.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            console.warn('WebGL context lost — pausing render loop until restored.');
+        }, false);
+        renderer.domElement.addEventListener('webglcontextrestored', () => {
+            if (typeof setupMapEnvironment === 'function') {
+                setupMapEnvironment(typeof currentMapType !== 'undefined' ? currentMapType : 'tournament_desert', typeof currentMapSize !== 'undefined' ? currentMapSize : 1500);
+            }
+        }, false);
+    }
 
-    animate();
+    if (!window._animateLoopStarted) {
+        window._animateLoopStarted = true;
+        animate();
+    }
 }
 
 function createSupplyFields() {
