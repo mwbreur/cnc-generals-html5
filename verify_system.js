@@ -20,7 +20,25 @@ const THREE = {
         this.crossVectors = () => this;
     },
     Vector2: function(x=0, y=0) { this.x = x; this.y = y; },
-    Quaternion: function() { this.x = 0; this.y = 0; this.z = 0; this.w = 1; },
+    Quaternion: function(x=0, y=0, z=0, w=1) {
+        this.x = x; this.y = y; this.z = z; this.w = w;
+        this.set = (nx, ny, nz, nw) => { this.x = nx; this.y = ny; this.z = nz; this.w = nw; return this; };
+        this.clone = () => new THREE.Quaternion(this.x, this.y, this.z, this.w);
+        this.copy = (q) => { this.x = q.x; this.y = q.y; this.z = q.z; this.w = q.w; return this; };
+        this.multiply = (b) => {
+            const ax = this.x, ay = this.y, az = this.z, aw = this.w;
+            this.x = aw * b.x + ax * b.w + ay * b.z - az * b.y;
+            this.y = aw * b.y - ax * b.z + ay * b.w + az * b.x;
+            this.z = aw * b.z + ax * b.y - ay * b.x + az * b.w;
+            this.w = aw * b.w - ax * b.x - ay * b.y - az * b.z;
+            return this;
+        };
+        this.setFromAxisAngle = (axis, angle) => {
+            const s = Math.sin(angle * 0.5);
+            this.x = (axis.x || 0) * s; this.y = (axis.y || 0) * s; this.z = (axis.z || 0) * s; this.w = Math.cos(angle * 0.5);
+            return this;
+        };
+    },
     Raycaster: function() {
         this.setFromCamera = () => {};
         this.intersectObjects = () => [];
@@ -59,6 +77,7 @@ const THREE = {
         this.children = [];
         this.position = new THREE.Vector3();
         this.rotation = { x: 0, y: 0, z: 0, set: (x,y,z) => { this.rotation.x = x; this.rotation.y = y; this.rotation.z = z; } };
+        this.quaternion = new THREE.Quaternion();
         this.scale = { x: 1, y: 1, z: 1, set: (x,y,z) => { this.scale.x = x; this.scale.y = y; this.scale.z = z; } };
         this.add = (c) => { c.parent = this; this.children.push(c); };
         this.remove = (c) => {
@@ -92,6 +111,7 @@ const THREE = {
         this.material = mat;
         this.position = new THREE.Vector3();
         this.rotation = { x: 0, y: 0, z: 0, set: (x,y,z) => { this.rotation.x = x; this.rotation.y = y; this.rotation.z = z; } };
+        this.quaternion = new THREE.Quaternion();
         this.scale = { x: 1, y: 1, z: 1, set: (x,y,z) => { this.scale.x = x; this.scale.y = y; this.scale.z = z; } };
         this.traverse = (cb) => cb(this);
         this.userData = {};
@@ -1256,5 +1276,128 @@ vm.runInContext(`
     }
 `, sandbox);
 console.log("✓ Verified retail A-10/SpyDrone/civilian _G models, garrison clearing & swap, General Powers, and FX.");
+
+// 21. Verify 11 Retail Model, Wheel, Paladin, BattleDrone, SupplyDrop, CompositeArmor, Flag & Base Orientation Fixes
+vm.runInContext(`
+    {
+        resetEntireBattlefieldState();
+        setupMapEnvironment('tournament_desert', 1500);
+
+        // 1 & 7 & 11. USA Command Center official ABBtCmdHQ_AC radar + USA Barracks retail flag + flagWindPivot
+        if (!window.W3D_BUILDING_DATA['usa_commandCenter_radar']) throw new Error('Missing usa_commandCenter_radar!');
+        const ccMesh = createW3DBuildingMesh('usa_commandCenter', false);
+        if (!ccMesh.getObjectByName('usaCommandCenterRadar') || !ccMesh.getObjectByName('radarDish')) {
+            throw new Error('USA Command Center missing official ABBtCmdHQ_AC radar tower or dish!');
+        }
+        if (!ccMesh.getObjectByName('flagWindPivot') || ccMesh.getObjectByName('factionFlag')) {
+            throw new Error('USA Command Center flag must use flagWindPivot and not procedural factionFlag!');
+        }
+        const barMesh = createW3DBuildingMesh('usa_barracks', false);
+        if (!barMesh.getObjectByName('flagWindPivot') || !barMesh.getObjectByName('HOUSECOLOR05') || barMesh.getObjectByName('factionFlag')) {
+            throw new Error('USA Barracks must use retail HOUSECOLOR04..06 flag inside flagWindPivot!');
+        }
+
+        // 2. Retail high-res terrain detail tiles
+        ['desert', 'jungle', 'snow', 'city', 'cliff'].forEach(tKey => {
+            if (!window.RETAIL_TERRAIN_TILES || !window.RETAIL_TERRAIN_TILES[tKey]) {
+                throw new Error('Missing RETAIL_TERRAIN_TILES.' + tKey);
+            }
+        });
+
+        // 3. USA Dozer textured spinning wheels
+        const dz = spawnUnit('dozer', new THREE.Vector3(0, 0, 0), null, 'usa');
+        const tire1 = dz.mesh.getObjectByName('TIRE01');
+        const tire1Mesh = dz.mesh.getObjectByName('avconstdoz.tire01');
+        if (!tire1 || !tire1Mesh || !tire1Mesh.material || !tire1Mesh.material.map) {
+            throw new Error('Expected USA Dozer TIRE01 to use retail textured material!');
+        }
+        const prevRotX = tire1.rotation.x;
+        spinVehicleWheels(dz, 1.0);
+        if (Math.abs(tire1.rotation.x - prevRotX) < 0.5) {
+            throw new Error('Expected spinVehicleWheels to rotate Dozer tires!');
+        }
+
+        // 4. Authentic Paladin Laser & Housecolor trim meshes
+        const palMesh = createW3DVehicleMesh('paladin', false);
+        ['avpaladin.laser', 'avpaladin.housecolor01', 'avpaladin.housecolor02', 'avpaladin.housecolor03'].forEach(mn => {
+            if (!palMesh.getObjectByName(mn)) throw new Error('Paladin missing official mesh ' + mn);
+        });
+
+        // 5. Battle Drone upright vertical silhouette (CHASSIS Y span > X span)
+        const bdData = window.W3D_VEHICLE_DATA['drone_battle'];
+        const bdChV = bdData.m['avbattledr.chassis'].v;
+        let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+        for (let i = 0; i < bdChV.length; i += 3) {
+            if (bdChV[i] < minX) minX = bdChV[i];
+            if (bdChV[i] > maxX) maxX = bdChV[i];
+            if (bdChV[i+1] < minY) minY = bdChV[i+1];
+            if (bdChV[i+1] > maxY) maxY = bdChV[i+1];
+        }
+        if ((maxY - minY) <= (maxX - minX) * 0.99) {
+            throw new Error('Expected Battle Drone CHASSIS to be upright vertically! Y=' + [minY, maxY] + ' X=' + [minX, maxX]);
+        }
+
+        // 6. C-130 Supply Drop Crate model (PMUNCrate03)
+        if (!window.W3D_BUILDING_DATA['supply_drop_crate']) throw new Error('Missing supply_drop_crate!');
+        const scMesh = createW3DBuildingMesh('supply_drop_crate', false);
+        if (!scMesh.getObjectByName('pmuncrate03.box01')) throw new Error('supply_drop_crate missing pmuncrate03.box01!');
+
+        // 8. Cold Fusion Reactor upright Control Rods + visible CYLINDER01
+        const pwrMesh = createW3DBuildingMesh('usa_power', false);
+        const upgGrp = pwrMesh.getObjectByName('controlRodsOfficialUpgrade');
+        const line01 = pwrMesh.getObjectByName('LINE01');
+        const cyl1 = pwrMesh.getObjectByName('CYLINDER01');
+        if (!upgGrp || !line01 || Math.abs(line01.quaternion.w - 1) < 0.05) {
+            throw new Error('Expected usa_power_upgrade LINE01 to have non-identity upright quaternion!');
+        }
+        if (cyl1 && cyl1.visible === false) throw new Error('Expected usa_power CYLINDER01 to remain visible!');
+        attachControlRodsVisual({ mesh: pwrMesh });
+        if (!upgGrp.visible || Math.abs(upgGrp.position.y - 5.3) > 0.01) {
+            throw new Error('Expected attachControlRodsVisual to show and elevate controlRodsOfficialUpgrade!');
+        }
+
+        // 9. Composite Armor +25% HP preserves full 100% HP on Paladin
+        selectedFaction = 'usa';
+        playerResources = 5000;
+        const palUnit = spawnUnit('paladin', new THREE.Vector3(10, 0, 10), null, 'usa');
+        palUnit.maxHealth = 500;
+        palUnit.health = 500;
+        researchedTechs.delete('compositeArmor');
+        palUnit.compositeArmor = false;
+        const scStruct = { type: 'strategyCenter', health: 1000, maxHealth: 1000, isBuilding: false, position: new THREE.Vector3(0,0,0), mesh: new THREE.Group() };
+        structures.push(scStruct);
+        executeStructureUpgradeOrAction({ id: 'compositeArmor', name: 'COMPOSITE ARMOR', cost: 1200 }, scStruct);
+        if (palUnit.maxHealth !== 625 || palUnit.health !== 625) {
+            throw new Error('Composite Armor HP regression: expected 625/625, got ' + palUnit.health + '/' + palUnit.maxHealth);
+        }
+
+        // 10. Starting bases orient Command Center toward map center (0, 0)
+        resetEntireBattlefieldState();
+        const pBasePos = new THREE.Vector3(-400, 0, 300);
+        deployBase(pBasePos, 'usa', 1);
+        const playerCC = structures.find(s => s.type === 'center');
+        const expectedYaw = Math.atan2(-pBasePos.x, -pBasePos.z);
+        if (!playerCC || Math.abs(playerCC.mesh.rotation.y - expectedYaw) > 1e-4) {
+            throw new Error('Expected player Command Center to face center! got ' + (playerCC && playerCC.mesh.rotation.y) + ' vs ' + expectedYaw);
+        }
+        const eBasePos = new THREE.Vector3(400, 0, -300);
+        deployEnemyBase(eBasePos, 'china', 'ai_test', 2, 'medium', 'red');
+        const enemyCC = enemyStructures.find(s => s.type === 'center');
+        const expectedEYaw = Math.atan2(-eBasePos.x, -eBasePos.z);
+        if (!enemyCC || Math.abs(enemyCC.mesh.rotation.y - expectedEYaw) > 1e-4) {
+            throw new Error('Expected enemy Command Center to face center!');
+        }
+        updateWindFlagsOnStructure(playerCC.mesh, 1.0);
+        updateWindFlagsOnStructure(enemyCC.mesh, 1.0);
+        const pfPivot = playerCC.mesh.getObjectByName('flagWindPivot');
+        const efPivot = enemyCC.mesh.getObjectByName('flagWindPivot');
+        const pWorldFlagYaw = playerCC.mesh.rotation.y + pfPivot.rotation.y;
+        const eWorldFlagYaw = enemyCC.mesh.rotation.y + efPivot.rotation.y;
+        if (Math.abs((pWorldFlagYaw - eWorldFlagYaw) % (Math.PI * 2)) > 0.35) {
+            throw new Error('Expected flags across buildings to blow in same world direction! p=' + pWorldFlagYaw + ' e=' + eWorldFlagYaw);
+        }
+    }
+`, sandbox);
+console.log("✓ Verified all 11 retail visual, model, terrain, base orientation, flag wind, and Composite Armor fixes.");
 
 console.log("=== ALL SYSTEM VERIFICATION CHECKS PASSED ===");

@@ -551,7 +551,10 @@ function deployBase(position, faction = selectedFaction, team = playerTeamId) {
     updateCameraPosition();
     supplyCenterPos.copy(position);
     supplyCenterPos.y = getTerrainHeight(supplyCenterPos.x, supplyCenterPos.z);
-    const ccObj = buildStructureMesh('center', supplyCenterPos, true);
+    const faceCenterYaw = (Math.hypot(supplyCenterPos.x, supplyCenterPos.z) > 1)
+        ? Math.atan2(-supplyCenterPos.x, -supplyCenterPos.z)
+        : 0;
+    const ccObj = buildStructureMesh('center', supplyCenterPos, true, faceCenterYaw);
     if (ccObj) {
         ccObj.teamId = team;
         ccObj.ownerId = 'player';
@@ -572,9 +575,12 @@ function deployBase(position, faction = selectedFaction, team = playerTeamId) {
         // Authentic Zero Hour: Exactly 1 Builder (Dozer for USA/China, Worker for GLA)
         forces = [builderType];
     }
+    const fwdX = Math.sin(faceCenterYaw), fwdZ = Math.cos(faceCenterYaw);
+    const rightX = Math.cos(faceCenterYaw), rightZ = -Math.sin(faceCenterYaw);
     forces.forEach((type, index) => {
-            const angle = index * 2.4;
-            const at = position.clone().add(new THREE.Vector3(Math.cos(angle) * 24, 0, Math.sin(angle) * 24));
+            const rowDist = 22 + Math.floor(index / 2) * 5;
+            const latSpread = index === 0 ? 0 : ((index % 2 === 1 ? -1 : 1) * (5.5 + Math.floor((index - 1) / 2) * 4));
+            const at = position.clone().add(new THREE.Vector3(fwdX * rowDist + rightX * latSpread, 0, fwdZ * rowDist + rightZ * latSpread));
             at.y = getTerrainHeight(at.x, at.z);
             const u = spawnUnit(type, at);
             if (u) {
@@ -582,6 +588,7 @@ function deployBase(position, faction = selectedFaction, team = playerTeamId) {
                 u.ownerId = 'player';
                 u.isAI = false;
                 u.taskState = 'Idle';
+                if (u.mesh) u.mesh.rotation.y = faceCenterYaw;
                 if (u.targetPosition && u.mesh) u.targetPosition.copy(u.mesh.position);
                 u.faction = faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
             }
@@ -831,11 +838,18 @@ function spawnNeutralMapTechBuildings(selectedSize, selectedEnv) {
                 pole.position.set(2.8, 2.1, 2.2);
                 flagGroup.add(pole);
 
+                const flagWindPivot = new THREE.Group();
+                flagWindPivot.name = "flagWindPivot";
+                flagWindPivot.userData.isWindFlag = true;
+                flagWindPivot.position.set(2.8, 3.6, 2.2);
+
                 const flagMat = new THREE.MeshStandardMaterial({ color: 0x95a5a6, roughness: 0.8, side: THREE.DoubleSide });
                 const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.0), flagMat);
                 flag.name = "neutralFlagCloth";
-                flag.position.set(3.6, 3.6, 2.2);
-                flagGroup.add(flag);
+                flag.rotation.y = Math.PI / 2;
+                flag.position.set(0, 0, 0.8);
+                flagWindPivot.add(flag);
+                flagGroup.add(flagWindPivot);
                 meshGroup.add(flagGroup);
 
                 if (typeof scene !== 'undefined' && scene && scene.add) {
@@ -872,13 +886,15 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
         window.aiColorMap[ownerId] = enemyHex;
     }
     const ccType = 'center';
+    const faceCenterYaw = (Math.hypot(pos.x, pos.z) > 1) ? Math.atan2(-pos.x, -pos.z) : 0;
     const ccGroup = faction === 'china' ? createChinaCommandCenter(true) : faction === 'gla' ? createGLACommandCenter(true) : createUSACommandCenter(true);
     if (!ccGroup.userData || !ccGroup.userData.isW3D) ccGroup.scale.set(1.35, 1.35, 1.35);
     ccGroup.position.copy(pos);
+    ccGroup.rotation.y = faceCenterYaw;
     ccGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
     scene.add(ccGroup);
     enemyStructures.push({
-            type: ccType, faction: faction, position: pos.clone(), mesh: ccGroup,
+            type: ccType, faction: faction, position: pos.clone(), mesh: ccGroup, rotationY: faceCenterYaw,
             health: 2200, maxHealth: 2200, radius: 11 * 1.35, buildProgress: 100, isBuilding: false,
             netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
     });
@@ -892,9 +908,12 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
     const startUnitsEl = document.getElementById('starting-units');
     const startMode = startUnitsEl ? startUnitsEl.value : 'standard';
     const numBuilders = startMode === 'heavy' ? 2 : 1;
+    const fwdX = Math.sin(faceCenterYaw), fwdZ = Math.cos(faceCenterYaw);
+    const rightX = Math.cos(faceCenterYaw), rightZ = -Math.sin(faceCenterYaw);
 
     for (let b = 0; b < numBuilders; b++) {
-        const bPos = pos.clone().add(new THREE.Vector3(14 + b * 5, 0, 12));
+        const lat = (b - (numBuilders - 1) * 0.5) * 6;
+        const bPos = pos.clone().add(new THREE.Vector3(fwdX * 20 + rightX * lat, 0, fwdZ * 20 + rightZ * lat));
         bPos.y = getTerrainHeight(bPos.x, bPos.z);
         const builderUnit = spawnEnemyUnit(builderType, bPos, null, faction);
         if (builderUnit) {
@@ -904,6 +923,8 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
             builderUnit.difficulty = difficulty;
             builderUnit.aiState = 'Idle';
             builderUnit.taskState = 'Idle';
+            if (builderUnit.mesh) builderUnit.mesh.rotation.y = faceCenterYaw;
+            if (builderUnit.targetPosition && builderUnit.mesh) builderUnit.targetPosition.copy(builderUnit.mesh.position);
         }
     }
 
@@ -911,10 +932,15 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
         const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'crusader';
         const numTanks = startMode === 'heavy' ? 2 : 1;
         for (let i = 0; i < numTanks; i++) {
-            const uPos = pos.clone().add(new THREE.Vector3(10 + i * 5, 0, -14));
+            const lat = (i - (numTanks - 1) * 0.5) * 7;
+            const uPos = pos.clone().add(new THREE.Vector3(fwdX * 26 + rightX * lat, 0, fwdZ * 26 + rightZ * lat));
             uPos.y = getTerrainHeight(uPos.x, uPos.z);
             const eu = spawnEnemyUnit(tankType, uPos, null, faction);
-            if (eu) { eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty; }
+            if (eu) {
+                eu.teamId = teamId; eu.ownerId = ownerId; eu.isAI = true; eu.difficulty = difficulty;
+                if (eu.mesh) eu.mesh.rotation.y = faceCenterYaw;
+                if (eu.targetPosition && eu.mesh) eu.targetPosition.copy(eu.mesh.position);
+            }
         }
     }
 }

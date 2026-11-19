@@ -61,6 +61,58 @@ function encodePngDataUrl(rgba, width, height) {
     return 'data:image/png;base64,' + png.toString('base64');
 }
 
+function paethPredictor(a, b, c) {
+    const p = a + b - c;
+    const pa = Math.abs(p - a);
+    const pb = Math.abs(p - b);
+    const pc = Math.abs(p - c);
+    if (pa <= pb && pa <= pc) return a;
+    return pb <= pc ? b : c;
+}
+
+function encodeRgbPngDataUrl(rgba, width, height, quantMask = 0xff) {
+    const stride = width * 3;
+    const raw = Buffer.alloc(height * (1 + stride));
+    const curRow = Buffer.alloc(stride);
+    const prevRow = Buffer.alloc(stride);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const si = (y * width + x) * 4;
+            const di = x * 3;
+            curRow[di + 0] = rgba[si + 0] & quantMask;
+            curRow[di + 1] = rgba[si + 1] & quantMask;
+            curRow[di + 2] = rgba[si + 2] & quantMask;
+        }
+        const rowStart = y * (1 + stride);
+        raw[rowStart] = 4; // Paeth filter
+        for (let i = 0; i < stride; i++) {
+            const cur = curRow[i];
+            const a = i >= 3 ? curRow[i - 3] : 0;
+            const b = prevRow[i];
+            const c = i >= 3 ? prevRow[i - 3] : 0;
+            raw[rowStart + 1 + i] = (cur - paethPredictor(a, b, c)) & 0xff;
+        }
+        curRow.copy(prevRow);
+    }
+    const compressed = zlib.deflateSync(raw, { level: 9 });
+    const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(width, 0);
+    ihdr.writeUInt32BE(height, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 2; // RGB
+    ihdr[10] = 0;
+    ihdr[11] = 0;
+    ihdr[12] = 0;
+    const png = Buffer.concat([
+        signature,
+        makePngChunk('IHDR', ihdr),
+        makePngChunk('IDAT', compressed),
+        makePngChunk('IEND', Buffer.alloc(0))
+    ]);
+    return 'data:image/png;base64,' + png.toString('base64');
+}
+
 function decompressRefPack(buf, startOffset) {
     let pos = startOffset;
     const magic = buf.readUInt16BE(pos); pos += 2;
@@ -591,50 +643,66 @@ function parseOfficialMap(mapKey, meta) {
             }
         }
         if (texClasses.length > 0) {
-            const TEX_RES = 384;
+            const TEX_RES = 512;
             const rgba = Buffer.alloc(TEX_RES * TEX_RES * 4);
             const cliffOff = blendPos + 4 + N * 6;
+            const sampleCellRgb = (cx, cy, uWorld, vWorld) => {
+                const cellIdx = cy * W + cx;
+                const tileIdx = decomp.readUInt16LE(blendPos + 4 + cellIdx * 2) >> 2;
+                let cls = texClasses[0];
+                for (let c = 0; c < texClasses.length; c++) {
+                    if (tileIdx >= texClasses[c].firstTile && tileIdx < texClasses[c].firstTile + texClasses[c].numTiles) {
+                        cls = texClasses[c];
+                        break;
+                    }
+                }
+                let r = 180, g = 150, b = 105;
+                if (cls && cls.tga) {
+                    const sub = Math.max(0, tileIdx - cls.firstTile);
+                    const tw = Math.max(1, cls.width || 1);
+                    const subX = sub % tw;
+                    const subY = Math.floor(sub / tw) % tw;
+                    const tileW = cls.tga.w / tw;
+                    const tileH = cls.tga.h / tw;
+                    const u = uWorld - Math.floor(uWorld);
+                    const v = vWorld - Math.floor(vWorld);
+                    const tx = Math.min(cls.tga.w - 1, Math.floor(subX * tileW + u * tileW));
+                    const ty = Math.min(cls.tga.h - 1, Math.floor(subY * tileH + v * tileH));
+                    const si = (ty * cls.tga.w + tx) * 4;
+                    r = cls.tga.rgba[si]; g = cls.tga.rgba[si + 1]; b = cls.tga.rgba[si + 2];
+                }
+                if (decomp[cliffOff + cellIdx] > 0) {
+                    r *= 0.72; g *= 0.70; b *= 0.68;
+                }
+                return [r, g, b];
+            };
             for (let py = 0; py < TEX_RES; py++) {
                 const normY = py / (TEX_RES - 1);
-                const srcY = Math.min(H - 1, Math.max(0, Math.floor(border + (1 - normY) * (playH - 1))));
+                const fy = border + (1 - normY) * (playH - 1);
+                const sy0 = Math.min(H - 1, Math.max(0, Math.floor(fy)));
+                const sy1 = Math.min(H - 1, sy0 + 1);
+                const wy = fy - sy0;
+                const vWorld = normY * 24;
                 for (let px = 0; px < TEX_RES; px++) {
                     const normX = px / (TEX_RES - 1);
-                    const srcX = Math.min(W - 1, Math.max(0, Math.floor(border + normX * (playW - 1))));
-                    const cellIdx = srcY * W + srcX;
-                    const tileIdx = decomp.readUInt16LE(blendPos + 4 + cellIdx * 2) >> 2;
-                    let cls = texClasses[0];
-                    for (let c = 0; c < texClasses.length; c++) {
-                        if (tileIdx >= texClasses[c].firstTile && tileIdx < texClasses[c].firstTile + texClasses[c].numTiles) {
-                            cls = texClasses[c];
-                            break;
-                        }
-                    }
-                    let r = 180, g = 150, b = 105;
-                    if (cls && cls.tga) {
-                        const sub = Math.max(0, tileIdx - cls.firstTile);
-                        const tw = Math.max(1, cls.width || 1);
-                        const subX = sub % tw;
-                        const subY = Math.floor(sub / tw) % tw;
-                        const tileW = cls.tga.w / tw;
-                        const tileH = cls.tga.h / tw;
-                        const u = ((px % 16) / 16);
-                        const v = ((py % 16) / 16);
-                        const tx = Math.min(cls.tga.w - 1, Math.floor(subX * tileW + u * tileW));
-                        const ty = Math.min(cls.tga.h - 1, Math.floor(subY * tileH + v * tileH));
-                        const si = (ty * cls.tga.w + tx) * 4;
-                        r = cls.tga.rgba[si]; g = cls.tga.rgba[si + 1]; b = cls.tga.rgba[si + 2];
-                    }
-                    const isCliff = decomp[cliffOff + cellIdx] > 0;
-                    if (isCliff) {
-                        r = Math.round(r * 0.72);
-                        g = Math.round(g * 0.70);
-                        b = Math.round(b * 0.68);
-                    }
+                    const fx = border + normX * (playW - 1);
+                    const sx0 = Math.min(W - 1, Math.max(0, Math.floor(fx)));
+                    const sx1 = Math.min(W - 1, sx0 + 1);
+                    const wx = fx - sx0;
+                    const uWorld = normX * 24;
+                    const c00 = sampleCellRgb(sx0, sy0, uWorld, vWorld);
+                    const c10 = sampleCellRgb(sx1, sy0, uWorld, vWorld);
+                    const c01 = sampleCellRgb(sx0, sy1, uWorld, vWorld);
+                    const c11 = sampleCellRgb(sx1, sy1, uWorld, vWorld);
+                    const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy), w01 = (1 - wx) * wy, w11 = wx * wy;
                     const di = (py * TEX_RES + px) * 4;
-                    rgba[di] = r; rgba[di + 1] = g; rgba[di + 2] = b; rgba[di + 3] = 255;
+                    rgba[di] = Math.round(c00[0] * w00 + c10[0] * w10 + c01[0] * w01 + c11[0] * w11);
+                    rgba[di + 1] = Math.round(c00[1] * w00 + c10[1] * w10 + c01[1] * w01 + c11[1] * w11);
+                    rgba[di + 2] = Math.round(c00[2] * w00 + c10[2] * w10 + c01[2] * w01 + c11[2] * w11);
+                    rgba[di + 3] = 255;
                 }
             }
-            // Stamp retail roads onto the 384x384 ground texture
+            // Stamp retail roads onto the 512x512 ground texture
             for (const rd of rawRoads) {
                 const rDef = TERRAIN_ASSETS.roadDefs[rd.tName] || { width: 35, tex: '' };
                 const rTga = TERRAIN_ASSETS.getTga(rDef.tex);
@@ -674,7 +742,7 @@ function parseOfficialMap(mapKey, meta) {
                     }
                 }
             }
-            terrainDataUrl = encodePngDataUrl(rgba, TEX_RES, TEX_RES);
+            terrainDataUrl = encodeRgbPngDataUrl(rgba, TEX_RES, TEX_RES, 0xfc);
         }
     }
 
@@ -723,16 +791,51 @@ for (const meta of OFFICIAL_MAP_LIST) {
     officialMaps[meta.id] = parseOfficialMap(meta.id, meta);
 }
 
-// Preserve RETAIL_DESERT_SAND_URI from existing 07b_tournament_desert.js
-const existing07b = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', '07b_tournament_desert.js'), 'utf8');
-const sandMatch = /window\.RETAIL_DESERT_SAND_URI\s*=\s*"([^"]+)";/.exec(existing07b);
-const retailSandUri = sandMatch ? sandMatch[1] : '';
+// Extract crisp 256x256 seamless retail ground detail tiles from Terrain.big / TerrainZH.big
+function encodeRetailTile256(tgaName) {
+    const tga = TERRAIN_ASSETS.getTga(tgaName);
+    if (!tga) throw new Error(`Missing retail terrain tile: ${tgaName}`);
+    const outSz = 256;
+    const rgba = Buffer.alloc(outSz * outSz * 4);
+    for (let y = 0; y < outSz; y++) {
+        const sy = (y / outSz) * tga.h;
+        const y0 = Math.floor(sy) % tga.h;
+        const y1 = (y0 + 1) % tga.h;
+        const wy = sy - Math.floor(sy);
+        for (let x = 0; x < outSz; x++) {
+            const sx = (x / outSz) * tga.w;
+            const x0 = Math.floor(sx) % tga.w;
+            const x1 = (x0 + 1) % tga.w;
+            const wx = sx - Math.floor(sx);
+            const i00 = (y0 * tga.w + x0) * 4, i10 = (y0 * tga.w + x1) * 4;
+            const i01 = (y1 * tga.w + x0) * 4, i11 = (y1 * tga.w + x1) * 4;
+            const w00 = (1 - wx) * (1 - wy), w10 = wx * (1 - wy), w01 = (1 - wx) * wy, w11 = wx * wy;
+            const di = (y * outSz + x) * 4;
+            rgba[di] = Math.round(tga.rgba[i00] * w00 + tga.rgba[i10] * w10 + tga.rgba[i01] * w01 + tga.rgba[i11] * w11);
+            rgba[di + 1] = Math.round(tga.rgba[i00 + 1] * w00 + tga.rgba[i10 + 1] * w10 + tga.rgba[i01 + 1] * w01 + tga.rgba[i11 + 1] * w11);
+            rgba[di + 2] = Math.round(tga.rgba[i00 + 2] * w00 + tga.rgba[i10 + 2] * w10 + tga.rgba[i01 + 2] * w01 + tga.rgba[i11 + 2] * w11);
+            rgba[di + 3] = 255;
+        }
+    }
+    return encodeRgbPngDataUrl(rgba, outSz, outSz, 0xff);
+}
+
+const RETAIL_TERRAIN_TILES = {
+    desert: encodeRetailTile256('TLSand01a.tga'),
+    jungle: encodeRetailTile256('TGGrass02.tga'),
+    snow: encodeRetailTile256('TLSnow01a.tga'),
+    city: encodeRetailTile256('TMDirt01a.tga'),
+    cliff: encodeRetailTile256('rock01.tga')
+};
+const retailSandUri = RETAIL_TERRAIN_TILES.desert;
 
 const outJs = `/**
  * Official EA Command & Conquer: Generals & Zero Hour Skirmish Maps
  * Extracted directly from retail Maps.big & MapsZH.big (CkMp HeightMapData, ObjectsList & aerial TGA previews)
  */
 window.OFFICIAL_SKIRMISH_MAPS = ${JSON.stringify(officialMaps)};
+
+window.RETAIL_TERRAIN_TILES = ${JSON.stringify(RETAIL_TERRAIN_TILES)};
 
 // Backward-compatible Tournament Desert reference
 window.TOURNAMENT_DESERT_DATA = window.OFFICIAL_SKIRMISH_MAPS.tournament_desert;

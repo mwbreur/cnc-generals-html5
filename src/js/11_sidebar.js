@@ -3161,21 +3161,35 @@ function executeStructureUpgradeOrAction(upg, structure) {
     // Immediate global stat application
     if (upg.id === 'compositeArmor') {
         units.filter(u => u.type === 'tank' || u.type === 'crusader' || u.type === 'paladin').forEach(u => {
+                if (u.compositeArmor) return;
                 u.compositeArmor = true;
-                u.maxHealth = Math.floor(u.maxHealth * 1.25);
-                u.health = Math.min(u.maxHealth, u.health + 100);
+                const oldMax = u.maxHealth || 400;
+                const newMax = Math.floor(oldMax * 1.25);
+                const hpGain = newMax - oldMax;
+                u.maxHealth = newMax;
+                u.health = Math.min(newMax, u.health + hpGain);
         });
         showNotification('Composite Armor researched: Tanks gained +25% HP and layered armor!', 'success');
     } else if (upg.id === 'migArmor') {
-        units.filter(u => u.type === 'raptor' && (u.faction === 'china' || u.isChina || selectedFaction === 'china')).forEach(u => {
-                u.maxHealth = Math.floor(u.maxHealth * 1.25);
-                u.health = Math.min(u.maxHealth, u.health + 65);
+        units.filter(u => (u.type === 'raptor' || u.type === 'mig') && (u.faction === 'china' || u.isChina || selectedFaction === 'china')).forEach(u => {
+                if (u.migArmorApplied) return;
+                u.migArmorApplied = true;
+                const oldMax = u.maxHealth || 300;
+                const newMax = Math.floor(oldMax * 1.25);
+                const hpGain = newMax - oldMax;
+                u.maxHealth = newMax;
+                u.health = Math.min(newMax, u.health + hpGain);
         });
         showNotification('MiG Composite Armor researched: MiGs gained +25% HP!', 'success');
     } else if (upg.id === 'fortifiedStructures') {
         structures.forEach(s => {
-                s.maxHealth = Math.floor(s.maxHealth * 1.25);
-                s.health = Math.min(s.maxHealth, s.health + 200);
+                if (s.fortifiedApplied) return;
+                s.fortifiedApplied = true;
+                const oldMax = s.maxHealth || 1000;
+                const newMax = Math.floor(oldMax * 1.25);
+                const hpGain = newMax - oldMax;
+                s.maxHealth = newMax;
+                s.health = Math.min(newMax, s.health + hpGain);
         });
         showNotification('Fortified Structures researched: GLA structures reinforced (+25% HP)!', 'success');
     } else if (upg.id === 'workerShoes') {
@@ -3203,14 +3217,11 @@ function attachControlRodsVisual(structure) {
         structure.mesh.traverse(child => {
                 if (child.name === 'controlRodsOfficialUpgrade') {
                     child.visible = true;
+                    child.position.y = (child.userData && child.userData.upgradedY !== undefined) ? child.userData.upgradedY : 5.3;
                 } else if (child.name === 'controlRodCap') {
                     child.position.y = 31.2;
                 } else if (child.name === 'controlRodCore') {
                     child.visible = true;
-                } else if (child.name === 'CYLINDER01' || child.name === 'CYLINDER02') {
-                    child.visible = true;
-                    if (child.userData.baseY === undefined) child.userData.baseY = child.position.y;
-                    child.position.y = child.userData.baseY + 5.0;
                 }
         });
         return;

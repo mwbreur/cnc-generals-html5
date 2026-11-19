@@ -2680,9 +2680,9 @@ function triggerSupplyDropZoneDelivery(structure) {
     let crateDropped = false;
 
     // 2. Parachute Supply Crate
-    function spawnParachuteCrate() {
-        const offX = (Math.random() - 0.5) * 5.0;
-        const offZ = (Math.random() - 0.5) * 5.0;
+    function spawnParachuteCrate(offsetX = 0, offsetZ = 0, valuePerCrate = 500) {
+        const offX = offsetX + (Math.random() - 0.5) * 1.4;
+        const offZ = offsetZ + (Math.random() - 0.5) * 1.4;
         const landX = dropCenter.x + offX;
         const landZ = dropCenter.z + offZ;
         const landY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(landX, landZ) : groundY;
@@ -2690,29 +2690,52 @@ function triggerSupplyDropZoneDelivery(structure) {
 
         const crateGrp = new THREE.Group();
         let proceduralBox = null, proceduralStrap = null, boxMat = null, strapMat = null;
-        if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['tech_supplyCrates']) {
-            const w3dCrate = createW3DBuildingMesh('tech_supplyCrates', false);
-            w3dCrate.scale.set(0.16, 0.16, 0.16);
+        if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['supply_drop_crate']) {
+            const w3dCrate = createW3DBuildingMesh('supply_drop_crate', false);
             crateGrp.add(w3dCrate);
         } else {
-            boxMat = new THREE.MeshStandardMaterial({ color: 0x4b5d3b, roughness: 0.7 });
+            boxMat = new THREE.MeshStandardMaterial({ color: 0x3b4e6b, roughness: 0.7 });
             strapMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.4 });
-            proceduralBox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.5), boxMat);
-            proceduralStrap = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.22, 1.58), strapMat);
+            proceduralBox = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.2, 1.6), boxMat);
+            proceduralBox.position.y = 0.6;
+            proceduralStrap = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.24, 1.68), strapMat);
+            proceduralStrap.position.y = 0.6;
             crateGrp.add(proceduralBox, proceduralStrap);
         }
-        const chuteMat = new THREE.MeshBasicMaterial({ color: 0xecf0f1, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
-        const chute = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.8, 8, 1, true), chuteMat);
+        const chuteTex = (typeof getW3dTexture === 'function') ? getW3dTexture('parachute') : null;
+        const chuteGeo = new THREE.SphereGeometry(2.0, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.52);
+        const chuteMat = new THREE.MeshStandardMaterial({
+            ...(chuteTex ? { map: chuteTex } : {}),
+            color: chuteTex ? 0xffffff : 0xe8e4d4,
+            roughness: 0.85,
+            side: THREE.DoubleSide,
+            alphaTest: 0.25
+        });
+        const chute = new THREE.Mesh(chuteGeo, chuteMat);
         chute.position.y = 3.2;
         crateGrp.add(chute);
+
+        const cordGeo = new THREE.CylinderGeometry(0.025, 0.025, 3.0, 4);
+        const cordMat = new THREE.MeshBasicMaterial({ color: 0xdedad0 });
+        const cords = [];
+        [[1.35, 0], [-1.35, 0], [0, 1.35], [0, -1.35]].forEach(([cx, cz]) => {
+            const cord = new THREE.Mesh(cordGeo, cordMat);
+            cord.position.set(cx * 0.5, 2.0, cz * 0.5);
+            if (cx) cord.rotation.z = cx > 0 ? -0.44 : 0.44;
+            if (cz) cord.rotation.x = cz > 0 ? 0.44 : -0.44;
+            crateGrp.add(cord);
+            cords.push(cord);
+        });
 
         crateGrp.position.set(landX, flightY - 1.2, landZ);
         scene.add(crateGrp);
 
         function disposeCrate() {
             scene.remove(crateGrp);
-            chute.geometry.dispose();
+            chuteGeo.dispose();
             chuteMat.dispose();
+            cordGeo.dispose();
+            cordMat.dispose();
             if (proceduralBox) proceduralBox.geometry.dispose();
             if (proceduralStrap) proceduralStrap.geometry.dispose();
             if (boxMat) boxMat.dispose();
@@ -2729,10 +2752,11 @@ function triggerSupplyDropZoneDelivery(structure) {
                     if (!landed) {
                         crateGrp.position.y -= 0.22;
                         crateGrp.rotation.y += 0.02;
-                        if (crateGrp.position.y <= landY + 0.55) {
-                            crateGrp.position.y = landY + 0.55;
+                        if (crateGrp.position.y <= landY + 0.05) {
+                            crateGrp.position.y = landY + 0.05;
                             landed = true;
                             chute.visible = false;
+                            for (let ci = 0; ci < cords.length; ci++) cords[ci].visible = false;
                         }
                         return true;
                     }
@@ -2752,8 +2776,7 @@ function triggerSupplyDropZoneDelivery(structure) {
                     // Collect immediately if a friendly unit touches it, or after ~4s (240 ticks) uncontested on the drop pad
                     const friendlyTouch = (typeof units !== 'undefined') && units.some(u => u.health > 0 && u.mesh && Math.hypot(u.mesh.position.x - landX, u.mesh.position.z - landZ) < 4.5);
                     if (friendlyTouch || groundTicks >= 240) {
-                        const hasSupplyLines = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines'));
-                        const bonus = hasSupplyLines ? 1650 : 1500;
+                        const bonus = valuePerCrate;
                         if (typeof playerResources !== 'undefined') {
                             playerResources += bonus;
                             const resEl = (typeof document !== 'undefined') ? document.getElementById('resource-display') : null;
@@ -2776,9 +2799,15 @@ function triggerSupplyDropZoneDelivery(structure) {
                 const t = planeTick / planeDuration;
                 plane.position.lerpVectors(startPos, endPos, t);
                 for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.65;
-                if (!crateDropped && t >= 0.5) {
+                if (!crateDropped && t >= 0.44) {
                     crateDropped = true;
-                    spawnParachuteCrate();
+                    const hasSupplyLines = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines'));
+                    const perCrateVal = hasSupplyLines ? 550 : 500;
+                    const dropOffsets = [[0, 0], [-2.3, -1.9], [2.3, -1.9]];
+                    dropOffsets.forEach(([ox, oz], ci) => {
+                        if (ci === 0) spawnParachuteCrate(ox, oz, perCrateVal);
+                        else setTimeout(() => { if (typeof scene !== 'undefined') spawnParachuteCrate(ox, oz, perCrateVal); }, ci * 260);
+                    });
                 }
                 if (planeTick >= planeDuration) {
                     if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {

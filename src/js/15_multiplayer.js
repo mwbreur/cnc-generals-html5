@@ -543,11 +543,13 @@ function startMultiplayerMatch(isHost, config) {
                 if (typeof getPlayerColorHex === 'function') {
                     window.activeEnemyColorHex = getPlayerColorHex(slot.color || 'red');
                 }
+                const faceCenterYaw = (Math.hypot(spawnPos.x, spawnPos.z) > 1) ? Math.atan2(-spawnPos.x, -spawnPos.z) : 0;
                 const foeCCGroup = (slot.faction === 'china') ? createChinaCommandCenter(true) : (slot.faction === 'gla') ? createGLACommandCenter(true) : createUSACommandCenter(true);
                 foeCCGroup.position.copy(spawnPos);
+                foeCCGroup.rotation.y = faceCenterYaw;
                 scene.add(foeCCGroup);
                 enemyStructures.push({
-                        type: 'commandCenter', faction: slot.faction, position: spawnPos.clone(),
+                        type: 'commandCenter', faction: slot.faction, position: spawnPos.clone(), rotationY: faceCenterYaw,
                         mesh: foeCCGroup, health: 2500, maxHealth: 2500, radius: 10,
                         buildProgress: 100, isBuilding: false, netId: (isHost ? 'CS_' : 'HS_') + 'CC',
                         teamId: slot.team, ownerId: 'challenger', isAI: false

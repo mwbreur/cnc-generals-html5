@@ -128,10 +128,78 @@ window.getCachedNode = getCachedNode;
 // staggered full refresh every ~3 seconds to catch deep hierarchy changes.
 // kind: 1 = rotor spinning +, 2 = rotor spinning -, 3 = other named animation
 // =========================================================================
+const GLOBAL_FLAG_WIND_YAW = 0.45;
+const _flagWaveQ = (typeof THREE !== 'undefined' && typeof THREE.Quaternion === 'function') ? new THREE.Quaternion() : null;
+const _flagWaveAxis = (typeof THREE !== 'undefined' && typeof THREE.Vector3 === 'function') ? new THREE.Vector3(1, 0, 0) : null;
+
+function spinVehicleWheels(unit, stepDist) {
+    if (!unit || !unit.mesh || !stepDist) return;
+    if (unit._wheelNodes === undefined) {
+        const wNodes = [];
+        if (typeof unit.mesh.traverse === 'function') {
+            unit.mesh.traverse(c => {
+                if (c.name && /^(TIRE|WHEEL)\d*$/i.test(c.name)) wNodes.push(c);
+            });
+        }
+        unit._wheelNodes = wNodes;
+    }
+    const wNodes = unit._wheelNodes;
+    if (wNodes && wNodes.length > 0) {
+        const angleDelta = stepDist * 1.45;
+        for (let i = 0; i < wNodes.length; i++) {
+            wNodes[i].rotation.x += angleDelta;
+        }
+    }
+}
+if (typeof window !== 'undefined') window.spinVehicleWheels = spinVehicleWheels;
+
+function updateWindFlagsOnStructure(rootMesh, animTime) {
+    if (!rootMesh) return;
+    if (rootMesh._windFlagEntries === undefined) {
+        const entries = [];
+        if (typeof rootMesh.traverse === 'function') {
+            rootMesh.traverse(c => {
+                if (c && (c.name === 'flagWindPivot' || (c.userData && c.userData.isWindFlag))) {
+                    const segs = [];
+                    if (typeof c.traverse === 'function') {
+                        c.traverse(sub => {
+                            if (sub && sub !== c && sub.userData && sub.userData.baseQuat) {
+                                segs.push(sub);
+                            }
+                        });
+                    }
+                    entries.push({ pivot: c, segs });
+                }
+            });
+        }
+        rootMesh._windFlagEntries = entries.length > 0 ? entries : null;
+    }
+    const entries = rootMesh._windFlagEntries;
+    if (!entries) return;
+    const rootYaw = (rootMesh.rotation && typeof rootMesh.rotation.y === 'number') ? rootMesh.rotation.y : 0;
+    const basePhase = ((rootMesh.id || 0) % 17) * 0.7;
+    for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        const pPhase = basePhase + i * 0.9;
+        e.pivot.rotation.y = (GLOBAL_FLAG_WIND_YAW - rootYaw) + Math.sin(animTime * 3.4 + pPhase) * 0.12;
+        if (_flagWaveQ && _flagWaveAxis && typeof _flagWaveQ.setFromAxisAngle === 'function') {
+            const segs = e.segs;
+            for (let s = 0; s < segs.length; s++) {
+                const seg = segs[s];
+                const wave = Math.sin(animTime * 6.2 - s * 1.15 + pPhase) * (0.14 + s * 0.06);
+                _flagWaveQ.setFromAxisAngle(_flagWaveAxis, wave);
+                if (seg.quaternion && typeof seg.quaternion.copy === 'function' && typeof seg.quaternion.multiply === 'function') {
+                    seg.quaternion.copy(seg.userData.baseQuat).multiply(_flagWaveQ);
+                }
+            }
+        }
+    }
+}
+
 const ANIMATED_NODE_NAMES = new Set([
         'radarDish', 'radarDish2', 'hazardBeacon', 'fusionCore', 'nukeCore', 'pumpjackArm',
         'particleAcceleratorRing', 'particleEmitter', 'nukeTip', 'nukeBlastDoorL',
-        'nukeBlastDoorR', 'scudGantry', 'factionFlag', 'usaCcCraneBoom', 'usaCcCraneHook',
+        'nukeBlastDoorR', 'scudGantry', 'factionFlag', 'flagWindPivot', 'usaCcCraneBoom', 'usaCcCraneHook',
         'OILDERRICK', 'HAMMERS'
 ]);
 function classifyAnimatedNode(obj) {
@@ -145,7 +213,6 @@ function classifyAnimatedNode(obj) {
     if (ANIMATED_NODE_NAMES.has(n)) return 3;
     if (!obj.isMesh) {
         if (/^FAN\d+$/i.test(n)) return 4;
-        if (/^HOUSECOLOR0[56]$/i.test(n) && pName && pName !== 'ROOTTRANSFORM') return 5;
         if (/^BANNER[A-E](0[235689]|1[12])$/i.test(n)) return 6;
         if (/^(FLOW)?TARP\d+$/i.test(n)) return 7;
     }
@@ -506,7 +573,7 @@ function animate() {
                         drone._propNodes = [];
                         dMesh.traverse(c => { if (c.name && c.name.toLowerCase().includes('prop')) drone._propNodes.push(c); });
                     }
-                    for (let pi = 0; pi < drone._propNodes.length; pi++) drone._propNodes[pi].rotation.y += 0.65;
+                    for (let pi = 0; pi < drone._propNodes.length; pi++) drone._propNodes[pi].rotation.z += 0.65;
 
                     // Scout Drone Function: +50% Sight/Scan Range & Active Stealth/Mine Detection within 32 units
                     unit.detectsStealth = true;
@@ -566,11 +633,11 @@ function animate() {
                     dMesh.position.z += (targetZ - dMesh.position.z) * 0.10;
                     dMesh.position.y += (targetY - dMesh.position.y) * 0.10;
 
-                    // Local-frame downward pitch so gun barrel always points downward at ground targets
+                    // Upright hover attitude with gentle hovering bob
                     dMesh.rotation.order = 'YXZ';
                     dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
-                    dMesh.rotation.x = 0.72 + Math.sin(drone.timer * 0.06) * 0.04;
-                    dMesh.rotation.z = Math.sin(drone.timer * 0.07) * 0.08;
+                    dMesh.rotation.x = Math.sin(drone.timer * 0.06) * 0.05;
+                    dMesh.rotation.z = Math.sin(drone.timer * 0.07) * 0.06;
 
                     // Ducted lift fan spin (PERF: fan nodes cached once)
                     if (!drone._fanNodes) {
@@ -1063,6 +1130,31 @@ function animate() {
                 }
             }
     });
+
+    if (typeof structures !== 'undefined') {
+        for (let si = 0; si < structures.length; si++) {
+            const s = structures[si];
+            if (s && s.mesh && s.health > 0) updateWindFlagsOnStructure(s.mesh, animTime);
+        }
+    }
+    if (typeof enemyStructures !== 'undefined') {
+        for (let ei = 0; ei < enemyStructures.length; ei++) {
+            const es = enemyStructures[ei];
+            if (es && es.mesh && es.health > 0) updateWindFlagsOnStructure(es.mesh, animTime);
+        }
+    }
+    if (typeof window !== 'undefined' && Array.isArray(window.neutralStructures)) {
+        for (let ni = 0; ni < window.neutralStructures.length; ni++) {
+            const ns = window.neutralStructures[ni];
+            if (ns && ns.mesh) updateWindFlagsOnStructure(ns.mesh, animTime);
+        }
+    }
+    if (typeof worldBuildings !== 'undefined') {
+        for (let wi = 0; wi < worldBuildings.length; wi++) {
+            const wb = worldBuildings[wi];
+            if (wb && wb.mesh && wb.garrisoned && wb.garrisoned.length > 0) updateWindFlagsOnStructure(wb.mesh, animTime);
+        }
+    }
 
     if (buildingTick % 6 === 0) updateStealthAndDetection();
     processPointDefenseLasers();
@@ -2152,6 +2244,7 @@ function animate() {
                 const step = Math.min(dist2D, unit.speed * combatDeltaScale);
                 unit.mesh.position.x += dirX * step;
                 unit.mesh.position.z += dirZ * step;
+                if (!unit.isAir && !INFANTRY_TYPE_SET.has(unit.type)) spinVehicleWheels(unit, step);
 
                 // Authentic Tank Crushing (SquishCollide.cpp: heavy tanks crush enemy infantry)
                 if (CRUSHER_TANK_SET.has(unit.type)) {
@@ -2834,6 +2927,7 @@ function processEnemyMovement() {
                 const step = Math.min(dist2D, enemy.speed * combatDeltaScale);
                 enemy.mesh.position.x += dirX * step;
                 enemy.mesh.position.z += dirZ * step;
+                if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type)) spinVehicleWheels(enemy, step);
                 if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type) && typeof spawnTreadDustPuff === 'function') {
                     const isTrackedEnemy = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(enemy.type);
                     const tickOff = buildingTick + (enemy.netId ? String(enemy.netId).length : 0);
