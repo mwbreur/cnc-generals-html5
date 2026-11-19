@@ -101,29 +101,96 @@ const _fxDebrisGeo = new THREE.BoxGeometry(0.36, 0.20, 0.52);
 const _fxDebrisMetalMat = new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.78, metalness: 0.45 });
 const _fxDebrisConcreteMat = new THREE.MeshStandardMaterial({ color: 0x4b4842, roughness: 0.92, metalness: 0.1 });
 
-function getTerrainDustColor() {
+function getTerrainSurfaceKind(x = 0, z = 0) {
+    if (typeof getTerrainHeight === 'function' && typeof currentWaterLevel === 'number') {
+        const h = getTerrainHeight(x, z);
+        if (h <= currentWaterLevel + 0.35) return 'water';
+        if (h <= currentWaterLevel + 1.35) return 'mud';
+    }
     const mapKey = (typeof currentMapType !== 'undefined' && currentMapType) ? String(currentMapType).toLowerCase() : 'tournament_desert';
-    if (mapKey.includes('snow') || mapKey.includes('winter') || mapKey.includes('alpine')) return 0xe6eef6;
-    if (mapKey.includes('city')) return 0x7d848b;
-    if (mapKey.includes('jungle') || mapKey.includes('final_crusade') || mapKey.includes('heartland') || mapKey.includes('lone_eagle')) return 0x8c7d63;
-    return 0xc9ae82;
+    if (mapKey.includes('snow') || mapKey.includes('winter') || mapKey.includes('alpine')) return 'snow';
+    if (mapKey.includes('city')) return 'city';
+    if (mapKey.includes('jungle') || mapKey.includes('final_crusade') || mapKey.includes('heartland') || mapKey.includes('lone_eagle') || mapKey === 'random') return 'green';
+    return 'desert';
+}
+
+function getTerrainDustColor() {
+    const kind = getTerrainSurfaceKind();
+    if (kind === 'snow') return 0xeaf3fb;
+    if (kind === 'city') return 0x7d848b;
+    if (kind === 'green' || kind === 'mud') return 0x6f6048;
+    return 0xcfb284;
+}
+
+const _fxMudClodMat = new THREE.MeshBasicMaterial({ color: 0x423020 });
+const _fxWaterSplashMat = new THREE.MeshBasicMaterial({ color: 0x9bd3e8, transparent: true, opacity: 0.8 });
+
+function spawnMudClodSpray(pos, backX = 0, backZ = 0, isWater = false) {
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 330) return;
+    const mat = isWater ? _fxWaterSplashMat : _fxMudClodMat;
+    const count = isWater ? 3 : 2;
+    for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(_fxSparkGeo, mat);
+        const s = isWater ? (1.1 + Math.random() * 0.6) : (0.95 + Math.random() * 0.75);
+        mesh.scale.set(s, s * 0.85, s);
+        mesh.position.set(
+            pos.x + (Math.random() - 0.5) * 0.35,
+            (pos.y || 0) + 0.16,
+            pos.z + (Math.random() - 0.5) * 0.35
+        );
+        scene.add(mesh);
+        let vx = backX * (0.14 + Math.random() * 0.14) + (Math.random() - 0.5) * 0.10;
+        let vz = backZ * (0.14 + Math.random() * 0.14) + (Math.random() - 0.5) * 0.10;
+        let vy = 0.16 + Math.random() * 0.14;
+        let life = 16 + Math.floor(Math.random() * 8);
+        activeFX.push({
+            mesh,
+            life,
+            update() {
+                life--;
+                mesh.position.x += vx;
+                mesh.position.z += vz;
+                mesh.position.y += vy;
+                vy -= 0.022;
+                const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(mesh.position.x, mesh.position.z) : 0;
+                if (life <= 0 || mesh.position.y <= gY + 0.04) {
+                    scene.remove(mesh);
+                    return false;
+                }
+                return true;
+            }
+        });
+    }
 }
 
 function spawnTreadDustPuff(pos, backX = 0, backZ = 0, color = null, size = 0.55) {
     if (!pos || typeof scene === 'undefined' || activeFX.length > 320) return;
-    const dustColor = color !== null ? color : getTerrainDustColor();
+    const surface = getTerrainSurfaceKind(pos.x, pos.z);
+
+    // Green/swamp/riverbank terrain flings mud clods (or water splashes) with much less dust than desert!
+    if (surface === 'mud' || surface === 'water') {
+        spawnMudClodSpray(pos, backX, backZ, surface === 'water');
+        if (Math.random() > 0.35) return;
+    } else if (surface === 'green' && Math.random() < 0.62) {
+        spawnMudClodSpray(pos, backX, backZ, false);
+    }
+
+    const dustColor = color !== null ? color : (surface === 'water' ? 0xb8e2f2 : getTerrainDustColor());
+    const surfaceSizeMult = (surface === 'desert') ? 1.42 : (surface === 'snow' ? 1.12 : (surface === 'green' ? 0.58 : (surface === 'city' ? 0.48 : 0.65)));
+    const baseOpacity = (surface === 'desert') ? 0.62 : (surface === 'snow' ? 0.56 : (surface === 'green' ? 0.30 : 0.34));
+    const maxLife = (surface === 'desert') ? 34 : (surface === 'snow' ? 24 : 18);
+
     const tex = _getFxSpriteTex('smoke');
     const mat = tex
-        ? new THREE.SpriteMaterial({ map: tex, color: dustColor, transparent: true, opacity: 0.52, depthWrite: false })
-        : new THREE.MeshBasicMaterial({ color: dustColor, transparent: true, opacity: 0.45 });
+        ? new THREE.SpriteMaterial({ map: tex, color: dustColor, transparent: true, opacity: baseOpacity, depthWrite: false })
+        : new THREE.MeshBasicMaterial({ color: dustColor, transparent: true, opacity: baseOpacity * 0.85 });
     const mesh = tex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
-    const startS = size * (tex ? 2.4 : 0.85);
+    const startS = size * surfaceSizeMult * (tex ? 2.4 : 0.85);
     mesh.scale.set(startS, startS, startS);
     mesh.position.set(pos.x + (Math.random() - 0.5) * 0.35, pos.y + 0.12, pos.z + (Math.random() - 0.5) * 0.35);
     scene.add(mesh);
 
-    let life = 24;
-    const maxLife = 24;
+    let life = maxLife;
     const grow = 0.045 * startS;
     activeFX.push({
         mesh,
@@ -131,15 +198,69 @@ function spawnTreadDustPuff(pos, backX = 0, backZ = 0, color = null, size = 0.55
         update() {
             life--;
             const prog = 1 - life / maxLife;
-            const s = startS + prog * startS * 1.15;
+            const s = startS + prog * startS * (surface === 'desert' ? 1.45 : 1.05);
             mesh.scale.set(s, s, s);
             mesh.position.x += backX * 0.04;
             mesh.position.z += backZ * 0.04;
-            mesh.position.y += 0.014 + grow * 0.1;
-            mat.opacity = Math.max(0, (1 - prog) * 0.5);
+            mesh.position.y += (surface === 'desert' ? 0.022 : 0.014) + grow * 0.1;
+            mat.opacity = Math.max(0, (1 - prog) * baseOpacity);
             if (life <= 0) {
                 scene.remove(mesh);
                 mat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+// Authentic C&C Generals USA Patriot Missile Network Curved Communication Arc (only while attacking/relaying!)
+function spawnPatriotCommArc(fromPos, toPos) {
+    if (!fromPos || !toPos || typeof scene === 'undefined' || activeFX.length > 350) return;
+    const dist = fromPos.distanceTo(toPos);
+    if (dist < 1.0) return;
+    const arcHeight = Math.max(6.0, Math.min(18.0, dist * 0.25));
+    const segs = 18;
+    const pts = [];
+    for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const p = new THREE.Vector3().lerpVectors(fromPos, toPos, t);
+        p.y += Math.sin(t * Math.PI) * arcHeight;
+        pts.push(p);
+    }
+    const arcGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    const arcMat = new THREE.LineBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.92 });
+    const arcLine = new THREE.Line(arcGeo, arcMat);
+    scene.add(arcLine);
+
+    // Traveling cyan data pulse orb zipping along the arc from spotting Patriot to assisting Patriot
+    const orbMat = new THREE.MeshBasicMaterial({ color: 0xc8ffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+    const orb = new THREE.Mesh(_fxSphere6, orbMat);
+    orb.scale.setScalar(0.55);
+    orb.position.copy(pts[0]);
+    scene.add(orb);
+
+    let life = 22;
+    const maxLife = 22;
+    activeFX.push({
+        life,
+        update() {
+            life--;
+            const prog = 1 - life / maxLife;
+            const pulseT = Math.min(1, prog * 1.25);
+            const idxF = pulseT * segs;
+            const i0 = Math.min(segs - 1, Math.floor(idxF));
+            const frac = idxF - i0;
+            orb.position.lerpVectors(pts[i0], pts[i0 + 1], frac);
+            const fade = Math.max(0, 1 - prog);
+            arcMat.opacity = fade * 0.92;
+            orbMat.opacity = fade * 0.95;
+            if (life <= 0) {
+                scene.remove(arcLine);
+                scene.remove(orb);
+                arcGeo.dispose();
+                arcMat.dispose();
+                orbMat.dispose();
                 return false;
             }
             return true;
@@ -939,8 +1060,11 @@ function spawnPromotionFX(pos, rank = 1) {
 }
 
 if (typeof window !== 'undefined') {
+    window.getTerrainSurfaceKind = getTerrainSurfaceKind;
     window.getTerrainDustColor = getTerrainDustColor;
+    window.spawnMudClodSpray = spawnMudClodSpray;
     window.spawnTreadDustPuff = spawnTreadDustPuff;
+    window.spawnPatriotCommArc = spawnPatriotCommArc;
     window.spawnRotorDownwashDust = spawnRotorDownwashDust;
     window.spawnJetContrailPuff = spawnJetContrailPuff;
     window.spawnExplosionDebris = spawnExplosionDebris;

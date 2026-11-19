@@ -3732,35 +3732,14 @@ function processBuildingFunctions() {
                     structure._patriotNetworked = false;
                 }
 
-                // Patriot Network Buff: persistent cyan data-link beams & base aura ring between nearby Patriots (<=55u)
+                // Patriot Network Buff: track nearby operational Patriots (<=55u); comm arc only fires when actively attacking!
                 if (structure.type === 'patriot' && buildingTick % 15 === 0) {
                     const linked = !defenseOffline
                         ? structures.filter(other => other !== structure && other.type === 'patriot' && !other.isBuilding && other.health > 0 && other.position.distanceTo(structure.position) <= 55)
                         : [];
                     structure._patriotNetworked = linked.length > 0;
-                    if (structure.mesh) {
-                        if (!structure._patriotLinkRing) {
-                            const ring = new THREE.Mesh(
-                                new THREE.RingGeometry(4.2, 4.9, 24),
-                                new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
-                            );
-                            ring.rotation.x = -Math.PI / 2;
-                            ring.position.y = 0.25;
-                            ring.name = 'patriotLinkRing';
-                            structure.mesh.add(ring);
-                            structure._patriotLinkRing = ring;
-                        }
-                        structure._patriotLinkRing.visible = structure._patriotNetworked;
-                    }
-                    if (structure._patriotNetworked && typeof spawnLaserBeam === 'function' && buildingTick % 30 === 0) {
-                        const hasLock = !!(structure._sharedTarget && structure._sharedTarget.health > 0);
-                        linked.forEach(other => {
-                            if ((structure.netId || 0) < (other.netId || 0)) {
-                                const p1 = structure.position.clone().add(new THREE.Vector3(0, 3.2, 0));
-                                const p2 = other.position.clone().add(new THREE.Vector3(0, 3.2, 0));
-                                spawnLaserBeam(p1, p2, hasLock ? 0x00ffff : 0x0088ff, hasLock ? 1.8 : 0.85);
-                            }
-                        });
+                    if (structure._patriotLinkRing) {
+                        structure._patriotLinkRing.visible = false;
                     }
                 }
 
@@ -3806,14 +3785,15 @@ function processBuildingFunctions() {
                             structures.forEach(other => {
                                     if (other !== structure && other.type === 'patriot' && !other.isBuilding && other.health > 0 && other.position.distanceTo(structure.position) <= 55) {
                                         other._sharedTarget = target;
-                                        if (typeof spawnLaserBeam === 'function' && (!structure._lastLinkPulse || buildingTick - structure._lastLinkPulse >= 20)) {
-                                            const p1 = structure.position.clone().add(new THREE.Vector3(0, 3.2, 0));
-                                            const p2 = other.position.clone().add(new THREE.Vector3(0, 3.2, 0));
-                                            spawnLaserBeam(p1, p2, 0x00ffff, 1.8);
+                                        if (!structure._lastLinkPulse || buildingTick - structure._lastLinkPulse >= 25) {
+                                            const p1 = structure.position.clone().add(new THREE.Vector3(0, 3.4, 0));
+                                            const p2 = other.position.clone().add(new THREE.Vector3(0, 3.4, 0));
+                                            if (typeof spawnPatriotCommArc === 'function') spawnPatriotCommArc(p1, p2);
+                                            else if (typeof spawnLaserBeam === 'function') spawnLaserBeam(p1, p2, 0x00ffff, 1.8);
                                         }
                                     }
                             });
-                            if (!structure._lastLinkPulse || buildingTick - structure._lastLinkPulse >= 20) {
+                            if (!structure._lastLinkPulse || buildingTick - structure._lastLinkPulse >= 25) {
                                 structure._lastLinkPulse = buildingTick;
                             }
                         }
