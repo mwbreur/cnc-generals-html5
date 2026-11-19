@@ -2074,23 +2074,43 @@ function issueMoveCommand(e) {
     // 1b. Check if right-clicking a friendly vehicle/aircraft with ejected Veteran Pilot(s), or transport/Internet Center to embark!
     const selectedPilots = units.filter(u => u.selected && u.type === 'pilot');
     if (selectedPilots.length > 0) {
-        const boardableMeshes = units.filter(u => !u.garrisonedIn && u.health > 0 && u.type !== 'pilot' && !isInfantryType(u.type) && !u.isUnmanned && u.mesh).map(u => u.mesh);
+        const boardableUnits = units.filter(u => !u.garrisonedIn && u.health > 0 && u.type !== 'pilot' && !isInfantryType(u.type) && u.mesh);
+        const boardableMeshes = boardableUnits.map(u => u.mesh);
         const pilotHits = boardableMeshes.length ? raycaster.intersectObjects(boardableMeshes, true) : [];
+        let targetVehicle = null;
         if (pilotHits.length > 0) {
             let hitObj = pilotHits[0].object;
             while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
-            const targetVehicle = units.find(u => u.mesh === hitObj);
-            if (targetVehicle) {
-                selectedPilots.forEach(p => {
-                        p.pilotTarget = targetVehicle;
-                        p.taskState = 'Moving';
-                        p.combatTarget = null;
-                        p.targetPosition.set(targetVehicle.mesh.position.x, getTerrainHeight(targetVehicle.mesh.position.x, targetVehicle.mesh.position.z), targetVehicle.mesh.position.z);
-                });
-                showNotification(`Pilot ordered to board ${targetVehicle.type.toUpperCase()} and transfer veterancy!`, 'info');
-                updateSidebar();
-                return;
+            targetVehicle = boardableUnits.find(u => u.mesh === hitObj) || null;
+        }
+        // Proximity fallback if click landed right next to a friendly vehicle/aircraft
+        if (!targetVehicle) {
+            const pGround = getGroundIntersectPoint();
+            if (pGround) {
+                let bestDist = Infinity;
+                for (let bi = 0; bi < boardableUnits.length; bi++) {
+                    const cand = boardableUnits[bi];
+                    const d = Math.hypot(cand.mesh.position.x - pGround.x, cand.mesh.position.z - pGround.z);
+                    if (d <= (cand.radius || 3.0) + 2.5 && d < bestDist) {
+                        bestDist = d;
+                        targetVehicle = cand;
+                    }
+                }
             }
+        }
+        if (targetVehicle) {
+            selectedPilots.forEach(p => {
+                    p.pilotTarget = targetVehicle;
+                    p.taskState = 'Moving';
+                    p.combatTarget = null;
+                    p.waypoints = [];
+                    p.targetPosition.set(targetVehicle.mesh.position.x, getTerrainHeight(targetVehicle.mesh.position.x, targetVehicle.mesh.position.z), targetVehicle.mesh.position.z);
+            });
+            if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(targetVehicle.mesh.position, 'move');
+            if (typeof playUnitVoice === 'function') playUnitVoice('pilot', 'move', 'usa');
+            showNotification(`Pilot ordered to board ${targetVehicle.type.toUpperCase()} and transfer veterancy!`, 'info');
+            updateSidebar();
+            return;
         }
     }
 
@@ -2318,6 +2338,7 @@ function issueMoveCommand(e) {
                 unit.targetPosition.copy(groundHit);
             }
             unit.combatTarget = null;
+            unit.pilotTarget = null;
             unit.taskState = 'Moving';
             if (unit.isAir) {
                 unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'flying';
@@ -2332,6 +2353,7 @@ function issueMoveCommand(e) {
                 unit.aiState = 'Idle';
             }
         } else if (selectedList.length > 1) {
+            selectedList.forEach(u => { u.pilotTarget = null; });
             if (typeof applyGroupFormationMove === 'function') {
                 applyGroupFormationMove(selectedList, groundHit);
             }

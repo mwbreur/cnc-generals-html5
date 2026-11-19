@@ -425,10 +425,15 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         }
     }
 
-    // Player "Unit Under Attack" / "Base Under Attack" EVA alert + Minimap radar signal
+    // Player "Unit Under Attack" / "Base Under Attack" / "Ally Under Attack" EVA alert + Minimap radar signal
     const isPlayerUnit = (typeof units !== 'undefined' && units.includes(target));
     const isPlayerStruct = (typeof structures !== 'undefined' && structures.includes(target));
-    if ((isPlayerUnit || isPlayerStruct) && (!attacker || !isFriendly(target, attacker))) {
+    const localTeam = (typeof playerTeamId !== 'undefined') ? playerTeamId : 1;
+    const isAlliedTeammateAsset = !isPlayerUnit && !isPlayerStruct &&
+        typeof isFriendly === 'function' &&
+        isFriendly({ teamId: localTeam }, target) &&
+        target.ownerId !== 'player';
+    if ((isPlayerUnit || isPlayerStruct || isAlliedTeammateAsset) && (!attacker || !isFriendly(target, attacker))) {
         const nowMs = Date.now();
         const tPos = target.position || (target.mesh && target.mesh.position);
         if (tPos && typeof window !== 'undefined') {
@@ -440,11 +445,17 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
             }
             if (!window._lastUnderAttackAlertMs || (nowMs - window._lastUnderAttackAlertMs) > 8000) {
                 window._lastUnderAttackAlertMs = nowMs;
+                const alertType = isAlliedTeammateAsset
+                    ? 'ally_under_attack'
+                    : (isPlayerStruct ? 'base_under_attack' : 'unit_under_attack');
                 if (typeof showNotification === 'function') {
-                    showNotification(isPlayerStruct ? '⚠ BASE UNDER ATTACK!' : '⚠ UNIT UNDER ATTACK!', 'error');
+                    const msg = isAlliedTeammateAsset
+                        ? '⚠ ALLY UNDER ATTACK!'
+                        : (isPlayerStruct ? '⚠ BASE UNDER ATTACK!' : '⚠ UNIT UNDER ATTACK!');
+                    showNotification(msg, 'error');
                 }
                 if (typeof playEvaAlert === 'function') {
-                    playEvaAlert(isPlayerStruct ? 'base_under_attack' : 'unit_under_attack');
+                    playEvaAlert(alertType);
                 } else if (typeof playAudio === 'function') {
                     playAudio('radar_alert');
                 }

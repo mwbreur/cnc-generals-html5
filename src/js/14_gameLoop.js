@@ -2178,6 +2178,20 @@ function animate() {
                     const dPilot = Math.hypot(pv.mesh.position.x - unit.mesh.position.x, pv.mesh.position.z - unit.mesh.position.z);
                     if (dPilot <= (pv.radius || 3.0) + 3.5) {
                         const pVet = unit.veterancy || 1;
+                        const wasUnmanned = !!pv.isUnmanned;
+                        if (!wasUnmanned && (pv.veterancy || 0) >= pVet) {
+                            if (typeof showNotification === 'function') {
+                                showNotification(`${pv.type.toUpperCase()} already has equal or higher veterancy!`, 'warning');
+                            }
+                            unit.pilotTarget = null;
+                            unit.taskState = 'Idle';
+                            unit.targetPosition.copy(unit.mesh.position);
+                            return;
+                        }
+                        if (wasUnmanned) {
+                            pv.isUnmanned = false;
+                            pv.disabledUntil = 0;
+                        }
                         if ((pv.veterancy || 0) < pVet) {
                             const prevMult = pv.veterancy === 3 ? 1.6 : (pv.veterancy === 2 ? 1.4 : (pv.veterancy === 1 ? 1.2 : 1.0));
                             const nextMult = pVet === 3 ? 1.6 : (pVet === 2 ? 1.4 : 1.2);
@@ -2186,9 +2200,10 @@ function animate() {
                             pv.health = Math.min(pv.maxHealth, pv.health + Math.max(0, pv.maxHealth - oldMax));
                             pv.veterancy = pVet;
                             pv.kills = Math.max(pv.kills || 0, unit.kills || 0);
-                            if (typeof showNotification === 'function') {
-                                showNotification(`★ Pilot boarded ${pv.type.toUpperCase()} — Veterancy Rank ${pVet} transferred!`, 'success');
-                            }
+                            if (typeof spawnPromotionFX === 'function') spawnPromotionFX(pv.mesh.position, pVet);
+                        }
+                        if (typeof showNotification === 'function') {
+                            showNotification(`★ Pilot boarded ${pv.type.toUpperCase()} — Veterancy Rank ${pVet} transferred!`, 'success');
                         }
                         unit.health = 0;
                         unit._silentRemove = true;
@@ -2638,6 +2653,8 @@ function animate() {
 
     if (units.some(u => u.health <= 0)) {
         const previousUnitCount = units.length;
+        const USA_PILOT_EJECT_SET = new Set(['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'chinook']);
+        const pendingPilotEjects = [];
         units = units.filter(unit => {
                 if (unit.health > 0) return true;
                 removeSelectionCircle(unit);
@@ -2654,24 +2671,20 @@ function animate() {
                 }
                 scene.remove(unit.mesh);
                 spawnUnitDeathFX(unit);
-                // USA Ejection Seat: Manned USA vehicles/aircraft at Veteran+ eject a pilot retaining veterancy
-                const USA_PILOT_EJECT_SET = new Set(['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk', 'comanche', 'raptor', 'stealthfighter', 'aurora', 'chinook']);
+                // USA Ejection Seat: Manned USA vehicles/aircraft at Veteran+ eject a pilot retaining veterancy.
+                // Deferred until AFTER units.filter() returns so spawnUnit() pushes onto the surviving units array!
                 const isUsaOwned = unit.faction === 'usa' || (!unit.faction && typeof selectedFaction !== 'undefined' && selectedFaction === 'usa');
                 if (!unit._silentRemove && isUsaOwned && !unit.isUnmanned && (unit.veterancy || 0) >= 1 && USA_PILOT_EJECT_SET.has(unit.type) && typeof spawnUnit === 'function') {
                     const ejectPos = unit.mesh.position.clone();
+                    ejectPos.x += (Math.random() - 0.5) * 1.0;
+                    ejectPos.z += (Math.random() - 0.5) * 1.0;
                     ejectPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(ejectPos.x, ejectPos.z) : 0;
-                    const pilot = spawnUnit('pilot', ejectPos, 'usa');
-                    if (pilot) {
-                        const vRank = Math.min(3, unit.veterancy);
-                        const vMult = vRank === 3 ? 1.6 : (vRank === 2 ? 1.4 : 1.2);
-                        pilot.veterancy = vRank;
-                        pilot.kills = unit.kills || 0;
-                        pilot.maxHealth = Math.floor(pilot.maxHealth * vMult);
-                        pilot.health = pilot.maxHealth;
-                        if (typeof showNotification === 'function') {
-                            showNotification(`🪂 Veteran Pilot ejected (Rank ${'★'.repeat(vRank)}) — right-click a friendly vehicle or aircraft to transfer veterancy!`, 'info');
-                        }
-                    }
+                    pendingPilotEjects.push({
+                        pos: ejectPos,
+                        vRank: Math.min(3, unit.veterancy),
+                        kills: unit.kills || 0,
+                        teamId: unit.teamId
+                    });
                 }
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
                 const uScrapRoll = (typeof simRandom === 'function') ? simRandom() : Math.random();
@@ -2683,6 +2696,22 @@ function animate() {
                 });
                 return false;
         });
+        for (let pi = 0; pi < pendingPilotEjects.length; pi++) {
+            const ej = pendingPilotEjects[pi];
+            const pilot = spawnUnit('pilot', ej.pos, 'usa');
+            if (pilot) {
+                const vMult = ej.vRank === 3 ? 1.6 : (ej.vRank === 2 ? 1.4 : 1.2);
+                pilot.veterancy = ej.vRank;
+                pilot.kills = ej.kills;
+                pilot.maxHealth = Math.floor(pilot.maxHealth * vMult);
+                pilot.health = pilot.maxHealth;
+                pilot.ownerId = 'player';
+                if (ej.teamId !== undefined) pilot.teamId = ej.teamId;
+                if (typeof showNotification === 'function') {
+                    showNotification(`🪂 Veteran Pilot ejected (Rank ${'★'.repeat(ej.vRank)}) — select and right-click a friendly vehicle or aircraft to transfer veterancy!`, 'info');
+                }
+            }
+        }
         if (units.length !== previousUnitCount) {
             if (typeof playEvaAlert === 'function') playEvaAlert('unit_lost');
             updateHUD();
