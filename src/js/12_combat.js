@@ -606,24 +606,24 @@ function executeWeaponFireInner(attacker, target) {
         attacker.combatTarget = null;
         return;
     }
-    // Authentic Command & Conquer: Generals Zero Hour Weapon Reload Rates (60 ticks = 1.0s, matched to INIZH.big)
+    // Authentic Command & Conquer: Generals Zero Hour Weapon Reload Rates (60 ticks = 1.0s, verified directly from INIZH.big Weapon.ini)
     const cncCooldowns = {
-        // Main Battle & Heavy Tanks
-        'tank': 120, 'crusader': 120, 'battlemaster': 120, 'scorpion': 120, 'marauder': 120,
-        'paladin': 120, 'overlord': 180,
-        // Artillery & Heavy Siege Missiles
-        'tomahawk': 360, 'scud': 600, 'inferno': 210, 'nukecannon': 450, 'nuketank': 450,
-        // Anti-Tank & Rocket Troops / Base Defenses
-        'rocket': 140, 'missiledefender': 140, 'rpg': 132, 'tankhunter': 138, 'patriot': 180, 'stingerSite': 150,
-        // Standard Infantry Rifle Bursts & Mob
-        'ranger': 60, 'redguard': 60, 'rebel': 60, 'infantry': 60, 'burton': 50, 'mob': 36,
+        // Main Battle & Heavy Tanks (INIZH.big: Crusader/Paladin/Battlemaster/Marauder 2000ms, Scorpion 1000ms, Overlord 2000ms reload + 300ms clip)
+        'tank': 120, 'crusader': 120, 'battlemaster': 120, 'scorpion': 60, 'marauder': 120,
+        'paladin': 120, 'overlord': 120,
+        // Artillery & Heavy Siege Missiles (INIZH.big: Tomahawk 7000ms, SCUD 10000ms, Inferno 4000ms, NukeCannon 10000ms)
+        'tomahawk': 420, 'scud': 600, 'inferno': 240, 'nukecannon': 600, 'nuketank': 600,
+        // Anti-Tank & Rocket Troops / Base Defenses (INIZH.big: MissileDefender/TankHunter/RPG 1000ms, Patriot/Stinger 2000ms)
+        'rocket': 60, 'missiledefender': 60, 'rpg': 60, 'tankhunter': 60, 'patriot': 120, 'stingerSite': 120,
+        // Standard Infantry Rifle Bursts & Mob (INIZH.big: RedGuard/Ranger/Rebel ~1000ms, Burton 500-800ms, Mob 250ms)
+        'ranger': 60, 'redguard': 60, 'rebel': 60, 'infantry': 60, 'burton': 50, 'mob': 30,
         'blacklotus': 120, 'hacker': 120,
-        // High-Caliber Snipers
-        'pathfinder': 90, 'jarmen': 90,
-        // Fast Attack & Light Vehicles
-        'humvee': 48, 'technical': 24, 'buggy': 270,
+        // High-Caliber Snipers (INIZH.big: Pathfinder 2000ms, Jarmen Kell 1000ms)
+        'pathfinder': 120, 'jarmen': 60,
+        // Fast Attack & Light Vehicles (INIZH.big: Buggy 6000ms reload, Humvee/Technical rapid, Dragon/Toxin continuous stream)
+        'humvee': 36, 'technical': 24, 'buggy': 360,
         'dragon': 18, 'dragonTank': 18, 'toxintractor': 18,
-        // Rapid-Fire Autocannons & Gatling Guns
+        // Rapid-Fire Autocannons & Gatling Guns (INIZH.big: Quad 100ms, Gatling 3-stage spool)
         'gatling': 16, 'gatlingTank': 16, 'gatlingCannon': 16, 'quad': 12,
         // Aircraft
         'comanche': 150, 'raptor': 360, 'mig': 360, 'stealthfighter': 360, 'aurora': 300,

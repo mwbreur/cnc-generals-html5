@@ -1174,10 +1174,11 @@ function processBaseDefenseCombat() {
                 def.attackCooldown = Math.max(0, def.attackCooldown - combatDeltaScale);
             }
 
-            // Acquire closest target within defense range (34 units) strictly filtering !isFriendly
+            // Acquire closest target within official INIZH.big defense range (AttackRange = 225.0 => 48.6 units) strictly filtering !isFriendly
             if (def.attackCooldown === 0) {
+                const defRange = 48.6;
                 let closestEnemy = null;
-                let closestDistSq = 34 * 34; // Fast squared distance
+                let closestDistSq = defRange * defRange;
                 const defCenter = def.position || def.mesh.position;
                 for (let target of allLivingUnits) {
                     if (target.health > 0 && !target.garrisonedIn && target.mesh && !isFriendly(def, target)) {
@@ -1195,7 +1196,7 @@ function processBaseDefenseCombat() {
                     for (let struct of allLivingStructures) {
                         if (struct.health > 0 && struct.mesh && !isFriendly(def, struct)) {
                             const sPos = struct.position || struct.mesh.position;
-                            const maxRange = 34 + (struct.radius || 0);
+                            const maxRange = defRange + (struct.radius || 0);
                             const dx = defCenter.x - sPos.x;
                             const dz = defCenter.z - sPos.z;
                             const dSq = dx * dx + dz * dz;
