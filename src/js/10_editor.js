@@ -157,7 +157,9 @@ function applyEditorBrush(e, isRightClick = false) {
             closest.z = worldZ;
         }
     } else if (editorTool === 'prop') {
-        editorProps.push({ x: worldX, z: worldZ, type: 'tree' });
+        if (editorProps.length < 200) {
+            editorProps.push({ x: worldX, z: worldZ, type: 'tree' });
+        }
     }
 
     renderEditorCanvas();
@@ -218,18 +220,114 @@ function renderEditorCanvas() {
 }
 
 // --- MAP SAVE, LOAD, EXPORT & IMPORT ---
+const VALID_CUSTOM_MAP_THEMES = new Set(['desert', 'jungle', 'snow', 'city', 'temperate', 'highland', 'island', 'random']);
+
+function sanitizeCustomMapObject(raw, fallbackId = null) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const rawId = typeof raw.id === 'string' && /^custom_[A-Za-z0-9_-]{1,48}$/.test(raw.id)
+        ? raw.id
+        : (fallbackId && /^custom_[A-Za-z0-9_-]{1,48}$/.test(fallbackId) ? fallbackId : null);
+    if (!rawId) return null;
+
+    const name = (typeof raw.name === 'string' ? raw.name.trim() : '').slice(0, 64) || 'Custom Map';
+    const theme = (typeof raw.theme === 'string' && VALID_CUSTOM_MAP_THEMES.has(raw.theme.toLowerCase()))
+        ? raw.theme.toLowerCase()
+        : null;
+    if (!theme) return null;
+
+    const size = Number(raw.size);
+    if (!Number.isFinite(size) || size < 400 || size > 4000) return null;
+
+    const waterLevel = raw.waterLevel === undefined ? 0 : Number(raw.waterLevel);
+    if (!Number.isFinite(waterLevel) || waterLevel < -20 || waterLevel > 20) return null;
+
+    if (!raw.heightGrid || typeof raw.heightGrid.length !== 'number' || raw.heightGrid.length !== 1024) return null;
+    const heightGrid = new Array(1024);
+    for (let i = 0; i < 1024; i++) {
+        const h = Number(raw.heightGrid[i]);
+        if (!Number.isFinite(h)) return null;
+        heightGrid[i] = Math.max(-10, Math.min(20, h));
+    }
+
+    const halfSize = size * 0.55;
+    const clampCoord = (v) => Math.max(-halfSize, Math.min(halfSize, v));
+    const sanitizePoints = (arr, maxCount, mapper) => {
+        if (arr === undefined || arr === null) return [];
+        if (!Array.isArray(arr)) return null;
+        const out = [];
+        const lim = Math.min(arr.length, maxCount);
+        for (let i = 0; i < lim; i++) {
+            const item = arr[i];
+            if (!item || typeof item !== 'object') continue;
+            const x = Number(item.x), z = Number(item.z);
+            if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+            out.push(mapper(item, clampCoord(x), clampCoord(z), i));
+        }
+        return out;
+    };
+
+    const bridges = sanitizePoints(raw.bridges, 16, (b, x, z) => ({
+        x, z,
+        width: Number.isFinite(Number(b.width)) ? Math.max(8, Math.min(60, Number(b.width))) : 22,
+        length: Number.isFinite(Number(b.length)) ? Math.max(16, Math.min(180, Number(b.length))) : 65,
+        angle: Number.isFinite(Number(b.angle)) ? Number(b.angle) : 0
+    }));
+    const supplies = sanitizePoints(raw.supplies, 32, (s, x, z) => ({
+        x, z,
+        amount: Number.isFinite(Number(s.amount)) ? Math.max(500, Math.min(100000, Number(s.amount))) : 8000
+    }));
+    const spawnPoints = sanitizePoints(raw.spawnPoints, 16, (sp, x, z, idx) => ({
+        id: Number.isInteger(sp.id) && sp.id > 0 && sp.id <= 16 ? sp.id : (idx + 1),
+        x, z
+    }));
+    const props = sanitizePoints(raw.props, 250, (p, x, z) => ({
+        x, z,
+        type: (typeof p.type === 'string' && /^[a-z0-9_-]{1,24}$/i.test(p.type)) ? p.type : 'tree'
+    }));
+    if (bridges === null || supplies === null || spawnPoints === null || props === null) return null;
+
+    return {
+        id: rawId,
+        name,
+        theme,
+        size: Math.round(size),
+        waterLevel,
+        heightGrid,
+        bridges,
+        supplies,
+        spawnPoints,
+        props
+    };
+}
+
 function initCustomMapsStorage() {
     try {
         const raw = localStorage.getItem('cnc_custom_maps');
-        if (raw) savedCustomMaps = JSON.parse(raw);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            const clean = {};
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                let dropped = 0;
+                Object.keys(parsed).forEach(k => {
+                    const valid = sanitizeCustomMapObject(parsed[k], k);
+                    if (valid) clean[valid.id] = valid;
+                    else dropped++;
+                });
+                if (dropped > 0) {
+                    try { localStorage.setItem('cnc_custom_maps', JSON.stringify(clean)); } catch (_) {}
+                }
+            }
+            savedCustomMaps = clean;
+        }
     } catch (e) {
         console.warn('localStorage not accessible, using memory cache:', e);
+        savedCustomMaps = {};
     }
 }
 
 function saveCustomMap() {
     const nameEl = document.getElementById('me-map-name');
-    const name = ((nameEl && nameEl.value) || 'Custom Map').trim();
+    const name = ((nameEl && nameEl.value) || 'Custom Map').trim().slice(0, 64) || 'Custom Map';
     const id = editorCurrentMapId && savedCustomMaps[editorCurrentMapId]
     ? editorCurrentMapId
     : 'custom_' + Date.now();
@@ -241,10 +339,10 @@ function saveCustomMap() {
         size: editorSize,
         waterLevel: parseFloat((waterEl && waterEl.value) || 0),
         heightGrid: Array.from(editorHeightGrid),
-        bridges: editorBridges,
-        supplies: editorSupplies,
-        spawnPoints: editorSpawns,
-        props: editorProps
+        bridges: editorBridges.map(b => ({ ...b })),
+        supplies: editorSupplies.map(s => ({ ...s })),
+        spawnPoints: editorSpawns.map(sp => ({ ...sp })),
+        props: editorProps.map(p => ({ ...p }))
     };
 
     savedCustomMaps[id] = mapObj;
@@ -299,18 +397,37 @@ function loadSavedMapsList() {
         return;
     }
 
+    if (!listEl._boundCustomMapClick) {
+        listEl._boundCustomMapClick = true;
+        listEl.addEventListener('click', (ev) => {
+            const btn = ev.target && ev.target.closest ? ev.target.closest('button[data-map-action]') : null;
+            if (!btn) return;
+            const mapId = btn.dataset.mapId;
+            const action = btn.dataset.mapAction;
+            if (!mapId || !savedCustomMaps[mapId]) return;
+            if (action === 'edit') loadCustomMapIntoEditor(mapId);
+            else if (action === 'single') openSavedCustomMapInMode(mapId, 'single');
+            else if (action === 'multiplayer') openSavedCustomMapInMode(mapId, 'multiplayer');
+            else if (action === 'delete') deleteCustomMap(mapId);
+        });
+    }
+
     let html = '';
     maps.forEach(m => {
+            const safeId = escapeHtml(m.id);
+            const safeName = escapeHtml(m.name);
+            const safeTheme = escapeHtml(m.theme);
+            const safeSize = escapeHtml(String(m.size));
             html += `<div class="saved-map-card">
                     <div>
-                        <strong>${escapeHtml(m.name)}</strong>
-                        <span style="color:#8f9e91; font-size:10px; margin-left:6px;">${m.theme} (${m.size}x${m.size})</span>
+                        <strong>${safeName}</strong>
+                        <span style="color:#8f9e91; font-size:10px; margin-left:6px;">${safeTheme} (${safeSize}x${safeSize})</span>
                     </div>
                     <div style="display:flex; gap:4px;">
-                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" onclick="loadCustomMapIntoEditor('${m.id}')">EDIT</button>
-                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" onclick="openSavedCustomMapInMode('${m.id}', 'single')">SKIRMISH</button>
-                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" onclick="openSavedCustomMapInMode('${m.id}', 'multiplayer')">MULTIPLAYER</button>
-                        <button class="rts-btn" style="padding:2px 8px; font-size:10px; border-color:#ff4757; color:#ff4757;" onclick="deleteCustomMap('${m.id}')">DEL</button>
+                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" data-map-action="edit" data-map-id="${safeId}">EDIT</button>
+                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" data-map-action="single" data-map-id="${safeId}">SKIRMISH</button>
+                        <button class="rts-btn" style="padding:2px 8px; font-size:10px;" data-map-action="multiplayer" data-map-id="${safeId}">MULTIPLAYER</button>
+                        <button class="rts-btn" style="padding:2px 8px; font-size:10px; border-color:#ff4757; color:#ff4757;" data-map-action="delete" data-map-id="${safeId}">DEL</button>
                     </div>
                 </div>`;
     });
@@ -334,10 +451,12 @@ function loadCustomMapIntoEditor(id) {
     editorTheme = m.theme;
     editorSize = m.size;
     editorHeightGrid = new Float32Array(m.heightGrid);
-    editorBridges = m.bridges || [];
-    editorSupplies = m.supplies || [];
-    editorSpawns = m.spawnPoints || getSpawnPointsForMap(editorSize, editorTheme, null);
-    editorProps = m.props || [];
+    editorBridges = (m.bridges || []).map(b => ({ ...b }));
+    editorSupplies = (m.supplies || []).map(s => ({ ...s }));
+    editorSpawns = (m.spawnPoints && m.spawnPoints.length > 0)
+        ? m.spawnPoints.map(sp => ({ ...sp }))
+        : getSpawnPointsForMap(editorSize, editorTheme, null);
+    editorProps = (m.props || []).map(p => ({ ...p }));
 
     renderEditorCanvas();
     showNotification(`Loaded custom map "${m.name}" into editor.`, 'info');
@@ -380,15 +499,20 @@ function importCustomMapJSON() {
     const jsonText = prompt("Paste raw custom map JSON data here:");
     if (!jsonText) return;
     try {
-        const m = JSON.parse(jsonText);
+        const parsed = JSON.parse(jsonText);
         const id = 'custom_' + Date.now();
-        m.id = id;
-        savedCustomMaps[id] = m;
+        const validated = sanitizeCustomMapObject(parsed, id);
+        if (!validated) {
+            showNotification("Invalid map JSON: missing or out-of-range theme, size, or heightGrid (1024 finite values required).", "error");
+            return;
+        }
+        validated.id = id;
+        savedCustomMaps[id] = validated;
         try { localStorage.setItem('cnc_custom_maps', JSON.stringify(savedCustomMaps)); } catch (e) {}
         refreshMapDropdowns();
         loadSavedMapsList();
         loadCustomMapIntoEditor(id);
-        showNotification(`Map "${m.name}" imported successfully!`, 'success');
+        showNotification(`Map "${validated.name}" imported successfully!`, 'success');
     } catch (e) {
         showNotification("Invalid map JSON format.", "error");
     }

@@ -344,6 +344,20 @@ function createStructureMeshForFaction(type, faction = 'usa', isEnemy = false) {
 }
 window.createStructureMeshForFaction = createStructureMeshForFaction;
 
+const STRUCTURE_MAX_HEALTH_TABLE = {
+    center: 2500, commandCenter: 2500, fakeCommandCenter: 600,
+    palace: 2000, strategyCenter: 2000, propagandaCenter: 2000, internetCenter: 1800,
+    particleCannon: 2000, nukeSilo: 2000, scudStorm: 2000,
+    factory: 1500, airfield: 1500, supplyCenter: 1500, supplyStash: 1500, blackMarket: 1500,
+    barracks: 1200, power: 1000, nuclearReactor: 1200, supplyDrop: 1000,
+    bunker: 1000, patriot: 1000, gatlingCannon: 1000, stingerSite: 900, speakerTower: 900,
+    tunnel: 900, demoTrap: 300, derrick: 1500
+};
+function getStructureMaxHealth(type) {
+    return STRUCTURE_MAX_HEALTH_TABLE[type] || 1200;
+}
+window.getStructureMaxHealth = getStructureMaxHealth;
+
 function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
     const f = (selectedFaction || 'usa').toLowerCase();
     if (typeof isBuildingAvailableForFaction === 'function' && !isBuildingAvailableForFaction(type, f)) {
@@ -376,8 +390,11 @@ function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
     }
 
 
-    const structMaxHp = (type === 'supplyDrop') ? 1000 : 1200;
-    const structNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence);
+    const structMaxHp = getStructureMaxHealth(type);
+    const isInitialMpCC = Boolean(isMultiplayerActive && instant && (type === 'center' || type === 'commandCenter') && !structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0));
+    const structNetId = isInitialMpCC
+        ? ((isMultiplayerHost ? 'HS_' : 'CS_') + 'CC')
+        : ((isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence));
     const structObj = {
         type: type, mesh: group, position: pos.clone(),
         rotationY: rotationY || 0,
@@ -417,7 +434,7 @@ function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
             }, 100);
     }
 
-    if (isMultiplayerActive && netConn && netConn.open) {
+    if (isMultiplayerActive && netConn && netConn.open && !isInitialMpCC) {
         broadcastNetPacket({
                 type: 'build_structure',
                 structType: type,

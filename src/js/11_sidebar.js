@@ -600,16 +600,19 @@ function updatePauseModalPlayerList() {
             }
 
             const teamLabel = s.team ? `Team ${s.team}` : 'None';
-            const armyLabel = (s.faction || 'USA').toUpperCase();
+            const armyLabel = String(s.faction || 'USA').toUpperCase();
+            const safeName = typeof escapeHtml === 'function' ? escapeHtml(s.name || 'Commander') : String(s.name || 'Commander');
+            const safeArmy = typeof escapeHtml === 'function' ? escapeHtml(armyLabel) : armyLabel;
+            const safeTeam = typeof escapeHtml === 'function' ? escapeHtml(teamLabel) : teamLabel;
             const statusHtml = isAlive ? `<span style="color:#2ed573; font-weight:bold;">Playing</span>` : `<span style="color:#ff4757; font-weight:bold;">Defeated</span>`;
             const nameColor = s.isPlayer ? '#2ed573' : (isFriendly(s, { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) }) ? '#2ed573' : '#ced6e0');
             const armyColor = s.isPlayer ? '#2ed573' : '#ced6e0';
 
             html += `<tr>
             <td style="text-align:center;"><input type="checkbox" style="cursor:pointer;" title="Mute Tactical Audio"></td>
-            <td style="color:${nameColor}; font-weight:bold;">${s.name || 'Commander'}</td>
-            <td style="color:${armyColor}; font-weight:600;">${armyLabel}</td>
-            <td style="color:#a4b0be;">${teamLabel}</td>
+            <td style="color:${nameColor}; font-weight:bold;">${safeName}</td>
+            <td style="color:${armyColor}; font-weight:600;">${safeArmy}</td>
+            <td style="color:#a4b0be;">${safeTeam}</td>
             <td>${statusHtml}</td>
         </tr>`;
     });

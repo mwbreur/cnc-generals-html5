@@ -34,7 +34,7 @@ function processCombatScanning() {
                 const trPos = tr.position || tr.mesh.position;
                 unit.mesh.position.copy(trPos);
                 if (isBuildingGarrison) unit.mesh.position.y += 2.0;
-                if (tr.combatTarget && tr.combatTarget.health > 0) {
+                if (tr.combatTarget && tr.combatTarget.health > 0 && canUnitTarget(unit, tr.combatTarget)) {
                     unit.combatTarget = tr.combatTarget;
                 } else if (!unit.combatTarget || unit.combatTarget.health <= 0) {
                     const rangeBonus = isBuildingGarrison ? 1.5 : 1.0;
@@ -43,6 +43,7 @@ function processCombatScanning() {
                     for (let hi = 0; hi < hostiles.length; hi++) {
                         const h = hostiles[hi];
                         if (!h || h.health <= 0 || isFriendly(unit, h)) continue;
+                        if (!canUnitTarget(unit, h)) continue;
                         const hp = h.position || (h.mesh && h.mesh.position);
                         if (!hp) continue;
                         const d = trPos.distanceTo(hp);
@@ -104,6 +105,7 @@ function processCombatScanning() {
                         const h = hostiles[hi];
                         const hPos = h && (h.position || (h.mesh && h.mesh.position));
                         if (!h || h.health <= 0 || !hPos || isFriendly(unit, h)) continue;
+                        if (h.isStealthed && !h.isDetected) continue;
                         const d = unit.mesh.position.distanceTo(hPos);
                         if (d <= 26) {
                             let score = 100 - d;
@@ -292,8 +294,15 @@ function getArmorCategory(target) {
 function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR_PIERCING') {
     if (!target || target.health <= 0) return;
 
-    // Aircraft Defensive Flare Countermeasures: 40% chance to deflect missile/anti-air damage
-    if (typeof units !== 'undefined' && units.includes(target) && typeof researchedTechs !== 'undefined' && researchedTechs.has('countermeasures') && target.isAir && Math.random() < 0.40) {
+    const isAttackerPlayer = Boolean(attacker && ((typeof units !== 'undefined' && units.includes(attacker)) || (typeof structures !== 'undefined' && structures.includes(attacker))));
+    const isTargetPlayer = Boolean(target && ((typeof units !== 'undefined' && units.includes(target)) || (typeof structures !== 'undefined' && structures.includes(target))));
+
+    // Aircraft Defensive Flare Countermeasures: 40% chance to deflect missile/rocket (EXPLOSIVE) damage only
+    const hasCountermeasures = target.isAir && (
+        (isTargetPlayer && typeof researchedTechs !== 'undefined' && researchedTechs.has('countermeasures')) ||
+        Boolean(target.hasCountermeasures)
+    );
+    if (hasCountermeasures && damageType === 'EXPLOSIVE' && Math.random() < 0.40) {
         if (target.mesh && typeof spawnSmokePuff === 'function') spawnSmokePuff(target.mesh.position, 0xffd700, 0.4);
         return; // Deflected!
     }
@@ -303,16 +312,18 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     ? ARMOR_COEFFICIENTS[cat][damageType]
     : 1.0;
 
+    // Respect 0.0 SAGE armor immunity (e.g., SNIPER vs building/aircraft, FLAME/TOXIN/CRUSH vs aircraft)
+    if (mult <= 0 || baseDamage <= 0) return;
+
     let finalDmg = Math.max(1, Math.round(baseDamage * mult));
 
     // Attacker offensive buffs (USA Strategy Center Bombardment: +20% damage)
-    const isAttackerPlayer = attacker && ((typeof units !== 'undefined' && units.includes(attacker)) || (typeof structures !== 'undefined' && structures.includes(attacker)));
     if (typeof battlePlan !== 'undefined' && battlePlan === 'bombard' && isAttackerPlayer) {
         finalDmg = Math.round(finalDmg * 1.20);
     }
     // China Horde Bonus: 5+ friendly horde units (Red Guard, Battlemaster) within 22m grant +20% damage (+35% with Nationalism)
-    if (attacker && (attacker.type === 'redguard' || attacker.type === 'battlemaster' || attacker.type === 'infantry' || attacker.type === 'tank') && (attacker.faction === 'china' || attacker.isChina || (typeof selectedFaction !== 'undefined' && selectedFaction === 'china' && units.includes(attacker)))) {
-        const friendlies = (typeof units !== 'undefined' && units.includes(attacker)) ? units : (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
+    if (attacker && (attacker.type === 'redguard' || attacker.type === 'battlemaster' || attacker.type === 'infantry' || attacker.type === 'tank') && (attacker.faction === 'china' || attacker.isChina || (typeof selectedFaction !== 'undefined' && selectedFaction === 'china' && isAttackerPlayer))) {
+        const friendlies = isAttackerPlayer ? units : (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
         let hordeCount = 0;
         const aPos = attacker.mesh ? attacker.mesh.position : attacker.position;
         if (aPos) {
@@ -331,7 +342,8 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
             }
         }
         if (hordeCount >= 5) {
-            const hordeFactor = (typeof researchedTechs !== 'undefined' && researchedTechs.has('nationalism')) ? 1.35 : 1.20;
+            const hasNationalism = isAttackerPlayer && typeof researchedTechs !== 'undefined' && researchedTechs.has('nationalism');
+            const hordeFactor = hasNationalism ? 1.35 : 1.20;
             finalDmg = Math.round(finalDmg * hordeFactor);
             attacker.isHordeActive = true;
         } else {
@@ -339,8 +351,8 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         }
     }
 
-    // Additional Tech Munition Buffs (Attacker)
-    if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined') {
+    // Additional Tech Munition Buffs (Attacker — strictly player-owned)
+    if (isAttackerPlayer && typeof researchedTechs !== 'undefined') {
         if (researchedTechs.has('laserMissiles') && ['raptor', 'comanche', 'stealthfighter'].includes(attacker.type)) {
             finalDmg = Math.round(finalDmg * 1.25);
         }
@@ -376,15 +388,14 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     }
 
     // Target defensive upgrade buffs (USA Strategy Center Hold the Line: +20% armor / -20% damage taken)
-    const isTargetPlayer = target && ((typeof units !== 'undefined' && units.includes(target)) || (typeof structures !== 'undefined' && structures.includes(target)));
     if (typeof battlePlan !== 'undefined' && battlePlan === 'hold' && isTargetPlayer) {
         finalDmg = Math.max(1, Math.round(finalDmg * 0.80));
     }
     if (target.salvageLevel >= 2) finalDmg = Math.max(1, Math.round(finalDmg * 0.8)); // GLA Level 2 Scrap Armor
     if (target.compositeArmor) finalDmg = Math.max(1, Math.round(finalDmg * 0.85)); // USA Composite Armor
 
-    // Target Tech Protection Buffs
-    if (typeof researchedTechs !== 'undefined') {
+    // Target Tech Protection Buffs (strictly player-owned)
+    if (isTargetPlayer && typeof researchedTechs !== 'undefined') {
         if (researchedTechs.has('chemicalSuits') && typeof units !== 'undefined' && units.includes(target) && (damageType === 'TOXIN' || damageType === 'RADIATION')) {
             finalDmg = Math.max(1, Math.round(finalDmg * 0.50)); // -50% chemical & radiation damage
         }
@@ -853,26 +864,15 @@ function executeWeaponFireInner(attacker, target) {
                 if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(p);
             }
         };
-        if (typeof spawnCannonShellProjectile === 'function') {
-            spawnCannonShellProjectile(muzzlePos, impactPos, {
-                color: shellColor, coreColor: 0xeaffff,
-                smokeColor: isNeutron ? 0x70f8ff : 0x55efc4,
-                thickness: 1.65 * heroicScale, speed: 2.0, arcHeight: 13.0, trailRate: 0.95, trailSize: 0.38, isHeroic,
-                onImpact: triggerNukeVisuals
-            });
-        } else {
-            spawnBulletTracer(muzzlePos, targetPos, shellColor, 6.5 * heroicScale);
-            triggerNukeVisuals(impactPos);
-        }
-
-        const applyNukeCannonImpact = () => {
+        const applyNukeCannonImpact = (hitPos) => {
+            const center = hitPos || impactPos;
             const allHostileUnits = (attacker.isAI ? units : enemyUnits) || [];
             const allHostileStructs = (attacker.isAI ? structures : enemyStructures) || [];
             if (isNeutron) {
                 // Authentic Neutron Shell: Wipes out all infantry and kills drivers inside all ground vehicles in blast radius!
                 allHostileUnits.forEach(e => {
                         if (e.health <= 0 || !e.mesh || isFriendly(attacker, e)) return;
-                        if (e.mesh.position.distanceTo(impactPos) <= 13.0) {
+                        if (e.mesh.position.distanceTo(center) <= 13.0) {
                             const cat = getArmorCategory(e);
                             if (cat === 'infantry') {
                                 applyCalculatedDamage(attacker, e, 999, 'TOXIN');
@@ -885,37 +885,57 @@ function executeWeaponFireInner(attacker, target) {
                         }
                 });
                 if (target && target.health > 0 && !isFriendly(attacker, target)) {
-                    const tCat = getArmorCategory(target);
-                    if (tCat === 'infantry') {
-                        applyCalculatedDamage(attacker, target, 999, 'TOXIN');
-                    } else if (!target.isAir && tCat !== 'building') {
-                        target.isUnmanned = true;
-                        target.disabledUntil = 999999;
-                        target.combatTarget = null;
+                    const tPos = target.position || (target.mesh && target.mesh.position);
+                    if (!tPos || tPos.distanceTo(center) <= 14.0) {
+                        const tCat = getArmorCategory(target);
+                        if (tCat === 'infantry') {
+                            applyCalculatedDamage(attacker, target, 999, 'TOXIN');
+                        } else if (!target.isAir && tCat !== 'building') {
+                            target.isUnmanned = true;
+                            target.disabledUntil = 999999;
+                            target.combatTarget = null;
+                        }
                     }
                 }
             } else {
                 // AoE Tactical Nuclear Shell Splash across all units & structures within 12 units
                 const hitSet = new Set();
                 allHostileUnits.forEach(e => {
-                        if (e.health > 0 && e.mesh && !isFriendly(attacker, e) && e.mesh.position.distanceTo(impactPos) <= 12.0) {
+                        if (e.health > 0 && e.mesh && !isFriendly(attacker, e) && e.mesh.position.distanceTo(center) <= 12.0) {
                             hitSet.add(e);
                             applyCalculatedDamage(attacker, e, 160, 'EXPLOSIVE');
                         }
                 });
                 allHostileStructs.forEach(s => {
                         const sp = s.position || (s.mesh && s.mesh.position);
-                        if (s.health > 0 && sp && !isFriendly(attacker, s) && sp.distanceTo(impactPos) <= 13.5) {
+                        if (s.health > 0 && sp && !isFriendly(attacker, s) && sp.distanceTo(center) <= 13.5) {
                             hitSet.add(s);
                             applyCalculatedDamage(attacker, s, 180, 'EXPLOSIVE');
                         }
                 });
                 if (target && target.health > 0 && !hitSet.has(target)) {
-                    applyCalculatedDamage(attacker, target, 160, 'EXPLOSIVE');
+                    const tPos = target.position || (target.mesh && target.mesh.position);
+                    if (!tPos || tPos.distanceTo(center) <= 14.0) {
+                        applyCalculatedDamage(attacker, target, 160, 'EXPLOSIVE');
+                    }
                 }
             }
         };
-        applyNukeCannonImpact();
+        const onNukeShellImpact = (hitPos) => {
+            triggerNukeVisuals(hitPos);
+            applyNukeCannonImpact(hitPos);
+        };
+        if (typeof spawnCannonShellProjectile === 'function') {
+            spawnCannonShellProjectile(muzzlePos, impactPos, {
+                color: shellColor, coreColor: 0xeaffff,
+                smokeColor: isNeutron ? 0x70f8ff : 0x55efc4,
+                thickness: 1.65 * heroicScale, speed: 2.0, arcHeight: 13.0, trailRate: 0.95, trailSize: 0.38, isHeroic,
+                onImpact: onNukeShellImpact
+            });
+        } else {
+            spawnBulletTracer(muzzlePos, targetPos, shellColor, 6.5 * heroicScale);
+            onNukeShellImpact(impactPos);
+        }
     } else if (['battlemaster'].includes(attacker.type)) {
         // China 152mm Smoothbore Cannon (uraniumShells applied in applyCalculatedDamage)
         const hasUranium = typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('uraniumShells');
@@ -1140,10 +1160,18 @@ function executeWeaponFireInner(attacker, target) {
         const tArmor = targetArmor;
         if (tArmor === 'building') {
             if ((target.type === 'supplyCenter' || target.type === 'supplyStash') && !attacker.isAI) {
-                playerResources += 1000;
-                if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(targetPos, 1000);
-                if (typeof showNotification === 'function') showNotification('Black Lotus hacked $1,000 from enemy Supply Depot!', 'success');
-                if (typeof updateHUD === 'function') updateHUD();
+                const nowMs = Date.now();
+                const HACK_COOLDOWN_MS = 25000;
+                if (!target._lastLotusHackMs || (nowMs - target._lastLotusHackMs) >= HACK_COOLDOWN_MS) {
+                    target._lastLotusHackMs = nowMs;
+                    playerResources += 1000;
+                    if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(targetPos, 1000);
+                    if (typeof showNotification === 'function') showNotification('Black Lotus hacked $1,000 from enemy Supply Depot!', 'success');
+                    if (typeof updateHUD === 'function') updateHUD();
+                } else {
+                    const remainSec = Math.ceil((HACK_COOLDOWN_MS - (nowMs - target._lastLotusHackMs)) / 1000);
+                    if (typeof showNotification === 'function') showNotification(`Cash Hack recharging on this depot (${remainSec}s)...`, 'info');
+                }
             } else {
                 applyCalculatedDamage(attacker, target, 340, 'EXPLOSIVE');
             }

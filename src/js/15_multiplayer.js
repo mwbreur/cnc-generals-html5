@@ -310,19 +310,33 @@ function refreshLanRooms() {
                 listEl.innerHTML = '<div style="color:#95a5a6; font-style:italic; padding:4px 0;">No hosted games yet on this LAN. Have one player click "Host Match".</div>';
                 return;
             }
+            if (!listEl._boundLanJoinClick) {
+                listEl._boundLanJoinClick = true;
+                listEl.addEventListener('click', (ev) => {
+                    const btn = ev.target && ev.target.closest ? ev.target.closest('button[data-lan-room]') : null;
+                    if (!btn) return;
+                    const roomCode = btn.dataset.lanRoom;
+                    if (roomCode && /^[A-Z0-9-]{1,32}$/.test(roomCode)) {
+                        joinLanRoom(roomCode);
+                    }
+                });
+            }
             let html = '';
             rooms.forEach(rm => {
-                const code = escapeHtml(rm.room || '');
+                const rawCode = String(rm.room || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 32);
+                const code = escapeHtml(rawCode);
                 const fac = escapeHtml(String(rm.hostFaction || 'usa').toUpperCase());
                 const mapName = escapeHtml(String(rm.mapName || 'Tournament Desert'));
-                const open = Boolean(rm.open);
+                const players = Math.max(0, Math.min(8, parseInt(rm.players, 10) || 0));
+                const maxPlayers = Math.max(1, Math.min(8, parseInt(rm.maxPlayers, 10) || 2));
+                const open = Boolean(rm.open) && Boolean(rawCode);
                 const statusBadge = open
-                    ? `<button type="button" class="rts-btn" style="padding:4px 12px; font-size:11px; background:#1f4030; border-color:#55efc4; color:#55efc4;" onclick="joinLanRoom('${code}')">JOIN</button>`
-                    : `<span style="color:#ff9f43; font-size:11px; font-weight:bold;">FULL (${rm.players}/${rm.maxPlayers})</span>`;
+                    ? `<button type="button" class="rts-btn" style="padding:4px 12px; font-size:11px; background:#1f4030; border-color:#55efc4; color:#55efc4;" data-lan-room="${code}">JOIN</button>`
+                    : `<span style="color:#ff9f43; font-size:11px; font-weight:bold;">FULL (${players}/${maxPlayers})</span>`;
                 html += `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; background:rgba(12,20,16,0.9); border:1px solid #2b4436; padding:6px 10px; border-radius:3px; margin-bottom:5px;">
                     <div>
                         <div style="color:#55efc4; font-family:monospace; font-weight:bold; font-size:13px;">${code} <span style="color:#f1c40f; font-family:sans-serif; font-size:11px;">(${fac})</span></div>
-                        <div style="color:#b2bec3; font-size:11px;">Map: ${mapName} &bull; Players: ${rm.players}/${rm.maxPlayers}</div>
+                        <div style="color:#b2bec3; font-size:11px;">Map: ${mapName} &bull; Players: ${players}/${maxPlayers}</div>
                     </div>
                     <div>${statusBadge}</div>
                 </div>`;
@@ -594,17 +608,80 @@ function setupNetDataConnection(conn) {
     });
 }
 
+const MP_ALLOWED_UNIT_TYPES = new Set([
+    'dozer', 'worker', 'chinook', 'truck', 'ranger', 'infantry', 'redguard', 'rebel',
+    'rocket', 'missiledefender', 'rpg', 'tankhunter', 'pathfinder', 'jarmen', 'burton',
+    'blacklotus', 'hacker', 'hijacker', 'terrorist', 'mob', 'pilot', 'humvee', 'ambulance',
+    'crusader', 'paladin', 'tomahawk', 'tank', 'battlemaster', 'gatling', 'dragon', 'dragonTank',
+    'overlord', 'inferno', 'nukecannon', 'nuketank', 'crawler', 'technical', 'scorpion', 'marauder',
+    'quad', 'buggy', 'toxintractor', 'bombtruck', 'radarvan', 'scud', 'battlebus',
+    'comanche', 'raptor', 'aurora', 'stealthfighter', 'mig', 'helix', 'drone_scout'
+]);
+const MP_ALLOWED_STRUCT_TYPES = new Set([
+    'center', 'commandCenter', 'fakeCommandCenter', 'power', 'nuclearReactor', 'barracks',
+    'factory', 'airfield', 'supplyCenter', 'supplyStash', 'supplyDrop', 'bunker', 'patriot',
+    'gatlingCannon', 'speakerTower', 'stingerSite', 'palace', 'scudStorm', 'particleCannon',
+    'nukeSilo', 'strategyCenter', 'detentionCamp', 'internetCenter', 'propagandaCenter',
+    'blackMarket', 'tunnel', 'demoTrap'
+]);
+
+function sanitizeMpSlots(rawSlots) {
+    if (!Array.isArray(rawSlots) || rawSlots.length === 0 || rawSlots.length > 8) return null;
+    const clean = [];
+    for (let i = 0; i < rawSlots.length; i++) {
+        const s = rawSlots[i];
+        if (!s || typeof s !== 'object') return null;
+        const fac = (typeof s.faction === 'string' && MP_ALLOWED_FACTIONS.has(s.faction.toLowerCase()))
+            ? s.faction.toLowerCase()
+            : 'usa';
+        const team = Number.isInteger(s.team) && s.team >= 1 && s.team <= 4 ? s.team : ((i % 2) + 1);
+        const spawnId = Number.isInteger(s.spawnId) && s.spawnId >= 1 && s.spawnId <= 8 ? s.spawnId : (i + 1);
+        const name = (typeof s.name === 'string' ? s.name.trim() : `Commander ${i + 1}`).slice(0, 48) || `Commander ${i + 1}`;
+        clean.push({
+            id: Number.isInteger(s.id) ? s.id : (i + 1),
+            name,
+            faction: fac,
+            team,
+            spawnId,
+            active: Boolean(s.active),
+            isHost: Boolean(s.isHost),
+            isHuman: Boolean(s.isHuman),
+            color: (typeof s.color === 'string' && /^[a-z0-9#_-]{1,20}$/i.test(s.color)) ? s.color : (i === 0 ? 'blue' : 'red'),
+            difficulty: (typeof s.difficulty === 'string' && ['easy', 'medium', 'hard'].includes(s.difficulty)) ? s.difficulty : 'medium'
+        });
+    }
+    return clean;
+}
+
+function getAuthenticatedPeerSlot() {
+    if (!Array.isArray(mpSlots)) return null;
+    return mpSlots.find(s => s && s.active && (isMultiplayerHost ? (!s.isHost && s.isHuman) : s.isHost)) || null;
+}
+
+function clampMpWorldPos(pos) {
+    const half = (typeof currentMapSize === 'number' && currentMapSize > 0 ? currentMapSize : 1500) * 0.49;
+    return new THREE.Vector3(
+        Math.max(-half, Math.min(half, Number(pos.x) || 0)),
+        Math.max(-20, Math.min(80, Number(pos.y) || 0)),
+        Math.max(-half, Math.min(half, Number(pos.z) || 0))
+    );
+}
+
 function renderClientSlotsList(slots) {
     const el = document.getElementById('mp-client-slots-list');
-    if (!el) return;
+    if (!el || !Array.isArray(slots)) return;
     let html = '';
-    slots.filter(s => s.active).forEach(s => {
-            const teamPillClass = `team-${s.team}`;
+    slots.filter(s => s && s.active).forEach(s => {
+            const teamNum = Math.max(1, Math.min(4, parseInt(s.team, 10) || 1));
+            const teamPillClass = `team-${teamNum}`;
+            const safeName = escapeHtml(String(s.name || 'Commander'));
+            const safeFaction = escapeHtml(String(s.faction || 'usa').toUpperCase());
+            const safeSpawn = escapeHtml(String(s.spawnId || 1));
             html += `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(20,28,22,0.8); border:1px solid #2e3d31; padding:5px 8px; border-radius:3px; margin-bottom:4px; font-size:11px;">
-                <span><strong>${escapeHtml(s.name)}</strong> (${s.faction.toUpperCase()})</span>
+                <span><strong>${safeName}</strong> (${safeFaction})</span>
                 <div>
-                    <span class="team-pill ${teamPillClass}">Team ${s.team}</span>
-                    <span style="color:#55efc4; margin-left:6px;">Spawn ${s.spawnId}</span>
+                    <span class="team-pill ${teamPillClass}">Team ${teamNum}</span>
+                    <span style="color:#55efc4; margin-left:6px;">Spawn ${safeSpawn}</span>
                 </div>
             </div>`;
     });
@@ -669,30 +746,35 @@ function handleNetworkPacket(packet) {
         if (packet.seq > _mpLastRxSeq) _mpLastRxSeq = packet.seq;
     }
 
+    try {
     if (packet.type === 'handshake') {
         mpOpponentFaction = packet.clientFaction || 'china';
         if (mpSlots[1]) mpSlots[1].faction = mpOpponentFaction;
         const statusEl = document.getElementById('mp-host-status');
         if (statusEl) {
-            statusEl.innerHTML = `🟢 <strong>CHALLENGER CONNECTED!</strong> (Opponent: ${mpOpponentFaction.toUpperCase()}). Ready to launch.`;
+            statusEl.innerHTML = `🟢 <strong>CHALLENGER CONNECTED!</strong> (Opponent: ${escapeHtml(String(mpOpponentFaction).toUpperCase())}). Ready to launch.`;
         }
         syncMpLobbyToPeer();
     }
     else if (packet.type === 'lobby_sync') {
         // Client receives live room configuration from Host
-        if (packet.slots) {
-            mpSlots = packet.slots;
-            if (packet.mapEnv) {
+        const cleanSlots = sanitizeMpSlots(packet.slots);
+        if (cleanSlots) {
+            mpSlots = cleanSlots;
+            if (typeof packet.mapEnv === 'string') {
                 const sel = document.getElementById('mp-map-env');
                 if (sel) sel.value = packet.mapEnv;
             }
-            if (packet.mapSize) {
+            if (Number.isFinite(packet.mapSize)) {
                 const sel = document.getElementById('mp-map-size');
                 if (sel) sel.value = String(packet.mapSize);
             }
-            if (packet.customMapData) {
-                activeCustomMap = packet.customMapData;
-                savedCustomMaps[packet.customMapData.id] = packet.customMapData;
+            if (packet.customMapData && typeof sanitizeCustomMapObject === 'function') {
+                const validCustom = sanitizeCustomMapObject(packet.customMapData, packet.customMapData.id);
+                if (validCustom) {
+                    activeCustomMap = validCustom;
+                    savedCustomMaps[validCustom.id] = validCustom;
+                }
             }
             const clientView = document.getElementById('mp-client-view');
             if (clientView) clientView.style.display = 'block';
@@ -702,15 +784,21 @@ function handleNetworkPacket(packet) {
     }
     else if (packet.type === 'start_battle') {
         // Client receives launch packet from host
-        startMultiplayerMatch(false, packet);
+        const cleanSlots = sanitizeMpSlots(packet.slots);
+        if (!cleanSlots) return false;
+        const safeConfig = Object.assign({}, packet, { slots: cleanSlots });
+        startMultiplayerMatch(false, safeConfig);
     }
     else if (packet.type === 'move_units') {
-        // Remote peer ordered movement
+        // Remote peer ordered movement (restricted to remote human peer's own units; bounds clamped; stale waypoints cleared)
         const ids = new Set(packet.unitNetIds || []);
-        const targetPos = new THREE.Vector3(packet.targetPos.x, packet.targetPos.y, packet.targetPos.z);
+        const targetPos = clampMpWorldPos(packet.targetPos);
+        const peerSlot = getAuthenticatedPeerSlot();
+        const peerTeamId = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
         enemyUnits.forEach(enemy => {
-                if (ids.has(enemy.netId)) {
+                if (ids.has(enemy.netId) && !enemy.isAI && enemy.teamId === peerTeamId) {
                     enemy.targetPosition.copy(targetPos);
+                    enemy.waypoints = [];
                     enemy.combatTarget = null;
                     if (enemy.isAir) {
                         enemy.airState = 'flying';
@@ -722,13 +810,15 @@ function handleNetworkPacket(packet) {
     }
     else if (packet.type === 'attack_target') {
         const ids = new Set(packet.unitNetIds || []);
+        const peerSlot = getAuthenticatedPeerSlot();
+        const peerTeamId = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
         const localTarget = units.find(u => u.netId === packet.targetNetId) ||
         structures.find(s => s.netId === packet.targetNetId) ||
         enemyUnits.find(eu => eu.netId === packet.targetNetId) ||
         enemyStructures.find(es => es.netId === packet.targetNetId);
         if (localTarget) {
             enemyUnits.forEach(enemy => {
-                    if (ids.has(enemy.netId)) {
+                    if (ids.has(enemy.netId) && !enemy.isAI && enemy.teamId === peerTeamId) {
                         enemy.combatTarget = localTarget;
                     }
             });
@@ -745,20 +835,32 @@ function handleNetworkPacket(packet) {
         if (badge) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
     }
     else if (packet.type === 'spawn_unit') {
-        const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
-        const spawnTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
+        if (!MP_ALLOWED_UNIT_TYPES.has(packet.unitType)) return false;
+        if (enemyUnits.some(u => u && u.netId === packet.netId) || units.some(u => u && u.netId === packet.netId)) return false;
+        if (enemyUnits.length >= 250) return false;
+        const pos = clampMpWorldPos(packet.position);
+        const peerSlot = getAuthenticatedPeerSlot();
+        const spawnTeam = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
+        const peerFaction = (peerSlot && peerSlot.faction && peerSlot.faction !== 'random') ? peerSlot.faction : (isMultiplayerHost ? mpOpponentFaction : 'usa');
         const isAlly = (spawnTeam === playerTeamId);
-        const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId, packet.faction);
-        unit.teamId = spawnTeam;
-        unit.ownerId = isAlly ? 'ally' : 'challenger';
-        unit.isAI = false;
-        if (packet.faction) unit.faction = packet.faction;
+        const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId, peerFaction);
+        if (unit) {
+            unit.teamId = spawnTeam;
+            unit.ownerId = isAlly ? 'ally' : 'challenger';
+            unit.isAI = false;
+            unit.faction = peerFaction;
+        }
     }
     else if (packet.type === 'build_structure') {
-        const pos = new THREE.Vector3(packet.position.x, packet.position.y, packet.position.z);
-        const structTeam = packet.teamId !== undefined ? packet.teamId : (isMultiplayerHost ? 2 : 1);
+        if (!MP_ALLOWED_STRUCT_TYPES.has(packet.structType)) return false;
+        if (enemyStructures.some(s => s && s.netId === packet.netId) || structures.some(s => s && s.netId === packet.netId)) return false;
+        if (enemyStructures.length >= 120) return false;
+        const pos = clampMpWorldPos(packet.position);
+        const peerSlot = getAuthenticatedPeerSlot();
+        const structTeam = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
         const isAlly = (structTeam === playerTeamId);
-        const foeFaction = packet.faction || (isMultiplayerHost ? mpOpponentFaction : 'usa');
+        const foeFaction = (peerSlot && peerSlot.faction && peerSlot.faction !== 'random') ? peerSlot.faction : (isMultiplayerHost ? mpOpponentFaction : 'usa');
+        const structMaxHp = (typeof getStructureMaxHealth === 'function') ? getStructureMaxHealth(packet.structType) : 1200;
         const group = (typeof createStructureMeshForFaction === 'function')
         ? createStructureMeshForFaction(packet.structType, foeFaction, true)
         : createChinaWarFactory();
@@ -766,15 +868,15 @@ function handleNetworkPacket(packet) {
             group.scale.set(1.35, 1.35, 1.35);
         }
         group.position.copy(pos);
-        if (packet.position && packet.position.rotationY) group.rotation.y = packet.position.rotationY;
+        if (packet.position && Number.isFinite(packet.position.rotationY)) group.rotation.y = packet.position.rotationY;
         scene.add(group);
         enemyStructures.push({
                 type: packet.structType,
                 faction: foeFaction,
                 position: pos,
                 mesh: group,
-                health: 1200,
-                maxHealth: 1200,
+                health: structMaxHp,
+                maxHealth: structMaxHp,
                 radius: (typeof getStructureFootprint === 'function') ? getStructureFootprint(packet.structType).radius : 8,
                 buildProgress: 100,
                 isBuilding: false,
@@ -790,23 +892,32 @@ function handleNetworkPacket(packet) {
         enemyUnits.find(eu => eu.netId === packet.targetNetId) ||
         enemyStructures.find(es => es.netId === packet.targetNetId);
         if (target) {
-            target.health = packet.remainingHealth;
+            const maxHp = target.maxHealth || 10000;
+            target.health = Math.max(0, Math.min(maxHp, packet.remainingHealth));
         }
     }
     else if (packet.type === 'state_sync' && !isMultiplayerHost) {
+        const halfMap = (typeof currentMapSize === 'number' && currentMapSize > 0 ? currentMapSize : 1500) * 0.5;
         const seenUnitIds = new Set();
         const unitMap = new Map();
         const localSet = new Set();
         for (let i = 0; i < units.length; i++) if (units[i].netId) { unitMap.set(units[i].netId, units[i]); localSet.add(units[i]); }
         for (let i = 0; i < enemyUnits.length; i++) if (enemyUnits[i].netId) unitMap.set(enemyUnits[i].netId, enemyUnits[i]);
         if (Array.isArray(packet.u)) {
-            for (let i = 0; i < packet.u.length; i++) {
-                const [nid, x, z, ry, hp] = packet.u[i];
+            const uLim = Math.min(packet.u.length, 400);
+            for (let i = 0; i < uLim; i++) {
+                const row = packet.u[i];
+                if (!Array.isArray(row) || row.length < 5) continue;
+                const [nid, rawX, rawZ, rawRy, rawHp] = row;
+                if (typeof nid !== 'string' || !Number.isFinite(rawX) || !Number.isFinite(rawZ) || !Number.isFinite(rawRy) || !Number.isFinite(rawHp)) continue;
+                const x = Math.max(-halfMap, Math.min(halfMap, rawX));
+                const z = Math.max(-halfMap, Math.min(halfMap, rawZ));
+                const ry = rawRy;
                 seenUnitIds.add(nid);
                 const ent = unitMap.get(nid);
                 if (ent) {
                     ent._mpSeenOnce = true;
-                    ent.health = hp;
+                    ent.health = Math.max(0, Math.min(ent.maxHealth || 10000, rawHp));
                     if (ent.mesh) {
                         const drift = Math.hypot(x - ent.mesh.position.x, z - ent.mesh.position.z);
                         // Avoid rubber-banding local player units unless drift exceeds 2.5 units
@@ -830,13 +941,17 @@ function handleNetworkPacket(packet) {
             const structMap = new Map();
             for (let i = 0; i < structures.length; i++) if (structures[i].netId) structMap.set(structures[i].netId, structures[i]);
             for (let i = 0; i < enemyStructures.length; i++) if (enemyStructures[i].netId) structMap.set(enemyStructures[i].netId, enemyStructures[i]);
-            for (let i = 0; i < packet.s.length; i++) {
-                const [nid, hp] = packet.s[i];
+            const sLim = Math.min(packet.s.length, 250);
+            for (let i = 0; i < sLim; i++) {
+                const row = packet.s[i];
+                if (!Array.isArray(row) || row.length < 2) continue;
+                const [nid, rawHp] = row;
+                if (typeof nid !== 'string' || !Number.isFinite(rawHp)) continue;
                 seenStructIds.add(nid);
                 const st = structMap.get(nid);
                 if (st) {
                     st._mpSeenOnce = true;
-                    st.health = hp;
+                    st.health = Math.max(0, Math.min(st.maxHealth || 10000, rawHp));
                 }
             }
             structMap.forEach((st, nid) => {
@@ -848,6 +963,10 @@ function handleNetworkPacket(packet) {
     }
     else if (packet.type === 'chat') {
         addMpChatMessage(packet.sender, packet.text);
+    }
+    } catch (err) {
+        console.warn('Error handling multiplayer packet:', err);
+        return false;
     }
 }
 
@@ -913,7 +1032,7 @@ function startMultiplayerMatch(isHost, config) {
     const badge = document.getElementById('mp-status-badge');
     if (badge) {
         badge.style.display = 'block';
-        badge.innerHTML = `🟢 P2P WEBRTC ONLINE | ROOM: ${currentRoomCode} | TEAM ${playerTeamId} (${isHost ? 'HOST' : 'CLIENT'})`;
+        badge.innerHTML = `🟢 P2P WEBRTC ONLINE | ROOM: ${escapeHtml(currentRoomCode)} | TEAM ${escapeHtml(String(playerTeamId))} (${isHost ? 'HOST' : 'CLIENT'})`;
     }
 
     const chatContainer = document.getElementById('mp-chat-container');
@@ -986,10 +1105,11 @@ function addMpChatMessage(sender, text) {
     const box = document.getElementById('mp-chat-messages');
     if (!box) return;
     const msg = document.createElement('div');
-    const isSys = sender === 'SYSTEM';
-    const isHst = sender.toLowerCase().includes('host');
+    const safeSenderStr = String(sender ?? 'Commander');
+    const isSys = safeSenderStr === 'SYSTEM';
+    const isHst = safeSenderStr.toLowerCase().includes('host');
     msg.className = 'mp-chat-msg ' + (isSys ? 'system' : isHst ? 'host' : 'challenger');
-    msg.innerHTML = `<strong>[${sender}]:</strong> ${escapeHtml(text)}`;
+    msg.innerHTML = `<strong>[${escapeHtml(safeSenderStr)}]:</strong> ${escapeHtml(text)}`;
     box.appendChild(msg);
     box.scrollTop = box.scrollHeight;
 
