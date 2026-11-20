@@ -2586,6 +2586,9 @@ function animate() {
     if (enemyUnits.some(e => e.health <= 0)) {
         enemyUnits = enemyUnits.filter(enemy => {
                 if (enemy.health > 0) return true;
+                if (enemy.garrisoned && enemy.garrisoned.length > 0 && typeof evacuateGarrisonedUnits === 'function') {
+                    evacuateGarrisonedUnits(enemy);
+                }
                 scene.remove(enemy.mesh);
                 spawnUnitDeathFX(enemy);
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
@@ -2593,8 +2596,12 @@ function animate() {
                 if (scrapRoll < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
                 }
-                units.forEach((unit, idx) => {
+                units.forEach((unit) => {
                         if (unit.combatTarget === enemy) unit.combatTarget = null;
+                        if (unit.embarkTarget === enemy) unit.embarkTarget = null;
+                });
+                enemyUnits.forEach((eu) => {
+                        if (eu.embarkTarget === enemy) eu.embarkTarget = null;
                 });
                 return false;
         });
@@ -2700,6 +2707,9 @@ function animate() {
         const pendingPilotEjects = [];
         units = units.filter(unit => {
                 if (unit.health > 0) return true;
+                if (unit.garrisoned && unit.garrisoned.length > 0 && typeof evacuateGarrisonedUnits === 'function') {
+                    evacuateGarrisonedUnits(unit);
+                }
                 removeSelectionCircle(unit);
                 if (unit.drone && unit.drone.mesh) {
                     scene.remove(unit.drone.mesh);
@@ -2736,6 +2746,10 @@ function animate() {
                 }
                 enemyUnits.forEach(enemy => {
                         if (enemy.combatTarget === unit) enemy.combatTarget = null;
+                });
+                units.forEach(other => {
+                        if (other.embarkTarget === unit) other.embarkTarget = null;
+                        if (other.pilotTarget === unit) other.pilotTarget = null;
                 });
                 return false;
         });
@@ -3245,17 +3259,26 @@ function updateStealthAndDetection() {
     const allUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined') ? [...units, ...enemyUnits] : [];
     const allStructs = (typeof structures !== 'undefined' && typeof enemyStructures !== 'undefined') ? [...structures, ...enemyStructures] : [];
 
-    // 1. Update natural cloak / uncloak state for stealth units
+    // 1. Update natural cloak / uncloak state for stealth units + GPS Scrambler timed cloak
+    const nowStealthMs = Date.now();
     for (let i = 0; i < allUnits.length; i++) {
         const u = allUnits[i];
         if (!u || u.health <= 0) continue;
         const hasComancheStealth = u.type === 'comanche' && !u.isAI && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche');
         const isStationaryStealth = STATIONARY_STEALTH_UNITS.has(u.type) || hasComancheStealth;
         const isAlwaysStealth = ALWAYS_STEALTH_UNITS.has(u.type);
-        if (!isStationaryStealth && !isAlwaysStealth) continue;
+        const hasGpsCloak = !!(u.gpsCloakUntil && u.gpsCloakUntil > nowStealthMs);
+        if (u.gpsCloakUntil && u.gpsCloakUntil <= nowStealthMs) {
+            u.gpsCloakUntil = 0;
+            if (!isStationaryStealth && !isAlwaysStealth) {
+                u.isStealthed = false;
+                if (u.mesh) setMeshStealthOpacity(u.mesh, false, animTime);
+            }
+        }
+        if (!isStationaryStealth && !isAlwaysStealth && !hasGpsCloak) continue;
 
         const isRevealed = (u.revealedUntil && u.revealedUntil > buildingTick);
-        if (isAlwaysStealth) {
+        if (isAlwaysStealth || hasGpsCloak) {
             u.isStealthed = !isRevealed;
         } else {
             const isMoving = u.taskState === 'Moving' || (u.waypoints && u.waypoints.length > 0);

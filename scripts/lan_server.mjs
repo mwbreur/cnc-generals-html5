@@ -84,20 +84,25 @@ function sendWsJson(client, obj) {
     }
 }
 
-// Room registry: roomCode -> { host: client, guest: client | null }
+// Room registry: roomCode -> { host: client, guest: client | null, ... }
 const rooms = new Map();
+const activeWsClients = new Set();
+const MAX_WS_CLIENTS = 64;
+const WS_IDLE_TIMEOUT_MS = 180000;
+const ROOM_CODE_RE = /^[A-Z0-9-]{1,32}$/;
 
-function detachClient(client) {
-    if (client.closed) return;
-    client.closed = true;
+function leaveCurrentRoom(client) {
     const roomCode = client.roomCode;
     if (!roomCode) return;
+    client.roomCode = null;
+    client.role = null;
     const room = rooms.get(roomCode);
     if (!room) return;
     if (room.host === client) {
         if (room.guest && !room.guest.closed) {
             sendWsJson(room.guest, { _lan: 'peer_disconnected', reason: 'host_left' });
             room.guest.roomCode = null;
+            room.guest.role = null;
         }
         rooms.delete(roomCode);
     } else if (room.guest === client) {
@@ -106,6 +111,13 @@ function detachClient(client) {
             sendWsJson(room.host, { _lan: 'peer_disconnected', reason: 'guest_left' });
         }
     }
+}
+
+function detachClient(client) {
+    if (client.closed) return;
+    client.closed = true;
+    activeWsClients.delete(client);
+    leaveCurrentRoom(client);
 }
 
 function handleWsMessage(client, text) {
@@ -119,9 +131,14 @@ function handleWsMessage(client, text) {
 
     if (msg._lan === 'host') {
         const roomCode = String(msg.room || '').trim().toUpperCase();
-        if (!roomCode || roomCode.length > 32) {
-            sendWsJson(client, { _lan: 'error', message: 'Invalid room code.' });
+        if (!ROOM_CODE_RE.test(roomCode)) {
+            sendWsJson(client, { _lan: 'error', message: 'Invalid room code (use A-Z, 0-9, -).' });
             return;
+        }
+        leaveCurrentRoom(client);
+        // Sweep any dead rooms before checking cap
+        for (const [k, r] of rooms.entries()) {
+            if (!r.host || r.host.closed) rooms.delete(k);
         }
         if (rooms.has(roomCode)) {
             sendWsJson(client, { _lan: 'error', code: 'unavailable-id', message: 'Room code already in use.' });
@@ -155,6 +172,11 @@ function handleWsMessage(client, text) {
 
     if (msg._lan === 'join') {
         const roomCode = String(msg.room || '').trim().toUpperCase();
+        if (!ROOM_CODE_RE.test(roomCode)) {
+            sendWsJson(client, { _lan: 'error', message: 'Invalid room code.' });
+            return;
+        }
+        leaveCurrentRoom(client);
         const room = rooms.get(roomCode);
         if (!room || !room.host || room.host.closed) {
             sendWsJson(client, { _lan: 'error', message: `Room ${roomCode} not found on LAN server.` });
@@ -183,17 +205,30 @@ function handleWsMessage(client, text) {
 }
 
 function attachWebSocket(socket) {
+    if (activeWsClients.size >= MAX_WS_CLIENTS) {
+        socket.destroy();
+        return;
+    }
     const client = {
         socket,
         roomCode: null,
         role: null,
         closed: false,
+        lastActivity: Date.now(),
         buf: Buffer.alloc(0),
         fragChunks: [],
+        fragBytes: 0,
         fragOpcode: 0
     };
+    activeWsClients.add(client);
 
     socket.on('data', (chunk) => {
+        client.lastActivity = Date.now();
+        if (client.buf.length + chunk.length > MAX_WS_PAYLOAD + 1024) {
+            socket.destroy();
+            detachClient(client);
+            return;
+        }
         client.buf = Buffer.concat([client.buf, chunk]);
         while (client.buf.length >= 2) {
             const b0 = client.buf[0];
@@ -201,6 +236,13 @@ function attachWebSocket(socket) {
             const fin = (b0 & 0x80) !== 0;
             const opcode = b0 & 0x0f;
             const masked = (b1 & 0x80) !== 0;
+            // RFC 6455 §5.1: client-to-server frames MUST be masked
+            if (!masked) {
+                try { socket.write(encodeWsFrame(Buffer.alloc(0), 0x8)); } catch (_) {}
+                socket.destroy();
+                detachClient(client);
+                return;
+            }
             let payloadLen = b1 & 0x7f;
             let offset = 2;
 
@@ -213,6 +255,7 @@ function attachWebSocket(socket) {
                 const bigLen = client.buf.readBigUInt64BE(2);
                 if (bigLen > BigInt(MAX_WS_PAYLOAD)) {
                     socket.destroy();
+                    detachClient(client);
                     return;
                 }
                 payloadLen = Number(bigLen);
@@ -221,43 +264,53 @@ function attachWebSocket(socket) {
 
             if (payloadLen > MAX_WS_PAYLOAD) {
                 socket.destroy();
+                detachClient(client);
                 return;
             }
 
-            const maskLen = masked ? 4 : 0;
-            if (client.buf.length < offset + maskLen + payloadLen) return;
+            if (client.buf.length < offset + 4 + payloadLen) return;
 
-            const maskKey = masked ? client.buf.subarray(offset, offset + 4) : null;
-            const payload = Buffer.from(client.buf.subarray(offset + maskLen, offset + maskLen + payloadLen));
-            client.buf = client.buf.subarray(offset + maskLen + payloadLen);
+            const maskKey = client.buf.subarray(offset, offset + 4);
+            const payload = Buffer.from(client.buf.subarray(offset + 4, offset + 4 + payloadLen));
+            client.buf = client.buf.subarray(offset + 4 + payloadLen);
 
-            if (masked && maskKey) {
-                for (let i = 0; i < payload.length; i++) {
-                    payload[i] ^= maskKey[i & 3];
-                }
+            for (let i = 0; i < payload.length; i++) {
+                payload[i] ^= maskKey[i & 3];
             }
 
             if (opcode === 0x8) {
-                // Close frame
                 try { socket.write(encodeWsFrame(Buffer.alloc(0), 0x8)); } catch (_) {}
                 socket.end();
                 detachClient(client);
                 return;
             } else if (opcode === 0x9) {
-                // Ping -> Pong
                 try { socket.write(encodeWsFrame(payload, 0xA)); } catch (_) {}
             } else if (opcode === 0xA) {
                 // Pong
             } else if (opcode === 0x1 || opcode === 0x0) {
+                if (opcode === 0x0 && client.fragOpcode !== 0x1) {
+                    // Stray continuation frame — protocol error
+                    socket.destroy();
+                    detachClient(client);
+                    return;
+                }
                 if (opcode === 0x1) {
                     client.fragChunks = [payload];
+                    client.fragBytes = payload.length;
                     client.fragOpcode = 0x1;
                 } else {
+                    client.fragBytes += payload.length;
+                    if (client.fragBytes > MAX_WS_PAYLOAD) {
+                        socket.destroy();
+                        detachClient(client);
+                        return;
+                    }
                     client.fragChunks.push(payload);
                 }
                 if (fin && client.fragOpcode === 0x1) {
                     const full = Buffer.concat(client.fragChunks).toString('utf8');
                     client.fragChunks = [];
+                    client.fragBytes = 0;
                     client.fragOpcode = 0;
                     handleWsMessage(client, full);
                 }
@@ -269,10 +322,62 @@ function attachWebSocket(socket) {
     socket.on('error', () => detachClient(client));
 }
 
-// 3. HTTP static file server + /api/lan-status discovery endpoint
+// Heartbeat & idle timeout sweep (every 30s)
+setInterval(() => {
+    const now = Date.now();
+    for (const client of activeWsClients) {
+        if (client.closed || !client.socket || client.socket.destroyed) {
+            detachClient(client);
+            continue;
+        }
+        if (now - client.lastActivity > WS_IDLE_TIMEOUT_MS) {
+            try { client.socket.destroy(); } catch (_) {}
+            detachClient(client);
+            continue;
+        }
+        try { client.socket.write(encodeWsFrame(Buffer.alloc(0), 0x9)); } catch (_) { detachClient(client); }
+    }
+}, 30000).unref();
+
+// Strictly whitelist servable paths (never expose .git, scripts, tools, package.json, etc.)
+const ALLOWED_STATIC_PREFIXES = ['/assets/data/', '/src/audio/', '/src/vendor/'];
+function isAllowedStaticPath(reqPath) {
+    if (reqPath === '/index.html') return true;
+    return ALLOWED_STATIC_PREFIXES.some(p => reqPath.startsWith(p));
+}
+
+function isAllowedWsOrigin(req) {
+    const origin = req.headers.origin;
+    if (!origin) return true; // Non-browser / direct LAN WS clients
+    try {
+        const oUrl = new URL(origin);
+        const hostHeader = String(req.headers.host || '').toLowerCase();
+        if (hostHeader && oUrl.host.toLowerCase() === hostHeader) return true;
+        const h = oUrl.hostname.toLowerCase();
+        if (h === 'localhost' || h === '127.0.0.1' || h === '::1') return true;
+        return false;
+    } catch (_) {
+        return false;
+    }
+}
+
+// 3. HTTP static file server + /api/lan-status & /api/lan-rooms discovery endpoints
 const server = http.createServer((req, res) => {
-    const urlObj = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-    let reqPath = decodeURIComponent(urlObj.pathname);
+    let reqPath;
+    try {
+        const safeHost = (req.headers.host && /^[a-zA-Z0-9.:\[\]-]+$/.test(req.headers.host)) ? req.headers.host : 'localhost';
+        const urlObj = new URL(req.url || '/', `http://${safeHost}`);
+        reqPath = decodeURIComponent(urlObj.pathname);
+    } catch (_) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Bad Request');
+        return;
+    }
+    if (reqPath.includes('\0')) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Bad Request');
+        return;
+    }
 
     if (reqPath === '/api/lan-status') {
         res.writeHead(200, {
@@ -306,9 +411,16 @@ const server = http.createServer((req, res) => {
     }
 
     if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
-    const filePath = path.resolve(rootDir, '.' + reqPath);
-    if (!filePath.startsWith(rootDir)) {
-        res.writeHead(403);
+    const normalizedPath = path.posix.normalize(reqPath);
+    if (!isAllowedStaticPath(normalizedPath)) {
+        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Forbidden');
+        return;
+    }
+    const filePath = path.resolve(rootDir, '.' + normalizedPath);
+    const rootPrefix = rootDir.endsWith(path.sep) ? rootDir : (rootDir + path.sep);
+    if (filePath !== rootDir && !filePath.startsWith(rootPrefix)) {
+        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('Forbidden');
         return;
     }
@@ -328,13 +440,26 @@ const server = http.createServer((req, res) => {
             headers['Cache-Control'] = 'public, max-age=3600';
         }
         res.writeHead(200, headers);
-        fs.createReadStream(filePath).pipe(res);
+        const stream = fs.createReadStream(filePath);
+        stream.on('error', () => {
+            if (!res.headersSent) res.writeHead(500);
+            res.end();
+        });
+        stream.pipe(res);
     });
 });
 
 server.on('upgrade', (req, socket) => {
-    const urlObj = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-    if (urlObj.pathname !== '/lan-ws') {
+    let pathname = '';
+    try {
+        const safeHost = (req.headers.host && /^[a-zA-Z0-9.:\[\]-]+$/.test(req.headers.host)) ? req.headers.host : 'localhost';
+        pathname = new URL(req.url || '/', `http://${safeHost}`).pathname;
+    } catch (_) {
+        socket.destroy();
+        return;
+    }
+    if (pathname !== '/lan-ws' || !isAllowedWsOrigin(req)) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
         socket.destroy();
         return;
     }

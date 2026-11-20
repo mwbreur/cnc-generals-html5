@@ -364,7 +364,8 @@ function registerFlattenedFootprint(cx, cz, radius, targetY) {
 window.registerFlattenedFootprint = registerFlattenedFootprint;
 
 function getTerrainHeight(x, z) {
-    // PERF: AABB + squared-distance reject avoids Math.hypot for distant footprints
+    // Compose overlapping flattened footprints in exact registration order (1:1 parity with registerFlattenedFootprint!)
+    let h = getRawTerrainHeight(x, z);
     for (let i = 0; i < flattenedFootprints.length; i++) {
         const fp = flattenedFootprints[i];
         const r = fp.radius;
@@ -375,15 +376,14 @@ function getTerrainHeight(x, z) {
         if (dz > outerR || dz < -outerR) continue;
         const d2 = dx * dx + dz * dz;
         if (d2 <= r * r) {
-            return fp.targetY;
+            h = fp.targetY;
         } else if (d2 < outerR * outerR) {
             const dist = Math.sqrt(d2);
             const t = (dist - r) / (r * 0.35);
-            const rawH = getRawTerrainHeight(x, z);
-            return fp.targetY * (1 - t) + rawH * t;
+            h = fp.targetY * (1 - t) + h * t;
         }
     }
-    return getRawTerrainHeight(x, z);
+    return h;
 }
 
 function getRawTerrainHeight(x, z) {
@@ -782,6 +782,16 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     currentMapType = mapType;
     currentMapSize = mapSize;
 
+    // Roll random map seed BEFORE any getTerrainHeight() / mesh displacement call; preserve multiplayer matchSeed!
+    if (mapType === 'random') {
+        const hasMpSeed = (typeof isMultiplayerActive !== 'undefined' && isMultiplayerActive && Number.isFinite(randomMapSeed) && randomMapSeed > 0);
+        if (!hasMpSeed) {
+            const rng = (typeof simRandom === 'function') ? simRandom : Math.random;
+            randomMapSeed = rng() * 100;
+            randomMapRiverFreq = 0.012 + rng() * 0.008;
+        }
+    }
+
     const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType];
     const effectiveTheme = (activeCustomMap && activeCustomMap.theme)
     ? activeCustomMap.theme
@@ -1164,8 +1174,6 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     else if (effectiveTheme === 'city') { waterColor = 0x2d3436; waterOpacity = 0.88; }
 
     if (mapType === 'random') {
-        randomMapSeed = Math.random() * 100;
-        randomMapRiverFreq = 0.012 + Math.random() * 0.008;
         waterColor = 0x1b7094; waterOpacity = 0.86;
     }
 
@@ -2214,7 +2222,7 @@ function applyAtmosphereAndSkybox(effectiveTheme, mapKey) {
     }
     const skyTex = _getSkyboxTexture(effectiveTheme, tod);
     if (skyTex && typeof THREE.SphereGeometry === 'function') {
-        const skyRadius = Math.max(520, (typeof mapSize === 'number' ? mapSize : 900) * 1.45);
+        const skyRadius = Math.max(520, (typeof currentMapSize === 'number' ? currentMapSize : 900) * 1.45);
         const skyGeo = new THREE.SphereGeometry(skyRadius, 28, 16);
         const skyMat = new THREE.MeshBasicMaterial({
             map: skyTex,

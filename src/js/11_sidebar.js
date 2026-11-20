@@ -678,14 +678,20 @@ function purchaseVehicleDrone(droneType, cost) {
         showNotification('Select a USA Vehicle (Crusader, Paladin, Humvee, Ambulance, or Tomahawk) first.', 'error');
         return;
     }
-    if (playerResources < cost) {
+    const eligible = selectedVehicles.filter(v => !(v.drone && v.drone.type === droneType));
+    if (eligible.length === 0) {
+        showNotification(`Selected vehicle(s) already have a ${droneType.toUpperCase()} Drone attached.`, 'info');
+        return;
+    }
+    const affordable = Math.min(eligible.length, Math.floor(playerResources / cost));
+    if (affordable <= 0) {
         showNotification(`Insufficient funds for ${droneType} drone ($${cost} needed).`, 'error');
         return;
     }
-    playerResources -= cost;
-    selectedVehicles.forEach(v => attachVehicleDrone(v, droneType));
+    playerResources -= cost * affordable;
+    for (let i = 0; i < affordable; i++) attachVehicleDrone(eligible[i], droneType);
     playUSASound('radio_chirp');
-    showNotification(`${droneType.toUpperCase()} Drone attached to vehicle!`, 'success');
+    showNotification(`${droneType.toUpperCase()} Drone attached to ${affordable} vehicle(s) (-$${cost * affordable})!`, 'success');
     updateSidebar();
 }
 
@@ -814,14 +820,20 @@ function purchaseOverlordUpgrade(upgType, cost) {
         showNotification('Select an Overlord Tank first.', 'error');
         return;
     }
-    if (playerResources < cost) {
+    const eligible = overlords.filter(ov => ov.overlordUpgrade !== upgType);
+    if (eligible.length === 0) {
+        showNotification(`Selected Overlord(s) already have ${upgType.toUpperCase()} installed.`, 'info');
+        return;
+    }
+    const affordable = Math.min(eligible.length, Math.floor(playerResources / cost));
+    if (affordable <= 0) {
         showNotification(`Insufficient funds for Overlord upgrade ($${cost} needed).`, 'error');
         return;
     }
-    playerResources -= cost;
-    overlords.forEach(ov => attachOverlordUpgrade(ov, upgType));
+    playerResources -= cost * affordable;
+    for (let i = 0; i < affordable; i++) attachOverlordUpgrade(eligible[i], upgType);
     playAudio('china_cannon', {}, 'china');
-    showNotification(`Overlord ${upgType.toUpperCase()} superstructure installed!`, 'success');
+    showNotification(`Overlord ${upgType.toUpperCase()} superstructure installed on ${affordable} unit(s) (-$${cost * affordable})!`, 'success');
     updateSidebar();
 }
 
@@ -831,14 +843,20 @@ function purchaseNukeCannonUpgrade(cost) {
         showNotification('Select a Nuke Cannon first.', 'error');
         return;
     }
-    if (playerResources < cost) {
+    const eligible = nukeCannons.filter(nc => !nc.neutronShells);
+    if (eligible.length === 0) {
+        showNotification('Selected Nuke Cannon(s) already have Neutron Shells.', 'info');
+        return;
+    }
+    const affordable = Math.min(eligible.length, Math.floor(playerResources / cost));
+    if (affordable <= 0) {
         showNotification(`Insufficient funds for Neutron Shells ($${cost} needed).`, 'error');
         return;
     }
-    playerResources -= cost;
-    nukeCannons.forEach(nc => { nc.neutronShells = true; nc.ammoMode = 'neutron'; });
+    playerResources -= cost * affordable;
+    for (let i = 0; i < affordable; i++) { eligible[i].neutronShells = true; eligible[i].ammoMode = 'neutron'; }
     playAudio('nuke_artillery', {}, 'china');
-    showNotification(`Neutron Shells loaded into Nuke Cannon battery! (Eliminates infantry & vehicle drivers)`, 'success');
+    showNotification(`Neutron Shells loaded into ${affordable} Nuke Cannon(s) (-$${cost * affordable})!`, 'success');
     updateSidebar();
 }
 
@@ -2860,7 +2878,11 @@ function orderUnitsHalt() {
     units.forEach(u => {
             if (u.selected) {
                 u.targetPosition.copy(u.mesh.position);
+                u.waypoints = [];
                 u.combatTarget = null;
+                u.pilotTarget = null;
+                u.embarkTarget = null;
+                u.captureTarget = null;
                 u.taskState = 'Idle';
                 if (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook') u.aiState = 'Idle';
             }
@@ -2952,6 +2974,9 @@ function sellStructure(structure) {
     playerResources += refund;
 
     const sPos = (structure.position || (structure.mesh && structure.mesh.position)) ? (structure.position || structure.mesh.position).clone() : null;
+    if (structure.garrisoned && structure.garrisoned.length > 0 && typeof evacuateGarrisonedUnits === 'function') {
+        evacuateGarrisonedUnits(structure);
+    }
     scene.remove(structure.mesh);
     const idx = structures.indexOf(structure);
     if (idx !== -1) structures.splice(idx, 1);
@@ -3401,14 +3426,15 @@ function attachCamoNettingVisual(structure) {
 }
 
 function upgradeDecoyToRealStructure(structure) {
-    if (!structure) return;
+    if (!structure || !structure.isFake) return;
     const oldType = structure.type;
-    const newType = (oldType === 'fakeBarracks') ? 'barracks' : 'factory';
+    const newType = (oldType === 'fakeCommandCenter') ? 'commandCenter' : (oldType === 'fakeBarracks' ? 'barracks' : 'factory');
     structure.type = newType;
     structure.isFake = false;
-    structure.maxHealth = (newType === 'barracks' ? 800 : 1200);
+    structure.maxHealth = (newType === 'commandCenter' ? 5000 : (newType === 'barracks' ? 800 : 1200));
     structure.health = structure.maxHealth;
-    showNotification(`Decoy converted: Now a fully operational ${newType === 'barracks' ? 'Barracks' : 'Arms Dealer'}!`, 'success');
+    const label = newType === 'commandCenter' ? 'Command Center' : (newType === 'barracks' ? 'Barracks' : 'Arms Dealer');
+    showNotification(`Decoy converted: Now a fully operational ${label}!`, 'success');
 }
 
 function triggerReconnaissanceScan(abilityId) {
@@ -4960,9 +4986,11 @@ function executeGeneralsPowerAt(pos) {
         if (typeof units !== 'undefined') {
             units.forEach(u => {
                     if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(pos) <= 22) {
-                        u.isStealth = true;
+                        u.isStealthed = true;
                         u.gpsCloakUntil = until;
-                        if (u.mesh) u.mesh.traverse(c => { if (c.material && c.material.transparent !== undefined) { c.material.transparent = true; c.material.opacity = 0.48; } });
+                        if (typeof setMeshStealthOpacity === 'function') {
+                            setMeshStealthOpacity(u.mesh, true, typeof animTime !== 'undefined' ? animTime : 0);
+                        }
                         cloaked++;
                     }
             });
