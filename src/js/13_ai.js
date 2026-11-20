@@ -788,6 +788,12 @@ function chooseAICounterUnitType(cmd, facilityType) {
     const f = cmd.faction || 'usa';
     const counter = (cmd.threatProfile && cmd.threatProfile.preferredCounter) || 'balanced';
 
+    if (facilityType === 'airfield') {
+        if (f === 'china') return 'mig';
+        if (f === 'usa') return simRandom() < 0.55 ? 'comanche' : 'raptor';
+        return null;
+    }
+
     if (facilityType === 'barracks') {
         if (f === 'china') {
             if (counter === 'anti_air' || counter === 'anti_armor') return 'tankhunter';
@@ -801,24 +807,42 @@ function chooseAICounterUnitType(cmd, facilityType) {
         }
     }
 
-    // War Factory / Arms Dealer vehicles
+    // War Factory / Arms Dealer vehicles (combined-arms roster)
+    const hasTier3 = typeof enemyStructures !== 'undefined' && enemyStructures.some(
+        s => s.ownerId === cmd.ownerId && !s.isBuilding && s.health > 0 &&
+        (s.type === 'propagandaCenter' || s.type === 'strategyCenter' || s.type === 'palace')
+    );
     if (f === 'china') {
-        if (counter === 'anti_air' || counter === 'anti_infantry') return simRandom() < 0.7 ? 'gatling' : 'battlemaster';
-        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && simRandom() < 0.55) ? 'overlord' : 'battlemaster';
-        if (cmd.difficulty === 'hard' && simRandom() < 0.22) return 'nukecannon';
-        return (cmd.difficulty === 'hard' && simRandom() < 0.4) ? 'overlord' : (simRandom() < 0.35 ? 'gatling' : 'battlemaster');
+        if (counter === 'anti_air') return simRandom() < 0.75 ? 'gatling' : 'battlemaster';
+        if (counter === 'anti_infantry') return simRandom() < 0.45 ? 'dragon' : (simRandom() < 0.65 ? 'gatling' : 'battlemaster');
+        if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.45) ? 'overlord' : 'battlemaster';
+        const r = simRandom();
+        if (hasTier3 && r < 0.24) return 'overlord';
+        if (hasTier3 && cmd.difficulty !== 'easy' && r < 0.34) return 'nukecannon';
+        if (r < 0.48) return 'gatling';
+        if (r < 0.62) return 'dragon';
+        if (r < 0.72) return 'inferno';
+        return 'battlemaster';
     } else if (f === 'gla') {
         if (counter === 'anti_air') return simRandom() < 0.75 ? 'quad' : 'scorpion';
-        if (counter === 'anti_infantry') return simRandom() < 0.65 ? 'quad' : 'buggy';
-        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && simRandom() < 0.5) ? 'marauder' : 'scorpion';
-        if (cmd.difficulty === 'hard' && simRandom() < 0.22) return 'scud';
-        return (cmd.difficulty === 'hard' && simRandom() < 0.4) ? 'marauder' : (simRandom() < 0.35 ? 'quad' : 'scorpion');
+        if (counter === 'anti_infantry') return simRandom() < 0.45 ? 'toxintractor' : (simRandom() < 0.7 ? 'quad' : 'buggy');
+        if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.45) ? 'marauder' : 'scorpion';
+        const r = simRandom();
+        if (hasTier3 && cmd.difficulty !== 'easy' && r < 0.22) return 'scud';
+        if (r < 0.42) return 'marauder';
+        if (r < 0.62) return 'quad';
+        if (r < 0.74) return 'buggy';
+        if (r < 0.84) return 'toxintractor';
+        return 'scorpion';
     } else {
         if (counter === 'anti_air') return simRandom() < 0.75 ? 'humvee' : 'paladin';
         if (counter === 'anti_infantry') return simRandom() < 0.65 ? 'humvee' : 'tank';
-        if (counter === 'anti_armor') return (cmd.difficulty === 'hard' && simRandom() < 0.55) ? 'paladin' : 'tank';
-        if (cmd.difficulty === 'hard' && simRandom() < 0.22) return 'tomahawk';
-        return (cmd.difficulty === 'hard' && simRandom() < 0.4) ? 'paladin' : (simRandom() < 0.35 ? 'humvee' : 'tank');
+        if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.45) ? 'paladin' : 'tank';
+        const r = simRandom();
+        if (hasTier3 && cmd.difficulty !== 'easy' && r < 0.22) return 'tomahawk';
+        if (r < 0.48) return 'paladin';
+        if (r < 0.72) return 'humvee';
+        return 'tank';
     }
 }
 
@@ -893,46 +917,64 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         cmd.resources = Math.min(25000, (cmd.resources || 0) + incomeTick);
     }
 
+    const nowBuildMs = Date.now();
     const desiredGatherers = ZERO_HOUR_AI_DATA.resourceGatherers[cmd.difficulty] || 1;
     const myGatherers = myUnits.filter(u => u.type === 'truck' || u.type === 'chinook' || (u.type === 'worker' && u.aiState && u.aiState !== 'Idle'));
     if (supplyStruct && myGatherers.length < desiredGatherers && cmd.resources >= 600) {
         const hType = (cmd.faction === 'gla') ? 'worker' : (cmd.faction === 'usa' ? 'chinook' : 'truck');
-        const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
-        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
-        const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
-        if (harv) {
-            cmd.resources -= 600;
-            harv.teamId = cmd.teamId;
-            harv.ownerId = cmd.ownerId;
-            harv.isAI = true;
-            harv.difficulty = cmd.difficulty;
-            harv.taskState = 'Idle';
-            harv.aiState = 'MovingToDock';
-            harv.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(harv.mesh.position) : null;
-            if (harv.supplyTarget) {
-                harv.targetPosition.copy(getSupplyDockSlotPosition(harv.supplyTarget, harv, false));
-                if (hType === 'chinook') harv.airState = 'flying';
+        const harvTrainMs = hType === 'worker' ? 5000 : (hType === 'chinook' ? 9000 : 7000);
+        if (!cmd._harvesterReadyAt) {
+            // Start realistic production timer matching player training time
+            cmd._harvesterReadyAt = nowBuildMs + harvTrainMs;
+        } else if (nowBuildMs >= cmd._harvesterReadyAt) {
+            cmd._harvesterReadyAt = 0;
+            const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
+            if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
+            const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
+            if (harv) {
+                cmd.resources -= 600;
+                harv.teamId = cmd.teamId;
+                harv.ownerId = cmd.ownerId;
+                harv.isAI = true;
+                harv.difficulty = cmd.difficulty;
+                harv.taskState = 'Idle';
+                harv.aiState = 'MovingToDock';
+                harv.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(harv.mesh.position) : null;
+                if (harv.supplyTarget) {
+                    harv.targetPosition.copy(getSupplyDockSlotPosition(harv.supplyTarget, harv, false));
+                    if (hType === 'chinook') harv.airState = 'flying';
+                }
             }
         }
+    } else {
+        cmd._harvesterReadyAt = 0;
     }
 
-    // Ensure AI maintains at least 1 Construction Dozer / Builder Worker if Command Center stands
+    // Ensure AI maintains at least 1 Construction Dozer / Builder Worker if Command Center stands (with realistic player-matched training time!)
     const myBuilders = myUnits.filter(u => u.type === 'dozer' || (u.type === 'worker' && (!u.aiState || u.aiState === 'Idle')));
     if (cmdCenter && myBuilders.length === 0 && cmd.resources >= 1000) {
         const bType = (cmd.faction === 'gla') ? 'worker' : 'dozer';
-        const spawnPos = adjustToPossibleDestination(cmdCenter.position.clone().add(new THREE.Vector3(-8, 0, 8)), cmdCenter);
-        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
-        const bUnit = spawnEnemyUnit(bType, spawnPos, null, cmd.faction);
-        if (bUnit) {
-            cmd.resources -= 1000;
-            bUnit.teamId = cmd.teamId;
-            bUnit.ownerId = cmd.ownerId;
-            bUnit.isAI = true;
-            bUnit.difficulty = cmd.difficulty;
-            bUnit.taskState = 'Idle';
-            bUnit.aiState = 'Idle';
-            myBuilders.push(bUnit);
+        const builderTrainMs = bType === 'worker' ? 5000 : 8000;
+        if (!cmd._builderReadyAt) {
+            cmd._builderReadyAt = nowBuildMs + builderTrainMs;
+        } else if (nowBuildMs >= cmd._builderReadyAt) {
+            cmd._builderReadyAt = 0;
+            const spawnPos = adjustToPossibleDestination(cmdCenter.position.clone().add(new THREE.Vector3(-8, 0, 8)), cmdCenter);
+            if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
+            const bUnit = spawnEnemyUnit(bType, spawnPos, null, cmd.faction);
+            if (bUnit) {
+                cmd.resources -= 1000;
+                bUnit.teamId = cmd.teamId;
+                bUnit.ownerId = cmd.ownerId;
+                bUnit.isAI = true;
+                bUnit.difficulty = cmd.difficulty;
+                bUnit.taskState = 'Idle';
+                bUnit.aiState = 'Idle';
+                myBuilders.push(bUnit);
+            }
         }
+    } else if (myBuilders.length > 0) {
+        cmd._builderReadyAt = 0;
     }
 
     // Find an available idle AI builder (Dozer or Worker)
@@ -1022,6 +1064,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         { check: s => s.type === 'supplyCenter' || s.type === 'supplyStash', build: f === 'gla' ? 'supplyStash' : 'supplyCenter', cost: 1500, offset: new THREE.Vector3(44, 0, -34) },
         { check: s => s.type === 'barracks', build: 'barracks', cost: 600, offset: new THREE.Vector3(-44, 0, 36) },
         { check: s => s.type === 'factory', build: 'factory', cost: 2000, offset: new THREE.Vector3(46, 0, 36) },
+        ...(f !== 'gla' ? [{ check: s => s.type === 'airfield', build: 'airfield', cost: 1000, offset: new THREE.Vector3(0, 0, -56) }] : []),
         { check: s => s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace', build: f === 'china' ? 'propagandaCenter' : f === 'gla' ? 'palace' : 'strategyCenter', cost: 1500, offset: new THREE.Vector3(-62, 0, 0) }
     ];
     const hasCompletedTier3 = myStructures.some(s => !s.isBuilding && s.health > 0 && (s.type === 'strategyCenter' || s.type === 'propagandaCenter' || s.type === 'palace'));
@@ -1111,27 +1154,46 @@ function processEnemyAIEngine() {
             if (cmd.productionTimer % prodInterval === 0 && combatUnits.length < maxUnits && (cmd.resources || 0) >= 500) {
                 const fac = myStructures.find(es => !es.isBuilding && es.type === 'factory' && es.health > 0);
                 const bar = myStructures.find(es => !es.isBuilding && es.type === 'barracks' && es.health > 0);
-                // Combined arms: mix 70% armor/vehicles + 30% counter infantry when both facilities exist
-                const chosenFacility = (fac && bar) ? (simRandom() < 0.72 ? fac : bar) : (fac || bar);
+                const air = myStructures.find(es => !es.isBuilding && es.type === 'airfield' && es.health > 0);
+                const existingAirCount = combatUnits.filter(u => u.isAir).length;
+                const maxAir = cmd.difficulty === 'hard' ? 4 : (cmd.difficulty === 'easy' ? 1 : 2);
+                // Combined arms: mix armor/vehicles (~55%), counter infantry (~25%), and aircraft (~20% when Airfield operational)
+                let chosenFacility = null;
+                if (air && existingAirCount < maxAir && simRandom() < 0.24) {
+                    chosenFacility = air;
+                } else if (fac && bar) {
+                    chosenFacility = simRandom() < 0.70 ? fac : bar;
+                } else {
+                    chosenFacility = fac || bar || (air && existingAirCount < maxAir ? air : null);
+                }
                 if (chosenFacility) {
-                    const rawSpawn = chosenFacility.position.clone().add(new THREE.Vector3(10 + simRandom() * 4, 0, 8 + simRandom() * 4));
-                    const spawnPos = adjustToPossibleDestination(rawSpawn, chosenFacility);
-                    spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
                     const uType = chooseAICounterUnitType(cmd, chosenFacility.type);
-                    if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
-                    const eu = spawnEnemyUnit(uType, spawnPos, null, cmd.faction);
-                    if (eu) {
-                        cmd.resources = Math.max(0, (cmd.resources || 0) - 700);
-                        eu.teamId = cmd.teamId;
-                        eu.ownerId = cmd.ownerId;
-                        eu.isAI = true;
-                        eu.difficulty = cmd.difficulty;
-                        // Add newly produced combat unit to staging strike team at rally point (AISkirmishPlayer::processTeamBuilding)
-                        if (!cmd.stagingTeam) cmd.stagingTeam = [];
-                        cmd.stagingTeam.push(eu.netId);
-                        eu.targetPosition.copy(cmd.rallyPoint);
-                        eu.taskState = 'Moving';
-                        eu.waypoints = [];
+                    if (uType) {
+                        const rawSpawn = chosenFacility.position.clone().add(new THREE.Vector3(10 + simRandom() * 4, 0, 8 + simRandom() * 4));
+                        const spawnPos = adjustToPossibleDestination(rawSpawn, chosenFacility);
+                        spawnPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(spawnPos.x, spawnPos.z) : 0;
+                        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
+                        const eu = spawnEnemyUnit(uType, spawnPos, null, cmd.faction);
+                        if (eu) {
+                            const uCost = (typeof unitCosts !== 'undefined' && unitCosts[uType]) ? unitCosts[uType] : 700;
+                            cmd.resources = Math.max(0, (cmd.resources || 0) - uCost);
+                            eu.teamId = cmd.teamId;
+                            eu.ownerId = cmd.ownerId;
+                            eu.isAI = true;
+                            eu.difficulty = cmd.difficulty;
+                            // Add newly produced combat unit to staging strike team at rally point (AISkirmishPlayer::processTeamBuilding)
+                            if (!cmd.stagingTeam) cmd.stagingTeam = [];
+                            cmd.stagingTeam.push(eu.netId);
+                            if (eu.isAir) {
+                                eu.airState = 'patrolling';
+                                eu.patrolCenter = cmd.rallyPoint.clone();
+                                eu.targetPosition.copy(cmd.rallyPoint);
+                            } else {
+                                eu.targetPosition.copy(cmd.rallyPoint);
+                                eu.taskState = 'Moving';
+                                eu.waypoints = [];
+                            }
+                        }
                     }
                 }
             }
@@ -1275,10 +1337,13 @@ function processEnemyAIEngine() {
                     if (retDist <= ZERO_HOUR_AI_DATA.maxRetaliateDistance || isBaseUnderAttack) {
                         shareTeamDiscovery(cmd.teamId, attacker, false);
                         const rallyRadius = isBaseUnderAttack ? 72 : ZERO_HOUR_AI_DATA.retaliateFriendsRadius;
+                        const stagingSet = new Set(cmd.stagingTeam || []);
                         combatUnits.forEach(ally => {
+                                // Only break staging formation if our own base is directly under attack!
+                                if (!isBaseUnderAttack && stagingSet.has(ally.netId)) return;
                                 if (!ally.combatTarget && ally.mesh.position.distanceTo(victimPos) <= rallyRadius) {
                                     ally.combatTarget = attacker;
-                                    ally._releasedForAttack = true;
+                                    if (isBaseUnderAttack) ally._releasedForAttack = true;
                                     assignAIGroundRoute(ally, attackerPos, attacker);
                                 }
                         });
@@ -1330,14 +1395,32 @@ function processEnemyAIEngine() {
                         sweepTarget = spawnPool[cmd._sweepIdx].clone();
                     }
                 }
-                // Release staging team into active offensive wave!
-                cmd.stagingTeam.forEach(id => {
-                        const member = combatUnits.find(u => u.netId === id);
-                        if (member) {
-                            member._releasedForAttack = true;
-                            if (sweepTarget) {
-                                member._sweepTarget = sweepTarget.clone();
-                                assignAIGroundRoute(member, member._sweepTarget);
+                // Release staging team as a coordinated combined-arms (land + air) strike wave!
+                const waveTargetPos = sweepTarget
+                    ? sweepTarget.clone()
+                    : (cmd.discoveredEnemyBases.length > 0
+                        ? cmd.discoveredEnemyBases[0].position.clone()
+                        : (cmd.discoveredEnemyTargets.length > 0 ? cmd.discoveredEnemyTargets[0].position.clone() : null));
+                const waveMembers = cmd.stagingTeam
+                    .map(id => combatUnits.find(u => u.netId === id))
+                    .filter(Boolean);
+                waveMembers.forEach((member, mi) => {
+                        member._releasedForAttack = true;
+                        const spreadAng = (mi / Math.max(1, waveMembers.length)) * Math.PI * 2;
+                        const formOffset = member.isAir ? 0 : 4.5;
+                        if (waveTargetPos) {
+                            const dest = new THREE.Vector3(
+                                waveTargetPos.x + Math.cos(spreadAng) * formOffset,
+                                waveTargetPos.y || 0,
+                                waveTargetPos.z + Math.sin(spreadAng) * formOffset
+                            );
+                            if (sweepTarget) member._sweepTarget = dest.clone();
+                            if (member.isAir) {
+                                member.airState = 'flying';
+                                member.patrolCenter = dest.clone();
+                                member.targetPosition.copy(dest);
+                            } else {
+                                assignAIGroundRoute(member, dest);
                             }
                         }
                 });
