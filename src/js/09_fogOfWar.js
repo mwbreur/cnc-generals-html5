@@ -182,23 +182,33 @@ function updateFogOfWar() {
         if (b.life <= 0) activeVisionBeacons.splice(i, 1);
     }
 
+    // Official INIZH.big ShroudClearingRange values (scaled at 150 SAGE = 32.4 game units => x 0.216)
+    const INIZH_SHROUD_RANGE = {
+        // Heroes & Specialists
+        burton: 108, pathfinder: 86, jarmen: 86, blacklotus: 86,
+        // Infantry
+        ranger: 86, infantry: 86, rocket: 86, missiledefender: 86,
+        tankhunter: 86, rpg: 86, rebel: 65, redguard: 43, hacker: 43, mob: 43, worker: 43, pilot: 43, terrorist: 43, hijacker: 43,
+        // Scout / Radar / AA Vehicles
+        drone_scout: 90, radarvan: 86, gatling: 78, humvee: 69,
+        // Battle Tanks & Artillery
+        tank: 65, crusader: 65, paladin: 65, battlemaster: 65, scorpion: 65, marauder: 65,
+        quad: 65, buggy: 65, inferno: 65, scud: 65, nukecannon: 65, nuketank: 65,
+        overlord: 43, dragon: 43, toxintractor: 43, tomahawk: 43, dozer: 43, truck: 43, technical: 54, crawler: 54, ambulance: 54, bombtruck: 43,
+        // Base Defenses
+        stingerSite: 86, patriot: 78, gatlingCannon: 78, bunker: 54, tunnel: 54,
+        // Structures
+        strategyCenter: 86, commandCenter: 65, center: 65, palace: 65,
+        power: 43, nuclearReactor: 43, supplyCenter: 43, supplyStash: 43, supplyDrop: 43,
+        barracks: 43, factory: 43, airfield: 43, propagandaCenter: 43, internetCenter: 54,
+        blackMarket: 43, particleCannon: 43, nukeSilo: 43, scudStorm: 43, derrick: 43
+    };
     function getOfficialVisionRange(src) {
-        if (!src) return 26;
+        if (!src) return 43;
         const t = src.type;
-        let v = src.scanRange || (src.radius ? src.radius + 18 : 26);
-        if (!t) return v;
-        // Official C&C Generals VisionRange calibration:
-        // Artillery has shorter sight than weapon range (needs spotters/scouts)
-        if (t === 'tomahawk' || t === 'scud' || t === 'nukecannon' || t === 'nuketank') v = 30;
-        else if (t === 'inferno' || t === 'buggy') v = 28;
-        else if (t === 'radarvan') v = 46;
-        else if (t === 'drone_scout') v = 55;
-        else if (t === 'pathfinder' || t === 'jarmen') v = 40;
-        else if (src.isAir) v = 44;
-        else if (t === 'commandCenter' || t === 'center') v = 42;
-        else if (t === 'patriot' || t === 'gatlingCannon' || t === 'stingerSite') v = 40;
-        else if (t === 'strategyCenter' || t === 'propagandaCenter' || t === 'palace') v = 34;
-        else if (src.scanRange > 0) v = Math.max(v, src.scanRange * 1.15);
+        let v = (t && INIZH_SHROUD_RANGE[t] !== undefined)
+            ? INIZH_SHROUD_RANGE[t]
+            : (src.isAir ? 72 : (src.scanRange ? Math.max(43, src.scanRange * 1.15) : (src.radius ? src.radius + 32 : 43)));
         if (src.drone && src.drone.type === 'scout') v *= 1.35;
         if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && !src.isAI) v *= 1.2;
         return v;
@@ -258,27 +268,6 @@ function updateFogOfWar() {
 
     // 4. Punch soft high-res circular vision holes for currently visible areas
     fogCtx.globalCompositeOperation = 'destination-out';
-    function getOfficialVisionRange(src) {
-        if (!src) return 26;
-        const t = src.type;
-        let v = src.scanRange || (src.radius ? src.radius + 18 : 26);
-        if (!t) return v;
-        // Official C&C Generals VisionRange calibration:
-        // Artillery has shorter sight than weapon range (needs spotters/scouts)
-        if (t === 'tomahawk' || t === 'scud' || t === 'nukecannon' || t === 'nuketank') v = 30;
-        else if (t === 'inferno' || t === 'buggy') v = 28;
-        else if (t === 'radarvan') v = 46;
-        else if (t === 'drone_scout') v = 55;
-        else if (t === 'pathfinder' || t === 'jarmen') v = 40;
-        else if (src.isAir) v = 44;
-        else if (t === 'commandCenter' || t === 'center') v = 42;
-        else if (t === 'patriot' || t === 'gatlingCannon' || t === 'stingerSite') v = 40;
-        else if (t === 'strategyCenter' || t === 'propagandaCenter' || t === 'palace') v = 34;
-        else if (src.scanRange > 0) v = Math.max(v, src.scanRange * 1.15);
-        if (src.drone && src.drone.type === 'scout') v *= 1.35;
-        if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && !src.isAI) v *= 1.2;
-        return v;
-    }
 
     visionSources.forEach(src => {
             const pos = src.position || src.mesh.position;

@@ -966,10 +966,10 @@ function updateSidebar() {
                 if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
                 if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
                 const drain = {
-                    barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
+                    factory: 1, supplyCenter: 1, airfield: 1,
                     strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
-                    propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                    particleCannon: 4, nukeSilo: 4, supplyDrop: 4
+                    propagandaCenter: 2, patriot: 3, gatlingCannon: 3,
+                    particleCannon: 10, nukeSilo: 10, supplyDrop: 4
                 }[s.type] || 0;
                 consumed += drain;
         });
@@ -3616,10 +3616,10 @@ function processBuildingFunctions() {
                 if (s.type === 'power') pProduced += (s.powerUpgraded ? 10 : 5);
                 if (s.type === 'nuclearReactor') pProduced += (s.overcharged ? 15 : 10);
                 const drain = {
-                    barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
+                    factory: 1, supplyCenter: 1, airfield: 1,
                     strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
-                    propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                    particleCannon: 4, nukeSilo: 4, supplyDrop: 4, supplyDrop: 4
+                    propagandaCenter: 2, patriot: 3, gatlingCannon: 3,
+                    particleCannon: 10, nukeSilo: 10, supplyDrop: 4
                 }[s.type] || 0;
                 pConsumed += drain;
         });
@@ -3987,7 +3987,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
     else if (type === 'humvee') { mesh = createHumveeMesh(false); radius = 2.8; speed = 0.22; health = 240; scanRange = 24; capacity = 5; garrisoned = []; }
     else if (type === 'ambulance') { mesh = createAmbulanceMesh(); radius = 2.8; speed = 0.18; health = 220; scanRange = 18; capacity = 4; garrisoned = []; }
     else if (type === 'tomahawk') { mesh = createTomahawkMesh(false); radius = 3.2; speed = 0.11; health = 180; scanRange = 56; }
-    else if (type === 'dozer') { mesh = spawnFaction === 'china' ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 1.9; speed = 0.10; health = 300; }
+    else if (type === 'dozer') { mesh = spawnFaction === 'china' ? createChinaDozerMesh(false) : createUSADozerMesh(false); radius = 1.9; speed = 0.10; health = 250; }
     else if (type === 'truck') { mesh = createUSATruckMesh(); radius = 3.2; speed = 0.13; health = 260; }
     else if (type === 'chinook') { mesh = createChinookMesh(); radius = 4.8; speed = 0.22; health = 500; scanRange = 0; isAir = true; capacity = 8; garrisoned = []; }
     else if (type === 'comanche') { mesh = createComancheMesh(); radius = 3.8; speed = 0.26; health = 220; scanRange = 32; isAir = true; }
@@ -4018,7 +4018,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
     else if (type === 'worker') { mesh = createGLAWorkerMesh(); radius = 0.8; speed = 0.10; health = 150; }
     else if (type === 'technical') { mesh = createTechnicalMesh(false); radius = 2.6; speed = 0.22; health = 240; scanRange = 24; capacity = 5; garrisoned = []; }
     else if (type === 'scorpion') { mesh = createScorpionTankMesh(false); radius = 3.2; speed = 0.16; health = 370; scanRange = 24; }
-    else if (type === 'marauder') { mesh = createMarauderTankMesh(false); radius = 3.4; speed = 0.13; health = 480; scanRange = 27; }
+    else if (type === 'marauder') { mesh = createMarauderTankMesh(false); radius = 3.4; speed = 0.13; health = 500; scanRange = 27; }
     else if (type === 'buggy') { mesh = createRocketBuggyMesh(false); radius = 2.6; speed = 0.22; health = 120; scanRange = 48; }
     else if (type === 'quad') { mesh = createQuadCannonMesh(false); radius = 3.2; speed = 0.17; health = 300; scanRange = 24; }
     else if (type === 'toxintractor') { mesh = createToxinTractorMesh(false); radius = 3.2; speed = 0.14; health = 240; scanRange = 12; }

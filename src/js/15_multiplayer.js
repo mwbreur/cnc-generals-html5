@@ -1072,9 +1072,10 @@ function startMultiplayerMatch(isHost, config) {
                 foeCCGroup.position.copy(spawnPos);
                 foeCCGroup.rotation.y = faceCenterYaw;
                 scene.add(foeCCGroup);
+                const ccMaxHp = (typeof getStructureMaxHealth === 'function') ? getStructureMaxHealth('commandCenter') : 5000;
                 enemyStructures.push({
                         type: 'commandCenter', faction: slot.faction, position: spawnPos.clone(), rotationY: faceCenterYaw,
-                        mesh: foeCCGroup, health: 2500, maxHealth: 2500, radius: 10,
+                        mesh: foeCCGroup, health: ccMaxHp, maxHealth: ccMaxHp, radius: 10,
                         buildProgress: 100, isBuilding: false, netId: (isHost ? 'CS_' : 'HS_') + 'CC',
                         teamId: slot.team, ownerId: 'challenger', isAI: false
                 });

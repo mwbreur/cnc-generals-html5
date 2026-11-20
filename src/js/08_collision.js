@@ -344,14 +344,16 @@ function createStructureMeshForFaction(type, faction = 'usa', isEnemy = false) {
 }
 window.createStructureMeshForFaction = createStructureMeshForFaction;
 
+// Official INIZH.big Structure MaxHealth values
 const STRUCTURE_MAX_HEALTH_TABLE = {
-    center: 2500, commandCenter: 2500, fakeCommandCenter: 600,
-    palace: 2000, strategyCenter: 2000, propagandaCenter: 2000, internetCenter: 1800,
-    particleCannon: 2000, nukeSilo: 2000, scudStorm: 2000,
-    factory: 1500, airfield: 1500, supplyCenter: 1500, supplyStash: 1500, blackMarket: 1500,
-    barracks: 1200, power: 1000, nuclearReactor: 1200, supplyDrop: 1000,
-    bunker: 1000, patriot: 1000, gatlingCannon: 1000, stingerSite: 900, speakerTower: 900,
-    tunnel: 900, demoTrap: 300, derrick: 1500
+    center: 5000, commandCenter: 5000, fakeCommandCenter: 600,
+    particleCannon: 4000, nukeSilo: 4000, scudStorm: 4000,
+    palace: 3000,
+    factory: 2000, supplyCenter: 2000, supplyStash: 2000, internetCenter: 2000,
+    airfield: 1500, strategyCenter: 1500, nuclearReactor: 1500, blackMarket: 1500, derrick: 1500,
+    barracks: 1000, propagandaCenter: 1000, supplyDrop: 1000,
+    bunker: 1000, patriot: 1000, gatlingCannon: 1000, stingerSite: 1000, speakerTower: 1000, tunnel: 1000,
+    power: 800, demoTrap: 300
 };
 function getStructureMaxHealth(type) {
     return STRUCTURE_MAX_HEALTH_TABLE[type] || 1200;
