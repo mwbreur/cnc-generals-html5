@@ -2008,47 +2008,314 @@ function spawnToxinSprayBurst(fromPos, toPos) {
     }
 }
 
-// Aurora Hypersonic Fuel-Air Bomb Detonation (Gigantic double shockwave + scorched crater)
-function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb') {
-    if (soundType !== 'none') {
-        playUSASound(soundType, { pos });
+// Authentic C&C Generals: Zero Hour Fuel Air Bomb / Daisy Cutter Thermobaric Detonation
+// Stage 1: Fuel-air aerosol mist dispersal -> Stage 2: Blinding thermobaric fire dome + Wilson condensation shell
+// -> Stage 3: Twin ground-hugging pressure shockwaves + debris skirt -> Stage 4: Rising ember-lit mushroom smoke column
+function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0, onIgnite = null) {
+    if (!pos || !scene) return;
+    const gY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+    const center = new THREE.Vector3(pos.x, gY, pos.z);
+    const isDaisyCutter = blastScale >= 1.15;
+    const dispersalTicks = isDaisyCutter ? 26 : 6; // ~0.43s visible aerosol cloud spread before ignition on Daisy Cutter!
+
+    const rootGrp = new THREE.Group();
+    rootGrp.position.copy(center);
+    scene.add(rootGrp);
+
+    const ownedGeos = [];
+    const ownedMats = [];
+    const track = (geo, mat) => { ownedGeos.push(geo); ownedMats.push(mat); return new THREE.Mesh(geo, mat); };
+
+    // --- STAGE 1: Aerosol Fuel Mist Dispersal Cloud (pale tan-white billowing lobes) ---
+    const mistGroup = new THREE.Group();
+    rootGrp.add(mistGroup);
+    const mistPuffs = [];
+    const mistCount = isDaisyCutter ? 18 : 8;
+    const sharedMistGeo = new THREE.IcosahedronGeometry(1.0, 1);
+    ownedGeos.push(sharedMistGeo);
+    for (let i = 0; i < mistCount; i++) {
+        const ang = (i / mistCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+        const ringR = (0.35 + (i % 3) * 0.32) * (isDaisyCutter ? 14.0 : 7.5) * blastScale;
+        const mMat = new THREE.MeshBasicMaterial({
+            color: (i % 2 === 0) ? 0xeae4d6 : 0xd6cfc0,
+            transparent: true,
+            opacity: 0.0,
+            depthWrite: false
+        });
+        ownedMats.push(mMat);
+        const puff = new THREE.Mesh(sharedMistGeo, mMat);
+        puff.position.set(0, 1.2 + Math.random() * 1.4, 0);
+        puff.scale.setScalar(0.8);
+        mistGroup.add(puff);
+        mistPuffs.push({
+            mesh: puff,
+            tx: Math.cos(ang) * ringR,
+            tz: Math.sin(ang) * ringR,
+            ty: 1.4 + Math.random() * (isDaisyCutter ? 3.2 : 1.6),
+            maxScale: (2.6 + Math.random() * 2.2) * blastScale
+        });
     }
 
-    // 1. Massive expanding fireball
-    spawnEnhancedExplosion(pos, 0xff793f, 3.2, true, 'none');
+    // Small initial burster charge pop at dispersal start
+    if (isDaisyCutter && typeof spawnMuzzleFlash === 'function') {
+        spawnMuzzleFlash(new THREE.Vector3(center.x, center.y + 2.2, center.z), 0xffd27d, 1.8);
+    }
 
-    // 2. Extra wide secondary supersonic shockwave ring
-    const ringGeo = new THREE.RingGeometry(1.0, 3.5, 32);
-    ringGeo.rotateX(-Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00d2d3, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.set(pos.x, getTerrainHeight(pos.x, pos.z) + 0.1, pos.z);
-    scene.add(ring);
+    // --- STAGE 2-4 meshes (created at ignition) ---
+    let ignited = false;
+    let igniteTick = 0;
+    let flashDome = null;
+    let fireDome = null;
+    let wilsonDome = null;
+    let shockRing1 = null;
+    let shockRing2 = null;
+    let dustSkirt = null;
+    const fireLobes = [];
+    const smokeCol = [];
 
-    // 3. Persistent scorched blast crater
-    spawnCraterDecal(pos, 4.5, 520, 'flame');
+    const triggerThermobaricIgnition = () => {
+        ignited = true;
+        if (soundType !== 'none' && typeof playUSASound === 'function') {
+            playUSASound(soundType, { pos: center });
+        }
+        if (typeof onIgnite === 'function') {
+            try { onIgnite(center); } catch (_) {}
+        }
+        if (typeof triggerScreenShake === 'function') {
+            triggerScreenShake(isDaisyCutter ? 1.8 : 0.9);
+        }
 
-    // 4. Lingering napalm scorch pool
-    spawnNapalmScorchPool(pos);
+        // 1. Blinding white-yellow core flash hemisphere
+        const flashGeo = new THREE.SphereGeometry(1.0, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55);
+        const flashMat = new THREE.MeshBasicMaterial({ color: 0xfffbe6, transparent: true, opacity: 1.0, depthWrite: false });
+        flashDome = track(flashGeo, flashMat);
+        flashDome.position.y = 0.2;
+        rootGrp.add(flashDome);
+
+        // 2. Main roaring orange-gold thermobaric fireball dome
+        const fireGeo = new THREE.SphereGeometry(1.0, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.58);
+        const fireMat = new THREE.MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0.95, depthWrite: false });
+        fireDome = track(fireGeo, fireMat);
+        fireDome.position.y = 0.15;
+        rootGrp.add(fireDome);
+
+        // 3. Translucent white Wilson condensation dome (signature Zero Hour atmospheric pressure shell!)
+        const wilsonGeo = new THREE.SphereGeometry(1.0, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52);
+        const wilsonMat = new THREE.MeshBasicMaterial({
+            color: 0xf4f7fa,
+            transparent: true,
+            opacity: 0.42,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        wilsonDome = track(wilsonGeo, wilsonMat);
+        wilsonDome.position.y = 0.1;
+        rootGrp.add(wilsonDome);
+
+        // 4. Primary ground-hugging white-amber thermobaric shockwave ring (scaled uniformly in X and Z!)
+        const ring1Geo = new THREE.RingGeometry(0.76, 1.0, 48);
+        ring1Geo.rotateX(-Math.PI / 2);
+        const ring1Mat = new THREE.MeshBasicMaterial({ color: 0xffe4a8, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+        shockRing1 = track(ring1Geo, ring1Mat);
+        shockRing1.position.y = 0.35;
+        rootGrp.add(shockRing1);
+
+        // 5. Secondary outer white supersonic Mach pressure ring
+        const ring2Geo = new THREE.RingGeometry(0.88, 1.0, 48);
+        ring2Geo.rotateX(-Math.PI / 2);
+        const ring2Mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false });
+        shockRing2 = track(ring2Geo, ring2Mat);
+        shockRing2.position.y = 0.55;
+        rootGrp.add(shockRing2);
+
+        // 6. Ground-level kicked-up dust/dirt torus skirt
+        const skirtGeo = new THREE.TorusGeometry(1.0, 0.16, 8, 32);
+        skirtGeo.rotateX(Math.PI / 2);
+        const skirtMat = new THREE.MeshBasicMaterial({ color: 0x9b8365, transparent: true, opacity: 0.75, depthWrite: false });
+        dustSkirt = track(skirtGeo, skirtMat);
+        dustSkirt.position.y = 0.9;
+        rootGrp.add(dustSkirt);
+
+        // 7. Secondary boiling fireball lobes around the perimeter
+        const lobeCount = isDaisyCutter ? 14 : 7;
+        for (let i = 0; i < lobeCount; i++) {
+            const ang = (i / lobeCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+            const dist = (3.5 + Math.random() * (isDaisyCutter ? 11.5 : 5.5)) * blastScale;
+            const lMat = new THREE.MeshBasicMaterial({
+                color: (i % 3 === 0) ? 0xffcc44 : ((i % 3 === 1) ? 0xff7722 : 0xe84118),
+                transparent: true,
+                opacity: 0.92,
+                depthWrite: false
+            });
+            ownedMats.push(lMat);
+            const lobe = new THREE.Mesh(sharedMistGeo, lMat);
+            lobe.position.set(Math.cos(ang) * dist * 0.35, 1.2 + Math.random() * 1.5, Math.sin(ang) * dist * 0.35);
+            rootGrp.add(lobe);
+            fireLobes.push({
+                mesh: lobe,
+                vx: Math.cos(ang) * (0.18 + Math.random() * 0.16) * blastScale,
+                vy: (0.14 + Math.random() * 0.18) * blastScale,
+                vz: Math.sin(ang) * (0.18 + Math.random() * 0.16) * blastScale,
+                maxScale: (2.8 + Math.random() * 2.4) * blastScale
+            });
+        }
+
+        // 8. Rising dark ember-lit mushroom smoke column (stem + billowing cap)
+        const smokeCount = isDaisyCutter ? 16 : 8;
+        for (let i = 0; i < smokeCount; i++) {
+            const isCap = i >= Math.floor(smokeCount * 0.45);
+            const ang = (i / smokeCount) * Math.PI * 2 + Math.random() * 0.6;
+            const capR = isCap ? (2.5 + Math.random() * 5.0) * blastScale : (0.6 + Math.random() * 1.4) * blastScale;
+            const sMat = new THREE.MeshBasicMaterial({
+                color: isCap ? 0x2d2a28 : 0x3b332e,
+                transparent: true,
+                opacity: 0.0,
+                depthWrite: false
+            });
+            ownedMats.push(sMat);
+            const puff = new THREE.Mesh(sharedMistGeo, sMat);
+            puff.position.set(Math.cos(ang) * capR * 0.3, isCap ? 3.5 * blastScale : 1.0, Math.sin(ang) * capR * 0.3);
+            rootGrp.add(puff);
+            smokeCol.push({
+                mesh: puff,
+                isCap,
+                tx: Math.cos(ang) * capR,
+                tz: Math.sin(ang) * capR,
+                riseSpeed: (isCap ? 0.14 : 0.09) * blastScale * (0.85 + Math.random() * 0.35),
+                baseScale: (isCap ? 3.6 : 2.1) * blastScale * (0.85 + Math.random() * 0.4)
+            });
+        }
+
+        // 9. Persistent scorched crater + burning napalm patches + flying debris
+        if (typeof spawnCraterDecal === 'function') spawnCraterDecal(center, isDaisyCutter ? 9.5 : 5.0, 680, 'flame');
+        if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(center);
+        if (typeof spawnExplosionDebris === 'function') spawnExplosionDebris(center, isDaisyCutter ? 14 : 7, 1.5 * blastScale, false);
+    };
+
+    const maxPostIgnite = isDaisyCutter ? 190 : 110;
+    let totalTick = 0;
+
+    const cleanup = () => {
+        scene.remove(rootGrp);
+        for (let i = 0; i < ownedGeos.length; i++) {
+            try { ownedGeos[i].dispose(); } catch (_) {}
+        }
+        for (let i = 0; i < ownedMats.length; i++) {
+            try { ownedMats[i].dispose(); } catch (_) {}
+        }
+    };
 
     activeFX.push({
-            ring: ring,
-            life: 24,
-            maxLife: 24,
-            update() {
-                this.life--;
-                const progress = 1 - (this.life / this.maxLife);
-                const scale = 1 + progress * 7.5;
-                this.ring.scale.set(scale, scale, 1);
-                this.ring.material.opacity = Math.max(0, (1 - progress) * 0.95);
-                if (this.life <= 0) {
-                    scene.remove(this.ring);
-                    this.ring.geometry.dispose();
-                    this.ring.material.dispose();
-                    return false;
+        group: rootGrp,
+        dispose: cleanup,
+        update() {
+            totalTick++;
+
+            // Stage 1: Fuel-air aerosol mist rapidly expands outward before igniting
+            if (!ignited) {
+                const p = Math.min(1, totalTick / dispersalTicks);
+                const ease = 1 - Math.pow(1 - p, 2);
+                for (let i = 0; i < mistPuffs.length; i++) {
+                    const mp = mistPuffs[i];
+                    mp.mesh.position.set(mp.tx * ease, mp.ty * (0.5 + 0.5 * ease), mp.tz * ease);
+                    mp.mesh.scale.setScalar(0.8 + mp.maxScale * ease);
+                    mp.mesh.material.opacity = Math.sin(p * Math.PI * 0.85) * 0.58;
+                }
+                if (totalTick >= dispersalTicks) {
+                    // Flash-ignite the aerosol mist!
+                    mistGroup.visible = false;
+                    triggerThermobaricIgnition();
                 }
                 return true;
             }
+
+            igniteTick++;
+            const tNorm = igniteTick / maxPostIgnite;
+
+            // Core blinding flash (0..22 ticks)
+            if (flashDome) {
+                const fp = Math.min(1, igniteTick / 22);
+                const fScale = (3.5 + fp * 16.5) * blastScale;
+                flashDome.scale.set(fScale, fScale * 0.72, fScale);
+                flashDome.material.opacity = Math.max(0, (1 - fp) * 0.95);
+                flashDome.visible = fp < 1;
+            }
+
+            // Main roaring thermobaric fireball dome (0..52 ticks)
+            if (fireDome) {
+                const bp = Math.min(1, igniteTick / 52);
+                const easeOut = 1 - Math.pow(1 - bp, 3);
+                const bScale = (4.0 + easeOut * 15.5) * blastScale;
+                fireDome.scale.set(bScale, bScale * (0.65 + 0.25 * (1 - bp)), bScale);
+                fireDome.position.y = 0.15 + bp * 2.2 * blastScale;
+                fireDome.material.opacity = Math.max(0, (1 - bp * bp) * 0.92);
+                fireDome.visible = bp < 1;
+            }
+
+            // Wilson condensation pressure dome (0..42 ticks)
+            if (wilsonDome) {
+                const wp = Math.min(1, igniteTick / 42);
+                const wScale = (5.0 + wp * 24.0) * blastScale;
+                wilsonDome.scale.set(wScale, wScale * 0.62, wScale);
+                wilsonDome.material.opacity = Math.max(0, (1 - wp) * 0.42);
+                wilsonDome.visible = wp < 1;
+            }
+
+            // Ground-hugging pressure shockwaves (scaled uniformly in X and Z!)
+            if (shockRing1) {
+                const sp1 = Math.min(1, igniteTick / 38);
+                const s1 = (2.5 + sp1 * 26.0) * blastScale;
+                shockRing1.scale.set(s1, 1, s1);
+                shockRing1.material.opacity = Math.max(0, (1 - sp1) * 0.92);
+                shockRing1.visible = sp1 < 1;
+            }
+            if (shockRing2) {
+                const sp2 = Math.min(1, igniteTick / 30);
+                const s2 = (3.0 + sp2 * 31.0) * blastScale;
+                shockRing2.scale.set(s2, 1, s2);
+                shockRing2.material.opacity = Math.max(0, (1 - sp2) * 0.78);
+                shockRing2.visible = sp2 < 1;
+            }
+            if (dustSkirt) {
+                const dp = Math.min(1, igniteTick / 68);
+                const ds = (3.0 + dp * 22.0) * blastScale;
+                dustSkirt.scale.set(ds, 1 + dp * 2.4, ds);
+                dustSkirt.material.opacity = Math.max(0, (1 - dp) * 0.68);
+                dustSkirt.visible = dp < 1;
+            }
+
+            // Boiling perimeter fireballs
+            for (let i = 0; i < fireLobes.length; i++) {
+                const fl = fireLobes[i];
+                const lp = Math.min(1, igniteTick / 58);
+                fl.mesh.position.x += fl.vx * (1 - lp * 0.7);
+                fl.mesh.position.y += fl.vy * (1 - lp * 0.5);
+                fl.mesh.position.z += fl.vz * (1 - lp * 0.7);
+                const ls = 1.0 + Math.sin(lp * Math.PI * 0.85) * fl.maxScale;
+                fl.mesh.scale.setScalar(ls);
+                fl.mesh.material.opacity = Math.max(0, (1 - lp) * 0.88);
+                fl.mesh.visible = lp < 1;
+            }
+
+            // Rising mushroom smoke column
+            for (let i = 0; i < smokeCol.length; i++) {
+                const sm = smokeCol[i];
+                const sp = Math.min(1, Math.max(0, (igniteTick - 12) / (maxPostIgnite - 12)));
+                sm.mesh.position.y += sm.riseSpeed * (1 - sp * 0.55);
+                sm.mesh.position.x = sm.tx * (0.35 + sp * 0.85);
+                sm.mesh.position.z = sm.tz * (0.35 + sp * 0.85);
+                sm.mesh.scale.setScalar(sm.baseScale * (0.65 + sp * 1.25));
+                const fadeIn = Math.min(1, Math.max(0, (igniteTick - 12) / 22));
+                const fadeOut = Math.max(0, 1 - Math.pow(sp, 1.8));
+                sm.mesh.material.opacity = fadeIn * fadeOut * (sm.isCap ? 0.68 : 0.55);
+            }
+
+            if (tNorm >= 1) {
+                cleanup();
+                return false;
+            }
+            return true;
+        }
     });
 }
 
@@ -3837,12 +4104,16 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
                         canisterMat.dispose();
                         chute.geometry.dispose();
                         chuteMat.dispose();
-                        if (typeof playAudio === 'function') playAudio('daisycutter_blast', { volume: 0.98 }, 'usa');
-                        if (typeof triggerScreenShake === 'function') triggerScreenShake(1.4);
-                        if (typeof spawnFuelAirExplosion === 'function') spawnFuelAirExplosion(dropCenter, 'none');
-                        else if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropCenter, 0xff7f50, 6.5, true, 'none');
-                        if (typeof spawnCraterDecal === 'function') spawnCraterDecal(dropCenter, 6.0, 600);
-                        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropCenter, 22.0, 650, 'EXPLOSIVE', pseudoAttacker);
+                        const triggerDaisyDamage = () => {
+                            if (typeof playAudio === 'function') playAudio('daisycutter_blast', { volume: 0.98 }, 'usa');
+                            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropCenter, 24.0, 650, 'EXPLOSIVE', pseudoAttacker);
+                        };
+                        if (typeof spawnFuelAirExplosion === 'function') {
+                            spawnFuelAirExplosion(dropCenter, 'none', 1.35, triggerDaisyDamage);
+                        } else {
+                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(dropCenter, 0xff7f50, 6.5, true, 'none');
+                            triggerDaisyDamage();
+                        }
                         return false;
                     }
                 });
