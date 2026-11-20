@@ -1472,8 +1472,19 @@ function animate() {
             case 'MovingToCenter': {
                 let dropoffPosition = null;
                 if (isAIUnit) {
-                    const aiStructs = enemyStructures.filter(s => s.ownerId === unit.ownerId && s.health > 0 && (s.type === 'supplyCenter' || s.type === 'supplyStash' || s.type === 'center' || s.type === 'commandCenter'));
-                    const bestCenter = aiStructs[0];
+                    const aiSupplyCenters = enemyStructures.filter(s => s.ownerId === unit.ownerId && !s.isBuilding && s.health > 0 && (s.type === 'supplyCenter' || s.type === 'supplyStash'));
+                    const candidates = aiSupplyCenters.length > 0
+                        ? aiSupplyCenters
+                        : enemyStructures.filter(s => s.ownerId === unit.ownerId && !s.isBuilding && s.health > 0 && (s.type === 'center' || s.type === 'commandCenter'));
+                    let bestCenter = candidates[0] || null;
+                    if (candidates.length > 1 && unit.mesh) {
+                        let bestDist = Infinity;
+                        for (let ci = 0; ci < candidates.length; ci++) {
+                            const c = candidates[ci];
+                            const d = Math.hypot(unit.mesh.position.x - c.position.x, unit.mesh.position.z - c.position.z);
+                            if (d < bestDist) { bestDist = d; bestCenter = c; }
+                        }
+                    }
                     if (bestCenter) {
                         dropoffPosition = (typeof getSupplyDockSlotPosition === 'function' && unit.type !== 'chinook')
                         ? getSupplyDockSlotPosition(bestCenter, unit, true)

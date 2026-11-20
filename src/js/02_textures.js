@@ -150,22 +150,21 @@ function createSupplyFields() {
 }
 
 function getSupplyDropoffPosition(unitPos = null) {
-    const dropoffs = structures.filter(s =>
+    const supplyCenters = structures.filter(s =>
         !s.isBuilding && s.health > 0 &&
-        (s.type === 'center' || s.type === 'supplyCenter' || s.type === 'supplyStash')
+        (s.type === 'supplyCenter' || s.type === 'supplyStash')
     );
+    const dropoffs = supplyCenters.length > 0
+        ? supplyCenters
+        : structures.filter(s => !s.isBuilding && s.health > 0 && (s.type === 'center' || s.type === 'commandCenter'));
     if (dropoffs.length === 0) return supplyCenterPos;
-    if (!unitPos) {
-        const sc = dropoffs.find(s => s.type === 'supplyCenter' || s.type === 'supplyStash');
-        return sc ? sc.position : dropoffs[0].position;
-    }
+    if (!unitPos) return dropoffs[0].position;
     let best = dropoffs[0];
     let bestDist = Infinity;
     for (const d of dropoffs) {
         const dist = Math.hypot(unitPos.x - d.position.x, unitPos.z - d.position.z);
-        const weight = (d.type === 'supplyCenter' || d.type === 'supplyStash') ? 0.75 : 1.0;
-        if (dist * weight < bestDist) {
-            bestDist = dist * weight;
+        if (dist < bestDist) {
+            bestDist = dist;
             best = d;
         }
     }
