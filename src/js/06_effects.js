@@ -3096,6 +3096,15 @@ function attachOverlordUpgrade(tank, upgradeType) {
     const dish = tank.mesh.getObjectByName("radardish01") || tank.mesh.getObjectByName("RADARDISH01") || tank.mesh.getObjectByName("radarDish");
     if (dish) dish.visible = true;
 
+    if (upgradeType === 'bunker') {
+        tank.capacity = 5;
+        if (!Array.isArray(tank.garrisoned)) tank.garrisoned = [];
+    } else {
+        if (Array.isArray(tank.garrisoned) && tank.garrisoned.length > 0 && typeof unloadTransportPassengers === 'function') {
+            unloadTransportPassengers(tank);
+        }
+        tank.capacity = 0;
+    }
     tank.overlordUpgrade = upgradeType;
 
     // Authentic Westwood 3D Overlord Upgrades (ChinaVehicle.ini / FactionUnit.ini):
@@ -3252,6 +3261,15 @@ function attachOverlordUpgrade(tank, upgradeType) {
 
     turretSys.add(group);
     tank.overlordUpgradeMesh = group;
+    if (upgradeType === 'bunker') {
+        tank.capacity = 5;
+        if (!Array.isArray(tank.garrisoned)) tank.garrisoned = [];
+    } else {
+        if (Array.isArray(tank.garrisoned) && tank.garrisoned.length > 0 && typeof unloadTransportPassengers === 'function') {
+            unloadTransportPassengers(tank);
+        }
+        tank.capacity = 0;
+    }
     tank.overlordUpgrade = upgradeType;
     if (upgradeType === 'bunker') {
         tank.capacity = 5;

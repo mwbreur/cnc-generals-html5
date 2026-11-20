@@ -786,21 +786,7 @@ function animate() {
                 const uX = unit.mesh.position.x;
                 const uZ = unit.mesh.position.z;
 
-                // Overlord Bunker: Garrisoned troops or default bunker crew shoot 360 degrees
-                if (unit.overlordUpgrade === 'bunker' && unit.upgTimer % 45 === 0) {
-                    const maxDistSq = 20.0 * 20.0;
-                    const target = getLivingUnits().find(e => {
-                            if (e.health <= 0 || isFriendly(unit, e)) return false;
-                            const dx = e.mesh.position.x - uX;
-                            const dz = e.mesh.position.z - uZ;
-                            return (dx * dx + dz * dz) <= maxDistSq;
-                    });
-                    if (target) {
-                        spawnBulletTracer(unit.mesh.position, target.mesh.position, 0xf39c12, 2.5);
-                        playAudio('china_cannon', {}, 'china');
-                        applyCalculatedDamage(unit, target, 24, 'SMALL_ARMS');
-                    }
-                }
+                // Overlord Bunker: firing is performed authentically by the actual garrisoned infantry via processCombatScanning()!
 
                 // Overlord Gatling Cannon: Stealth detection (firing handled by processCombatScanning)
                 if (unit.overlordUpgrade === 'gatling') {

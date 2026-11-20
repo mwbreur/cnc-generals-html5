@@ -29,25 +29,38 @@ function processCombatScanning() {
             if (unit.garrisonedIn) {
                 const tr = unit.garrisonedIn;
                 const isBuildingGarrison = !!(tr && (tr.isWorldBuilding || tr.type === 'bunker'));
-                const hasFireports = tr && tr.health > 0 && tr.mesh && (isBuildingGarrison || tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus' || (tr.type === 'overlord' && tr.overlordUpgrade === 'bunker'));
+                const isOverlordBunker = !!(tr && tr.type === 'overlord' && tr.overlordUpgrade === 'bunker');
+                const hasFireports = tr && tr.health > 0 && tr.mesh && (isBuildingGarrison || isOverlordBunker || tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus');
                 if (!hasFireports) return;
                 const trPos = tr.position || tr.mesh.position;
                 unit.mesh.position.copy(trPos);
                 if (isBuildingGarrison) unit.mesh.position.y += 2.0;
-                if (tr.combatTarget && tr.combatTarget.health > 0 && canUnitTarget(unit, tr.combatTarget)) {
+                else if (isOverlordBunker) unit.mesh.position.y += 4.5;
+                const rangeBonus = (isBuildingGarrison || isOverlordBunker) ? 1.5 : 1.0;
+                const baseGarrisonRange = (unit.scanRange || 22) * rangeBonus + (isOverlordBunker ? (tr.radius || 6.2) : 0);
+                const distToHostile = (h) => {
+                    const hp = h && (h.position || (h.mesh && h.mesh.position));
+                    if (!hp) return Infinity;
+                    return (unit.isAir || h.isAir)
+                        ? trPos.distanceTo(hp)
+                        : Math.hypot(trPos.x - hp.x, trPos.z - hp.z);
+                };
+                if (tr.combatTarget && tr.combatTarget.health > 0 && canUnitTarget(unit, tr.combatTarget) &&
+                    distToHostile(tr.combatTarget) <= baseGarrisonRange + (tr.combatTarget.radius || 0)) {
                     unit.combatTarget = tr.combatTarget;
-                } else if (!unit.combatTarget || unit.combatTarget.health <= 0) {
-                    const rangeBonus = isBuildingGarrison ? 1.5 : 1.0;
+                } else if (!unit.combatTarget || unit.combatTarget.health <= 0 ||
+                    !canUnitTarget(unit, unit.combatTarget) ||
+                    distToHostile(unit.combatTarget) > baseGarrisonRange + (unit.combatTarget.radius || 0)) {
+                    unit.combatTarget = null;
                     const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
-                    let bestGTarget = null, bestGD = (unit.scanRange || 22) * rangeBonus + 8;
+                    let bestGTarget = null, bestGD = Infinity;
                     for (let hi = 0; hi < hostiles.length; hi++) {
                         const h = hostiles[hi];
                         if (!h || h.health <= 0 || isFriendly(unit, h)) continue;
                         if (!canUnitTarget(unit, h)) continue;
-                        const hp = h.position || (h.mesh && h.mesh.position);
-                        if (!hp) continue;
-                        const d = trPos.distanceTo(hp);
-                        if (d < bestGD) { bestGD = d; bestGTarget = h; }
+                        const d = distToHostile(h);
+                        const maxD = baseGarrisonRange + (h.radius || 0);
+                        if (d <= maxD && d < bestGD) { bestGD = d; bestGTarget = h; }
                     }
                     if (bestGTarget) unit.combatTarget = bestGTarget;
                 }
@@ -64,8 +77,10 @@ function processCombatScanning() {
                     ? unit.mesh.position.distanceTo(targetPos)
                     : Math.hypot(unit.mesh.position.x - targetPos.x, unit.mesh.position.z - targetPos.z))
                 : Infinity;
-                const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker')) ? 1.5 : 1.0;
-                const maxEffectiveRange = unit.scanRange * garrisonRangeMult + targetRadius;
+                const inOverlordBunker = !!(unit.garrisonedIn && unit.garrisonedIn.type === 'overlord' && unit.garrisonedIn.overlordUpgrade === 'bunker');
+                const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker' || inOverlordBunker)) ? 1.5 : 1.0;
+                const garrisonRadiusBonus = inOverlordBunker ? (unit.garrisonedIn.radius || 6.2) : 0;
+                const maxEffectiveRange = unit.scanRange * garrisonRangeMult + garrisonRadiusBonus + targetRadius;
                 const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
 
                 if (!canUnitTarget(unit, unit.combatTarget) || unit.combatTarget.health <= 0) {
@@ -101,13 +116,15 @@ function processCombatScanning() {
                     const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
                     let bestTarget = null;
                     let bestScore = -Infinity;
+                    // Authentic Zero Hour OverlordGattlingCannon: AttackRange 200 vs OverlordTankGun 175 (37.8) => 43.2 horizontal range (both Air & Ground)
+                    const gatRange = 43.2;
                     for (let hi = 0; hi < hostiles.length; hi++) {
                         const h = hostiles[hi];
                         const hPos = h && (h.position || (h.mesh && h.mesh.position));
                         if (!h || h.health <= 0 || !hPos || isFriendly(unit, h)) continue;
                         if (h.isStealthed && !h.isDetected) continue;
-                        const d = unit.mesh.position.distanceTo(hPos);
-                        if (d <= 26) {
+                        const d = Math.hypot(unit.mesh.position.x - hPos.x, unit.mesh.position.z - hPos.z);
+                        if (d <= gatRange + (h.radius || 0)) {
                             let score = 100 - d;
                             if (h.isAir) score += 60; // Prioritize airborne aircraft!
                             if (getArmorCategory(h) === 'infantry') score += 30;
@@ -634,12 +651,37 @@ function executeWeaponFireInner(attacker, target) {
     targetPos.y += (target.isAir ? 0.2 : 0.5);
 
     let muzzlePos = getMuzzleWorldPosition(attacker);
-    if (attacker.garrisonedIn && attacker.garrisonedIn.isWorldBuilding && attacker.garrisonedIn.position) {
-        const bPos = attacker.garrisonedIn.position;
-        const bRad = attacker.garrisonedIn.radius || 5.5;
-        const dx = targetPos.x - bPos.x, dz = targetPos.z - bPos.z;
-        const len = Math.hypot(dx, dz) || 1;
-        muzzlePos = new THREE.Vector3(bPos.x + (dx / len) * (bRad * 0.72), (bPos.y || 0) + 3.0 + (Math.random() - 0.5) * 0.6, bPos.z + (dz / len) * (bRad * 0.72));
+    if (attacker.garrisonedIn) {
+        const gHost = attacker.garrisonedIn;
+        if (gHost.isWorldBuilding && gHost.position) {
+            const bPos = gHost.position;
+            const bRad = gHost.radius || 5.5;
+            const dx = targetPos.x - bPos.x, dz = targetPos.z - bPos.z;
+            const len = Math.hypot(dx, dz) || 1;
+            muzzlePos = new THREE.Vector3(bPos.x + (dx / len) * (bRad * 0.72), (bPos.y || 0) + 3.0 + (Math.random() - 0.5) * 0.6, bPos.z + (dz / len) * (bRad * 0.72));
+        } else if (gHost.type === 'overlord' && gHost.overlordUpgrade === 'bunker' && gHost.mesh) {
+            const upgMesh = gHost.overlordUpgradeMesh || getCachedNode(gHost.mesh, "overlordUpgrade");
+            const bCenter = (upgMesh && typeof upgMesh.getWorldPosition === 'function')
+                ? upgMesh.getWorldPosition(new THREE.Vector3())
+                : gHost.mesh.position.clone().add(new THREE.Vector3(0, 4.6, 0));
+            const dx = targetPos.x - bCenter.x, dz = targetPos.z - bCenter.z;
+            const len = Math.hypot(dx, dz) || 1;
+            muzzlePos = new THREE.Vector3(
+                bCenter.x + (dx / len) * 2.4 + (Math.random() - 0.5) * 0.7,
+                bCenter.y + 1.2 + (Math.random() - 0.5) * 0.3,
+                bCenter.z + (dz / len) * 2.4 + (Math.random() - 0.5) * 0.7
+            );
+        } else if (gHost.mesh) {
+            const hPos = gHost.position || gHost.mesh.position;
+            const hRad = gHost.radius || 2.8;
+            const dx = targetPos.x - hPos.x, dz = targetPos.z - hPos.z;
+            const len = Math.hypot(dx, dz) || 1;
+            muzzlePos = new THREE.Vector3(
+                hPos.x + (dx / len) * (hRad * 0.65),
+                (hPos.y || 0) + 1.8,
+                hPos.z + (dz / len) * (hRad * 0.65)
+            );
+        }
     }
 
     // Spin Gatling barrels when firing (sets momentum for smooth continuous spin in gameLoop)

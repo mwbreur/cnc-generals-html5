@@ -4003,7 +4003,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
 
     // China Forces (Official INIZH.big MaxHealth values)
     else if (type === 'battlemaster') { mesh = createBattlemasterTankMesh(false); radius = 3.4; speed = 0.15; health = 400; scanRange = 24; }
-    else if (type === 'overlord') { mesh = createOverlordTankMesh(false); radius = 4.6; speed = 0.09; health = 1100; scanRange = 28; capacity = 5; garrisoned = []; }
+    else if (type === 'overlord') { mesh = createOverlordTankMesh(false); radius = 4.6; speed = 0.09; health = 1100; scanRange = 28; capacity = 0; garrisoned = []; }
     else if (type === 'gatling') { mesh = createGatlingTankMesh(false); radius = 3.2; speed = 0.16; health = 300; scanRange = 26; }
     else if (type === 'dragon') { mesh = createDragonTankMesh(false); radius = 3.2; speed = 0.15; health = 280; scanRange = 18; }
     else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 3.6; speed = 0.15; health = 420; scanRange = 20; capacity = 8; garrisoned = []; }
