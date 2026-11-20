@@ -1223,19 +1223,21 @@ function processBaseDefenseCombat() {
                     targetPos.y += (closestEnemy.isAir ? 0.2 : 0.5);
 
                     if (def.type === 'gatlingCannon') {
-                        def.attackCooldown = 28; // ~0.46s reload
+                        // Authentic Zero Hour 3-stage Gatling Cannon spool-up (16 -> 10 -> 6 ticks)
+                        def._gatSpin = Math.min(12, (def._gatSpin || 0) + 1);
+                        def.attackCooldown = def._gatSpin >= 8 ? 6 : (def._gatSpin >= 4 ? 10 : 16);
                         spawnMuzzleFlash(defPos, 0xffa502, 0.4);
                         spawnBulletTracer(defPos, targetPos, 0xf1c40f, 2.5);
-                        if ((!def.mesh || def.mesh.visible) && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
-                        closestEnemy.health -= 22;
+                        if ((!def.mesh || def.mesh.visible) && Math.random() < 0.4 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
+                        closestEnemy.health -= 10;
                     } else if (def.type === 'patriot') {
-                        def.attackCooldown = 190; // ~3.16s reload
+                        def.attackCooldown = 180; // 3.0s reload
                         spawnMuzzleFlash(defPos, 0xff9f43, 0.8);
                         spawnRocketProjectile(defPos, targetPos, true, false);
                         if ((!def.mesh || def.mesh.visible) && typeof playUSASound === 'function') playUSASound('patriot_fire');
                         closestEnemy.health -= 65;
                     } else if (def.type === 'stingerSite') {
-                        def.attackCooldown = 150; // ~2.5s reload
+                        def.attackCooldown = 150; // 2.5s reload
                         spawnMuzzleFlash(defPos, 0xff9f43, 0.5);
                         spawnRocketProjectile(defPos, targetPos, false, true);
                         if ((!def.mesh || def.mesh.visible) && typeof playAudio === 'function') playAudio('stinger_fire', {}, 'gla');

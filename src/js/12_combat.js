@@ -606,34 +606,35 @@ function executeWeaponFireInner(attacker, target) {
         attacker.combatTarget = null;
         return;
     }
-    // Authentic Command & Conquer: Generals Weapon Reload Rates (60 ticks = 1.0s, matched to INIZH.big)
+    // Authentic Command & Conquer: Generals Zero Hour Weapon Reload Rates (60 ticks = 1.0s, matched to INIZH.big)
     const cncCooldowns = {
         // Main Battle & Heavy Tanks
-        'tank': 120, 'crusader': 120, 'battlemaster': 120, 'scorpion': 60, 'marauder': 90,
+        'tank': 120, 'crusader': 120, 'battlemaster': 120, 'scorpion': 120, 'marauder': 120,
         'paladin': 120, 'overlord': 180,
         // Artillery & Heavy Siege Missiles
-        'tomahawk': 420, 'scud': 600, 'inferno': 240, 'nukecannon': 450, 'nuketank': 450,
+        'tomahawk': 360, 'scud': 600, 'inferno': 210, 'nukecannon': 450, 'nuketank': 450,
         // Anti-Tank & Rocket Troops / Base Defenses
-        'rocket': 60, 'missiledefender': 60, 'rpg': 60, 'tankhunter': 60, 'patriot': 120, 'stingerSite': 120,
-        // Standard Infantry Rifle Bursts
-        'ranger': 60, 'redguard': 60, 'rebel': 60, 'infantry': 60, 'burton': 50,
+        'rocket': 140, 'missiledefender': 140, 'rpg': 132, 'tankhunter': 138, 'patriot': 180, 'stingerSite': 150,
+        // Standard Infantry Rifle Bursts & Mob
+        'ranger': 60, 'redguard': 60, 'rebel': 60, 'infantry': 60, 'burton': 50, 'mob': 36,
+        'blacklotus': 120, 'hacker': 120,
         // High-Caliber Snipers
-        'pathfinder': 120, 'jarmen': 60,
+        'pathfinder': 90, 'jarmen': 90,
         // Fast Attack & Light Vehicles
-        'humvee': 25, 'technical': 35, 'buggy': 360,
-        'dragon': 45, 'dragonTank': 45, 'toxintractor': 45,
+        'humvee': 48, 'technical': 24, 'buggy': 270,
+        'dragon': 18, 'dragonTank': 18, 'toxintractor': 18,
         // Rapid-Fire Autocannons & Gatling Guns
-        'gatling': 24, 'gatlingTank': 24, 'gatlingCannon': 24, 'quad': 36,
+        'gatling': 16, 'gatlingTank': 16, 'gatlingCannon': 16, 'quad': 12,
         // Aircraft
         'comanche': 150, 'raptor': 360, 'mig': 360, 'stealthfighter': 360, 'aurora': 300,
         'chinook': 180, 'truck': 180, 'worker': 180, 'dozer': 180
     };
     let baseCooldown = cncCooldowns[attacker.type] || 120;
 
-    // Authentic Gatling Spool-Up Fire Rate Acceleration
+    // Authentic Zero Hour 3-Stage Gatling Spool-Up Fire Rate Acceleration (16 -> 10 -> 6 ticks)
     if (attacker.type === 'gatling' || attacker.type === 'gatlingTank' || attacker.type === 'gatlingCannon') {
-        attacker.gatlingSpin = Math.min(6, (attacker.gatlingSpin || 0) + 1);
-        baseCooldown = Math.max(15, Math.round(baseCooldown - attacker.gatlingSpin * 1.5));
+        attacker.gatlingSpin = Math.min(12, (attacker.gatlingSpin || 0) + 1);
+        baseCooldown = attacker.gatlingSpin >= 8 ? 6 : (attacker.gatlingSpin >= 4 ? 10 : 16);
     } else if (attacker.gatlingSpin) {
         attacker.gatlingSpin = 0;
     }
@@ -755,15 +756,15 @@ function executeWeaponFireInner(attacker, target) {
         setTimeout(() => fireOverlordBarrel(0.45, true), 220);
         // Note: Overlord Gatling Cannon upgrade fires autonomously at full 43.2 range with 3-stage spool-up in processCombatScanning()!
     } else if (attacker.type === 'dragon') {
-        // Dragon Tank NAPALM FLAMETHROWER!
+        // Dragon Tank NAPALM FLAMETHROWER! (Continuous stream @ 0.3s)
         spawnFlamethrowerBurst(muzzlePos, targetPos);
-        playAudio('dragon_flame', {}, 'china');
-        applyCalculatedDamage(attacker, target, 24, 'FLAME');
+        if (Math.random() < 0.45) playAudio('dragon_flame', {}, 'china');
+        applyCalculatedDamage(attacker, target, 10, 'FLAME');
     } else if (attacker.type === 'toxintractor') {
-        // Toxin Tractor CHEMICAL ANTHRAX SPRAY!
+        // Toxin Tractor CHEMICAL ANTHRAX SPRAY! (Continuous stream @ 0.3s)
         spawnToxinSprayBurst(muzzlePos, targetPos);
-        playAudio('toxin_spray', {}, 'gla');
-        let toxDmg = 24;
+        if (Math.random() < 0.45) playAudio('toxin_spray', {}, 'gla');
+        let toxDmg = 10;
         if (attacker.salvageLevel >= 1) toxDmg = Math.round(toxDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
         applyCalculatedDamage(attacker, target, toxDmg, 'TOXIN');
     } else if (attacker.type === 'buggy') {
@@ -1012,13 +1013,13 @@ function executeWeaponFireInner(attacker, target) {
             spawnBulletTracer(mR, targetPos, isHeroic ? heroicTracerColor : 0xffd32a, 3.0 * heroicScale);
             if (typeof spawnSmokePuff === 'function' && Math.random() < 0.35) spawnSmokePuff(mR, 0xc8c4bc, 0.22);
         }, 48);
-        playAudio('gatling_fire', {}, 'china');
-        applyCalculatedDamage(attacker, target, 15, 'GATLING');
+        if (Math.random() < 0.45) playAudio('gatling_fire', {}, 'china');
+        applyCalculatedDamage(attacker, target, 10, 'GATLING');
     } else if (attacker.type === 'dragonTank') {
-        // China Dragon Tank Flamethrower
+        // China Dragon Tank Flamethrower (Continuous stream @ 0.3s)
         spawnFlamethrowerBurst(muzzlePos, targetPos);
-        playAudio('dragon_flame', {}, 'china');
-        applyCalculatedDamage(attacker, target, 24, 'FLAME');
+        if (Math.random() < 0.45) playAudio('dragon_flame', {}, 'china');
+        applyCalculatedDamage(attacker, target, 10, 'FLAME');
     } else if (['rebel', 'technical'].includes(attacker.type)) {
         // GLA Kalashnikov AK-47 & Technical Heavy MG (apBullets applied in applyCalculatedDamage)
         const burstN = attacker.type === 'technical' ? 3 : 2;
@@ -1130,9 +1131,9 @@ function executeWeaponFireInner(attacker, target) {
                 if (idx === 1 && typeof spawnSmokePuff === 'function' && Math.random() < 0.4) spawnSmokePuff(mPos, 0xb8b4ac, 0.22);
             }, idx * 45);
         });
-        let qDmg = 24;
+        let qDmg = 10;
         if (attacker.salvageLevel >= 1) qDmg = Math.round(qDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
-        playAudio('quad_cannon', {}, 'gla');
+        if (Math.random() < 0.5) playAudio('quad_cannon', {}, 'gla');
         applyCalculatedDamage(attacker, target, qDmg, 'GATLING');
     } else if (attacker.type === 'jarmen' || attacker.type === 'pathfinder') {
         // Supersonic Sniper Vapor Trail (Instant lethal damage vs infantry, Jarmen Kell also snipes vehicle drivers!)
@@ -1306,9 +1307,9 @@ function executeWeaponFireInner(attacker, target) {
             });
         }
         playAudio('rebel_ak47', {}, 'gla');
-        const mobDmg = 30;
+        const mobDmg = 14;
         applyCalculatedDamage(attacker, target, mobDmg, 'SMALL_ARMS');
-        applyCalculatedDamage(attacker, target, 15, 'FLAME');
+        applyCalculatedDamage(attacker, target, 7, 'FLAME');
     } else if (['tank', 'crusader', 'scorpion', 'marauder'].includes(attacker.type)) {
         // Tank Cannon (Crusader 60, Marauder 45, Scorpion 20 per INIZH.big)
         const isScorpion = attacker.type === 'scorpion';
