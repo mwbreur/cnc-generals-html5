@@ -3032,8 +3032,8 @@ function attachVehicleDrone(vehicle, droneType) {
         vehicle._baseScanRange = vehicle.scanRange || 25;
     }
     if (vehicle.drone && vehicle.drone.mesh) {
-        scene.remove(vehicle.drone.mesh);
-        vehicle.drone.mesh.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(vehicle.drone.mesh);
+        else scene.remove(vehicle.drone.mesh);
     }
 
     const mesh = createDroneMesh(droneType);
@@ -3080,13 +3080,7 @@ function attachOverlordUpgrade(tank, upgradeType) {
             turretSys.remove(tank.overlordUpgradeMesh);
             tank.mesh.remove(tank.overlordUpgradeMesh);
         }
-        tank.overlordUpgradeMesh.traverse(c => {
-                if (c.geometry) c.geometry.dispose();
-                if (c.material) {
-                    if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-                    else c.material.dispose();
-                }
-        });
+        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(tank.overlordUpgradeMesh);
         tank.overlordUpgradeMesh = null;
     }
 

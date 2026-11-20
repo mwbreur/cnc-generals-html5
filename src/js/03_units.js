@@ -4,6 +4,9 @@ function createTrackAssembly(width, height, length, matHull, isEnemy = false) {
         _unitTrackBoxGeo = new THREE.BoxGeometry(1, 1, 1);
         _unitTrackCyl12Geo = new THREE.CylinderGeometry(1, 1, 1, 12);
         _unitTrackCyl8Geo = new THREE.CylinderGeometry(1, 1, 1, 8);
+        [_unitTrackBoxGeo, _unitTrackCyl12Geo, _unitTrackCyl8Geo].forEach(g => {
+            if (g) g.userData = Object.assign(g.userData || {}, { _shared: true });
+        });
     }
     const trackGroup = new THREE.Group();
     const treadWidth = 0.44;

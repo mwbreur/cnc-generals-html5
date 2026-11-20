@@ -446,10 +446,14 @@ function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
     }
 
     if (!instant) {
+        if (!window._sharedConstructionWireMat) {
+            window._sharedConstructionWireMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true, transparent: true, opacity: 0.45 });
+            window._sharedConstructionWireMat.userData = { _shared: true };
+        }
         group.traverse(child => {
                 if (child.isMesh) {
                     child.savedMaterial = child.material;
-                    child.material = new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true, transparent: true, opacity: 0.45 });
+                    child.material = window._sharedConstructionWireMat;
                 }
         });
     }

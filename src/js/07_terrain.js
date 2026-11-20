@@ -798,11 +798,39 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     : (officialMap ? officialMap.theme : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city', 'tournament_desert'].includes(mapType) ? mapType : 'desert')));
 
     flattenedFootprints.length = 0;
-    // Clear previous terrain, water, props, and supply points
-    if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh = null; }
-    if (window.terrainDetailMesh) { scene.remove(window.terrainDetailMesh); if (window.terrainDetailMesh.material) window.terrainDetailMesh.material.dispose(); window.terrainDetailMesh = null; }
-    if (waterMesh) { scene.remove(waterMesh); waterMesh.geometry.dispose(); waterMesh = null; }
-    if (mapPropsGroup) { scene.remove(mapPropsGroup); mapPropsGroup = null; }
+    // Clear previous terrain, water, props, and supply points (disposing non-shared GPU geometries, materials & canvas textures)
+    if (terrainMesh) {
+        scene.remove(terrainMesh);
+        if (terrainMesh.geometry && typeof terrainMesh.geometry.dispose === 'function') terrainMesh.geometry.dispose();
+        if (terrainMesh.material) {
+            if (terrainMesh.material.map && typeof terrainMesh.material.map.dispose === 'function') terrainMesh.material.map.dispose();
+            if (typeof terrainMesh.material.dispose === 'function') terrainMesh.material.dispose();
+        }
+        terrainMesh = null;
+    }
+    if (window.terrainDetailMesh) {
+        scene.remove(window.terrainDetailMesh);
+        if (window.terrainDetailMesh.geometry && typeof window.terrainDetailMesh.geometry.dispose === 'function') window.terrainDetailMesh.geometry.dispose();
+        if (window.terrainDetailMesh.material) {
+            if (window.terrainDetailMesh.material.map && typeof window.terrainDetailMesh.material.map.dispose === 'function') window.terrainDetailMesh.material.map.dispose();
+            if (typeof window.terrainDetailMesh.material.dispose === 'function') window.terrainDetailMesh.material.dispose();
+        }
+        window.terrainDetailMesh = null;
+    }
+    if (waterMesh) {
+        scene.remove(waterMesh);
+        if (waterMesh.geometry && typeof waterMesh.geometry.dispose === 'function') waterMesh.geometry.dispose();
+        if (waterMesh.material) {
+            if (waterMesh.material.map && typeof waterMesh.material.map.dispose === 'function') waterMesh.material.map.dispose();
+            if (typeof waterMesh.material.dispose === 'function') waterMesh.material.dispose();
+        }
+        waterMesh = null;
+    }
+    if (mapPropsGroup) {
+        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(mapPropsGroup);
+        else scene.remove(mapPropsGroup);
+        mapPropsGroup = null;
+    }
     mapObstacles.length = 0;
     worldBuildings.length = 0;
     if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
@@ -814,7 +842,12 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
         window._minimapTerrainBg = null;
         window._minimapTerrainKey = '';
     }
-    supplyPoints.forEach(sp => { if (sp.mesh) scene.remove(sp.mesh); });
+    supplyPoints.forEach(sp => {
+        if (sp.mesh) {
+            if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(sp.mesh);
+            else scene.remove(sp.mesh);
+        }
+    });
     supplyPoints.length = 0;
 
     mapPropsGroup = new THREE.Group();

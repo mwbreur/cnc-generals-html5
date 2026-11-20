@@ -1401,7 +1401,11 @@ let blueprintRotationY = 0;
 window.blueprintRotationY = 0;
 
 function activateBlueprint(type) {
-    if (blueprintMesh) { scene.remove(blueprintMesh); blueprintMesh = null; }
+    if (blueprintMesh) {
+        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(blueprintMesh);
+        else scene.remove(blueprintMesh);
+        blueprintMesh = null;
+    }
 
     // Prerequisite tech tree check!
     const structReq = getStructureTechPrerequisite(type);

@@ -559,6 +559,22 @@ function initSharedMaterials() {
     window.matEnemyHull = matEnemyHull = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.5, metalness: 0.35 });
     window.matEnemySkirt = matEnemySkirt = new THREE.MeshStandardMaterial({ color: 0x992d22, roughness: 0.6 });
     window.matEnemyDark = matEnemyDark = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
+
+    // Mark all shared materials so disposeSceneNodeSafe never corrupts live meshes on death/reset
+    [
+        matUSA, matChina, matGLA, matUSAColor, matChinaColor, matGLAColor,
+        matGunmetal, matDarkMetal, matTread, matTire,
+        matGlass, matBlueGlass, matGoldGlass,
+        matHazard, matIonBlue, matNukeGreen, matToxinGreen, matRedStar, matGold,
+        matConcrete, matSandbags, matTarp, matCorrugated, matWood,
+        matBeaconRed, matBeaconAmber, matFlameOrange,
+        matSolar, matWindowGlow, matChrome, matExhaust,
+        matEnemyHull, matEnemySkirt, matEnemyDark
+    ].forEach(m => {
+        if (m) {
+            m.userData = Object.assign(m.userData || {}, { _shared: true });
+        }
+    });
 }
 let matEnemyHull, matEnemySkirt, matEnemyDark;
 

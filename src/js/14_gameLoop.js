@@ -324,8 +324,14 @@ function animate() {
     : (1 / 60);
     window._lastCombatFrameTime = nowTime;
     const speedMul = (typeof window !== 'undefined' && typeof window.gameSpeedMultiplier === 'number' && isFinite(window.gameSpeedMultiplier)) ? window.gameSpeedMultiplier : 1.0;
-    const fixedStepDt = (typeof SIM_FIXED_DT === 'number' && SIM_FIXED_DT > 0) ? SIM_FIXED_DT : (1 / 30);
-    _simTimeAccumSec = Math.min(_simTimeAccumSec + rawDt * speedMul, fixedStepDt * 4);
+    const simStep60Dt = 1 / 60;
+    _simTimeAccumSec = Math.min(_simTimeAccumSec + rawDt * speedMul, simStep60Dt * 4);
+    let _simStepsThisFrame = 0;
+    while (_simTimeAccumSec >= simStep60Dt && _simStepsThisFrame < 4) {
+        _simTimeAccumSec -= simStep60Dt;
+        _simStepsThisFrame++;
+    }
+    if (typeof window !== 'undefined') window._simStepsThisFrame = _simStepsThisFrame;
     const dt = rawDt;
     combatDeltaScale = Math.max(0.25, Math.min(4.0, dt * 60 * speedMul));
 
@@ -362,9 +368,10 @@ function animate() {
         }
     }
 
-    // Update Weapon Effects & Particle System
-
-    updateFXEngine();
+    // Update Weapon Effects & Particle System at fixed 60 Hz simulation cadence (refresh-rate independent)
+    for (let _fxStep = 0; _fxStep < _simStepsThisFrame; _fxStep++) {
+        updateFXEngine();
+    }
     if (typeof updateTopplingTrees === 'function') updateTopplingTrees(combatDeltaScale);
 
     // Update Top-Right Match Clock (Zero Hour style)
@@ -545,7 +552,7 @@ function animate() {
             if (unit.health <= 0) return;
 
             // 1. Authentic SAGE Engine Veterancy Passive Regeneration (ActiveBody.cpp)
-            if (buildingTick % 60 === 0 && unit.health < unit.maxHealth) {
+            if (_simStepsThisFrame > 0 && buildingTick % 60 === 0 && unit.health < unit.maxHealth) {
                 if (unit.veterancy === 1) unit.health = Math.min(unit.maxHealth, unit.health + 2); // +2 HP/s
                 else if (unit.veterancy === 2) unit.health = Math.min(unit.maxHealth, unit.health + 4); // +4 HP/s
                 else if (unit.veterancy === 3) unit.health = Math.min(unit.maxHealth, unit.health + 6); // +6 HP/s
@@ -1209,7 +1216,9 @@ function animate() {
     processEnemyMovement();
     processEnemyCombat();
     assignBuildersToConstruction();
-    processBuildingFunctions();
+    for (let _bStep = 0; _bStep < _simStepsThisFrame; _bStep++) {
+        processBuildingFunctions();
+    }
 
     let constructionActive = false;
     const allConstructing = [...structures, ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
@@ -2589,13 +2598,24 @@ function animate() {
                 if (enemy.garrisoned && enemy.garrisoned.length > 0 && typeof evacuateGarrisonedUnits === 'function') {
                     evacuateGarrisonedUnits(enemy);
                 }
-                scene.remove(enemy.mesh);
+                if (enemy.drone && enemy.drone.mesh) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(enemy.drone.mesh);
+                    else scene.remove(enemy.drone.mesh);
+                    enemy.drone = null;
+                }
+                if (enemy.trajectoryLine) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(enemy.trajectoryLine);
+                    else scene.remove(enemy.trajectoryLine);
+                    enemy.trajectoryLine = null;
+                }
                 spawnUnitDeathFX(enemy);
                 // Authentic GLA Scrap Crate Drop Chance (SalvageCrateCollide.cpp)
                 const scrapRoll = (typeof simRandom === 'function') ? simRandom() : Math.random();
                 if (scrapRoll < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
                 }
+                if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(enemy.mesh);
+                else scene.remove(enemy.mesh);
                 units.forEach((unit) => {
                         if (unit.combatTarget === enemy) unit.combatTarget = null;
                         if (unit.embarkTarget === enemy) unit.embarkTarget = null;
@@ -2640,7 +2660,14 @@ function animate() {
     if (structures.some(s => s.health <= 0)) {
         structures = structures.filter(structure => {
                 if (structure.health > 0) return true;
-                if (structure.mesh) scene.remove(structure.mesh);
+                if (structure._progressBarEl && structure._progressBarEl.parentElement) {
+                    structure._progressBarEl.parentElement.removeChild(structure._progressBarEl);
+                    structure._progressBarEl = null;
+                }
+                if (structure.mesh) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(structure.mesh);
+                    else scene.remove(structure.mesh);
+                }
                 const sPos = structure.position || (structure.mesh && structure.mesh.position);
                 if (typeof spawnBuildingDestructionFX === 'function' && sPos) spawnBuildingDestructionFX(sPos, structure.radius || 5.5, 0xff793f);
                 else createImpactExplosion(sPos);
@@ -2667,7 +2694,14 @@ function animate() {
     if (enemyStructures.some(s => s.health <= 0)) {
         enemyStructures = enemyStructures.filter(structure => {
                 if (structure.health > 0) return true;
-                if (structure.mesh) scene.remove(structure.mesh);
+                if (structure._progressBarEl && structure._progressBarEl.parentElement) {
+                    structure._progressBarEl.parentElement.removeChild(structure._progressBarEl);
+                    structure._progressBarEl = null;
+                }
+                if (structure.mesh) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(structure.mesh);
+                    else scene.remove(structure.mesh);
+                }
                 const expPos = structure.position || (structure.mesh && structure.mesh.position);
                 if (typeof spawnBuildingDestructionFX === 'function' && expPos) spawnBuildingDestructionFX(expPos, structure.radius || 5.5, 0xff4757);
                 else createImpactExplosion(expPos);
@@ -2685,7 +2719,10 @@ function animate() {
             const wb = worldBuildings[wi];
             if (wb.health > 0) continue;
             evacuateGarrisonedUnits(wb);
-            if (wb.mesh) scene.remove(wb.mesh);
+                if (wb.mesh) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(wb.mesh);
+                    else scene.remove(wb.mesh);
+                }
             if (wb.position) {
                 if (typeof spawnBuildingDestructionFX === 'function') spawnBuildingDestructionFX(wb.position, wb.radius || 5.5, 0xff793f);
                 else createImpactExplosion(wb.position);
@@ -2711,18 +2748,16 @@ function animate() {
                     evacuateGarrisonedUnits(unit);
                 }
                 removeSelectionCircle(unit);
+                if (unit.trajectoryLine) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(unit.trajectoryLine);
+                    else scene.remove(unit.trajectoryLine);
+                    unit.trajectoryLine = null;
+                }
                 if (unit.drone && unit.drone.mesh) {
-                    scene.remove(unit.drone.mesh);
-                    unit.drone.mesh.traverse(c => {
-                            if (c.geometry && !c.geometry.userData?._shared) c.geometry.dispose();
-                            if (c.material && !c.material.userData?._shared) {
-                                if (Array.isArray(c.material)) c.material.forEach(m => { if (!m.userData?._shared) m.dispose(); });
-                                else c.material.dispose();
-                            }
-                    });
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(unit.drone.mesh);
+                    else scene.remove(unit.drone.mesh);
                     unit.drone = null;
                 }
-                scene.remove(unit.mesh);
                 spawnUnitDeathFX(unit);
                 // USA Ejection Seat: Manned USA vehicles/aircraft at Veteran+ eject a pilot retaining veterancy.
                 // Deferred until AFTER units.filter() returns so spawnUnit() pushes onto the surviving units array!
@@ -2744,6 +2779,8 @@ function animate() {
                 if (uScrapRoll < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(unit.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);
                 }
+                if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(unit.mesh);
+                else scene.remove(unit.mesh);
                 enemyUnits.forEach(enemy => {
                         if (enemy.combatTarget === unit) enemy.combatTarget = null;
                 });

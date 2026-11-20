@@ -813,7 +813,14 @@ function resetEntireBattlefieldState(mapSize = 1500) {
         debrisList.length = 0;
     }
     if (typeof activeFX !== 'undefined' && Array.isArray(activeFX)) {
-        activeFX.forEach(fx => { if (fx && fx.mesh) disposeSceneNodeSafe(fx.mesh); });
+        activeFX.forEach(fx => {
+            if (!fx) return;
+            if (typeof fx.dispose === 'function') {
+                try { fx.dispose(); } catch (_) {}
+            }
+            if (fx.mesh) disposeSceneNodeSafe(fx.mesh);
+            if (fx.group) disposeSceneNodeSafe(fx.group);
+        });
         activeFX.length = 0;
     }
     if (typeof activeMissiles !== 'undefined' && Array.isArray(activeMissiles)) {
