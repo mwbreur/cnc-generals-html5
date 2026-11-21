@@ -1707,8 +1707,25 @@ function animate() {
             }
         }
     };
+    const updateDozerBladeAnim = (unit) => {
+        if (!unit || unit.health <= 0 || !unit.mesh || unit.type !== 'dozer') return;
+        const arms = getCachedNode(unit.mesh, 'ARMS');
+        const bucket = getCachedNode(unit.mesh, 'BUCKET');
+        if (!arms && !bucket) return;
+        const isWorking = (unit.taskState === 'Building' || unit.taskState === 'Repairing');
+        if (isWorking) {
+            const phase = buildingTick * 0.14;
+            if (arms) arms.rotation.x = Math.sin(phase) * 0.22 - 0.10;
+            if (bucket) bucket.rotation.x = Math.sin(phase + 0.85) * 0.32;
+        } else {
+            if (arms && Math.abs(arms.rotation.x) > 0.002) arms.rotation.x *= 0.85;
+            if (bucket && Math.abs(bucket.rotation.x) > 0.002) bucket.rotation.x *= 0.85;
+        }
+    };
     units.forEach(updateWorkerTools);
     enemyUnits.forEach(updateWorkerTools);
+    units.forEach(updateDozerBladeAnim);
+    enemyUnits.forEach(updateDozerBladeAnim);
 
     // Sync GLA Scorpion Tank turret rocket rack & Quad Cannon salvage turret tiers
     const syncGLASalvageMeshes = (unit, isAIUnit) => {
@@ -2553,25 +2570,7 @@ function animate() {
                         unit.mesh.rotation.x = 0;
                         unit.mesh.rotation.z = 0;
                         unit._strideBob = 0;
-                        if (unit.mesh.userData && unit.mesh.userData.animatedMeshes) {
-                            unit.mesh.userData.animatedMeshes.forEach(m => {
-                                    if (m.userData && m.userData.standVerts) {
-                                        const std = m.userData.standVerts;
-                                        const pos = m.geometry.attributes.position.array;
-                                        let changed = false;
-                                        for (let k = 0; k < pos.length; k++) {
-                                            const diff = std[k] - pos[k];
-                                            if (Math.abs(diff) > 0.001) {
-                                                pos[k] += diff * 0.25;
-                                                changed = true;
-                                            } else {
-                                                pos[k] = std[k];
-                                            }
-                                        }
-                                        if (changed) m.geometry.attributes.position.needsUpdate = true;
-                                    }
-                            });
-                        }
+                        updateInfantryStationaryAnim(unit);
                     }
                 }
             }
@@ -2666,8 +2665,10 @@ function animate() {
                 if (scrapRoll < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(enemy) === 'heavy_vehicle' || getArmorCategory(enemy) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(enemy.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(enemy.mesh.position);
                 }
-                if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(enemy.mesh);
-                else scene.remove(enemy.mesh);
+                if (!spawnInfantryDeathAnimation(enemy)) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(enemy.mesh);
+                    else scene.remove(enemy.mesh);
+                }
                 units.forEach((unit) => {
                         if (unit.combatTarget === enemy) unit.combatTarget = null;
                         if (unit.embarkTarget === enemy) unit.embarkTarget = null;
@@ -2831,8 +2832,10 @@ function animate() {
                 if (uScrapRoll < 0.65 && (typeof getArmorCategory === 'function' ? (getArmorCategory(unit) === 'heavy_vehicle' || getArmorCategory(unit) === 'light_vehicle') : !INFANTRY_TYPE_SET.has(unit.type))) {
                     if (typeof spawnScrapCrate === 'function') spawnScrapCrate(unit.mesh.position);
                 }
-                if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(unit.mesh);
-                else scene.remove(unit.mesh);
+                if (!spawnInfantryDeathAnimation(unit)) {
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(unit.mesh);
+                    else scene.remove(unit.mesh);
+                }
                 enemyUnits.forEach(enemy => {
                         if (enemy.combatTarget === unit) enemy.combatTarget = null;
                 });
@@ -3289,25 +3292,7 @@ function processEnemyMovement() {
                     enemy.mesh.rotation.x = 0;
                     enemy.mesh.rotation.z = 0;
                     enemy._strideBob = 0;
-                    if (enemy.mesh.userData && enemy.mesh.userData.animatedMeshes) {
-                        enemy.mesh.userData.animatedMeshes.forEach(m => {
-                                if (m.userData && m.userData.standVerts) {
-                                    const std = m.userData.standVerts;
-                                    const pos = m.geometry.attributes.position.array;
-                                    let changed = false;
-                                    for (let k = 0; k < pos.length; k++) {
-                                        const diff = std[k] - pos[k];
-                                        if (Math.abs(diff) > 0.001) {
-                                            pos[k] += diff * 0.25;
-                                            changed = true;
-                                        } else {
-                                            pos[k] = std[k];
-                                        }
-                                    }
-                                    if (changed) m.geometry.attributes.position.needsUpdate = true;
-                                }
-                        });
-                    }
+                    updateInfantryStationaryAnim(enemy);
                 }
             }
 
@@ -3316,6 +3301,115 @@ function processEnemyMovement() {
             enemy.mesh.position.y = eGroundY + (enemy._strideBob || 0);
             resolveObstacleCollisions(enemy);
     });
+}
+
+function updateInfantryStationaryAnim(unit) {
+    if (!unit || !unit.mesh || !unit.mesh.userData || !unit.mesh.userData.animatedMeshes) return;
+    if (unit._atkAnimTicks > 0) unit._atkAnimTicks--;
+    const isAttacking = (unit._atkAnimTicks > 0) || !!(unit.combatTarget && unit.combatTarget.health > 0);
+    if (isAttacking) {
+        unit._atkCycle = ((unit._atkCycle || 0) + 0.24) % 4;
+    }
+    const c = unit._atkCycle || 0;
+    unit.mesh.userData.animatedMeshes.forEach(m => {
+        if (!m || !m.userData || !m.geometry || !m.geometry.attributes || !m.geometry.attributes.position) return;
+        const pos = m.geometry.attributes.position.array;
+        if (isAttacking && m.userData.atkFrames && m.userData.atkFrames.length >= 2) {
+            const frames = m.userData.atkFrames;
+            const n = frames.length;
+            const idx = c % n;
+            const f0 = Math.floor(idx);
+            const f1 = (f0 + 1) % n;
+            const frac = idx - f0;
+            const arr0 = frames[f0];
+            const arr1 = frames[f1];
+            if (arr0 && arr1 && arr0.length === pos.length) {
+                for (let k = 0; k < pos.length; k++) {
+                    pos[k] = arr0[k] * (1 - frac) + arr1[k] * frac;
+                }
+                m.geometry.attributes.position.needsUpdate = true;
+                return;
+            }
+        }
+        if (m.userData.standVerts) {
+            const std = m.userData.standVerts;
+            let changed = false;
+            for (let k = 0; k < pos.length; k++) {
+                const diff = std[k] - pos[k];
+                if (Math.abs(diff) > 0.001) {
+                    pos[k] += diff * 0.25;
+                    changed = true;
+                } else {
+                    pos[k] = std[k];
+                }
+            }
+            if (changed) m.geometry.attributes.position.needsUpdate = true;
+        }
+    });
+}
+
+function spawnInfantryDeathAnimation(unit) {
+    if (!unit || unit._silentRemove || !unit.mesh || !INFANTRY_TYPE_SET.has(unit.type)) return false;
+    const animMeshes = unit.mesh.userData && unit.mesh.userData.animatedMeshes;
+    if (!animMeshes || animMeshes.length === 0) return false;
+    const hasDie = animMeshes.some(m => m && m.userData && m.userData.dieFrames && m.userData.dieFrames.length >= 2);
+    if (!hasDie || typeof activeFX === 'undefined') return false;
+
+    const corpseMesh = unit.mesh;
+    corpseMesh.rotation.x = 0;
+    corpseMesh.rotation.z = 0;
+    // Hide health/rank/selection UI attachments while playing the skeletal collapse
+    if (corpseMesh.children) {
+        for (let i = 0; i < corpseMesh.children.length; i++) {
+            const ch = corpseMesh.children[i];
+            if (ch && ch.name && (ch.name === 'healthBar' || ch.name === 'veterancyChevron' || ch.name === 'selectionRing' || ch.name === 'workerHammer' || ch.name === 'cargoHold' || ch.name === 'mineDetector')) {
+                ch.visible = false;
+            }
+        }
+    }
+
+    const collapseTicks = 28;
+    const holdTicks = 45;
+    const sinkTicks = 22;
+    let tick = 0;
+    const totalTicks = collapseTicks + holdTicks + sinkTicks;
+    activeFX.push({
+        life: totalTicks,
+        update() {
+            tick++;
+            if (tick <= collapseTicks) {
+                const prog = tick / collapseTicks;
+                for (let mi = 0; mi < animMeshes.length; mi++) {
+                    const m = animMeshes[mi];
+                    if (!m || !m.userData || !m.userData.dieFrames || m.userData.dieFrames.length < 2) continue;
+                    const frames = m.userData.dieFrames;
+                    const maxIdx = frames.length - 1;
+                    const fVal = prog * maxIdx;
+                    const f0 = Math.min(maxIdx, Math.floor(fVal));
+                    const f1 = Math.min(maxIdx, f0 + 1);
+                    const frac = fVal - f0;
+                    const arr0 = frames[f0];
+                    const arr1 = frames[f1];
+                    const pos = m.geometry && m.geometry.attributes && m.geometry.attributes.position && m.geometry.attributes.position.array;
+                    if (pos && arr0 && arr1 && arr0.length === pos.length) {
+                        for (let k = 0; k < pos.length; k++) {
+                            pos[k] = arr0[k] * (1 - frac) + arr1[k] * frac;
+                        }
+                        m.geometry.attributes.position.needsUpdate = true;
+                    }
+                }
+            } else if (tick > collapseTicks + holdTicks) {
+                corpseMesh.position.y -= 0.06;
+            }
+            if (tick >= totalTicks) {
+                if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(corpseMesh);
+                else if (typeof scene !== 'undefined') scene.remove(corpseMesh);
+                return false;
+            }
+            return true;
+        }
+    });
+    return true;
 }
 
 const STATIONARY_STEALTH_UNITS = new Set(['pathfinder', 'jarmen', 'burton', 'blacklotus', 'hijacker']);

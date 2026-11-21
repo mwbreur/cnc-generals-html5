@@ -1732,6 +1732,40 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             throw new Error('Issue #51: USA Superweapon General should discount Particle Cannon to $2,500!');
         }
         selectGeneral('usa');
+
+        // 12. Issue #46 regression: Official W3D HANIM skeletal run/attack/death keyframes & playback
+        const armedInf = ['ranger', 'missiledefender', 'pathfinder', 'burton', 'redguard', 'tankhunter', 'hacker', 'lotus', 'rebel', 'rpg', 'terrorist', 'jarmen', 'mob'];
+        for (const k of Object.keys(window.W3D_INFANTRY_DATA)) {
+            const meshes = Object.values(window.W3D_INFANTRY_DATA[k].m);
+            const hasDie = meshes.some(m => Array.isArray(m.die) && m.die.length === 5);
+            if (!hasDie) {
+                throw new Error('Issue #46: Missing 5-frame W3D HANIM death animation for infantry ' + k);
+            }
+            if (armedInf.includes(k)) {
+                const hasAtk = meshes.some(m => Array.isArray(m.atk) && m.atk.length === 4);
+                if (!hasAtk) {
+                    throw new Error('Issue #46: Missing 4-frame W3D HANIM attack animation for armed infantry ' + k);
+                }
+            }
+        }
+        const rangerMesh = createW3DInfantryMesh('ranger', false);
+        const rAnim = rangerMesh && rangerMesh.userData && rangerMesh.userData.animatedMeshes && rangerMesh.userData.animatedMeshes[0];
+        if (!rAnim || !Array.isArray(rAnim.userData.runFrames) || rAnim.userData.runFrames.length !== 8 ||
+            !Array.isArray(rAnim.userData.atkFrames) || rAnim.userData.atkFrames.length !== 4 ||
+            !Array.isArray(rAnim.userData.dieFrames) || rAnim.userData.dieFrames.length !== 5) {
+            throw new Error('Issue #46: createW3DInfantryMesh("ranger") did not wire run/atk/die HANIM frames onto userData!');
+        }
+        const testRanger = { type: 'ranger', mesh: rangerMesh, _atkAnimTicks: 10, health: 100 };
+        updateInfantryStationaryAnim(testRanger);
+        if (testRanger._atkAnimTicks !== 9) {
+            throw new Error('Issue #46: updateInfantryStationaryAnim did not advance attack animation ticks!');
+        }
+        const fxBefore = activeFX.length;
+        const spawnedDeath = spawnInfantryDeathAnimation(testRanger);
+        if (!spawnedDeath || activeFX.length !== fxBefore + 1) {
+            throw new Error('Issue #46: spawnInfantryDeathAnimation failed to enqueue skeletal death collapse in activeFX!');
+        }
+        activeFX.pop();
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

@@ -774,6 +774,9 @@ function executeWeaponFireInner(attacker, target) {
         attacker.combatTarget = null;
         return;
     }
+    if (attacker.isInfantry || (attacker.mesh && attacker.mesh.userData && attacker.mesh.userData.animatedMeshes)) {
+        attacker._atkAnimTicks = 24;
+    }
     // Authentic Command & Conquer: Generals Zero Hour Weapon Reload Rates (60 ticks = 1.0s, verified directly from INIZH.big Weapon.ini)
     const cncCooldowns = {
         // Main Battle & Heavy Tanks (INIZH.big: Crusader/Paladin/Battlemaster/Marauder 2000ms, Scorpion 1000ms, Overlord 2000ms reload + 300ms clip)
