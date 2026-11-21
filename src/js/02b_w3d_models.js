@@ -524,6 +524,12 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
     } else if (modelKey === 'scud') {
         const missile = root.getObjectByName('MISSILE');
         if (missile) missile.rotation.x = Math.PI / 2;
+    } else if (modelKey === 'battlebus') {
+        // Retail GLAVehicleBattleBus: HideSubObject = BUSUP01 BUSUP02 until scrap crate upgrades are collected
+        const bup1 = root.getObjectByName('BUSUP01') || root.getObjectByName('uvbattbus.busup01');
+        const bup2 = root.getObjectByName('BUSUP02') || root.getObjectByName('uvbattbus.busup02');
+        if (bup1) bup1.visible = false;
+        if (bup2) bup2.visible = false;
     } else if (modelKey === 'nukecannon') {
         // Retail NVNukeCn.W3D has TWO gun sets:
         // - Packed/travel stowed cannon: TURRETBACK, TURRETFRONT, ELEVATIONBARREL, GUNBARREL, LIFTERS

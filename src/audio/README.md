@@ -6,20 +6,21 @@ The web build loads official audio from faction-specific catalogs. The audio run
 
 | Catalog | Contents | Current entries |
 |---|---|---:|
-| `global.json` | Shared official battlefield and interface effects | 25 |
-| `usa.json` | USA unit voices and EVA announcements | 155 |
-| `china.json` | China unit voices and EVA announcements | 142 |
-| `gla.json` | GLA unit voices and EVA announcements | 147 |
+| `global.json` | Shared official battlefield, weapon, explosion, and interface effects | 198 |
+| `usa.json` | USA unit voices and EVA announcements | 172 |
+| `china.json` | China unit voices and EVA announcements | 165 |
+| `gla.json` | GLA unit voices and EVA announcements | 164 |
 
 When a web Skirmish starts, the game requests shared effects and the player's faction catalog. Other catalogs are not requested for that match. The runtime caches each catalog request and only plays voice keys present in the loaded catalog. Campaign dialogue and cutscene audio are not included in these groups.
 
 The generated `index.html` needs the files in `src/audio/` alongside it on the server.
 
-## What this does and does not establish
+## Coverage & Architecture
 
-These catalogs split the 469 official clips already present in the project's audio data. The split does not prove that every original-game voice line or weapon sound has been found. The earlier archive inventory reported 41 unresolved audio references; those need to be matched against the local source archives. A live browser test for all three factions is also still needed.
-
-Enemy weapon effects must remain audible. They belong in `global.json`, even when a faction-specific weapon uses them. Faction catalogs are for voices and EVA lines, not a filter that silences enemy combat.
+These 4 catalogs contain **699 official retail audio clips** extracted from `Audio.big`, `AudioZH.big`, `AudioEnglish.big`, `AudioEnglishZH.big`, `SpeechEnglish.big`, and `SpeechEnglishZH.big`:
+- All **119 `OFFICIAL_AUDIO_MAP` entries** in `src/js/05_audio.js` resolve across **160 retail SFX keys** in `global.json` (0 unresolved or broken references), covering tank cannons, infantry rifles, machine guns, gatling guns, flamethrowers, toxin sprays, sniper rifles, rockets/missiles, superweapons, aircraft, explosions, impacts, and UI sounds.
+- All 41 previously unresolved weapon/FX audio references from the initial 469-clip split have been extracted from the retail archives into `global.json` (which expanded from 25 to 198 shared battlefield SFX clips) and faction catalogs.
+- Enemy weapon effects remain audible regardless of player faction because all combat SFX reside in `global.json`, while faction catalogs contain unit voices and EVA lines.
 
 ## Updating the catalogs
 

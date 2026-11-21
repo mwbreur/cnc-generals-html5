@@ -1754,6 +1754,12 @@ function animate() {
                 t2.visible = (lvl >= 2);
                 if (t0 && t2.visible) t2.rotation.y = t0.rotation.y;
             }
+        } else if (unit.type === 'battlebus') {
+            const lvl = unit.salvageLevel || 0;
+            const bup1 = getCachedNode(unit.mesh, 'BUSUP01') || getCachedNode(unit.mesh, 'uvbattbus.busup01');
+            const bup2 = getCachedNode(unit.mesh, 'BUSUP02') || getCachedNode(unit.mesh, 'uvbattbus.busup02');
+            if (bup1) bup1.visible = (lvl >= 1);
+            if (bup2) bup2.visible = (lvl >= 2);
         } else if (unit.type === 'scud') {
             const turretEl = getCachedNode(unit.mesh, 'TURRETEL');
             if (turretEl) {
