@@ -1331,6 +1331,37 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             { name: 'ALL COMBAT', badge: 'SEL', action: () => selectUnitsByType('combat'), desc: 'Select all combat units' },
             { name: 'HARVESTERS', badge: 'SEL', action: () => selectUnitsByType('harvesters'), desc: 'Select harvesters' }
         ];
+
+        // Multi-unit batch upgrades (Retail Zero Hour: click once to equip all eligible selected vehicles!)
+        const droneEligible = selectedUnits.filter(u => ['tank', 'crusader', 'paladin', 'humvee', 'ambulance', 'tomahawk'].includes(u.type));
+        if (droneEligible.length > 0) {
+            const needBattle = droneEligible.filter(u => !(u.drone && u.drone.type === 'battle')).length;
+            const needScout = droneEligible.filter(u => !(u.drone && u.drone.type === 'scout')).length;
+            const needHellfire = droneEligible.filter(u => !(u.drone && u.drone.type === 'hellfire')).length;
+            currentGridSlots.push(
+                { name: 'BATTLE DRONE', cost: 300, badge: needBattle === 0 ? 'ACTIVE' : `×${needBattle}`, action: () => purchaseVehicleDrone('battle', 300), desc: `Attach Battle Drone to all ${needBattle || droneEligible.length} selected USA vehicle(s) ($300 each)` },
+                { name: 'SCOUT DRONE', cost: 100, badge: needScout === 0 ? 'ACTIVE' : `×${needScout}`, action: () => purchaseVehicleDrone('scout', 100), desc: `Attach Scout Drone to all ${needScout || droneEligible.length} selected USA vehicle(s) ($100 each)` },
+                { name: 'HELLFIRE DRONE', cost: 500, badge: needHellfire === 0 ? 'ACTIVE' : `×${needHellfire}`, action: () => purchaseVehicleDrone('hellfire', 500), desc: `Attach Hellfire Drone to all ${needHellfire || droneEligible.length} selected USA vehicle(s) ($500 each)` }
+            );
+        }
+        const selectedOverlords = selectedUnits.filter(u => u.type === 'overlord');
+        if (selectedOverlords.length > 0) {
+            const needBunker = selectedOverlords.filter(u => u.overlordUpgrade !== 'bunker').length;
+            const needGatling = selectedOverlords.filter(u => u.overlordUpgrade !== 'gatling').length;
+            const needProp = selectedOverlords.filter(u => u.overlordUpgrade !== 'propaganda').length;
+            currentGridSlots.push(
+                { name: 'BUNKER TOWER', cost: 500, badge: needBunker === 0 ? 'ACTIVE' : `×${needBunker}`, action: () => purchaseOverlordUpgrade('bunker', 500), desc: `Mount Bunker Tower on all ${needBunker || selectedOverlords.length} selected Overlord(s) ($500 each)` },
+                { name: 'GATLING TOWER', cost: 1200, badge: needGatling === 0 ? 'ACTIVE' : `×${needGatling}`, action: () => purchaseOverlordUpgrade('gatling', 1200), desc: `Mount Gatling Tower on all ${needGatling || selectedOverlords.length} selected Overlord(s) ($1200 each)` },
+                { name: 'PROPAGANDA', cost: 500, badge: needProp === 0 ? 'ACTIVE' : `×${needProp}`, action: () => purchaseOverlordUpgrade('propaganda', 500), desc: `Mount Propaganda Tower on all ${needProp || selectedOverlords.length} selected Overlord(s) ($500 each)` }
+            );
+        }
+        const loadedTransports = selectedUnits.filter(u => u.capacity > 0 && u.garrisoned && u.garrisoned.length > 0);
+        if (loadedTransports.length > 0) {
+            const totalPass = loadedTransports.reduce((sum, tr) => sum + tr.garrisoned.length, 0);
+            currentGridSlots.push(
+                { name: `EVACUATE (${totalPass})`, badge: 'UNLOAD', action: () => loadedTransports.forEach(tr => unloadTransportPassengers(tr)), desc: 'Disembark passengers from all selected transports' }
+            );
+        }
     }
 }
 
