@@ -4029,7 +4029,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
     else if (type === 'aurora') { mesh = createAuroraMesh(); radius = 4.2; speed = 0.38; health = 80; scanRange = 40; isAir = true; }
     else if (type === 'infantry' || type === 'ranger') { mesh = createRangerMesh(); radius = 0.8; speed = 0.08; health = 180; scanRange = 22; }
     else if (type === 'rocket') { mesh = createMissileDefenderMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
-    else if (type === 'pathfinder') { mesh = createPathfinderMesh(); radius = 0.8; speed = 0.09; health = 120; scanRange = 48; }
+    else if (type === 'pathfinder') { mesh = createPathfinderMesh(); radius = 0.8; speed = 0.09; health = 120; scanRange = 65; }
     else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.9; speed = 0.10; health = 200; scanRange = 27; }
     else if (type === 'pilot') { mesh = typeof createPilotMesh === 'function' ? createPilotMesh(false) : createRangerMesh(); radius = 0.7; speed = 0.095; health = 100; scanRange = 0; }
 
@@ -4062,7 +4062,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
     else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.8; speed = 0.12; health = 80; scanRange = 8; }
     else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 1.4; speed = 0.08; health = 280; scanRange = 26; }
     else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.8; speed = 0.11; health = 120; }
-    else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.09; health = 200; scanRange = 36; }
+    else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.09; health = 200; scanRange = 49; }
     else if (type === 'drone_scout') {
         mesh = (typeof createW3DVehicleMesh === 'function') ? createW3DVehicleMesh('drone_scout', false) : new THREE.Group();
         radius = 1.4; speed = 0.25; health = 80; scanRange = 45; isAir = true;
