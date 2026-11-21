@@ -412,9 +412,19 @@ function animate() {
     }
     if (typeof updateTopplingTrees === 'function') updateTopplingTrees(combatDeltaScale);
 
-    // When in the main menu (not in an active match or map editor), render only the ShellMap diorama + FX (no background gameplay simulation)
-    if ((typeof isMatchActive === 'undefined' || !isMatchActive) && (typeof isMapEditorMode === 'undefined' || !isMapEditorMode)) {
+    // When in the main menu (not in an active match, map editor, or post-match Inspect Battlefield), render only the ShellMap diorama + FX
+    const _inMainMenuShell = (typeof isMatchActive === 'undefined' || !isMatchActive)
+        && (typeof isMapEditorMode === 'undefined' || !isMapEditorMode)
+        && !(typeof document !== 'undefined' && document.getElementById('start-menu') && document.getElementById('start-menu').style && document.getElementById('start-menu').style.display === 'none');
+    if (_inMainMenuShell) {
         if (typeof updateShellMapDemo === 'function') updateShellMapDemo(dt);
+        renderer.render(scene, camera);
+        return;
+    }
+    // Post-match Inspect Battlefield: keep camera controls active & render the finished battlefield without spawning the Main Menu demo
+    if ((typeof isMatchActive === 'undefined' || !isMatchActive) && (typeof isMapEditorMode === 'undefined' || !isMapEditorMode)) {
+        if (typeof updateCamera === 'function') updateCamera();
+        if (typeof updateUnitHealthBars === 'function') updateUnitHealthBars();
         renderer.render(scene, camera);
         return;
     }
@@ -3036,7 +3046,8 @@ function animate() {
         }
     }
 
-    if (!isMatchActive && typeof updateShellMapDemo === 'function') {
+    const _menuElForShell = (typeof document !== 'undefined') ? document.getElementById('start-menu') : null;
+    if (!isMatchActive && !(_menuElForShell && _menuElForShell.style && _menuElForShell.style.display === 'none') && typeof updateShellMapDemo === 'function') {
         updateShellMapDemo(dt);
     }
     if (typeof renderRadarMinimap === 'function') renderRadarMinimap();

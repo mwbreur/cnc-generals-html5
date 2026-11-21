@@ -4904,6 +4904,8 @@ function renderGeneralPowersBar(facOverride) {
         `;
     });
 
+    if (gpBar._lastHtml === html) return;
+    gpBar._lastHtml = html;
     gpBar.innerHTML = html;
 }
 window.renderGeneralPowersBar = renderGeneralPowersBar;
