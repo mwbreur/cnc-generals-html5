@@ -3453,10 +3453,20 @@ function processEnemyCombat() {
     enemyUnits.forEach((enemy, eIdx) => {
             if (enemy.health <= 0 || !enemy.mesh) return;
             if (enemy.isUnmanned || (enemy.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < enemy.disabledUntil)) return;
+            if (enemy.garrisonedIn) {
+                const host = enemy.garrisonedIn;
+                if (!host || host.health <= 0 || !host.mesh) return;
+                enemy.mesh.position.copy(host.position || host.mesh.position);
+                enemy.mesh.position.y += 4.2;
+            }
             if (enemy.attackCooldown > 0) enemy.attackCooldown = Math.max(0, enemy.attackCooldown - combatDeltaScale);
             if (!enemy.scanRange || enemy.scanRange <= 0) return;
 
             const minRange = (enemy.type === 'tomahawk' || enemy.type === 'nukecannon' || enemy.type === 'nuketank') ? (enemy.minRange || 16.0) : 0;
+            const distBetween = (aPos, bPos, use3D) => use3D
+                ? aPos.distanceTo(bPos)
+                : Math.hypot(aPos.x - bPos.x, aPos.z - bPos.z);
+
             let fireTarget = enemy.combatTarget;
             if (fireTarget && (fireTarget.health <= 0 || isFriendly(enemy, fireTarget))) {
                 enemy.combatTarget = null;
@@ -3465,10 +3475,10 @@ function processEnemyCombat() {
 
             let targetPos = fireTarget ? (fireTarget.position || (fireTarget.mesh && fireTarget.mesh.position)) : null;
             let targetRadius = fireTarget ? (fireTarget.radius || 0) : 0;
-            let distToTarget = targetPos ? enemy.mesh.position.distanceTo(targetPos) : Infinity;
+            let distToTarget = targetPos ? distBetween(enemy.mesh.position, targetPos, !!(enemy.isAir || (fireTarget && fireTarget.isAir))) : Infinity;
             let canHitTarget = fireTarget ? ((typeof canUnitTarget === 'function') ? canUnitTarget(enemy, fireTarget) : !(enemy.type === 'tomahawk' && fireTarget.isAir)) : false;
 
-            // Fire-on-the-move auto-scan: if assigned target is missing or out of range, engage nearest in-range hostile without stopping
+            // Fire-on-the-move auto-scan across ALL hostile units & structures (player AND hostile AI teams!)
             if (!fireTarget || !targetPos || distToTarget > (enemy.scanRange + targetRadius) || distToTarget < minRange || !canHitTarget) {
                 if ((buildingTick + eIdx) % 3 === 0 || enemy.attackCooldown === 0) {
                     let bestOpp = null;
@@ -3477,13 +3487,13 @@ function processEnemyCombat() {
                         if (!arr) return;
                         for (let i = 0; i < arr.length; i++) {
                             const cand = arr[i];
-                            if (!cand || cand.health <= 0 || isFriendly(enemy, cand)) continue;
+                            if (!cand || cand === enemy || cand.health <= 0 || cand.garrisonedIn || isFriendly(enemy, cand)) continue;
                             if (cand.isStealthed && !(cand.revealedUntil && cand.revealedUntil > buildingTick)) continue;
                             const cPos = cand.position || (cand.mesh && cand.mesh.position);
                             if (!cPos) continue;
                             if (typeof canUnitTarget === 'function' && !canUnitTarget(enemy, cand)) continue;
                             const cR = cand.radius || defaultR;
-                            const d = enemy.mesh.position.distanceTo(cPos);
+                            const d = distBetween(enemy.mesh.position, cPos, !!(enemy.isAir || cand.isAir));
                             if (d <= enemy.scanRange + cR && d >= minRange && d < bestDist) {
                                 bestDist = d;
                                 bestOpp = cand;
@@ -3491,7 +3501,11 @@ function processEnemyCombat() {
                         }
                     };
                     checkList(units, 1.5);
-                    if (!bestOpp) checkList(structures, 6.0);
+                    checkList(enemyUnits, 1.5);
+                    if (!bestOpp) {
+                        checkList(structures, 6.0);
+                        checkList(enemyStructures, 6.0);
+                    }
                     if (bestOpp) {
                         fireTarget = bestOpp;
                         targetPos = fireTarget.position || fireTarget.mesh.position;
@@ -3503,13 +3517,15 @@ function processEnemyCombat() {
                 }
             }
 
-            if (fireTarget && targetPos && distToTarget <= (enemy.scanRange + targetRadius) && distToTarget >= minRange && canHitTarget && enemy.attackCooldown === 0) {
+            if (fireTarget && targetPos && distToTarget <= (enemy.scanRange + targetRadius) && distToTarget >= minRange && canHitTarget) {
                 const turret = getCachedNode(enemy.mesh, "turretSystem");
                 if (turret && turret.parent) {
                     const localTarget = turret.parent.worldToLocal(targetPos.clone());
                     turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);
                 }
-                executeWeaponFire(enemy, fireTarget);
+                if (enemy.attackCooldown === 0) {
+                    executeWeaponFire(enemy, fireTarget);
+                }
             }
     });
 }
