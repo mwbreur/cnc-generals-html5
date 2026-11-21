@@ -1,6 +1,7 @@
 
 let isPlacingBlueprint = false;
 let blueprintPlacementPos = null;
+let isRightDragging = false;
 let rightDragStart = null;
 let lastRightPointerPos = { x: 0, y: 0 };
 
