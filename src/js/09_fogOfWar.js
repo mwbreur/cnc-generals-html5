@@ -114,6 +114,8 @@ const INIZH_SHROUD_RANGE = {
     tankhunter: 86, rpg: 86, rebel: 65, redguard: 43, hacker: 43, mob: 43, worker: 43, pilot: 43, terrorist: 43, hijacker: 43,
     // Scout / Radar / AA Vehicles
     drone_scout: 90, radarvan: 86, gatling: 78, humvee: 69,
+    // Aircraft (Official INIZH.big ShroudClearingRange: Comanche/Chinook/Aurora 600 => 130, Raptor 400 => 86, MiG/Stealth 300 => 65)
+    comanche: 130, chinook: 130, aurora: 130, raptor: 86, mig: 65, stealthfighter: 65,
     // Battle Tanks & Artillery
     tank: 65, crusader: 65, paladin: 65, battlemaster: 65, scorpion: 65, marauder: 65,
     quad: 65, buggy: 65, inferno: 65, scud: 65, nukecannon: 65, nuketank: 65,
