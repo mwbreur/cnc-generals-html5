@@ -346,16 +346,25 @@ function isAllowedStaticPath(reqPath) {
     return ALLOWED_STATIC_PREFIXES.some(p => reqPath.startsWith(p));
 }
 
+const ALLOWED_WS_HOSTNAMES = new Set([
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    '[::1]',
+    ...(os.hostname ? [String(os.hostname()).toLowerCase()] : []),
+    ...getLanIpv4Addresses().map(ip => String(ip).toLowerCase())
+]);
+
 function isAllowedWsOrigin(req) {
     const origin = req.headers.origin;
     if (!origin) return true; // Non-browser / direct LAN WS clients
     try {
         const oUrl = new URL(origin);
-        const hostHeader = String(req.headers.host || '').toLowerCase();
-        if (hostHeader && oUrl.host.toLowerCase() === hostHeader) return true;
+        if (oUrl.protocol !== 'http:' && oUrl.protocol !== 'https:') return false;
         const h = oUrl.hostname.toLowerCase();
-        if (h === 'localhost' || h === '127.0.0.1' || h === '::1') return true;
-        return false;
+        if (!ALLOWED_WS_HOSTNAMES.has(h)) return false;
+        if (oUrl.port && Number(oUrl.port) !== PORT) return false;
+        return true;
     } catch (_) {
         return false;
     }

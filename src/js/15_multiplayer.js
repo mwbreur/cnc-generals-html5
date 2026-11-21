@@ -653,6 +653,52 @@ function sanitizeMpSlots(rawSlots) {
     return clean;
 }
 
+const MP_FACTION_UNITS = {
+    usa: new Set([
+        'dozer', 'chinook', 'ranger', 'infantry', 'rocket', 'missiledefender', 'pathfinder', 'burton', 'pilot',
+        'humvee', 'ambulance', 'crusader', 'paladin', 'tomahawk', 'tank',
+        'comanche', 'raptor', 'aurora', 'stealthfighter', 'drone_scout'
+    ]),
+    china: new Set([
+        'dozer', 'truck', 'redguard', 'infantry', 'tankhunter', 'rocket', 'hacker', 'blacklotus',
+        'battlemaster', 'tank', 'gatling', 'dragon', 'dragonTank', 'overlord', 'inferno', 'nukecannon', 'nuketank', 'crawler',
+        'mig', 'helix'
+    ]),
+    gla: new Set([
+        'worker', 'rebel', 'infantry', 'rpg', 'rocket', 'terrorist', 'hijacker', 'jarmen', 'mob',
+        'technical', 'scorpion', 'marauder', 'tank', 'quad', 'buggy', 'toxintractor', 'bombtruck', 'radarvan', 'scud', 'battlebus'
+    ])
+};
+const MP_FACTION_STRUCTS = {
+    usa: new Set(['center', 'commandCenter', 'power', 'barracks', 'factory', 'airfield', 'supplyCenter', 'supplyDrop', 'patriot', 'strategyCenter', 'detentionCamp', 'particleCannon']),
+    china: new Set(['center', 'commandCenter', 'nuclearReactor', 'power', 'barracks', 'factory', 'airfield', 'supplyCenter', 'bunker', 'gatlingCannon', 'speakerTower', 'propagandaCenter', 'internetCenter', 'nukeSilo']),
+    gla: new Set(['center', 'commandCenter', 'fakeCommandCenter', 'barracks', 'factory', 'supplyStash', 'stingerSite', 'tunnel', 'demoTrap', 'palace', 'blackMarket', 'scudStorm'])
+};
+let _mpPeerBudget = 10000;
+let _mpPeerBudgetLastMs = 0;
+
+function resolveConcreteMpFaction(rawFaction, seed, slotIndex = 0) {
+    const f = String(rawFaction || 'usa').toLowerCase();
+    if (f === 'usa' || f === 'china' || f === 'gla') return f;
+    const pool = ['usa', 'china', 'gla'];
+    const idx = Math.abs(((Number(seed) >>> 0) + (slotIndex * 7919)) % pool.length);
+    return pool[idx];
+}
+
+function consumeMpPeerBudget(cost) {
+    const now = Date.now();
+    if (_mpPeerBudgetLastMs > 0) {
+        const elapsedSec = Math.max(0, Math.min(30, (now - _mpPeerBudgetLastMs) / 1000));
+        // Generous upper bound for peer economy income (harvesters + secondary economy) to prevent false positives while blocking spam/free superweapons
+        _mpPeerBudget = Math.min(35000, _mpPeerBudget + elapsedSec * 280);
+    }
+    _mpPeerBudgetLastMs = now;
+    const safeCost = Math.max(0, Number(cost) || 0);
+    if (_mpPeerBudget < safeCost) return false;
+    _mpPeerBudget -= safeCost;
+    return true;
+}
+
 function getAuthenticatedPeerSlot() {
     if (!Array.isArray(mpSlots)) return null;
     return mpSlots.find(s => s && s.active && (isMultiplayerHost ? (!s.isHost && s.isHuman) : s.isHost)) || null;
@@ -841,7 +887,21 @@ function handleNetworkPacket(packet) {
         const pos = clampMpWorldPos(packet.position);
         const peerSlot = getAuthenticatedPeerSlot();
         const spawnTeam = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
-        const peerFaction = (peerSlot && peerSlot.faction && peerSlot.faction !== 'random') ? peerSlot.faction : (isMultiplayerHost ? mpOpponentFaction : 'usa');
+        const peerFaction = resolveConcreteMpFaction(
+            (peerSlot && peerSlot.faction) || (isMultiplayerHost ? mpOpponentFaction : 'usa'),
+            typeof randomMapSeed !== 'undefined' ? randomMapSeed : 424242,
+            1
+        );
+        const factionAllowedUnits = MP_FACTION_UNITS[peerFaction];
+        if (factionAllowedUnits && !factionAllowedUnits.has(packet.unitType)) {
+            console.warn('Rejected off-faction peer spawn_unit:', packet.unitType, 'for', peerFaction);
+            return false;
+        }
+        const unitCost = (typeof unitCosts !== 'undefined' && Number.isFinite(unitCosts[packet.unitType])) ? unitCosts[packet.unitType] : 500;
+        if (!consumeMpPeerBudget(unitCost)) {
+            console.warn('Rejected unaffordable peer spawn_unit:', packet.unitType);
+            return false;
+        }
         const isAlly = (spawnTeam === playerTeamId);
         const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId, peerFaction);
         if (unit) {
@@ -859,7 +919,21 @@ function handleNetworkPacket(packet) {
         const peerSlot = getAuthenticatedPeerSlot();
         const structTeam = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
         const isAlly = (structTeam === playerTeamId);
-        const foeFaction = (peerSlot && peerSlot.faction && peerSlot.faction !== 'random') ? peerSlot.faction : (isMultiplayerHost ? mpOpponentFaction : 'usa');
+        const foeFaction = resolveConcreteMpFaction(
+            (peerSlot && peerSlot.faction) || (isMultiplayerHost ? mpOpponentFaction : 'usa'),
+            typeof randomMapSeed !== 'undefined' ? randomMapSeed : 424242,
+            1
+        );
+        const factionAllowedStructs = MP_FACTION_STRUCTS[foeFaction];
+        if (factionAllowedStructs && !factionAllowedStructs.has(packet.structType)) {
+            console.warn('Rejected off-faction peer build_structure:', packet.structType, 'for', foeFaction);
+            return false;
+        }
+        const structCost = (typeof getStructureCost === 'function' ? getStructureCost(packet.structType) : 0) || 500;
+        if (!consumeMpPeerBudget(structCost)) {
+            console.warn('Rejected unaffordable peer build_structure:', packet.structType);
+            return false;
+        }
         const structMaxHp = (typeof getStructureMaxHealth === 'function') ? getStructureMaxHealth(packet.structType) : 1200;
         const group = (typeof createStructureMeshForFaction === 'function')
         ? createStructureMeshForFaction(packet.structType, foeFaction, true)
@@ -1006,17 +1080,37 @@ function startMultiplayerMatch(isHost, config) {
     currentMapType = config.mapType;
     currentMapSize = config.mapSize;
     playerResources = config.money;
+    _mpPeerBudget = Math.max(2000, (Number(config.money) || 10000) + 2500);
+    _mpPeerBudgetLastMs = Date.now();
 
     if (config.customMapData) {
-        activeCustomMap = config.customMapData;
-        savedCustomMaps[config.mapType] = config.customMapData;
+        const validCustom = (typeof sanitizeCustomMapObject === 'function')
+            ? sanitizeCustomMapObject(config.customMapData, config.customMapData.id || (typeof config.mapType === 'string' ? config.mapType : null))
+            : null;
+        if (!validCustom) {
+            console.warn('Rejected invalid customMapData in start_battle');
+            if (typeof showNotification === 'function') showNotification('Rejected invalid custom map data from host.', 'error');
+            return;
+        }
+        activeCustomMap = validCustom;
+        if (typeof savedCustomMaps === 'object' && savedCustomMaps !== null) {
+            savedCustomMaps[validCustom.id] = validCustom;
+        }
+        currentMapType = validCustom.id;
     }
 
-    const activeSlots = (config.slots || mpSlots).filter(s => s.active);
+    const rawSlots = (config.slots || mpSlots).filter(s => s && s.active);
+    const activeSlots = rawSlots.map((s, idx) => Object.assign({}, s, {
+        faction: resolveConcreteMpFaction(s.faction, matchSeed, idx)
+    }));
+    mpSlots = activeSlots.slice();
     const mySlot = isHost ? activeSlots.find(s => s.isHost) : activeSlots.find(s => !s.isHost && s.isHuman);
     const playerSlot = mySlot || activeSlots[0];
+    if (!playerSlot) return;
     playerTeamId = playerSlot.team;
     selectedFaction = playerSlot.faction;
+    const remoteHumanSlot = activeSlots.find(s => s.isHuman && s !== playerSlot);
+    if (remoteHumanSlot) mpOpponentFaction = remoteHumanSlot.faction;
     if (typeof preloadSkirmishAudio === 'function') preloadSkirmishAudio(selectedFaction);
 
     // Refresh map & purge any previous single player skirmish remnants completely
