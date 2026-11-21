@@ -1890,7 +1890,15 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             if (hvTow.getObjectByName('turretSystem').visible !== false || hvTow.getObjectByName('TURRETUP01').visible !== true) {
                 throw new Error('Humvee with TOW upgrade should hide base turretSystem and show TURRETUP01!');
             }
+            const mockAir = { type: 'mig', isAir: true, health: 100 };
+            const mockHv = { type: 'humvee', isAI: false, health: 100 };
+            if (canUnitTarget(mockHv, mockAir) !== true) {
+                throw new Error('Humvee WITH TOW Missile upgrade should be able to target aircraft!');
+            }
             researchedTechs.delete('towMissile');
+            if (canUnitTarget(mockHv, mockAir) !== false) {
+                throw new Error('Humvee WITHOUT TOW Missile upgrade should NOT be able to target aircraft!');
+            }
         }
 
         // 16. Official & Procedural Map Roads, 100% Official W3D Assets, and AI Corridor Pathfinding Rules

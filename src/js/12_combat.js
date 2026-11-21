@@ -6,6 +6,15 @@ const AA_CAPABLE_UNITS = new Set([
 ]);
 const GROUND_ONLY_AIRCRAFT = new Set(['aurora', 'stealthfighter']);
 
+function hasHumveeTowMissile(unit) {
+    if (!unit || unit.type !== 'humvee') return false;
+    if (unit.isAI) {
+        const diff = unit.aiDifficulty || unit.difficulty;
+        return diff === 'medium' || diff === 'hard';
+    }
+    return typeof researchedTechs !== 'undefined' && researchedTechs.has('towMissile');
+}
+
 function canUnitTarget(attacker, target) {
     if (!attacker || !target) return false;
     const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
@@ -14,6 +23,7 @@ function canUnitTarget(attacker, target) {
     }
     if (target.isAir) {
         if (GROUND_ONLY_AIRCRAFT.has(attacker.type)) return false;
+        if (attacker.type === 'humvee') return hasHumveeTowMissile(attacker);
         return AA_CAPABLE_UNITS.has(attacker.type);
     }
     return true;
@@ -1549,6 +1559,16 @@ function executeWeaponFireInner(attacker, target) {
         }
         applyCalculatedDamage(attacker, target, tkDmg, 'ARMOR_PIERCING');
     } else if (attacker.type === 'humvee') {
+        const hasTow = hasHumveeTowMissile(attacker);
+        if (target.isAir) {
+            // Retail INIZH.big HumveeMissileWeaponAir: 50 dmg AntiAirborneVehicle TOW missile
+            if (hasTow) {
+                if (typeof spawnRocketBackblast === 'function') spawnRocketBackblast(muzzlePos, targetPos, 0.85 * heroicScale);
+                spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 50, damageType: 'EXPLOSIVE' });
+                playAudio('missile_launch');
+            }
+            return;
+        }
         // USA Humvee Heavy .50 Machine Gun (3-round burst + TOW missile backblast)
         for (let b = 0; b < 3; b++) {
             setTimeout(() => {
@@ -1558,17 +1578,11 @@ function executeWeaponFireInner(attacker, target) {
             }, b * 55);
         }
         playUSASound('humvee_mg');
-        let vehDmg = 12;
-        if (typeof units !== 'undefined' && units.includes(attacker)) {
-            if (typeof researchedTechs !== 'undefined' && researchedTechs.has('towMissile')) {
-                vehDmg = 15;
-                if (typeof spawnRocketBackblast === 'function') spawnRocketBackblast(muzzlePos, targetPos, 0.8 * heroicScale);
-                spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 32, damageType: 'EXPLOSIVE' });
-            }
-        } else if (attacker.isAI && (attacker.difficulty === 'hard' || attacker.difficulty === 'medium')) {
-            // AI Rockvees on Medium/Hard fire TOW missiles
+        let vehDmg = hasTow ? 15 : 12;
+        if (hasTow) {
+            // Retail INIZH.big HumveeMissileWeapon: 30 dmg ground TOW missile
             if (typeof spawnRocketBackblast === 'function') spawnRocketBackblast(muzzlePos, targetPos, 0.8 * heroicScale);
-            spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 32, damageType: 'EXPLOSIVE' });
+            spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 30, damageType: 'EXPLOSIVE' });
         }
         // Fire-From-Within: Garrisoned troops fire out (Player & AI)
         if (attacker.garrisoned && attacker.garrisoned.length > 0) {
