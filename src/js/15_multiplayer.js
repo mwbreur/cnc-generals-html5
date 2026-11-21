@@ -1270,6 +1270,7 @@ function processBaseDefenseCombat() {
     const allLivingStructures = [...structures, ...enemyStructures];
 
     allDefenses.forEach(def => {
+            if (def.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < def.disabledUntil) return;
             if (def.attackCooldown === undefined) def.attackCooldown = 0;
             if (def.attackCooldown > 0) {
                 def.attackCooldown = Math.max(0, def.attackCooldown - combatDeltaScale);

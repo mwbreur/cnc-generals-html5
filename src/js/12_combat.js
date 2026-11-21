@@ -322,6 +322,55 @@ function getArmorCategory(target) {
     return cat;
 }
 
+function damageHostilesInRadius(center, radius, damage, damageType = 'EXPLOSIVE', attacker = null) {
+    if (!center || !Number.isFinite(radius) || radius <= 0 || !Number.isFinite(damage) || damage <= 0) return 0;
+    const refAttacker = attacker || { teamId: (typeof playerTeamId !== 'undefined' ? playerTeamId : 1), ownerId: 'player', isAI: false };
+    const isAttackerAI = Boolean(refAttacker.isAI);
+    const targetUnitLists = isAttackerAI
+        ? [typeof units !== 'undefined' ? units : [], typeof enemyUnits !== 'undefined' ? enemyUnits : []]
+        : [typeof enemyUnits !== 'undefined' ? enemyUnits : [], typeof units !== 'undefined' ? units : []];
+    const targetStructLists = isAttackerAI
+        ? [typeof structures !== 'undefined' ? structures : [], typeof enemyStructures !== 'undefined' ? enemyStructures : []]
+        : [typeof enemyStructures !== 'undefined' ? enemyStructures : [], typeof structures !== 'undefined' ? structures : []];
+
+    let hits = 0;
+    const applyAoE = (ent) => {
+        if (!ent || ent.health <= 0) return;
+        if (typeof isFriendly === 'function' && isFriendly(refAttacker, ent)) return;
+        const p = ent.position || (ent.mesh && ent.mesh.position);
+        if (!p) return;
+        const effRad = radius + (ent.radius || 0);
+        const dist = Math.hypot(p.x - center.x, p.z - center.z);
+        if (dist > effRad) return;
+        // Authentic SAGE radial falloff: 100% damage inside 60% radius, tapering to 50% at outer edge
+        const falloff = dist <= effRad * 0.6 ? 1.0 : Math.max(0.5, 1.0 - ((dist - effRad * 0.6) / Math.max(0.1, effRad * 0.4)) * 0.5);
+        applyCalculatedDamage(refAttacker, ent, Math.round(damage * falloff), damageType);
+        hits++;
+    };
+
+    for (let li = 0; li < targetUnitLists.length; li++) {
+        const list = targetUnitLists[li];
+        for (let i = 0; i < list.length; i++) applyAoE(list[i]);
+    }
+    for (let li = 0; li < targetStructLists.length; li++) {
+        const list = targetStructLists[li];
+        for (let i = 0; i < list.length; i++) applyAoE(list[i]);
+    }
+    if (typeof worldBuildings !== 'undefined' && Array.isArray(worldBuildings)) {
+        for (let i = 0; i < worldBuildings.length; i++) {
+            const wb = worldBuildings[i];
+            if (wb && wb.health > 0 && Array.isArray(wb.garrisoned) && wb.garrisoned.length > 0) {
+                const occ = wb.garrisoned[0];
+                if (occ && (typeof isFriendly !== 'function' || !isFriendly(refAttacker, occ))) {
+                    applyAoE(wb);
+                }
+            }
+        }
+    }
+    return hits;
+}
+if (typeof window !== 'undefined') window.damageHostilesInRadius = damageHostilesInRadius;
+
 function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR_PIERCING') {
     if (!target || target.health <= 0) return;
 

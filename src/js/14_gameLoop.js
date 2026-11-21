@@ -2968,8 +2968,15 @@ function applyViewShake(dt) {
 }
 function processEnemyMovement() {
     separateGroundUnits(enemyUnits);
-    enemyUnits.forEach(enemy => {
+    enemyUnits.forEach((enemy, eIdx) => {
             if (enemy.health <= 0) return;
+            const isDisabled = Boolean(enemy.isUnmanned || (enemy.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < enemy.disabledUntil));
+            if (isDisabled) {
+                if (enemy.mesh && (buildingTick + eIdx) % 28 === 0 && typeof spawnEMPDisableSparks === 'function') {
+                    spawnEMPDisableSparks(enemy.mesh.position);
+                }
+                return;
+            }
 
             // Authentic Aircraft & Helicopter Flight Dynamics for AI
             if (enemy.isAir) {
@@ -3415,6 +3422,7 @@ function updateStealthAndDetection() {
 function processEnemyCombat() {
     enemyUnits.forEach((enemy, eIdx) => {
             if (enemy.health <= 0 || !enemy.mesh) return;
+            if (enemy.isUnmanned || (enemy.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < enemy.disabledUntil)) return;
             if (enemy.attackCooldown > 0) enemy.attackCooldown = Math.max(0, enemy.attackCooldown - combatDeltaScale);
             if (!enemy.scanRange || enemy.scanRange <= 0) return;
 

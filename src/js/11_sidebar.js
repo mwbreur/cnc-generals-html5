@@ -4829,18 +4829,36 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'leafletDrop') {
         if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.65 });
-        if (typeof triggerLeafletDropFX === 'function') triggerLeafletDropFX(pos);
-        else if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xffffff);
-        let stunned = 0;
-        if (typeof enemyUnits !== 'undefined') {
-            enemyUnits.forEach(e => {
-                    if (e.health > 0 && e.mesh && e.mesh.position.distanceTo(pos) <= 20) {
-                        e.empDisabledUntil = Date.now() + 12000;
-                        stunned++;
-                    }
-            });
+        const applyLeafletStun = (dropPos) => {
+            const center = dropPos || pos;
+            const tickUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 720; // 12s at 60Hz sim ticks
+            let stunned = 0;
+            if (typeof enemyUnits !== 'undefined') {
+                enemyUnits.forEach(e => {
+                        if (e.health > 0 && e.mesh && Math.hypot(e.mesh.position.x - center.x, e.mesh.position.z - center.z) <= 22) {
+                            e.disabledUntil = Math.max(e.disabledUntil || 0, tickUntil);
+                            e.combatTarget = null;
+                            stunned++;
+                        }
+                });
+            }
+            if (typeof enemyStructures !== 'undefined') {
+                enemyStructures.forEach(s => {
+                        if (s.health > 0 && s.position && Math.hypot(s.position.x - center.x, s.position.z - center.z) <= 22) {
+                            s.disabledUntil = Math.max(s.disabledUntil || 0, tickUntil);
+                            stunned++;
+                        }
+                });
+            }
+            showNotification(`★ Leaflet Drop stunned ${stunned} hostile target(s) for 12s!`, 'success');
+        };
+        if (typeof triggerLeafletDropFX === 'function') {
+            triggerLeafletDropFX(pos, applyLeafletStun);
+            showNotification('★ C-130 Leaflet Drop inbound!', 'info');
+        } else {
+            if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0xffffff);
+            applyLeafletStun(pos);
         }
-        showNotification(`★ Leaflet Drop stunned ${stunned} hostile unit(s) for 12s!`, 'success');
         return true;
     } else if (p === 'spectreGunship') {
         showNotification('★ AC-130 Spectre Gunship circling target area!', 'success');
@@ -4940,7 +4958,8 @@ function executeGeneralsPowerAt(pos) {
                     }
             });
         }
-        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0xff2222, 4.0);
+        if (typeof triggerFrenzyFX === 'function') triggerFrenzyFX(pos);
+        else if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0xff2222, 4.0);
         if (typeof playAudio === 'function') playAudio('frenzy', { volume: 0.9 }, 'china');
         showNotification(`★ Frenzy activated on ${boosted} unit(s) (+30% combat speed & damage for 15s)!`, 'success');
         return true;
@@ -4952,20 +4971,21 @@ function executeGeneralsPowerAt(pos) {
             if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00d2ff, 7.0);
         }
         let disabled = 0;
-        const until = Date.now() + 12000;
+        const tickUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 720; // 12s at 60Hz sim ticks
         if (typeof enemyUnits !== 'undefined') {
             enemyUnits.forEach(e => {
-                    if (e.health > 0 && !e.isInfantry && e.mesh && e.mesh.position.distanceTo(pos) <= 22) {
-                        e.empDisabledUntil = until;
+                    const isInf = (typeof isInfantryType === 'function' && isInfantryType(e.type));
+                    if (e.health > 0 && !isInf && e.mesh && Math.hypot(e.mesh.position.x - pos.x, e.mesh.position.z - pos.z) <= 24) {
+                        e.disabledUntil = Math.max(e.disabledUntil || 0, tickUntil);
+                        e.combatTarget = null;
                         if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(e.mesh.position);
                         disabled++;
                     }
             });
         }
         if (typeof enemyStructures !== 'undefined') {
-            const tickUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 720;
             enemyStructures.forEach(s => {
-                    if (s.health > 0 && s.position && s.position.distanceTo(pos) <= 22) {
+                    if (s.health > 0 && s.position && Math.hypot(s.position.x - pos.x, s.position.z - pos.z) <= 24) {
                         s.disabledUntil = Math.max(s.disabledUntil || 0, tickUntil);
                         if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(s.position);
                         disabled++;
@@ -4992,12 +5012,7 @@ function executeGeneralsPowerAt(pos) {
             if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0x2ecc71, 5.5, true, 'none');
             if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 18.0, 320, 'TOXIN', pseudoAttacker);
         }
-        for (let t = 1; t <= 4; t++) {
-            setTimeout(() => {
-                    if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 16.0, 95, 'TOXIN', pseudoAttacker);
-                }, t * 1500);
-        }
-        showNotification('★ Anthrax Beta Bomb detonated! Toxic cloud lingering.', 'warning');
+        showNotification('★ Anthrax Beta Bomb inbound! Toxic cloud will linger.', 'warning');
         return true;
     } else if (p === 'sneakAttack') {
         if (typeof triggerSneakAttackFX === 'function') {
@@ -5029,7 +5044,8 @@ function executeGeneralsPowerAt(pos) {
                     }
             });
         }
-        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.0);
+        if (typeof triggerGpsScramblerFX === 'function') triggerGpsScramblerFX(pos);
+        else if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.0);
         if (typeof playAudio === 'function') playAudio('gps_scrambler', { volume: 0.9 }, 'gla');
         showNotification(`★ GPS Scrambler cloaked ${cloaked} friendly unit(s) for 30s!`, 'success');
         return true;

@@ -4368,86 +4368,101 @@ function triggerA10Strike(targetPos, pseudoAttacker) {
     const target = targetPos.clone();
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(target.x, target.z) : 0;
 
+    // Authentic Zero Hour 2-plane A-10 Warthog flight (fixed 60Hz activeFX — no setTimeout!)
     for (let i = 0; i < 2; i++) {
-        setTimeout(() => {
-            if (typeof scene === 'undefined') return;
-            const latOffset = (i === 0 ? -4.5 : 4.5);
-            const startPos = new THREE.Vector3(target.x - 105 + latOffset, groundY + 26, target.z - 105 - latOffset);
-            const diveApex = new THREE.Vector3(target.x + latOffset * 0.6, groundY + 9.5, target.z - latOffset * 0.6);
-            const exitPos = new THREE.Vector3(target.x + 110 + latOffset, groundY + 28, target.z + 110 - latOffset);
+        const delayTicks = i * 20;
+        const latOffset = (i === 0 ? -4.5 : 4.5);
+        const startPos = new THREE.Vector3(target.x - 105 + latOffset, groundY + 26, target.z - 105 - latOffset);
+        const diveApex = new THREE.Vector3(target.x + latOffset * 0.6, groundY + 9.5, target.z - latOffset * 0.6);
+        const exitPos = new THREE.Vector3(target.x + 110 + latOffset, groundY + 28, target.z + 110 - latOffset);
 
-            let plane = null;
-            if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['a10_warthog']) {
-                plane = createW3DVehicleMesh('a10_warthog', false);
-            } else {
-                plane = new THREE.Group();
-            }
-            plane.position.copy(startPos);
-            if (typeof plane.lookAt === 'function') plane.lookAt(diveApex);
-            scene.add(plane);
-            if (i === 0 && typeof playAudio === 'function') {
-                playAudio('a10_dive', { volume: 0.92 }, 'usa');
-                playAudio('a10_flyby', { volume: 0.72 }, 'usa');
-            }
+        let plane = null;
+        let launched = false;
+        let waitTick = 0;
+        let frame = 0;
+        const totalFrames = 175;
+        const firedMissiles = new Set();
 
-            let frame = 0;
-            const totalFrames = 175;
-            const firedMissiles = new Set();
-            activeFX.push({
-                update() {
-                    frame++;
-                    const t = frame / totalFrames;
-                    if (t < 0.5) {
-                        const dt = t * 2;
-                        plane.position.lerpVectors(startPos, diveApex, dt);
-                        if (typeof plane.lookAt === 'function') plane.lookAt(diveApex.x + 2, diveApex.y - 2, diveApex.z + 2);
+        const cleanupPlane = () => {
+            if (plane) {
+                if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(plane);
+                else scene.remove(plane);
+                plane = null;
+            }
+        };
+
+        activeFX.push({
+            dispose: cleanupPlane,
+            update() {
+                if (!launched) {
+                    waitTick++;
+                    if (waitTick < delayTicks) return true;
+                    launched = true;
+                    if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['a10_warthog']) {
+                        plane = createW3DVehicleMesh('a10_warthog', false);
                     } else {
-                        const ct = (t - 0.5) * 2;
-                        plane.position.lerpVectors(diveApex, exitPos, ct);
-                        if (typeof plane.lookAt === 'function') plane.lookAt(exitPos);
+                        plane = new THREE.Group();
                     }
-
-                    if (frame % 4 === 0 && t > 0.15 && t < 0.85) {
-                        spawnJetContrailPuff(plane.position.clone().add(new THREE.Vector3(-2.8, 0.2, 0)), false);
-                        spawnJetContrailPuff(plane.position.clone().add(new THREE.Vector3(2.8, 0.2, 0)), false);
+                    plane.position.copy(startPos);
+                    if (typeof plane.lookAt === 'function') plane.lookAt(diveApex);
+                    scene.add(plane);
+                    if (i === 0 && typeof playAudio === 'function') {
+                        playAudio('a10_dive', { volume: 0.92 }, 'usa');
+                        playAudio('a10_flyby', { volume: 0.72 }, 'usa');
                     }
-
-                    // 30mm GAU-8 Avenger cannon strafe during dive approach
-                    if (t >= 0.24 && t <= 0.48 && frame % 4 === 0) {
-                        const hitPt = target.clone().add(new THREE.Vector3((Math.random() - 0.5) * 9, 0, (Math.random() - 0.5) * 9));
-                        hitPt.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(hitPt.x, hitPt.z) : groundY;
-                        spawnBulletTracer(plane.position.clone(), hitPt, 0xffd32a, 3.0);
-                        spawnSparks(hitPt, 0xffa502, 5);
-                        if (frame % 8 === 0 && typeof playAudio === 'function') playAudio('gatling_fire', { volume: 0.65 }, 'usa');
-                        if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(hitPt, 4.0, 26, 'GATLING', pseudoAttacker);
-                    }
-
-                    // Launch 3 Maverick AGM-65 missiles per A-10
-                    [0.30, 0.37, 0.44].forEach((trigT, mIdx) => {
-                        if (!firedMissiles.has(mIdx) && t >= trigT) {
-                            firedMissiles.add(mIdx);
-                            const impact = target.clone().add(new THREE.Vector3((Math.random() - 0.5) * 9.5, 0, (Math.random() - 0.5) * 9.5));
-                            impact.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(impact.x, impact.z) : groundY;
-                            if (typeof spawnRocketProjectile === 'function') {
-                                spawnRocketProjectile(plane.position.clone(), impact, true, false, {
-                                    attacker: pseudoAttacker,
-                                    target: null,
-                                    targetPos: impact,
-                                    damage: 120,
-                                    damageType: 'EXPLOSIVE',
-                                    splashRadius: 6.5
-                                });
-                            }
-                            if (typeof playAudio === 'function') playAudio('jet_missile', { volume: 0.78 }, 'usa');
-                        }
-                    });
-
-                    if (frame < totalFrames) return true;
-                    scene.remove(plane);
-                    return false;
                 }
-            });
-        }, i * 320);
+                frame++;
+                const t = frame / totalFrames;
+                if (t < 0.5) {
+                    const dt = t * 2;
+                    plane.position.lerpVectors(startPos, diveApex, dt);
+                    if (typeof plane.lookAt === 'function') plane.lookAt(diveApex.x + 2, diveApex.y - 2, diveApex.z + 2);
+                } else {
+                    const ct = (t - 0.5) * 2;
+                    plane.position.lerpVectors(diveApex, exitPos, ct);
+                    if (typeof plane.lookAt === 'function') plane.lookAt(exitPos);
+                }
+
+                if (frame % 4 === 0 && t > 0.15 && t < 0.85) {
+                    spawnJetContrailPuff(plane.position.clone().add(new THREE.Vector3(-2.8, 0.2, 0)), false);
+                    spawnJetContrailPuff(plane.position.clone().add(new THREE.Vector3(2.8, 0.2, 0)), false);
+                }
+
+                // 30mm GAU-8 Avenger cannon strafe during dive approach
+                if (t >= 0.24 && t <= 0.48 && frame % 4 === 0) {
+                    const hitPt = target.clone().add(new THREE.Vector3((Math.random() - 0.5) * 9, 0, (Math.random() - 0.5) * 9));
+                    hitPt.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(hitPt.x, hitPt.z) : groundY;
+                    spawnBulletTracer(plane.position.clone(), hitPt, 0xffd32a, 3.0);
+                    spawnSparks(hitPt, 0xffa502, 5);
+                    if (frame % 8 === 0 && typeof playAudio === 'function') playAudio('gatling_fire', { volume: 0.65 }, 'usa');
+                    if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(hitPt, 4.5, 32, 'GATLING', pseudoAttacker);
+                }
+
+                // Launch 3 Maverick AGM-65 missiles per A-10
+                [0.30, 0.37, 0.44].forEach((trigT, mIdx) => {
+                    if (!firedMissiles.has(mIdx) && t >= trigT) {
+                        firedMissiles.add(mIdx);
+                        const impact = target.clone().add(new THREE.Vector3((Math.random() - 0.5) * 9.5, 0, (Math.random() - 0.5) * 9.5));
+                        impact.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(impact.x, impact.z) : groundY;
+                        if (typeof spawnRocketProjectile === 'function') {
+                            spawnRocketProjectile(plane.position.clone(), impact, true, false, {
+                                attacker: pseudoAttacker,
+                                target: null,
+                                targetPos: impact,
+                                damage: 140,
+                                damageType: 'EXPLOSIVE',
+                                splashRadius: 6.5
+                            });
+                        }
+                        if (typeof playAudio === 'function') playAudio('jet_missile', { volume: 0.78 }, 'usa');
+                    }
+                });
+
+                if (frame < totalFrames) return true;
+                cleanupPlane();
+                return false;
+            }
+        });
     }
 }
 
@@ -4474,10 +4489,19 @@ function triggerSpyDronePower(targetPos) {
     scanRing.position.set(center.x, gY + 0.35, center.z);
     scene.add(scanRing);
 
-    let life = 900;
+    const maxLife = 3600; // Matches 60s fog reveal duration
+    let life = maxLife;
     let angle = 0;
+    const cleanupDrone = () => {
+        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(drone);
+        else scene.remove(drone);
+        scene.remove(scanRing);
+        ringGeo.dispose();
+        ringMat.dispose();
+    };
     activeFX.push({
         life,
+        dispose: cleanupDrone,
         update() {
             life--;
             angle += 0.03;
@@ -4488,14 +4512,31 @@ function triggerSpyDronePower(targetPos) {
             drone.position.set(ox, gY + 18 + Math.sin(angle * 2) * 0.5, oz);
             if (typeof drone.lookAt === 'function') drone.lookAt(nx, drone.position.y, nz);
             if (prop && prop.rotation) prop.rotation.z += 0.85;
-            const pulse = 1 + ((900 - life) % 60) / 60 * 4.5;
+            const pulse = 1 + ((maxLife - life) % 60) / 60 * 4.5;
             scanRing.scale.setScalar(pulse);
-            ringMat.opacity = Math.max(0, 0.72 * (1 - ((900 - life) % 60) / 60));
+            ringMat.opacity = Math.max(0, 0.72 * (1 - ((maxLife - life) % 60) / 60));
+            // Actively detect stealthed hostile units & structures beneath the Spy Drone
+            if (life % 12 === 0 && typeof buildingTick !== 'undefined') {
+                const detUntil = buildingTick + 30;
+                if (typeof enemyUnits !== 'undefined') {
+                    for (let i = 0; i < enemyUnits.length; i++) {
+                        const eu = enemyUnits[i];
+                        if (eu && eu.health > 0 && eu.isStealthed && eu.mesh && Math.hypot(eu.mesh.position.x - center.x, eu.mesh.position.z - center.z) <= 85) {
+                            eu.revealedUntil = Math.max(eu.revealedUntil || 0, detUntil);
+                        }
+                    }
+                }
+                if (typeof enemyStructures !== 'undefined') {
+                    for (let i = 0; i < enemyStructures.length; i++) {
+                        const es = enemyStructures[i];
+                        if (es && es.health > 0 && es.isStealthed && es.position && Math.hypot(es.position.x - center.x, es.position.z - center.z) <= 85) {
+                            es.revealedUntil = Math.max(es.revealedUntil || 0, detUntil);
+                        }
+                    }
+                }
+            }
             if (life <= 0) {
-                scene.remove(drone);
-                scene.remove(scanRing);
-                ringGeo.dispose();
-                ringMat.dispose();
+                cleanupDrone();
                 return false;
             }
             return true;
@@ -4545,21 +4586,40 @@ function triggerEmpPulseFX(targetPos) {
 function triggerArtilleryBarrageFX(targetPos, pseudoAttacker) {
     if (!targetPos || typeof scene === 'undefined') return;
     if (typeof playAudio === 'function') playAudio('artillery_fire', { volume: 0.85 }, 'china');
-    for (let i = 0; i < 8; i++) {
-        setTimeout(() => {
-            if (typeof scene === 'undefined') return;
-            const scatter = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 18, 0, (Math.random() - 0.5) * 18));
-            scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : 0;
-            if (i % 2 === 0 && typeof playAudio === 'function') playAudio('shell_whistle', { volume: 0.55 });
-            setTimeout(() => {
-                if (typeof scene === 'undefined') return;
-                spawnEnhancedExplosion(scatter, 0xff5722, 3.0, true, 'expl_artillery');
-                spawnCraterDecal(scatter, 2.8, 420);
-                if (typeof triggerScreenShake === 'function') triggerScreenShake(0.45);
-                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 8.0, 140, 'EXPLOSIVE', pseudoAttacker);
-            }, 240);
-        }, i * 260);
-    }
+    const center = targetPos.clone();
+    const totalShells = 10;
+    let tick = 0;
+    let fired = 0;
+    // Fixed 60Hz activeFX barrage with falling 152mm arcing shells (no setTimeout!)
+    activeFX.push({
+        update() {
+            tick++;
+            if (fired < totalShells && (tick === 1 || tick % 16 === 0)) {
+                const shellIdx = fired++;
+                const scatter = center.clone().add(new THREE.Vector3((Math.random() - 0.5) * 18, 0, (Math.random() - 0.5) * 18));
+                scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : 0;
+                const skyOrigin = new THREE.Vector3(scatter.x - 18, scatter.y + 52, scatter.z - 14);
+                if (shellIdx % 2 === 0 && typeof playAudio === 'function') playAudio('shell_whistle', { volume: 0.55 });
+                const onShellHit = (hitPos) => {
+                    const p = hitPos || scatter;
+                    spawnEnhancedExplosion(p, 0xff5722, 3.0, true, 'expl_artillery');
+                    spawnCraterDecal(p, 2.8, 420);
+                    if (typeof triggerScreenShake === 'function') triggerScreenShake(0.45);
+                    if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(p, 8.5, 145, 'EXPLOSIVE', pseudoAttacker);
+                };
+                if (typeof spawnCannonShellProjectile === 'function') {
+                    spawnCannonShellProjectile(skyOrigin, scatter, {
+                        color: 0xffa502, coreColor: 0xfff5cc, smokeColor: 0xd0ccc4,
+                        thickness: 1.35, speed: 3.1, arcHeight: 4.0, trailRate: 0.85,
+                        onImpact: onShellHit
+                    });
+                } else {
+                    onShellHit(scatter);
+                }
+            }
+            return fired < totalShells;
+        }
+    });
 }
 
 function triggerAnthraxBombFX(targetPos, pseudoAttacker) {
@@ -4576,32 +4636,74 @@ function triggerAnthraxBombFX(targetPos, pseudoAttacker) {
     if (typeof bomb.lookAt === 'function') bomb.lookAt(impact);
     scene.add(bomb);
 
+    // Authentic Zero Hour Anthrax Beta green toxin cloud dome + 4 fixed-step lingering DoT pulses (no setTimeout!)
     let tick = 0;
+    let detonated = false;
+    let postTick = 0;
+    let cloudDome = null;
+    let cloudGeo = null;
+    let cloudMat = null;
+
+    const cleanup = () => {
+        if (bomb.parent) scene.remove(bomb);
+        try { bombGeo.dispose(); bombMat.dispose(); } catch (_) {}
+        if (cloudDome) {
+            scene.remove(cloudDome);
+            try { cloudGeo.dispose(); cloudMat.dispose(); } catch (_) {}
+            cloudDome = null;
+        }
+    };
+
     activeFX.push({
+        dispose: cleanup,
         update() {
-            tick++;
-            const t = Math.min(1, tick / 28);
-            bomb.position.lerpVectors(dropFrom, impact, t);
-            if (tick % 3 === 0) spawnSmokePuff(bomb.position, 0x2ecc71, 0.45);
-            if (t < 1) return true;
-            scene.remove(bomb); bombGeo.dispose(); bombMat.dispose();
-            if (typeof playAudio === 'function') playAudio('anthrax_blast', { volume: 0.95 }, 'gla');
-            setTimeout(() => { if (typeof playAudio === 'function') playAudio('anthrax_hiss', { volume: 0.75 }, 'gla'); }, 180);
-            if (typeof triggerScreenShake === 'function') triggerScreenShake(0.9);
-            spawnEnhancedExplosion(impact, 0x2ecc71, 4.8, true, 'none');
-            spawnCraterDecal(impact, 5.2, 560, 'toxin');
-            spawnLingeringToxinCloud(impact);
-            for (let k = 0; k < 4; k++) {
-                const a = (k / 4) * Math.PI * 2;
-                spawnLingeringToxinCloud(impact.clone().add(new THREE.Vector3(Math.cos(a) * 6.5, 0, Math.sin(a) * 6.5)));
+            if (!detonated) {
+                tick++;
+                const t = Math.min(1, tick / 28);
+                bomb.position.lerpVectors(dropFrom, impact, t);
+                if (tick % 3 === 0) spawnSmokePuff(bomb.position, 0x2ecc71, 0.45);
+                if (t < 1) return true;
+                detonated = true;
+                scene.remove(bomb);
+                if (typeof playAudio === 'function') playAudio('anthrax_blast', { volume: 0.95 }, 'gla');
+                if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
+                spawnEnhancedExplosion(impact, 0x2ecc71, 4.8, true, 'none');
+                spawnCraterDecal(impact, 5.2, 560, 'toxin');
+                spawnLingeringToxinCloud(impact);
+                for (let k = 0; k < 5; k++) {
+                    const a = (k / 5) * Math.PI * 2;
+                    spawnLingeringToxinCloud(impact.clone().add(new THREE.Vector3(Math.cos(a) * 7.5, 0, Math.sin(a) * 7.5)));
+                }
+                cloudGeo = new THREE.SphereGeometry(1.0, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55);
+                cloudMat = new THREE.MeshBasicMaterial({ color: 0x32ff7e, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide });
+                cloudDome = new THREE.Mesh(cloudGeo, cloudMat);
+                cloudDome.position.set(impact.x, impact.y + 0.2, impact.z);
+                scene.add(cloudDome);
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(impact, 18.0, 320, 'TOXIN', pseudoAttacker);
+                return true;
             }
-            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(impact, 18.0, 320, 'TOXIN', pseudoAttacker);
-            return false;
+            postTick++;
+            if (postTick === 12 && typeof playAudio === 'function') playAudio('anthrax_hiss', { volume: 0.75 }, 'gla');
+            if (cloudDome) {
+                const p = Math.min(1, postTick / 360);
+                const s = 4.0 + Math.min(1, postTick / 35) * 14.5;
+                cloudDome.scale.set(s, s * 0.55, s);
+                cloudMat.opacity = Math.max(0, (1 - p) * 0.40);
+            }
+            // 4 lingering Anthrax Beta toxin damage waves every 90 ticks (1.5s at 60Hz)
+            if (postTick % 90 === 0 && postTick <= 360) {
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(impact, 16.5, 95, 'TOXIN', pseudoAttacker);
+            }
+            if (postTick >= 360) {
+                cleanup();
+                return false;
+            }
+            return true;
         }
     });
 }
 
-function triggerLeafletDropFX(targetPos) {
+function triggerLeafletDropFX(targetPos, onDrop = null) {
     if (!targetPos || typeof scene === 'undefined') return;
     const dropCenter = targetPos.clone();
     const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
@@ -4615,7 +4717,12 @@ function triggerLeafletDropFX(targetPos) {
 
     let frame = 0;
     let released = false;
+    const cleanupPlane = () => {
+        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(plane);
+        else scene.remove(plane);
+    };
     activeFX.push({
+        dispose: cleanupPlane,
         update() {
             frame++;
             const t = frame / leafDur;
@@ -4623,6 +4730,9 @@ function triggerLeafletDropFX(targetPos) {
             for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.8;
             if (!released && t >= leafDropT) {
                 released = true;
+                if (typeof onDrop === 'function') {
+                    try { onDrop(dropCenter); } catch (_) {}
+                }
                 if (typeof playAudio === 'function') playAudio('parachute_open', { volume: 0.75 });
                 const paperGeo = new THREE.PlaneGeometry(0.65, 0.42);
                 const paperMat = new THREE.MeshBasicMaterial({ color: 0xfaf7e8, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
@@ -4654,12 +4764,62 @@ function triggerLeafletDropFX(targetPos) {
                     });
                 }
             }
-            if (frame < 240) return true;
-            scene.remove(plane);
+            if (frame < leafDur) return true;
+            cleanupPlane();
             return false;
         }
     });
 }
+
+function triggerFrenzyFX(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+    const ringGeo = new THREE.RingGeometry(1.5, 3.0, 36);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xff2e2e, side: THREE.DoubleSide, transparent: true, opacity: 0.92, depthWrite: false });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.set(targetPos.x, gY + 0.45, targetPos.z);
+    scene.add(ring);
+    spawnSparks({ x: targetPos.x, y: gY + 1.0, z: targetPos.z }, 0xff3838, 16);
+    let life = 44;
+    activeFX.push({
+        dispose() { scene.remove(ring); ringGeo.dispose(); ringMat.dispose(); },
+        update() {
+            life--;
+            const p = 1 - life / 44;
+            const s = 1 + p * 8.5;
+            ring.scale.set(s, 1, s);
+            ringMat.opacity = Math.max(0, (1 - p) * 0.92);
+            if (life <= 0) { scene.remove(ring); ringGeo.dispose(); ringMat.dispose(); return false; }
+            return true;
+        }
+    });
+}
+window.triggerFrenzyFX = triggerFrenzyFX;
+
+function triggerGpsScramblerFX(targetPos) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+    const domeGeo = new THREE.SphereGeometry(2.0, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    const domeMat = new THREE.MeshBasicMaterial({ color: 0x2ed573, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+    const dome = new THREE.Mesh(domeGeo, domeMat);
+    dome.position.set(targetPos.x, gY + 0.2, targetPos.z);
+    scene.add(dome);
+    let life = 42;
+    activeFX.push({
+        dispose() { scene.remove(dome); domeGeo.dispose(); domeMat.dispose(); },
+        update() {
+            life--;
+            const p = 1 - life / 42;
+            const s = 1 + p * 10.5;
+            dome.scale.set(s, s * 0.5, s);
+            domeMat.opacity = Math.max(0, (1 - p) * 0.45);
+            if (life <= 0) { scene.remove(dome); domeGeo.dispose(); domeMat.dispose(); return false; }
+            return true;
+        }
+    });
+}
+window.triggerGpsScramblerFX = triggerGpsScramblerFX;
 
 function triggerEmergencyRepairFX(targetPos) {
     if (!targetPos || typeof scene === 'undefined') return;
