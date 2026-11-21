@@ -917,17 +917,16 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         cmd.resources = Math.min(25000, (cmd.resources || 0) + incomeTick);
     }
 
-    const nowBuildMs = Date.now();
+    const curSimTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
     const desiredGatherers = ZERO_HOUR_AI_DATA.resourceGatherers[cmd.difficulty] || 1;
     const myGatherers = myUnits.filter(u => u.type === 'truck' || u.type === 'chinook' || (u.type === 'worker' && u.aiState && u.aiState !== 'Idle'));
     if (supplyStruct && myGatherers.length < desiredGatherers && cmd.resources >= 600) {
         const hType = (cmd.faction === 'gla') ? 'worker' : (cmd.faction === 'usa' ? 'chinook' : 'truck');
-        const harvTrainMs = hType === 'worker' ? 5000 : (hType === 'chinook' ? 9000 : 7000);
-        if (!cmd._harvesterReadyAt) {
-            // Start realistic production timer matching player training time
-            cmd._harvesterReadyAt = nowBuildMs + harvTrainMs;
-        } else if (nowBuildMs >= cmd._harvesterReadyAt) {
-            cmd._harvesterReadyAt = 0;
+        const harvTrainTicks = hType === 'worker' ? 300 : (hType === 'chinook' ? 540 : 420); // 5s / 9s / 7s at 60Hz sim ticks
+        if (!cmd._harvesterReadyTick) {
+            cmd._harvesterReadyTick = curSimTick + harvTrainTicks;
+        } else if (curSimTick >= cmd._harvesterReadyTick) {
+            cmd._harvesterReadyTick = 0;
             const spawnPos = adjustToPossibleDestination(supplyStruct.position.clone().add(new THREE.Vector3(7, 0, 7)), supplyStruct);
             if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
             const harv = spawnEnemyUnit(hType, spawnPos, null, cmd.faction);
@@ -947,18 +946,18 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             }
         }
     } else {
-        cmd._harvesterReadyAt = 0;
+        cmd._harvesterReadyTick = 0;
     }
 
-    // Ensure AI maintains at least 1 Construction Dozer / Builder Worker if Command Center stands (with realistic player-matched training time!)
+    // Ensure AI maintains at least 1 Construction Dozer / Builder Worker if Command Center stands (tick-based training time respects pause & game speed)
     const myBuilders = myUnits.filter(u => u.type === 'dozer' || (u.type === 'worker' && (!u.aiState || u.aiState === 'Idle')));
     if (cmdCenter && myBuilders.length === 0 && cmd.resources >= 1000) {
         const bType = (cmd.faction === 'gla') ? 'worker' : 'dozer';
-        const builderTrainMs = bType === 'worker' ? 5000 : 8000;
-        if (!cmd._builderReadyAt) {
-            cmd._builderReadyAt = nowBuildMs + builderTrainMs;
-        } else if (nowBuildMs >= cmd._builderReadyAt) {
-            cmd._builderReadyAt = 0;
+        const builderTrainTicks = bType === 'worker' ? 300 : 480; // 5s Worker / 8s Dozer at 60Hz sim ticks
+        if (!cmd._builderReadyTick) {
+            cmd._builderReadyTick = curSimTick + builderTrainTicks;
+        } else if (curSimTick >= cmd._builderReadyTick) {
+            cmd._builderReadyTick = 0;
             const spawnPos = adjustToPossibleDestination(cmdCenter.position.clone().add(new THREE.Vector3(-8, 0, 8)), cmdCenter);
             if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
             const bUnit = spawnEnemyUnit(bType, spawnPos, null, cmd.faction);
@@ -974,7 +973,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             }
         }
     } else if (myBuilders.length > 0) {
-        cmd._builderReadyAt = 0;
+        cmd._builderReadyTick = 0;
     }
 
     // Find an available idle AI builder (Dozer or Worker)

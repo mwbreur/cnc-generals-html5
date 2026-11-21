@@ -68,6 +68,7 @@ function updateTopplingTrees(scale = 1.0) {
                 t.mesh.position.y -= 0.05 * scale;
                 if (t.mesh.position.y < t.baseY - 4.5) {
                     if (t.mesh.parent) t.mesh.parent.remove(t.mesh);
+                    if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(t.mesh);
                     topplingTrees.splice(i, 1);
                 }
             }

@@ -3448,10 +3448,30 @@ function upgradeDecoyToRealStructure(structure) {
     const newType = (oldType === 'fakeCommandCenter') ? 'commandCenter' : (oldType === 'fakeBarracks' ? 'barracks' : 'factory');
     structure.type = newType;
     structure.isFake = false;
-    structure.maxHealth = (newType === 'commandCenter' ? 5000 : (newType === 'barracks' ? 800 : 1200));
+    structure.maxHealth = (typeof getStructureMaxHealth === 'function')
+        ? getStructureMaxHealth(newType)
+        : (newType === 'commandCenter' ? 5000 : (newType === 'barracks' ? 1000 : 2000));
     structure.health = structure.maxHealth;
+    // Rebuild structure mesh so the converted decoy visually matches the real structure
+    if (typeof createStructureMeshForFaction === 'function' && structure.position) {
+        const realGroup = createStructureMeshForFaction(newType, structure.faction || 'gla', !!structure.isAI);
+        if (realGroup) {
+            if (!realGroup.userData || !realGroup.userData.isW3D) {
+                realGroup.scale.set(1.35, 1.35, 1.35);
+            }
+            realGroup.position.copy(structure.position);
+            realGroup.rotation.y = structure.rotationY || 0;
+            if (structure.mesh) {
+                if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(structure.mesh);
+                else if (typeof scene !== 'undefined' && scene) scene.remove(structure.mesh);
+            }
+            if (typeof scene !== 'undefined' && scene) scene.add(realGroup);
+            structure.mesh = realGroup;
+        }
+    }
     const label = newType === 'commandCenter' ? 'Command Center' : (newType === 'barracks' ? 'Barracks' : 'Arms Dealer');
     showNotification(`Decoy converted: Now a fully operational ${label}!`, 'success');
+    if (typeof updateSidebar === 'function') updateSidebar();
 }
 
 function triggerReconnaissanceScan(abilityId) {

@@ -327,8 +327,9 @@ function playOfficialSound(soundKey, volume = 0.85, faction = null, pan = null) 
         return playOfficialAudioElementFallback(data, clampedVol);
     };
     if (window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey]) return play();
-    loadOfficialAudioGroup(getOfficialAudioGroup(soundKey, faction)).then(play);
-    return true;
+    // Kick off lazy group load for subsequent plays, but return false now so caller plays synth fallback instead of silence
+    loadOfficialAudioGroup(getOfficialAudioGroup(soundKey, faction)).catch(() => {});
+    return false;
 }
 /**
  * Authentic Unit Voice Lines with Multiple Random Variations

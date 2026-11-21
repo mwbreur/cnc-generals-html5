@@ -666,8 +666,27 @@ function spawnSupplyCacheNearBase(basePos) {
 }
 
 function deployBase(position, faction = selectedFaction, team = playerTeamId) {
-    const nearby = structures.some(structure => structure.position.distanceTo(position) < structure.radius + 18);
-    if (nearby || Math.abs(position.x) > currentMapSize * 0.48 || Math.abs(position.z) > currentMapSize * 0.48) return;
+    let deployPos = position.clone();
+    const mapLimit = currentMapSize * 0.48;
+    const isSpotClear = (p) => (
+        Math.abs(p.x) <= mapLimit &&
+        Math.abs(p.z) <= mapLimit &&
+        !structures.some(structure => structure.position.distanceTo(p) < structure.radius + 18) &&
+        !(typeof enemyStructures !== 'undefined' && enemyStructures.some(es => es.position && es.position.distanceTo(p) < (es.radius || 10) + 18))
+    );
+    if (!isSpotClear(deployPos)) {
+        let foundClear = null;
+        for (let r = 28; r <= 140 && !foundClear; r += 22) {
+            for (let a = 0; a < 12; a++) {
+                const ang = (a / 12) * Math.PI * 2;
+                const cand = new THREE.Vector3(deployPos.x + Math.cos(ang) * r, 0, deployPos.z + Math.sin(ang) * r);
+                if (isSpotClear(cand)) { foundClear = cand; break; }
+            }
+        }
+        if (!foundClear) return;
+        deployPos = foundClear;
+    }
+    position = deployPos;
     choosingBaseLocation = false;
     const hint = document.getElementById('deployment-hint');
     if (hint) hint.style.display = 'none';
@@ -836,6 +855,12 @@ function resetEntireBattlefieldState(mapSize = 1500) {
         landmines.length = 0;
     }
     if (typeof topplingTrees !== 'undefined' && Array.isArray(topplingTrees)) {
+        topplingTrees.forEach(t => {
+            if (t && t.mesh) {
+                if (t.mesh.parent) t.mesh.parent.remove(t.mesh);
+                disposeSceneNodeSafe(t.mesh);
+            }
+        });
         topplingTrees.length = 0;
     }
     if (typeof window !== 'undefined') {

@@ -1192,16 +1192,16 @@ function executeWeaponFireInner(attacker, target) {
         const tArmor = targetArmor;
         if (tArmor === 'building') {
             if ((target.type === 'supplyCenter' || target.type === 'supplyStash') && !attacker.isAI) {
-                const nowMs = Date.now();
-                const HACK_COOLDOWN_MS = 25000;
-                if (!target._lastLotusHackMs || (nowMs - target._lastLotusHackMs) >= HACK_COOLDOWN_MS) {
-                    target._lastLotusHackMs = nowMs;
+                const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+                const HACK_COOLDOWN_TICKS = 1500; // 25s at 60Hz sim ticks (respects pause & game speed)
+                if (target._lastLotusHackTick === undefined || (curTick - target._lastLotusHackTick) >= HACK_COOLDOWN_TICKS) {
+                    target._lastLotusHackTick = curTick;
                     playerResources += 1000;
                     if (typeof spawnFloatingCashNumber === 'function') spawnFloatingCashNumber(targetPos, 1000);
                     if (typeof showNotification === 'function') showNotification('Black Lotus hacked $1,000 from enemy Supply Depot!', 'success');
                     if (typeof updateHUD === 'function') updateHUD();
                 } else {
-                    const remainSec = Math.ceil((HACK_COOLDOWN_MS - (nowMs - target._lastLotusHackMs)) / 1000);
+                    const remainSec = Math.ceil((HACK_COOLDOWN_TICKS - (curTick - target._lastLotusHackTick)) / 60);
                     if (typeof showNotification === 'function') showNotification(`Cash Hack recharging on this depot (${remainSec}s)...`, 'info');
                 }
             } else {
