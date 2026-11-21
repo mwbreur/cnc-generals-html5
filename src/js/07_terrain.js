@@ -1,7 +1,7 @@
 // MAP ENVIRONMENTS, PROCEDURAL TERRAIN, WATER & PROPS (TREES / CITY)
 // =========================================================================
 let currentMapType = 'tournament_desert';
-let currentMapSize = 1500;
+let currentMapSize = 600;
 let terrainMesh = null;
 let waterMesh = null;
 let mapPropsGroup = null;
@@ -762,7 +762,7 @@ function createTerrainTextureForMap(mapType) {
 }
 
 // Build Terrain, Water, and Props for the selected Map
-function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
+function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 600) {
     if (mapType === 'desert') mapType = 'tournament_desert';
     // 0. Resolve activeCustomMap if mapType starts with custom_
     if (mapType && mapType.startsWith('custom_')) {

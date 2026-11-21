@@ -1767,14 +1767,15 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
         }
         activeFX.pop();
 
-        // 13. Strict Battlefield Size / Player Count map category filtering
-        if (doesMapMatchBattlefieldSize('tournament_desert', 900) !== true ||
+        // 13. Strict Battlefield Size / Player Count map category filtering (retail 600/900/1200/1600 scale)
+        if (doesMapMatchBattlefieldSize('tournament_desert', 600) !== true ||
+            doesMapMatchBattlefieldSize('twilight_flame', 600) !== false ||
+            doesMapMatchBattlefieldSize('tournament_desert', 900) !== false ||
             doesMapMatchBattlefieldSize('twilight_flame', 900) !== false ||
-            doesMapMatchBattlefieldSize('tournament_desert', 1500) !== false ||
-            doesMapMatchBattlefieldSize('twilight_flame', 1500) !== false ||
-            doesMapMatchBattlefieldSize('tournament_desert', 2200) !== false ||
-            doesMapMatchBattlefieldSize('twilight_flame', 2200) !== true ||
-            doesMapMatchBattlefieldSize('desert', 1500) !== true) {
+            doesMapMatchBattlefieldSize('tournament_desert', 1200) !== false ||
+            doesMapMatchBattlefieldSize('twilight_flame', 1200) !== true ||
+            doesMapMatchBattlefieldSize('twilight_flame', 1600) !== true ||
+            doesMapMatchBattlefieldSize('desert', 900) !== true) {
             throw new Error('Strict Battlefield Size map category filtering failed!');
         }
 

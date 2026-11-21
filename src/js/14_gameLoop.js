@@ -3840,7 +3840,7 @@ function initShellMapDemo() {
 
     if (typeof terrainMesh === 'undefined' || !terrainMesh) {
         if (typeof setupMapEnvironment === 'function') {
-            setupMapEnvironment('tournament_desert', 900);
+            setupMapEnvironment('tournament_desert', 600);
         }
     }
 

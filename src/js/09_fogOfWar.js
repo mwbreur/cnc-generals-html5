@@ -1325,7 +1325,7 @@ function getSpawnPointsForMap(mapSize, mapType, customMap) {
     }
 
     const spawns = [];
-    if (mapSize <= 1000) {
+    if (mapSize <= 750) {
         // Small map: 4 spawn points (quadrants)
         const d = mapSize * 0.30;
         spawns.push(
@@ -1334,7 +1334,7 @@ function getSpawnPointsForMap(mapSize, mapType, customMap) {
             { id: 3, name: 'Spawn 3 (NW)', x: -d, z: -d },
             { id: 4, name: 'Spawn 4 (SE)', x: d, z: d }
         );
-    } else if (mapSize <= 1800) {
+    } else if (mapSize <= 1050) {
         // Medium map: 6 spawn points evenly distributed in a ring
         const r = mapSize * 0.32;
         const count = 6;
@@ -1549,7 +1549,7 @@ function initLobbySlots(mode) {
     const mapSize = parseInt(document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size').value, 10);
     const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
     const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
-    const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
+    const maxSpawns = Math.max(2, Math.min(8, spawns.length || getRequiredSpawnsForSize(mapSize)));
     const slots = mode === 'single' ? spSlots : mpSlots;
 
     slots.forEach((s, idx) => {
@@ -1601,7 +1601,7 @@ function renderSlotsUI(mode) {
     const slots = mode === 'single' ? spSlots : mpSlots;
     const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
     const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
-    const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
+    const maxSpawns = Math.max(2, Math.min(8, spawns.length || getRequiredSpawnsForSize(mapSize)));
 
     let html = '';
     if (mode === 'single') {
@@ -1773,7 +1773,7 @@ function updateSkirmishSlotType(slotIdx, val) {
     const mapSize = parseInt(document.getElementById('map-size').value, 10);
     const mapType = document.getElementById('map-environment').value;
     const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
-    const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
+    const maxSpawns = Math.max(2, Math.min(8, spawns.length || getRequiredSpawnsForSize(mapSize)));
     renderSlotsUI('single');
     renderMapPreview('sp-map-preview', mapType, mapSize, spSlots, true);
     updateLobbySlotsCount('single', maxSpawns, spSlots);
@@ -1807,7 +1807,7 @@ function updateSlot(mode, slotIdx, field, value, skipRerender = false) {
     renderMapPreview(canvasId, mapType, mapSize, slots, true);
     if (mode === 'single') {
         const spawns = getSpawnPointsForMap(mapSize, mapType, activeCustomMap);
-        const maxSpawns = Math.max(2, Math.min(8, spawns.length || (mapSize <= 1000 ? 4 : mapSize <= 1800 ? 6 : 8)));
+        const maxSpawns = Math.max(2, Math.min(8, spawns.length || getRequiredSpawnsForSize(mapSize)));
         updateLobbySlotsCount('single', maxSpawns, slots);
     }
 
@@ -1817,9 +1817,9 @@ function updateSlot(mode, slotIdx, field, value, skipRerender = false) {
 }
 
 function getRequiredSpawnsForSize(mapSize) {
-    const sz = parseInt(mapSize, 10) || 900;
-    if (sz <= 1000) return 4;
-    if (sz <= 1800) return 6;
+    const sz = parseInt(mapSize, 10) || 600;
+    if (sz <= 750) return 4;
+    if (sz <= 1050) return 6;
     return 8;
 }
 
@@ -1854,7 +1854,7 @@ function syncMapOptionsForBattlefieldSize(mode) {
     const sizeEl = document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size');
     if (!envEl || !sizeEl) return;
 
-    const mapSize = parseInt(sizeEl.value, 10) || 900;
+    const mapSize = parseInt(sizeEl.value, 10) || 600;
     const options = Array.from(envEl.options || []);
     let firstCompatibleVal = null;
 
@@ -1968,7 +1968,7 @@ function renderSkirmishMapPickerGrid() {
     if (!gridEl) return;
     syncMapOptionsForBattlefieldSize('single');
     const currentKey = envEl ? envEl.value : 'tournament_desert';
-    const mapSize = sizeEl ? (parseInt(sizeEl.value, 10) || 900) : 900;
+    const mapSize = sizeEl ? (parseInt(sizeEl.value, 10) || 600) : 600;
     const requiredSpawns = getRequiredSpawnsForSize(mapSize);
     const items = [];
     let hiddenCount = 0;
