@@ -1075,9 +1075,10 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
     ccGroup.rotation.y = faceCenterYaw;
     ccGroup.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
     scene.add(ccGroup);
+    const ccMaxHp = (typeof getStructureMaxHealth === 'function') ? getStructureMaxHealth('commandCenter') : 5000;
     enemyStructures.push({
             type: ccType, faction: faction, position: pos.clone(), mesh: ccGroup, rotationY: faceCenterYaw,
-            health: 2200, maxHealth: 2200, radius: 11 * 1.35, buildProgress: 100, isBuilding: false,
+            health: ccMaxHp, maxHealth: ccMaxHp, radius: 11 * 1.35, buildProgress: 100, isBuilding: false,
             netId: 'ES_' + (++netIdSequence), teamId: teamId, ownerId: ownerId, isAI: true, difficulty: difficulty
     });
 
@@ -1088,8 +1089,10 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
     // Spawn AI Starting Construction Builder (Dozer for USA/China, Worker for GLA)
     const builderType = faction === 'gla' ? 'worker' : 'dozer';
     const startUnitsEl = document.getElementById('starting-units');
-    const startMode = startUnitsEl ? startUnitsEl.value : 'standard';
-    const numBuilders = startMode === 'heavy' ? 2 : 1;
+    const startMode = startUnitsEl ? startUnitsEl.value : 'dozer';
+    const isLargeStart = (startMode === 'large' || startMode === 'heavy');
+    const isSmallStart = (startMode === 'small' || startMode === 'light');
+    const numBuilders = isLargeStart ? 2 : 1;
     const fwdX = Math.sin(faceCenterYaw), fwdZ = Math.cos(faceCenterYaw);
     const rightX = Math.cos(faceCenterYaw), rightZ = -Math.sin(faceCenterYaw);
 
@@ -1110,9 +1113,9 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
         }
     }
 
-    if (startMode === 'light' || startMode === 'heavy') {
+    if (isSmallStart || isLargeStart) {
         const tankType = faction === 'china' ? 'battlemaster' : faction === 'gla' ? 'scorpion' : 'crusader';
-        const numTanks = startMode === 'heavy' ? 2 : 1;
+        const numTanks = isLargeStart ? 2 : 1;
         for (let i = 0; i < numTanks; i++) {
             const lat = (i - (numTanks - 1) * 0.5) * 7;
             const uPos = pos.clone().add(new THREE.Vector3(fwdX * 26 + rightX * lat, 0, fwdZ * 26 + rightZ * lat));

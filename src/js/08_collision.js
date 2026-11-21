@@ -513,6 +513,12 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     else if (type === 'bombtruck') { mesh = createBombTruckMesh(true); radius = 3.0; speed = 0.18; health = 220; scanRange = 14; }
     else if (type === 'scud') { mesh = createScudLauncherMesh(true); radius = 3.6; speed = 0.10; health = 240; scanRange = 56; }
     else if (type === 'radarvan') { mesh = createRadarVanMesh(true); radius = 3.0; speed = 0.16; health = 220; scanRange = 20; }
+    else if (type === 'battlebus') {
+        mesh = (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['battlebus'])
+            ? createW3DVehicleMesh('battlebus', true)
+            : createTechnicalMesh(true);
+        radius = 3.4; speed = 0.16; health = 450; scanRange = 24;
+    }
     else if (type === 'rebel') { mesh = createRebelMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 22; }
     else if (type === 'rpg') { mesh = createRPGTrooperMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 38; }
     else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.8; speed = 0.12; health = 80; scanRange = 8; }

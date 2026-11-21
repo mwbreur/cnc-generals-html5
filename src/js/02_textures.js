@@ -149,6 +149,15 @@ function createSupplyFields() {
     }
 }
 
+// Shared INIZH.big Structure Power Drain table (used by HUD, processBuildingFunctions, and isRadarOnline)
+const STRUCTURE_POWER_DRAIN = {
+    factory: 1, supplyCenter: 1, airfield: 1,
+    strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
+    propagandaCenter: 2, patriot: 3, gatlingCannon: 3,
+    particleCannon: 10, nukeSilo: 10, supplyDrop: 4
+};
+window.STRUCTURE_POWER_DRAIN = STRUCTURE_POWER_DRAIN;
+
 function getSupplyDropoffPosition(unitPos = null) {
     const supplyCenters = structures.filter(s =>
         !s.isBuilding && s.health > 0 &&

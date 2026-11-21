@@ -85,12 +85,7 @@ function isRadarOnline(faction = (typeof selectedFaction !== 'undefined' ? selec
                 if (s.health <= 0 || s.isBuilding) return;
                 if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
                 if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
-                const drain = {
-                    barracks: 1, factory: 1, supplyCenter: 1, airfield: 1,
-                    strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
-                    propagandaCenter: 2, patriot: 3, gatlingCannon: 1,
-                    particleCannon: 4, nukeSilo: 4, supplyDrop: 4
-                }[s.type] || 0;
+                const drain = (typeof STRUCTURE_POWER_DRAIN !== 'undefined' ? STRUCTURE_POWER_DRAIN[s.type] : 0) || 0;
                 consumed += drain;
         });
         if (produced < consumed) return false;
@@ -172,9 +167,10 @@ function updateFogOfWar() {
         });
     }
 
+    const beaconSteps = (typeof window !== 'undefined' && typeof window._simStepsThisFrame === 'number') ? window._simStepsThisFrame : 1;
     for (let i = activeVisionBeacons.length - 1; i >= 0; i--) {
         const b = activeVisionBeacons[i];
-        b.life--;
+        b.life -= beaconSteps;
         visionSources.push({
                 position: { x: b.x, z: b.z },
                 scanRange: b.radius

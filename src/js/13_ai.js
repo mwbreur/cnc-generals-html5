@@ -1341,6 +1341,7 @@ function processEnemyAIEngine() {
                         combatUnits.forEach(ally => {
                                 // Only break staging formation if our own base is directly under attack!
                                 if (!isBaseUnderAttack && stagingSet.has(ally.netId)) return;
+                                if (typeof canUnitTarget === 'function' && !canUnitTarget(ally, attacker)) return;
                                 if (!ally.combatTarget && ally.mesh.position.distanceTo(victimPos) <= rallyRadius) {
                                     ally.combatTarget = attacker;
                                     if (isBaseUnderAttack) ally._releasedForAttack = true;
@@ -1462,6 +1463,7 @@ function processEnemyAIEngine() {
                     let minDist = 38 * ZERO_HOUR_AI_DATA.guardInnerModifierAI;
                     hostileUnits.forEach(hu => {
                             if (hu.mesh) {
+                                if (typeof canUnitTarget === 'function' && !canUnitTarget(enemy, hu)) return;
                                 if (hu.isStealthed && !(hu.revealedUntil && hu.revealedUntil > buildingTick)) return;
                                 const d = enemy.mesh.position.distanceTo(hu.mesh.position);
                                 if (d < minDist) { minDist = d; localIntruder = hu; }

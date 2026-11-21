@@ -1178,7 +1178,7 @@ function animate() {
         }
     }
 
-    if (buildingTick % 6 === 0) updateStealthAndDetection();
+    if (_simStepsThisFrame > 0 && buildingTick % 6 === 0) updateStealthAndDetection();
     processPointDefenseLasers();
     processScrapCrateCollection();
     processCameraKeyboardPanning();
@@ -1198,7 +1198,9 @@ function animate() {
     }
     updateTurretSystems();
     updateFogOfWar();
-    processEnemyAIEngine();
+    for (let _aiStep = 0; _aiStep < _simStepsThisFrame; _aiStep++) {
+        processEnemyAIEngine();
+    }
     processEnemyMovement();
     processEnemyCombat();
     assignBuildersToConstruction();

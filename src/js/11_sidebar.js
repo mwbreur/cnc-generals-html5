@@ -965,12 +965,7 @@ function updateSidebar() {
                 if (s.health <= 0 || s.isBuilding) return;
                 if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
                 if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
-                const drain = {
-                    factory: 1, supplyCenter: 1, airfield: 1,
-                    strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
-                    propagandaCenter: 2, patriot: 3, gatlingCannon: 3,
-                    particleCannon: 10, nukeSilo: 10, supplyDrop: 4
-                }[s.type] || 0;
+                const drain = (typeof STRUCTURE_POWER_DRAIN !== 'undefined' ? STRUCTURE_POWER_DRAIN[s.type] : 0) || 0;
                 consumed += drain;
         });
     }
@@ -2973,14 +2968,33 @@ function sellStructure(structure) {
         return;
     }
     const cost = getStructureCost(structure.type) || 500;
-    const refund = Math.floor(cost * 0.5);
+    let queueRefund = 0;
+    if (Array.isArray(structure.productionQueue) && structure.productionQueue.length > 0) {
+        structure.productionQueue.forEach(item => {
+            if (item && Number.isFinite(item.cost)) queueRefund += item.cost;
+        });
+        structure.productionQueue = [];
+    }
+    const refund = Math.floor(cost * 0.5) + queueRefund;
     playerResources += refund;
 
     const sPos = (structure.position || (structure.mesh && structure.mesh.position)) ? (structure.position || structure.mesh.position).clone() : null;
     if (structure.garrisoned && structure.garrisoned.length > 0 && typeof evacuateGarrisonedUnits === 'function') {
         evacuateGarrisonedUnits(structure);
     }
-    scene.remove(structure.mesh);
+    if (structure.dozerRef) {
+        structure.dozerRef.taskState = 'Idle';
+        structure.dozerRef.targetStructure = null;
+        structure.dozerRef = null;
+    }
+    if (structure._progressBarEl && structure._progressBarEl.parentElement) {
+        structure._progressBarEl.parentElement.removeChild(structure._progressBarEl);
+        structure._progressBarEl = null;
+    }
+    if (structure.mesh) {
+        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(structure.mesh);
+        else scene.remove(structure.mesh);
+    }
     const idx = structures.indexOf(structure);
     if (idx !== -1) structures.splice(idx, 1);
     if (selectedStructure === structure) selectedStructure = null;
@@ -2994,7 +3008,7 @@ function sellStructure(structure) {
         if (typeof spawnGroundDustPlume === 'function') spawnGroundDustPlume(sPos, 1.8);
     }
 
-    showNotification(`Demolished ${structure.type}. +$${refund} refunded.`, 'info');
+    showNotification(`Demolished ${structure.type}. +$${refund} refunded${queueRefund > 0 ? ` (incl. $${queueRefund} queued)` : ''}.`, 'info');
     updateSidebar();
 }
 
@@ -3615,12 +3629,7 @@ function processBuildingFunctions() {
                 if (s.health <= 0 || s.isBuilding) return;
                 if (s.type === 'power') pProduced += (s.powerUpgraded ? 10 : 5);
                 if (s.type === 'nuclearReactor') pProduced += (s.overcharged ? 15 : 10);
-                const drain = {
-                    factory: 1, supplyCenter: 1, airfield: 1,
-                    strategyCenter: 2, detentionCamp: 1, internetCenter: 2,
-                    propagandaCenter: 2, patriot: 3, gatlingCannon: 3,
-                    particleCannon: 10, nukeSilo: 10, supplyDrop: 4
-                }[s.type] || 0;
+                const drain = (typeof STRUCTURE_POWER_DRAIN !== 'undefined' ? STRUCTURE_POWER_DRAIN[s.type] : 0) || 0;
                 pConsumed += drain;
         });
     }
