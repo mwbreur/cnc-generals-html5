@@ -381,6 +381,8 @@ const DAMAGE_TYPES = {
     SNIPER: 'SNIPER',
     FLAME: 'FLAME',
     TOXIN: 'TOXIN',
+    POISON: 'POISON',
+    RADIATION: 'RADIATION',
     CRUSH: 'CRUSH'
 };
 
@@ -393,6 +395,8 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 3.0,
         FLAME: 1.5,
         TOXIN: 1.5,
+        POISON: 1.5,
+        RADIATION: 1.5,
         CRUSH: 10.0,
         AURORA_BOMB: 1.0,
         STEALTHJET_MISSILES: 0.5
@@ -405,6 +409,8 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.1,
         FLAME: 0.85,
         TOXIN: 0.6,
+        POISON: 0.6,
+        RADIATION: 0.6,
         CRUSH: 0.0,
         AURORA_BOMB: 1.0,
         STEALTHJET_MISSILES: 1.0
@@ -417,6 +423,8 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.05,
         FLAME: 0.5,
         TOXIN: 0.4,
+        POISON: 0.4,
+        RADIATION: 0.4,
         CRUSH: 0.0,
         AURORA_BOMB: 1.0,
         STEALTHJET_MISSILES: 1.0
@@ -429,6 +437,8 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.0,
         FLAME: 0.0,
         TOXIN: 0.0,
+        POISON: 0.0,
+        RADIATION: 0.0,
         CRUSH: 0.0,
         AURORA_BOMB: 0.0,
         STEALTHJET_MISSILES: 0.0
@@ -441,6 +451,8 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.0,
         FLAME: 1.25,
         TOXIN: 0.25,
+        POISON: 0.25,
+        RADIATION: 0.0,
         CRUSH: 0.0,
         AURORA_BOMB: 1.0,
         STEALTHJET_MISSILES: 1.25
@@ -639,7 +651,7 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
 
     // Target Tech Protection Buffs (strictly player-owned)
     if (isTargetPlayer && typeof researchedTechs !== 'undefined') {
-        if (researchedTechs.has('chemicalSuits') && typeof units !== 'undefined' && units.includes(target) && (damageType === 'TOXIN' || damageType === 'RADIATION')) {
+        if (researchedTechs.has('chemicalSuits') && typeof units !== 'undefined' && units.includes(target) && (damageType === 'TOXIN' || damageType === 'POISON' || damageType === 'RADIATION')) {
             finalDmg = Math.max(1, Math.round(finalDmg * 0.50)); // -50% chemical & radiation damage
         }
         if (researchedTechs.has('droneArmor') && (target.type === 'drone' || target.drone)) {
@@ -1012,9 +1024,12 @@ function executeWeaponFireInner(attacker, target) {
         }
     } else if (['rocket', 'missiledefender', 'rpg', 'tankhunter'].includes(attacker.type)) {
         // Shoulder-fired rockets (Tracked for Point Defense Laser interception; apRockets applied in applyCalculatedDamage)
+        // Official INIZH.big: China Tank Hunters and vanilla GLA RPG Troopers fire standard AT rockets (NO toxin pools).
+        // Only GLA Toxin General (Dr. Thrax) RPG Troopers fire Anthrax rockets.
+        const isToxinRocket = (attacker.type === 'rpg' && typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin' && typeof units !== 'undefined' && units.includes(attacker));
         if (typeof spawnRocketBackblast === 'function') spawnRocketBackblast(muzzlePos, targetPos, 0.85 * heroicScale);
         else spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff9f43, 0.5 * heroicScale);
-        spawnRocketProjectile(muzzlePos, targetPos, false, attacker.type === 'rpg' || attacker.type === 'tankhunter', {
+        spawnRocketProjectile(muzzlePos, targetPos, false, isToxinRocket, {
                 attacker: attacker,
                 target: target,
                 damage: 40,
