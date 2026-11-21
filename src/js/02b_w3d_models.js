@@ -530,6 +530,28 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         const bup2 = root.getObjectByName('BUSUP02') || root.getObjectByName('uvbattbus.busup02');
         if (bup1) bup1.visible = false;
         if (bup2) bup2.visible = false;
+    } else if (modelKey === 'humvee') {
+        // Retail AvHummer.W3D rest-pose pivot quaternions:
+        // - DOOR01 / DOOR02 stand upright flush along cab sides (without quat they stick out horizontally like wings)
+        // - HOUSECOLOR02 / 03 / 04 sit on turret shield & TOW pod (without quat they hang beneath the chassis)
+        ['DOOR01', 'DOOR02'].forEach(dName => {
+            const dNode = root.getObjectByName(dName);
+            if (dNode && dNode.quaternion && typeof dNode.quaternion.set === 'function') {
+                dNode.quaternion.set(0.707107, -0.707107, 0, 0);
+            }
+        });
+        ['HOUSECOLOR02', 'HOUSECOLOR03', 'HOUSECOLOR04'].forEach(hcName => {
+            const hcNode = root.getObjectByName(hcName);
+            if (hcNode && hcNode.quaternion && typeof hcNode.quaternion.set === 'function') {
+                hcNode.quaternion.set(0.5, -0.5, 0.5, -0.5);
+            }
+        });
+        // Retail AmericaVehicleHumvee: HideSubObject TURRETUP01 until Upgrade_AmericaTOWMissile swaps TURRET -> TURRETUP01
+        const hasTow = (!isEnemy && typeof researchedTechs !== 'undefined' && researchedTechs.has('towMissile'));
+        const tBase = root.getObjectByName('turretSystem') || root.getObjectByName('TURRET');
+        const tUp = root.getObjectByName('TURRETUP01');
+        if (tBase) tBase.visible = !hasTow;
+        if (tUp) tUp.visible = hasTow;
     } else if (modelKey === 'nukecannon') {
         // Retail NVNukeCn.W3D has TWO gun sets:
         // - Packed/travel stowed cannon: TURRETBACK, TURRETFRONT, ELEVATIONBARREL, GUNBARREL, LIFTERS

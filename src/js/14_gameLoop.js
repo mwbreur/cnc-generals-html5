@@ -1766,6 +1766,21 @@ function animate() {
             const bup2 = getCachedNode(unit.mesh, 'BUSUP02') || getCachedNode(unit.mesh, 'uvbattbus.busup02');
             if (bup1) bup1.visible = (lvl >= 1);
             if (bup2) bup2.visible = (lvl >= 2);
+        } else if (unit.type === 'humvee') {
+            const hasTow = (!isAIUnit && typeof researchedTechs !== 'undefined' && researchedTechs.has('towMissile'))
+                || (isAIUnit && unit.aiDifficulty && unit.aiDifficulty !== 'easy');
+            const t0 = getCachedNode(unit.mesh, 'turretSystem');
+            const t1 = getCachedNode(unit.mesh, 'TURRETUP01');
+            if (t0) t0.visible = !hasTow;
+            if (t1) {
+                t1.visible = !!hasTow;
+                if (t0 && t1.visible) t1.rotation.y = t0.rotation.y;
+            }
+            const towEl = getCachedNode(unit.mesh, 'TURRETUPEL01');
+            if (towEl && hasTow) {
+                const targetPitch = (unit.combatTarget && unit.combatTarget.health > 0) ? (unit.combatTarget.isAir ? -0.45 : -0.08) : 0;
+                towEl.rotation.x += (targetPitch - towEl.rotation.x) * 0.14;
+            }
         } else if (unit.type === 'scud') {
             const turretEl = getCachedNode(unit.mesh, 'TURRETEL');
             if (turretEl) {

@@ -1862,6 +1862,28 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             resetMultiplayerTransportState();
             units.length = 0; enemyUnits.length = 0;
         }
+
+        // 15. USA Humvee W3D DOOR01/DOOR02 upright quaternions & TOW Missile single-turret swap
+        {
+            researchedTechs.delete('towMissile');
+            const hvBase = createW3DVehicleMesh('humvee', false);
+            const d1 = hvBase.getObjectByName('DOOR01');
+            const d2 = hvBase.getObjectByName('DOOR02');
+            const tBase = hvBase.getObjectByName('turretSystem');
+            const tTow = hvBase.getObjectByName('TURRETUP01');
+            if (!d1 || !d2 || Math.abs(d1.quaternion.x - 0.707107) > 0.01 || Math.abs(d2.quaternion.x - 0.707107) > 0.01) {
+                throw new Error('Humvee DOOR01/DOOR02 missing upright AvHummer.W3D rest-pose quaternions!');
+            }
+            if (!tBase || !tTow || tBase.visible !== true || tTow.visible !== false) {
+                throw new Error('Humvee without TOW upgrade should show base turretSystem and hide TURRETUP01!');
+            }
+            researchedTechs.add('towMissile');
+            const hvTow = createW3DVehicleMesh('humvee', false);
+            if (hvTow.getObjectByName('turretSystem').visible !== false || hvTow.getObjectByName('TURRETUP01').visible !== true) {
+                throw new Error('Humvee with TOW upgrade should hide base turretSystem and show TURRETUP01!');
+            }
+            researchedTechs.delete('towMissile');
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");
