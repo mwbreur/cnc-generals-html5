@@ -1883,55 +1883,62 @@ function spawnNapalmScorchPool(pos) {
     });
 }
 
-// Lingering Toxic Gas Cloud (Anthrax / GLA Toxin pool with poison tick)
-function spawnLingeringToxinCloud(pos) {
-    const groundY = getTerrainHeight(pos.x, pos.z);
-    const cloudGeo = new THREE.CircleGeometry(4.0, 16);
+// Lingering Toxic Gas Cloud (Anthrax / GLA Toxin / SCUD Storm OCL_PoisonFieldLarge with poison DoT)
+function spawnLingeringToxinCloud(pos, radius = 5.5, durationTicks = 600) {
+    if (!pos || typeof scene === 'undefined') return;
+    const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+    const smokeTex = _getFxSpriteTex('smoke');
+    const cloudGeo = new THREE.PlaneGeometry(radius * 2.4, radius * 2.4);
     cloudGeo.rotateX(-Math.PI / 2);
-    const cloudMat = new THREE.MeshBasicMaterial({ color: 0x2ed573, transparent: true, opacity: 0.75, depthWrite: false });
+    const cloudMat = new THREE.MeshBasicMaterial({
+        ...(smokeTex ? { map: smokeTex } : {}),
+        color: 0x2ecc40,
+        transparent: true,
+        opacity: 0.68,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2
+    });
     const cloud = new THREE.Mesh(cloudGeo, cloudMat);
-    cloud.position.set(pos.x, groundY + 0.05, pos.z);
+    cloud.position.set(pos.x, groundY + 0.14, pos.z);
+    cloud.rotation.y = Math.random() * Math.PI * 2;
     scene.add(cloud);
 
     activeFX.push({
             mesh: cloud,
             pos: pos.clone(),
-            life: 300, // ~5.0 seconds
-            maxLife: 300,
-            radius: 4.8,
+            life: durationTicks,
+            maxLife: durationTicks,
+            radius: radius,
             tickTimer: 0,
             update() {
                 this.life--;
                 this.tickTimer++;
+                const fadeOut = Math.min(1, this.life / 90);
 
-                // Pulsing toxic glow
-                this.mesh.material.opacity = 0.45 + Math.sin(this.life * 0.2) * 0.25;
+                // Soft pulsing green anthrax contamination pool
+                this.mesh.material.opacity = fadeOut * (0.48 + Math.sin(this.life * 0.14) * 0.16);
 
-                // Rising green toxic mist spores
-                if (this.tickTimer % 6 === 0) {
-                    const mistPos = this.pos.clone();
-                    mistPos.x += (Math.random() - 0.5) * 3.5;
-                    mistPos.z += (Math.random() - 0.5) * 3.5;
-                    mistPos.y = groundY + 0.3;
-                    spawnSmokePuff(mistPos, 0x2ed573, 0.5);
+                // Rising green anthrax gas fumes
+                if (this.tickTimer % 8 === 0 && activeFX.length < 480) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const rr = Math.random() * this.radius * 0.78;
+                    const mistPos = new THREE.Vector3(this.pos.x + Math.cos(ang) * rr, groundY + 0.35, this.pos.z + Math.sin(ang) * rr);
+                    spawnSmokePuff(mistPos, (this.tickTimer % 16 === 0) ? 0x55efc4 : 0x2ed573, 0.55 + (this.radius > 7 ? 0.25 : 0));
                 }
 
-                // Lingering poison damage tick: deals damage to infantry & light vehicles
-                if (this.tickTimer % 20 === 0) {
-                    units.forEach(unit => {
-                            if (unit.health > 0 && unit.mesh && !unit.isAir) {
-                                if (unit.mesh.position.distanceTo(this.pos) <= this.radius) {
-                                    unit.health -= 7;
-                                }
-                            }
-                    });
-                    enemyUnits.forEach(enemy => {
-                            if (enemy.health > 0 && enemy.mesh && !enemy.isAir) {
-                                if (enemy.mesh.position.distanceTo(this.pos) <= this.radius) {
-                                    enemy.health -= 7;
-                                }
-                            }
-                    });
+                // Official INIZH.big poison field tick (~500ms = 30 ticks): damages all ground units inside
+                if (this.tickTimer % 30 === 0) {
+                    const dmg = this.radius > 7 ? 14 : 9;
+                    const allGround = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
+                    for (let i = 0; i < allGround.length; i++) {
+                        const u = allGround[i];
+                        if (u && u.health > 0 && u.mesh && !u.isAir && Math.hypot(u.mesh.position.x - this.pos.x, u.mesh.position.z - this.pos.z) <= this.radius) {
+                            if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, dmg, 'POISON');
+                            else u.health -= dmg;
+                        }
+                    }
                 }
 
                 if (this.life <= 0) {
@@ -2079,7 +2086,9 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
     const gY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
     const center = new THREE.Vector3(pos.x, gY, pos.z);
     const isDaisyCutter = blastScale >= 1.15;
-    const dispersalTicks = isDaisyCutter ? 26 : 6; // ~0.43s visible aerosol cloud spread before ignition on Daisy Cutter!
+    // Official INIZH.big FX_DaisyCutterExplode -> FX_DaisyCutterIgnite (+0.5s) -> FX_DaisyCutterFinalExplosion (+1.0s)
+    const dispersalTicks = isDaisyCutter ? 66 : 12;
+    const igniteFlashStart = isDaisyCutter ? 40 : 6;
 
     const rootGrp = new THREE.Group();
     rootGrp.position.copy(center);
@@ -2088,52 +2097,71 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
     const ownedGeos = [];
     const ownedMats = [];
     const track = (geo, mat) => { ownedGeos.push(geo); ownedMats.push(mat); return new THREE.Mesh(geo, mat); };
+    const smokeTex = _getFxSpriteTex('smoke');
+    const fireTex = _getFxSpriteTex('fireball');
+    const fallbackGeo = new THREE.IcosahedronGeometry(1.0, 1);
+    ownedGeos.push(fallbackGeo);
 
-    // --- STAGE 1: Aerosol Fuel Mist Dispersal Cloud (pale tan-white billowing lobes) ---
+    const makeVolSprite = (tex, colorHex, opacity, additive = false) => {
+        if (tex && typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+            const mat = new THREE.SpriteMaterial({
+                map: tex,
+                color: colorHex,
+                transparent: true,
+                opacity,
+                depthWrite: false,
+                ...(additive ? { blending: THREE.AdditiveBlending } : {})
+            });
+            ownedMats.push(mat);
+            return new THREE.Sprite(mat);
+        }
+        const mat = new THREE.MeshBasicMaterial({
+            color: colorHex,
+            transparent: true,
+            opacity,
+            depthWrite: false,
+            ...(additive ? { blending: THREE.AdditiveBlending } : {})
+        });
+        ownedMats.push(mat);
+        return new THREE.Mesh(fallbackGeo, mat);
+    };
+
+    // --- STAGE 1: Official DaisyExplosionGasSpray (R:239 G:227 B:10 bright yellow-gold aerosol fuel vapor cloud) ---
     const mistGroup = new THREE.Group();
     rootGrp.add(mistGroup);
     const mistPuffs = [];
-    const mistCount = isDaisyCutter ? 18 : 8;
-    const sharedMistGeo = new THREE.IcosahedronGeometry(1.0, 1);
-    ownedGeos.push(sharedMistGeo);
+    const mistCount = isDaisyCutter ? 30 : 12;
     for (let i = 0; i < mistCount; i++) {
-        const ang = (i / mistCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
-        const ringR = (0.35 + (i % 3) * 0.32) * (isDaisyCutter ? 14.0 : 7.5) * blastScale;
-        const mMat = new THREE.MeshBasicMaterial({
-            color: (i % 2 === 0) ? 0xeae4d6 : 0xd6cfc0,
-            transparent: true,
-            opacity: 0.0,
-            depthWrite: false
-        });
-        ownedMats.push(mMat);
-        const puff = new THREE.Mesh(sharedMistGeo, mMat);
-        puff.position.set(0, 1.2 + Math.random() * 1.4, 0);
-        puff.scale.setScalar(0.8);
+        const ang = (i / mistCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.32;
+        const ringFrac = 0.25 + ((i % 4) / 3) * 0.75;
+        const ringR = ringFrac * (isDaisyCutter ? 18.5 : 8.5) * blastScale;
+        const col = (i % 5 === 0) ? 0xc4fa7a : ((i % 2 === 0) ? 0xefe30a : 0xdcc914); // Official R:239,227,10 & R:196,250,122
+        const puff = makeVolSprite(smokeTex, col, 0.0, false);
+        puff.position.set(0, 1.0 + Math.random() * 1.2, 0);
+        puff.scale.setScalar(1.2);
         mistGroup.add(puff);
         mistPuffs.push({
             mesh: puff,
             tx: Math.cos(ang) * ringR,
             tz: Math.sin(ang) * ringR,
-            ty: 1.4 + Math.random() * (isDaisyCutter ? 3.2 : 1.6),
-            maxScale: (2.6 + Math.random() * 2.2) * blastScale
+            ty: 1.2 + Math.random() * (isDaisyCutter ? 3.8 : 1.8),
+            maxScale: (5.2 + Math.random() * 3.8) * blastScale
         });
     }
 
-    // Small initial burster charge pop at dispersal start
-    if (isDaisyCutter && typeof spawnMuzzleFlash === 'function') {
-        spawnMuzzleFlash(new THREE.Vector3(center.x, center.y + 2.2, center.z), 0xffd27d, 1.8);
+    // Initial burster pop (BuggySubExplosion)
+    if (typeof spawnMuzzleFlash === 'function') {
+        spawnMuzzleFlash(new THREE.Vector3(center.x, center.y + 1.8, center.z), 0xffe44d, isDaisyCutter ? 2.0 : 1.1);
     }
 
-    // --- STAGE 2-4 meshes (created at ignition) ---
+    // --- STAGE 2-3 meshes (created at ignition) ---
     let ignited = false;
     let igniteTick = 0;
-    let flashDome = null;
-    let fireDome = null;
     let wilsonDome = null;
     let shockRing1 = null;
     let shockRing2 = null;
     let dustSkirt = null;
-    const fireLobes = [];
+    const fireWall = [];
     const smokeCol = [];
 
     const triggerThermobaricIgnition = () => {
@@ -2145,29 +2173,37 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
             try { onIgnite(center); } catch (_) {}
         }
         if (typeof triggerScreenShake === 'function') {
-            triggerScreenShake(isDaisyCutter ? 1.8 : 0.9);
+            triggerScreenShake(isDaisyCutter ? 2.1 : 1.0);
         }
 
-        // 1. Blinding white-yellow core flash hemisphere
-        const flashGeo = new THREE.SphereGeometry(1.0, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55);
-        const flashMat = new THREE.MeshBasicMaterial({ color: 0xfffbe6, transparent: true, opacity: 1.0, depthWrite: false });
-        flashDome = track(flashGeo, flashMat);
-        flashDome.position.y = 0.2;
-        rootGrp.add(flashDome);
+        // 1. Official DaisyFlameShockwave: outward wall of roaring additive fire sprites across the entire fuel cloud!
+        const wallCount = isDaisyCutter ? 32 : 14;
+        for (let i = 0; i < wallCount; i++) {
+            const ang = (i / wallCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+            const isCore = i < Math.floor(wallCount * 0.25);
+            const col = isCore ? 0xfff3a8 : ((i % 3 === 0) ? 0xffcc33 : ((i % 3 === 1) ? 0xff7718 : 0xe84118));
+            const spr = makeVolSprite(fireTex || smokeTex, col, 0.95, true);
+            const startR = isCore ? (Math.random() * 3.5 * blastScale) : ((3.0 + Math.random() * 6.0) * blastScale);
+            spr.position.set(Math.cos(ang) * startR, 1.4 + Math.random() * 2.4, Math.sin(ang) * startR);
+            const initS = (isCore ? 6.5 : 4.2) * blastScale;
+            spr.scale.setScalar(initS);
+            rootGrp.add(spr);
+            fireWall.push({
+                mesh: spr,
+                vx: Math.cos(ang) * (isCore ? 0.14 : (0.36 + Math.random() * 0.24)) * blastScale,
+                vy: (isCore ? 0.22 : (0.10 + Math.random() * 0.14)) * blastScale,
+                vz: Math.sin(ang) * (isCore ? 0.14 : (0.36 + Math.random() * 0.24)) * blastScale,
+                baseScale: initS,
+                maxGrow: (isCore ? 12.0 : 9.5) * blastScale
+            });
+        }
 
-        // 2. Main roaring orange-gold thermobaric fireball dome
-        const fireGeo = new THREE.SphereGeometry(1.0, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.58);
-        const fireMat = new THREE.MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0.95, depthWrite: false });
-        fireDome = track(fireGeo, fireMat);
-        fireDome.position.y = 0.15;
-        rootGrp.add(fireDome);
-
-        // 3. Translucent white Wilson condensation dome (signature Zero Hour atmospheric pressure shell!)
+        // 2. Translucent white Wilson condensation dome (atmospheric overpressure flash)
         const wilsonGeo = new THREE.SphereGeometry(1.0, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52);
         const wilsonMat = new THREE.MeshBasicMaterial({
             color: 0xf4f7fa,
             transparent: true,
-            opacity: 0.42,
+            opacity: 0.30,
             side: THREE.DoubleSide,
             depthWrite: false
         });
@@ -2175,87 +2211,54 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
         wilsonDome.position.y = 0.1;
         rootGrp.add(wilsonDome);
 
-        // 4. Primary ground-hugging white-amber thermobaric shockwave ring (scaled uniformly in X and Z!)
-        const ring1Geo = new THREE.RingGeometry(0.76, 1.0, 48);
+        // 3. Ground-hugging amber flame shockwave ring + outer supersonic white Mach ring
+        const ring1Geo = new THREE.RingGeometry(0.72, 1.0, 48);
         ring1Geo.rotateX(-Math.PI / 2);
-        const ring1Mat = new THREE.MeshBasicMaterial({ color: 0xffe4a8, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+        const ring1Mat = new THREE.MeshBasicMaterial({ color: 0xffd56b, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
         shockRing1 = track(ring1Geo, ring1Mat);
         shockRing1.position.y = 0.35;
         rootGrp.add(shockRing1);
 
-        // 5. Secondary outer white supersonic Mach pressure ring
         const ring2Geo = new THREE.RingGeometry(0.88, 1.0, 48);
         ring2Geo.rotateX(-Math.PI / 2);
-        const ring2Mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false });
+        const ring2Mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
         shockRing2 = track(ring2Geo, ring2Mat);
         shockRing2.position.y = 0.55;
         rootGrp.add(shockRing2);
 
-        // 6. Ground-level kicked-up dust/dirt torus skirt
-        const skirtGeo = new THREE.TorusGeometry(1.0, 0.16, 8, 32);
+        const skirtGeo = new THREE.TorusGeometry(1.0, 0.14, 8, 32);
         skirtGeo.rotateX(Math.PI / 2);
-        const skirtMat = new THREE.MeshBasicMaterial({ color: 0x9b8365, transparent: true, opacity: 0.75, depthWrite: false });
+        const skirtMat = new THREE.MeshBasicMaterial({ color: 0x9b8365, transparent: true, opacity: 0.55, depthWrite: false });
         dustSkirt = track(skirtGeo, skirtMat);
-        dustSkirt.position.y = 0.9;
+        dustSkirt.position.y = 0.85;
         rootGrp.add(dustSkirt);
 
-        // 7. Secondary boiling fireball lobes around the perimeter
-        const lobeCount = isDaisyCutter ? 14 : 7;
-        for (let i = 0; i < lobeCount; i++) {
-            const ang = (i / lobeCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-            const dist = (3.5 + Math.random() * (isDaisyCutter ? 11.5 : 5.5)) * blastScale;
-            const lMat = new THREE.MeshBasicMaterial({
-                color: (i % 3 === 0) ? 0xffcc44 : ((i % 3 === 1) ? 0xff7722 : 0xe84118),
-                transparent: true,
-                opacity: 0.92,
-                depthWrite: false
-            });
-            ownedMats.push(lMat);
-            const lobe = new THREE.Mesh(sharedMistGeo, lMat);
-            lobe.position.set(Math.cos(ang) * dist * 0.35, 1.2 + Math.random() * 1.5, Math.sin(ang) * dist * 0.35);
-            rootGrp.add(lobe);
-            fireLobes.push({
-                mesh: lobe,
-                vx: Math.cos(ang) * (0.18 + Math.random() * 0.16) * blastScale,
-                vy: (0.14 + Math.random() * 0.18) * blastScale,
-                vz: Math.sin(ang) * (0.18 + Math.random() * 0.16) * blastScale,
-                maxScale: (2.8 + Math.random() * 2.4) * blastScale
-            });
-        }
-
-        // 8. Rising dark ember-lit mushroom smoke column (stem + billowing cap)
-        const smokeCount = isDaisyCutter ? 16 : 8;
+        // 4. Rising volumetric dark smoke column (textured smoke sprites, stem + cap)
+        const smokeCount = isDaisyCutter ? 18 : 9;
         for (let i = 0; i < smokeCount; i++) {
             const isCap = i >= Math.floor(smokeCount * 0.45);
             const ang = (i / smokeCount) * Math.PI * 2 + Math.random() * 0.6;
-            const capR = isCap ? (2.5 + Math.random() * 5.0) * blastScale : (0.6 + Math.random() * 1.4) * blastScale;
-            const sMat = new THREE.MeshBasicMaterial({
-                color: isCap ? 0x2d2a28 : 0x3b332e,
-                transparent: true,
-                opacity: 0.0,
-                depthWrite: false
-            });
-            ownedMats.push(sMat);
-            const puff = new THREE.Mesh(sharedMistGeo, sMat);
-            puff.position.set(Math.cos(ang) * capR * 0.3, isCap ? 3.5 * blastScale : 1.0, Math.sin(ang) * capR * 0.3);
+            const capR = isCap ? (3.0 + Math.random() * 6.0) * blastScale : (0.8 + Math.random() * 1.8) * blastScale;
+            const puff = makeVolSprite(smokeTex, isCap ? 0x262422 : 0x3a322c, 0.0, false);
+            puff.position.set(Math.cos(ang) * capR * 0.3, isCap ? 4.0 * blastScale : 1.2, Math.sin(ang) * capR * 0.3);
             rootGrp.add(puff);
             smokeCol.push({
                 mesh: puff,
                 isCap,
                 tx: Math.cos(ang) * capR,
                 tz: Math.sin(ang) * capR,
-                riseSpeed: (isCap ? 0.14 : 0.09) * blastScale * (0.85 + Math.random() * 0.35),
-                baseScale: (isCap ? 3.6 : 2.1) * blastScale * (0.85 + Math.random() * 0.4)
+                riseSpeed: (isCap ? 0.16 : 0.10) * blastScale * (0.85 + Math.random() * 0.35),
+                baseScale: (isCap ? 7.5 : 4.5) * blastScale * (0.85 + Math.random() * 0.4)
             });
         }
 
-        // 9. Persistent scorched crater + burning napalm patches + flying debris
-        if (typeof spawnCraterDecal === 'function') spawnCraterDecal(center, isDaisyCutter ? 9.5 : 5.0, 680, 'flame');
+        // 5. Scorched ground crater + perimeter flame ignition (DaisyCutterFlameWeapon) + flying debris
+        if (typeof spawnCraterDecal === 'function') spawnCraterDecal(center, isDaisyCutter ? 10.5 : 5.2, 720, 'flame');
         if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(center);
         if (typeof spawnExplosionDebris === 'function') spawnExplosionDebris(center, isDaisyCutter ? 14 : 7, 1.5 * blastScale, false);
     };
 
-    const maxPostIgnite = isDaisyCutter ? 190 : 110;
+    const maxPostIgnite = isDaisyCutter ? 185 : 105;
     let totalTick = 0;
 
     const cleanup = () => {
@@ -2274,18 +2277,24 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
         update() {
             totalTick++;
 
-            // Stage 1: Fuel-air aerosol mist rapidly expands outward before igniting
+            // Stage 1 & 2: Yellow-gold aerosol fuel vapor expands outward, then sparks with yellow-green/amber ignition flashes!
             if (!ignited) {
                 const p = Math.min(1, totalTick / dispersalTicks);
                 const ease = 1 - Math.pow(1 - p, 2);
                 for (let i = 0; i < mistPuffs.length; i++) {
                     const mp = mistPuffs[i];
                     mp.mesh.position.set(mp.tx * ease, mp.ty * (0.5 + 0.5 * ease), mp.tz * ease);
-                    mp.mesh.scale.setScalar(0.8 + mp.maxScale * ease);
-                    mp.mesh.material.opacity = Math.sin(p * Math.PI * 0.85) * 0.58;
+                    mp.mesh.scale.setScalar(1.2 + mp.maxScale * ease);
+                    mp.mesh.material.opacity = Math.sin(p * Math.PI * 0.85) * 0.52;
+                }
+                // Stage 2: DaisyExplosionScatterIgnite1 & 2 (yellow-green -> golden ignition flashes inside the gas cloud)
+                if (totalTick >= igniteFlashStart && (totalTick % 4 === 0) && typeof spawnMuzzleFlash === 'function') {
+                    const ang = Math.random() * Math.PI * 2;
+                    const rr = Math.random() * (isDaisyCutter ? 14.0 : 6.0) * blastScale;
+                    const flashPos = new THREE.Vector3(center.x + Math.cos(ang) * rr, center.y + 1.2 + Math.random() * 2.5, center.z + Math.sin(ang) * rr);
+                    spawnMuzzleFlash(flashPos, (totalTick % 8 === 0) ? 0xd3f843 : 0xffda6a, isDaisyCutter ? 2.6 : 1.4);
                 }
                 if (totalTick >= dispersalTicks) {
-                    // Flash-ignite the aerosol mist!
                     mistGroup.visible = false;
                     triggerThermobaricIgnition();
                 }
@@ -2293,87 +2302,65 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
             }
 
             igniteTick++;
-            const tNorm = igniteTick / maxPostIgnite;
 
-            // Core blinding flash (0..22 ticks)
-            if (flashDome) {
-                const fp = Math.min(1, igniteTick / 22);
-                const fScale = (3.5 + fp * 16.5) * blastScale;
-                flashDome.scale.set(fScale, fScale * 0.72, fScale);
-                flashDome.material.opacity = Math.max(0, (1 - fp) * 0.95);
-                flashDome.visible = fp < 1;
+            // Roaring volumetric flame shockwave wall (0..52 ticks)
+            const wp = Math.min(1, igniteTick / 52);
+            for (let i = 0; i < fireWall.length; i++) {
+                const fl = fireWall[i];
+                fl.mesh.position.x += fl.vx * (1 - wp * 0.65);
+                fl.mesh.position.y += fl.vy * (1 - wp * 0.55);
+                fl.mesh.position.z += fl.vz * (1 - wp * 0.65);
+                fl.mesh.scale.setScalar(fl.baseScale + Math.sin(wp * Math.PI * 0.78) * fl.maxGrow);
+                fl.mesh.material.opacity = Math.max(0, (1 - wp * wp) * 0.92);
+                fl.mesh.visible = wp < 1;
             }
 
-            // Main roaring thermobaric fireball dome (0..52 ticks)
-            if (fireDome) {
-                const bp = Math.min(1, igniteTick / 52);
-                const easeOut = 1 - Math.pow(1 - bp, 3);
-                const bScale = (4.0 + easeOut * 15.5) * blastScale;
-                fireDome.scale.set(bScale, bScale * (0.65 + 0.25 * (1 - bp)), bScale);
-                fireDome.position.y = 0.15 + bp * 2.2 * blastScale;
-                fireDome.material.opacity = Math.max(0, (1 - bp * bp) * 0.92);
-                fireDome.visible = bp < 1;
-            }
-
-            // Wilson condensation pressure dome (0..42 ticks)
+            // Wilson condensation pressure dome (0..38 ticks)
             if (wilsonDome) {
-                const wp = Math.min(1, igniteTick / 42);
-                const wScale = (5.0 + wp * 24.0) * blastScale;
-                wilsonDome.scale.set(wScale, wScale * 0.62, wScale);
-                wilsonDome.material.opacity = Math.max(0, (1 - wp) * 0.42);
-                wilsonDome.visible = wp < 1;
+                const cp = Math.min(1, igniteTick / 38);
+                const wScale = (5.0 + cp * 24.0) * blastScale;
+                wilsonDome.scale.set(wScale, wScale * 0.58, wScale);
+                wilsonDome.material.opacity = Math.max(0, (1 - cp) * 0.30);
+                wilsonDome.visible = cp < 1;
             }
 
-            // Ground-hugging pressure shockwaves (scaled uniformly in X and Z!)
+            // Ground-hugging flame & supersonic Mach shockwave rings
             if (shockRing1) {
-                const sp1 = Math.min(1, igniteTick / 38);
+                const sp1 = Math.min(1, igniteTick / 36);
                 const s1 = (2.5 + sp1 * 26.0) * blastScale;
                 shockRing1.scale.set(s1, 1, s1);
                 shockRing1.material.opacity = Math.max(0, (1 - sp1) * 0.92);
                 shockRing1.visible = sp1 < 1;
             }
             if (shockRing2) {
-                const sp2 = Math.min(1, igniteTick / 30);
+                const sp2 = Math.min(1, igniteTick / 28);
                 const s2 = (3.0 + sp2 * 31.0) * blastScale;
                 shockRing2.scale.set(s2, 1, s2);
-                shockRing2.material.opacity = Math.max(0, (1 - sp2) * 0.78);
+                shockRing2.material.opacity = Math.max(0, (1 - sp2) * 0.72);
                 shockRing2.visible = sp2 < 1;
             }
             if (dustSkirt) {
-                const dp = Math.min(1, igniteTick / 68);
+                const dp = Math.min(1, igniteTick / 62);
                 const ds = (3.0 + dp * 22.0) * blastScale;
-                dustSkirt.scale.set(ds, 1 + dp * 2.4, ds);
-                dustSkirt.material.opacity = Math.max(0, (1 - dp) * 0.68);
+                dustSkirt.scale.set(ds, 1 + dp * 2.2, ds);
+                dustSkirt.material.opacity = Math.max(0, (1 - dp) * 0.55);
                 dustSkirt.visible = dp < 1;
             }
 
-            // Boiling perimeter fireballs
-            for (let i = 0; i < fireLobes.length; i++) {
-                const fl = fireLobes[i];
-                const lp = Math.min(1, igniteTick / 58);
-                fl.mesh.position.x += fl.vx * (1 - lp * 0.7);
-                fl.mesh.position.y += fl.vy * (1 - lp * 0.5);
-                fl.mesh.position.z += fl.vz * (1 - lp * 0.7);
-                const ls = 1.0 + Math.sin(lp * Math.PI * 0.85) * fl.maxScale;
-                fl.mesh.scale.setScalar(ls);
-                fl.mesh.material.opacity = Math.max(0, (1 - lp) * 0.88);
-                fl.mesh.visible = lp < 1;
-            }
-
-            // Rising mushroom smoke column
+            // Rising volumetric dark smoke column
             for (let i = 0; i < smokeCol.length; i++) {
                 const sm = smokeCol[i];
-                const sp = Math.min(1, Math.max(0, (igniteTick - 12) / (maxPostIgnite - 12)));
+                const sp = Math.min(1, Math.max(0, (igniteTick - 10) / (maxPostIgnite - 10)));
                 sm.mesh.position.y += sm.riseSpeed * (1 - sp * 0.55);
                 sm.mesh.position.x = sm.tx * (0.35 + sp * 0.85);
                 sm.mesh.position.z = sm.tz * (0.35 + sp * 0.85);
                 sm.mesh.scale.setScalar(sm.baseScale * (0.65 + sp * 1.25));
-                const fadeIn = Math.min(1, Math.max(0, (igniteTick - 12) / 22));
+                const fadeIn = Math.min(1, Math.max(0, (igniteTick - 10) / 20));
                 const fadeOut = Math.max(0, 1 - Math.pow(sp, 1.8));
-                sm.mesh.material.opacity = fadeIn * fadeOut * (sm.isCap ? 0.68 : 0.55);
+                sm.mesh.material.opacity = fadeIn * fadeOut * (sm.isCap ? 0.65 : 0.52);
             }
 
-            if (tNorm >= 1) {
+            if (igniteTick >= maxPostIgnite) {
                 cleanup();
                 return false;
             }
@@ -2620,12 +2607,14 @@ window.setParticleBeamCursor = setParticleBeamCursor;
 
 function spawnParticleFirePatch(pos) {
     if (typeof scene === 'undefined' || !pos) return;
-    const patchGeo = new THREE.CircleGeometry(2.6, 12);
+    const fireTex = _getFxSpriteTex('fireball');
+    const patchGeo = new THREE.PlaneGeometry(7.2, 7.2);
     patchGeo.rotateX(-Math.PI / 2);
     const patchMat = new THREE.MeshBasicMaterial({
+            ...(fireTex ? { map: fireTex } : {}),
             color: 0xff7b1a,
             transparent: true,
-            opacity: 0.85,
+            opacity: 0.82,
             depthWrite: false,
             blending: THREE.AdditiveBlending,
             polygonOffset: true,
@@ -2634,18 +2623,19 @@ function spawnParticleFirePatch(pos) {
     });
     const patch = new THREE.Mesh(patchGeo, patchMat);
     const py = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
-    patch.position.set(pos.x, py + 0.22, pos.z);
+    patch.position.set(pos.x, py + 0.18, pos.z);
+    patch.rotation.y = Math.random() * Math.PI * 2;
     patch.renderOrder = 3;
     scene.add(patch);
 
-    let fireLife = 210; // ~3.5 seconds of residual fire
+    let fireLife = 360; // ~6.0 seconds of glowing molten scorch trail
     activeFX.push({
             life: fireLife,
             update() {
                 fireLife--;
-                patchMat.opacity = 0.65 * Math.min(1, fireLife / 60) * (0.8 + Math.sin(fireLife * 0.4) * 0.2);
-                if (fireLife % 12 === 0 && typeof spawnSmokePuff === 'function') {
-                    spawnSmokePuff(patch.position, 0xff5500, 0.45);
+                patchMat.opacity = 0.72 * Math.min(1, fireLife / 90) * (0.78 + Math.sin(fireLife * 0.35) * 0.22);
+                if (fireLife % 14 === 0 && typeof spawnSmokePuff === 'function' && activeFX.length < 480) {
+                    spawnSmokePuff(patch.position, (fireLife % 28 === 0) ? 0xff6b1a : 0x2b2d32, 0.52);
                 }
                 if (fireLife % 20 === 0 && typeof applyCalculatedDamage === 'function') {
                     const allU = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
@@ -3018,30 +3008,51 @@ function animateNukeStrike(siloPos, targetPos) {
                         if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(targetPos, 34, 420);
                         if (typeof triggerScreenShake === 'function') triggerScreenShake(2.4);
                         spawnMushroomCloud(targetPos);
-                        // Lingering Nuclear Radiation Pool
+                        // Official INIZH.big NukeRadiationFieldWeapon: 25s lingering radiation field (25 RADIATION dmg / 750ms to all ground units)
                         const radGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+                        const radTex = _getFxSpriteTex('smoke');
+                        const radGeo = new THREE.PlaneGeometry(42, 42);
+                        radGeo.rotateX(-Math.PI / 2);
                         const radPool = new THREE.Mesh(
-                            new THREE.CircleGeometry(14, 24),
-                            new THREE.MeshBasicMaterial({ color: 0x39ff14, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false, depthTest: false })
+                            radGeo,
+                            new THREE.MeshBasicMaterial({
+                                ...(radTex ? { map: radTex } : {}),
+                                color: 0x9be824,
+                                transparent: true,
+                                opacity: 0.45,
+                                depthWrite: false,
+                                blending: THREE.AdditiveBlending,
+                                polygonOffset: true,
+                                polygonOffsetFactor: -2,
+                                polygonOffsetUnits: -2
+                            })
                         );
-                        radPool.rotation.x = -Math.PI / 2;
-                        radPool.position.set(targetPos.x, radGroundY + 0.45, targetPos.z);
-                        radPool.renderOrder = 9;
+                        radPool.position.set(targetPos.x, radGroundY + 0.16, targetPos.z);
                         scene.add(radPool);
                         let radTicks = 0;
+                        const radDuration = 1500; // ~25 seconds
                         activeFX.push({
-                                life: 480,
+                                life: radDuration,
                                 update() {
                                     radTicks++;
-                                    radPool.material.opacity = 0.25 + 0.12 * Math.sin(radTicks * 0.15);
-                                    if (radTicks % 30 === 0 && typeof enemyUnits !== 'undefined') {
-                                        enemyUnits.forEach(eu => {
-                                                if (eu.health > 0 && eu.mesh && eu.mesh.position.distanceTo(targetPos) <= 14.5) {
-                                                    eu.health -= 18;
-                                                }
-                                        });
+                                    const fadeOut = Math.min(1, (radDuration - radTicks) / 180);
+                                    radPool.material.opacity = fadeOut * (0.34 + 0.10 * Math.sin(radTicks * 0.12));
+                                    if (radTicks % 12 === 0 && typeof spawnSmokePuff === 'function' && activeFX.length < 480) {
+                                        const ang = Math.random() * Math.PI * 2;
+                                        const rr = Math.random() * 16.5;
+                                        spawnSmokePuff(new THREE.Vector3(targetPos.x + Math.cos(ang) * rr, radGroundY + 0.45, targetPos.z + Math.sin(ang) * rr), 0xa8f030, 0.72);
                                     }
-                                    if (radTicks >= 479) {
+                                    if (radTicks % 45 === 0) {
+                                        const allGround = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
+                                        for (let i = 0; i < allGround.length; i++) {
+                                            const u = allGround[i];
+                                            if (u && u.health > 0 && u.mesh && !u.isAir && Math.hypot(u.mesh.position.x - targetPos.x, u.mesh.position.z - targetPos.z) <= 20.0) {
+                                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, 25, 'RADIATION');
+                                                else u.health -= 25;
+                                            }
+                                        }
+                                    }
+                                    if (radTicks >= radDuration) {
                                         scene.remove(radPool);
                                         radPool.geometry.dispose();
                                         radPool.material.dispose();
@@ -3124,9 +3135,8 @@ function spawnMushroomCloud(pos, scaleMult = 1.0) {
     machRing.position.set(pos.x, groundY + 9 * scaleMult, pos.z);
     scene.add(machRing);
 
-    // 4. Crater and lingering radioactive fallout field
-    spawnCraterDecal(pos, 8.0 * scaleMult, 900, 'nuke');
-    spawnLingeringToxinCloud(pos);
+    // 4. Persistent nuclear scorched crater (lingering radiation field is spawned by the Nuclear Missile detonation)
+    spawnCraterDecal(pos, 8.0 * scaleMult, 1200, 'nuke');
 
     const maxLife = Math.round(95 * Math.max(0.6, scaleMult));
     let life = maxLife;
@@ -3233,7 +3243,9 @@ function animateScudStormStrike(stormPos, targetPos) {
                                 }
                             }
                         });
-                        spawnCraterDecal(impactPos, 3.6, 520, 'toxin');
+                        spawnCraterDecal(impactPos, 3.6, 720, 'toxin');
+                        // Official INIZH.big ScudStormDamageWeapon FireOCL = OCL_PoisonFieldLarge (~18s bubbling anthrax field)
+                        spawnLingeringToxinCloud(impactPos, 8.5, 1080);
                     }
                 });
             }, i * 155);
