@@ -139,6 +139,10 @@ function ensurePcmWavBuffer(bytes) {
         pos += 8 + ((sz + 1) & ~1);
     }
     if (fmt !== 0x0011 || !dataOffset || dataSize <= 0) return bytes.buffer;
+    if (channels !== 1) {
+        console.warn('ensurePcmWavBuffer: stereo IMA ADPCM unsupported, passing raw buffer');
+        return bytes.buffer;
+    }
 
     const numBlocks = Math.floor(dataSize / blockAlign);
     const spb = samplesPerBlock || (1 + Math.floor((blockAlign - 4 * channels) * 2 / channels));
@@ -294,8 +298,9 @@ function playOfficialSound(soundKey, volume = 0.85, faction = null, pan = null) 
         _lastWorldSoundTime[soundKey] = nowMs;
     }
     const play = () => {
+        try {
         const data = window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey];
-        if (!data) return false;
+        if (!data || typeof data !== 'string') return false;
         const ctx = (typeof getAudioContext === 'function') ? getAudioContext() : null;
         if (ctx && typeof ctx.decodeAudioData === 'function') {
             const cached = window.OFFICIAL_AUDIO_CACHE[soundKey];
@@ -325,6 +330,10 @@ function playOfficialSound(soundKey, volume = 0.85, faction = null, pan = null) 
             return true;
         }
         return playOfficialAudioElementFallback(data, clampedVol);
+        } catch (err) {
+            console.warn('Official audio playback error for', soundKey, err);
+            return false;
+        }
     };
     if (window.OFFICIAL_AUDIO_DATA && window.OFFICIAL_AUDIO_DATA[soundKey]) return play();
     // Kick off lazy group load for subsequent plays, but return false now so caller plays synth fallback instead of silence

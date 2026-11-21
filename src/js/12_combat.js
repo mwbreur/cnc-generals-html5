@@ -331,7 +331,8 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         (isTargetPlayer && typeof researchedTechs !== 'undefined' && researchedTechs.has('countermeasures')) ||
         Boolean(target.hasCountermeasures)
     );
-    if (hasCountermeasures && damageType === 'EXPLOSIVE' && Math.random() < 0.40) {
+    const cmRoll = (typeof simRandom === 'function') ? simRandom() : Math.random();
+    if (hasCountermeasures && damageType === 'EXPLOSIVE' && cmRoll < 0.40) {
         if (target.mesh && typeof spawnSmokePuff === 'function') spawnSmokePuff(target.mesh.position, 0xffd700, 0.4);
         return; // Deflected!
     }

@@ -50,11 +50,16 @@ jsFiles.forEach(file => {
     }
 });
 
-// 3. Assemble the web build (safe replacement without $ pattern interpretation)
+// 3. Assemble the web build (CRLF-safe replacement without $ pattern interpretation)
+const scriptAnchorRe = /<script>\r?\n\/\/ \{\{JS_CONTENT\}\}/;
+if (!scriptAnchorRe.test(template)) {
+    console.error('✗ Build FAILED: template missing <script>\\n// {{JS_CONTENT}} anchor!');
+    process.exit(1);
+}
 const webHtml = template
     .replace('/* {{CSS_CONTENT}} */', () => css)
     .replace('<!-- {{BODY_CONTENT}} -->', () => body)
-    .replace('<script>\n// {{JS_CONTENT}}', () => `${externalTags.join('\n')}\n<script>\n// {{JS_CONTENT}}`)
+    .replace(scriptAnchorRe, () => `${externalTags.join('\n')}\n<script>\n// {{JS_CONTENT}}`)
     .replace('// {{JS_CONTENT}}', () => assembledJS);
 
 // 4. Static lint & JavaScript syntax validation before saving

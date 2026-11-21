@@ -989,7 +989,7 @@ function setupGameDeployment() {
 
     hasSpawnedInitialEnemyBase = true;
     isMatchActive = true;
-    matchStartTime = Date.now();
+    if (!matchStartTime) matchStartTime = Date.now();
     matchStartTime = Date.now();
     if (typeof initAICommanders === 'function') initAICommanders();
     updateSidebar();
@@ -1109,7 +1109,7 @@ function deployEnemyBase(pos, faction, ownerId = 'ai_1', teamId = 2, difficulty 
 
     hasSpawnedInitialEnemyBase = true;
     isMatchActive = true;
-    matchStartTime = Date.now();
+    if (!matchStartTime) matchStartTime = Date.now();
 
     // Spawn AI Starting Construction Builder (Dozer for USA/China, Worker for GLA)
     const builderType = faction === 'gla' ? 'worker' : 'dozer';

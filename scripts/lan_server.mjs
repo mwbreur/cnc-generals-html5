@@ -442,7 +442,11 @@ const server = http.createServer((req, res) => {
         }
         const ext = path.extname(filePath).toLowerCase();
         const mime = MIME_TYPES[ext] || 'application/octet-stream';
-        const headers = { 'Content-Type': mime };
+        const headers = {
+            'Content-Type': mime,
+            'X-Content-Type-Options': 'nosniff',
+            'Referrer-Policy': 'same-origin'
+        };
         if (ext === '.html') {
             headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
         } else {

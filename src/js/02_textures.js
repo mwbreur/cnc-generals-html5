@@ -44,6 +44,8 @@ function init() {
     window.setGraphicsQuality = function(level) {
         if (!renderer) return;
         const lvl = String(level || 'medium').toLowerCase();
+        const prevShadowEnabled = renderer.shadowMap.enabled;
+        const prevShadowType = renderer.shadowMap.type;
         if (lvl === 'low') {
             renderer.setPixelRatio(1);
             renderer.shadowMap.enabled = false;
@@ -55,6 +57,15 @@ function init() {
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFShadowMap;
+        }
+        if ((prevShadowEnabled !== renderer.shadowMap.enabled || prevShadowType !== renderer.shadowMap.type) && typeof scene !== 'undefined' && scene) {
+            scene.traverse(obj => {
+                if (!obj || !obj.material) return;
+                const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                for (let i = 0; i < mats.length; i++) {
+                    if (mats[i]) mats[i].needsUpdate = true;
+                }
+            });
         }
     };
 

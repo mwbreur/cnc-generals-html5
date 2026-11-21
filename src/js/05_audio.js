@@ -5,11 +5,18 @@ let masterAudioCtx = null;
 
 function getAudioContext() {
     if (!masterAudioCtx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (AC) masterAudioCtx = new AC();
+        try {
+            const AC = (typeof window !== 'undefined') && (window.AudioContext || window.webkitAudioContext);
+            if (AC) masterAudioCtx = new AC();
+        } catch (_) {
+            return null;
+        }
     }
     if (masterAudioCtx && masterAudioCtx.state === 'suspended') {
-        masterAudioCtx.resume();
+        try {
+            const p = masterAudioCtx.resume();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch (_) {}
     }
     return masterAudioCtx;
 }
@@ -30,16 +37,7 @@ if (typeof window !== 'undefined') {
 }
 
 function isAudioAllowed(type, faction = null) {
-    if (typeof selectedFaction === 'undefined') return true;
-    const globalSounds = [
-        'superweapon_siren', 'orbital_beam', 'nuke_detonation', 'scud_storm_volley', 'scud_detonation',
-        'explosion', 'construction', 'infantry_squish', 'laser_point_defense', 'scrap_pickup', 'gla_salvage',
-        'nuke_artillery', 'nukecannon_deploy', 'nukecannon_undeploy', 'overlord_cannon', 'speaker_pulse', 'drone_repair'
-    ];
-    if (globalSounds.includes(type)) return true;
-
-    const targetFaction = faction || (type.startsWith('china') || ['gatling_fire', 'flamethrower', 'propaganda_drone', 'nuke_artillery'].includes(type) ? 'china' : (type.startsWith('gla') || ['ak47', 'technical_rev', 'scud_launch', 'demo_beep', 'scrap_pickup'].includes(type)) ? 'gla' : 'usa');
-    return true; // All combat sounds on the battlefield are audible
+    return true;
 }
 
 function isUSASoundAllowed() {
@@ -91,6 +89,128 @@ function computeSpatialAudio(pos) {
     return { cull: false, gain, pan };
 }
 
+const OFFICIAL_AUDIO_MAP = {
+    cannon: 'sfx_cannon_crusader',
+    china_cannon: ['sfx_cannon_battlemaster_0', 'sfx_cannon_battlemaster_1'],
+    battlemaster_cannon: ['sfx_cannon_battlemaster_0', 'sfx_cannon_battlemaster_1'],
+    scorpion_cannon: ['sfx_cannon_scorpion_0', 'sfx_cannon_scorpion_1'],
+    scorpion_missile: 'sfx_scorpion_missile',
+    marauder_cannon: ['sfx_cannon_marauder_0', 'sfx_cannon_marauder_1'],
+    inferno_cannon: 'sfx_cannon_inferno',
+    paladin_cannon: 'sfx_cannon_paladin',
+    machine_gun: 'sfx_rifle_ranger',
+    humvee_mg: 'sfx_humvee_mg',
+    comanche_cannon: 'sfx_comanche_cannon',
+    redguard_rifle: ['sfx_rifle_redguard_0', 'sfx_rifle_redguard_1'],
+    rebel_ak47: ['sfx_rifle_rebel_0', 'sfx_rifle_rebel_1'],
+    ak47: ['sfx_rifle_rebel_0', 'sfx_rifle_rebel_1'],
+    technical_mg: ['sfx_technical_mg_0', 'sfx_technical_mg_1'],
+    quad_cannon: ['sfx_quad_cannon_0', 'sfx_quad_cannon_1', 'sfx_quad_cannon_2'],
+    gatling_fire: ['sfx_gatling_fire_0', 'sfx_gatling_fire_1', 'sfx_gatling_fire_2'],
+    dragon_flame: 'sfx_dragon_flame',
+    flamethrower: 'sfx_dragon_flame',
+    toxin_spray: 'sfx_toxin_spray',
+    burton_rifle: 'sfx_burton_rifle',
+    sniper_rifle: 'sfx_sniper_rifle',
+    jarmen_snipe: 'sfx_jarmen_snipe',
+    missile_defender: ['sfx_missile_defender', 'sfx_missile_defender_1', 'sfx_missile_defender_2'],
+    expl_tomahawk: 'sfx_expl_tomahawk',
+    tankhunter_rocket: 'sfx_tankhunter_rocket',
+    rpg_launch: ['sfx_rpg_launch_0', 'sfx_rpg_launch_1'],
+    buggy_rocket: ['sfx_buggy_rocket_0', 'sfx_buggy_rocket_1', 'sfx_buggy_rocket_2'],
+    stinger_fire: ['sfx_stinger_fire_0', 'sfx_stinger_fire_1'],
+    jet_missile: 'sfx_jet_missile',
+    comanche_missile: 'sfx_missile_comanche',
+    tomahawk_launch: 'sfx_missile_tomahawk',
+    scud_launch: 'sfx_scud_launch',
+    missile_launch: 'sfx_missile_comanche',
+    laser_point_defense: 'sfx_pdl_laser',
+    aurora_bomb: 'sfx_daisycutter_blast',
+    daisycutter_drop: 'sfx_daisycutter_drop',
+    daisycutter_blast: 'sfx_daisycutter_blast',
+    carpet_bomb: ['sfx_carpet_bomb_0', 'sfx_carpet_bomb_1', 'sfx_carpet_bomb_2', 'sfx_expl_carpet_3'],
+    spectre_gatling: ['sfx_spectre_gatling_0', 'sfx_spectre_gatling_1', 'sfx_spectre_gatling_2'],
+    spectre_howitzer: ['sfx_spectre_howitzer_0', 'sfx_spectre_howitzer_1'],
+    c130_flyover: 'sfx_c130_flyover',
+    parachute_open: 'sfx_parachute_open',
+    explosion: ['sfx_explosion', 'sfx_expl_small_0', 'sfx_expl_small_1', 'sfx_expl_small_2'],
+    expl_small: ['sfx_expl_small_0', 'sfx_expl_small_1', 'sfx_expl_small_2'],
+    expl_missile: ['sfx_expl_missile_0', 'sfx_expl_missile_1', 'sfx_expl_missile_2'],
+    expl_vehicle: ['sfx_expl_vehicle_0', 'sfx_expl_vehicle_1', 'sfx_expl_vehicle_2'],
+    expl_building: ['sfx_expl_building_0', 'sfx_expl_building_1'],
+    expl_artillery: ['sfx_expl_artillery_0', 'sfx_expl_artillery_1', 'sfx_expl_artillery_2'],
+    expl_fire: ['sfx_expl_fire_0', 'sfx_expl_fire_1', 'sfx_expl_fire_2'],
+    expl_flashbang: ['sfx_expl_flashbang_0', 'sfx_expl_flashbang_1'],
+    expl_neutron: ['sfx_expl_neutron_0', 'sfx_expl_neutron_1'],
+    expl_mininuke: 'sfx_expl_mininuke',
+    expl_emp: ['sfx_expl_emp_0', 'sfx_expl_emp_1'],
+    impact_vehicle: ['sfx_impact_vehicle_0', 'sfx_impact_vehicle_1'],
+    impact_building: ['sfx_impact_building_0', 'sfx_impact_building_1'],
+    debris_vehicle: ['sfx_debris_vehicle_0', 'sfx_debris_vehicle_1'],
+    debris_building: ['sfx_debris_building_0', 'sfx_debris_building_1'],
+    shell_whistle: ['sfx_shell_whistle_0', 'sfx_shell_whistle_1'],
+    demo_beep: 'sfx_demo_beep',
+    mine_detonate: 'sfx_mine_detonate',
+    unit_promoted: 'sfx_unit_promoted',
+    jarmen_snipe_hit: 'sfx_jarmen_snipe_hit',
+    fire_start: 'sfx_fire_start',
+    a10_dive: ['sfx_a10_dive_0', 'sfx_a10_dive_1'],
+    a10_flyby: 'sfx_a10_flyby',
+    nuke_doors: 'sfx_nuke_doors',
+    nuke_launch: 'sfx_nuke_launch',
+    particle_annihilate: 'sfx_particle_annihilate',
+    anthrax_blast: 'sfx_anthrax_blast',
+    anthrax_hiss: 'sfx_anthrax_hiss',
+    artillery_fire: 'sfx_artillery_fire',
+    cluster_mines: 'sfx_cluster_mines',
+    emp_pulse: 'sfx_emp_pulse',
+    cash_hack: 'sfx_cash_hack',
+    frenzy: 'sfx_frenzy',
+    emergency_repair: 'sfx_emergency_repair',
+    spy_drone: 'sfx_spy_drone',
+    radar_scan: 'sfx_radar_scan',
+    rebel_ambush: 'sfx_rebel_ambush',
+    sneak_attack: 'sfx_sneak_attack',
+    gps_scrambler: 'sfx_gps_scrambler',
+    infantry_squish: 'sfx_infantry_squish',
+    scrap_pickup: 'sfx_salvage_pickup',
+    construction: 'sfx_place_building',
+    click: 'sfx_click',
+    gui_click: 'sfx_click',
+    gui_combo: 'sfx_gui_combo',
+    gui_blip: 'sfx_gui_blip',
+    gui_msg: 'sfx_gui_msg',
+    gui_error: 'sfx_gui_error',
+    gui_slider: 'sfx_gui_slider',
+    cash_up: 'sfx_cash_up',
+    cash_down: 'sfx_cash_down',
+    rally_set: 'sfx_rally_set',
+    rally_fail: 'sfx_rally_fail',
+    radar_alert: 'sfx_radar_alert',
+    radio_chirp: 'sfx_radar_ping',
+    radar_on: 'sfx_radar_on',
+    radar_off: 'sfx_radar_off',
+    crate_pickup: 'sfx_crate_pickup',
+    garrison_enter: ['sfx_garrison_enter_0', 'sfx_garrison_enter_1'],
+    garrison_exit: ['sfx_garrison_exit_0', 'sfx_garrison_exit_1'],
+    power_down: 'sfx_power_down',
+    power_up: 'sfx_power_up',
+    mine_place: 'sfx_mine_place',
+    nuke_artillery: 'sfx_nukecannon_fire',
+    nukecannon_deploy: 'sfx_nukecannon_deploy',
+    nukecannon_undeploy: 'sfx_nukecannon_undeploy',
+    overlord_cannon: 'sfx_overlord_fire',
+    speaker_pulse: 'sfx_speaker_tower',
+    orbital_beam: 'sfx_particle_beam',
+    nuke_detonation: 'sfx_nuke_blast',
+    scud_storm_volley: 'sfx_scud_alarm',
+    scud_detonation: 'sfx_scud_blast',
+    superweapon_siren: 'sfx_nuke_siren',
+    drone_repair: 'sfx_drone_fire',
+    patriot_fire: ['sfx_patriot_fire_0', 'sfx_patriot_fire_1', 'sfx_patriot_fire_2', 'sfx_patriot_fire_3'],
+    patriot_select: 'sfx_patriot_select'
+};
+
 function playAudio(type, options = {}, faction = null) {
     if (!isAudioAllowed(type, faction)) return;
 
@@ -98,138 +218,17 @@ function playAudio(type, options = {}, faction = null) {
         if (playEvaAlert(type, faction)) return;
     }
 
+    // Authentic SAGE-style 3D world audio attenuation & culling (applied to both official WAV & procedural synth fallback)
+    const worldPos = options.pos || (UI_AUDIO_TYPES.has(type) ? null : window._sfxPos);
+    const spatial = worldPos ? computeSpatialAudio(worldPos) : null;
+    if (spatial && spatial.cull) return;
+    const baseVol = options.volume || 0.90;
+
     // Trigger authentic retail WAV from 05b_official_audio.js when available
     if (typeof playOfficialSound === 'function') {
-        const officialMap = {
-            cannon: 'sfx_cannon_crusader',
-            china_cannon: ['sfx_cannon_battlemaster_0', 'sfx_cannon_battlemaster_1'],
-            battlemaster_cannon: ['sfx_cannon_battlemaster_0', 'sfx_cannon_battlemaster_1'],
-            scorpion_cannon: ['sfx_cannon_scorpion_0', 'sfx_cannon_scorpion_1'],
-            scorpion_missile: 'sfx_scorpion_missile',
-            marauder_cannon: ['sfx_cannon_marauder_0', 'sfx_cannon_marauder_1'],
-            inferno_cannon: 'sfx_cannon_inferno',
-            paladin_cannon: 'sfx_cannon_paladin',
-            machine_gun: 'sfx_rifle_ranger',
-            humvee_mg: 'sfx_humvee_mg',
-            comanche_cannon: 'sfx_comanche_cannon',
-            redguard_rifle: ['sfx_rifle_redguard_0', 'sfx_rifle_redguard_1'],
-            rebel_ak47: ['sfx_rifle_rebel_0', 'sfx_rifle_rebel_1'],
-            ak47: ['sfx_rifle_rebel_0', 'sfx_rifle_rebel_1'],
-            technical_mg: ['sfx_technical_mg_0', 'sfx_technical_mg_1'],
-            quad_cannon: ['sfx_quad_cannon_0', 'sfx_quad_cannon_1', 'sfx_quad_cannon_2'],
-            gatling_fire: ['sfx_gatling_fire_0', 'sfx_gatling_fire_1', 'sfx_gatling_fire_2'],
-            dragon_flame: 'sfx_dragon_flame',
-            flamethrower: 'sfx_dragon_flame',
-            toxin_spray: 'sfx_toxin_spray',
-            burton_rifle: 'sfx_burton_rifle',
-            sniper_rifle: 'sfx_sniper_rifle',
-            jarmen_snipe: 'sfx_jarmen_snipe',
-            missile_defender: ['sfx_missile_defender', 'sfx_missile_defender_1', 'sfx_missile_defender_2'],
-            expl_tomahawk: 'sfx_expl_tomahawk',
-            tankhunter_rocket: 'sfx_tankhunter_rocket',
-            rpg_launch: ['sfx_rpg_launch_0', 'sfx_rpg_launch_1'],
-            buggy_rocket: ['sfx_buggy_rocket_0', 'sfx_buggy_rocket_1', 'sfx_buggy_rocket_2'],
-            stinger_fire: ['sfx_stinger_fire_0', 'sfx_stinger_fire_1'],
-            jet_missile: 'sfx_jet_missile',
-            comanche_missile: 'sfx_missile_comanche',
-            tomahawk_launch: 'sfx_missile_tomahawk',
-            scud_launch: 'sfx_scud_launch',
-            missile_launch: 'sfx_missile_comanche',
-            laser_point_defense: 'sfx_pdl_laser',
-            aurora_bomb: 'sfx_daisycutter_blast',
-            daisycutter_drop: 'sfx_daisycutter_drop',
-            daisycutter_blast: 'sfx_daisycutter_blast',
-            carpet_bomb: ['sfx_carpet_bomb_0', 'sfx_carpet_bomb_1', 'sfx_carpet_bomb_2', 'sfx_expl_carpet_3'],
-            spectre_gatling: ['sfx_spectre_gatling_0', 'sfx_spectre_gatling_1', 'sfx_spectre_gatling_2'],
-            spectre_howitzer: ['sfx_spectre_howitzer_0', 'sfx_spectre_howitzer_1'],
-            c130_flyover: 'sfx_c130_flyover',
-            parachute_open: 'sfx_parachute_open',
-            explosion: ['sfx_explosion', 'sfx_expl_small_0', 'sfx_expl_small_1', 'sfx_expl_small_2'],
-            expl_small: ['sfx_expl_small_0', 'sfx_expl_small_1', 'sfx_expl_small_2'],
-            expl_missile: ['sfx_expl_missile_0', 'sfx_expl_missile_1', 'sfx_expl_missile_2'],
-            expl_vehicle: ['sfx_expl_vehicle_0', 'sfx_expl_vehicle_1', 'sfx_expl_vehicle_2'],
-            expl_building: ['sfx_expl_building_0', 'sfx_expl_building_1'],
-            expl_artillery: ['sfx_expl_artillery_0', 'sfx_expl_artillery_1', 'sfx_expl_artillery_2'],
-            expl_fire: ['sfx_expl_fire_0', 'sfx_expl_fire_1', 'sfx_expl_fire_2'],
-            expl_flashbang: ['sfx_expl_flashbang_0', 'sfx_expl_flashbang_1'],
-            expl_neutron: ['sfx_expl_neutron_0', 'sfx_expl_neutron_1'],
-            expl_mininuke: 'sfx_expl_mininuke',
-            expl_emp: ['sfx_expl_emp_0', 'sfx_expl_emp_1'],
-            impact_vehicle: ['sfx_impact_vehicle_0', 'sfx_impact_vehicle_1'],
-            impact_building: ['sfx_impact_building_0', 'sfx_impact_building_1'],
-            debris_vehicle: ['sfx_debris_vehicle_0', 'sfx_debris_vehicle_1'],
-            debris_building: ['sfx_debris_building_0', 'sfx_debris_building_1'],
-            shell_whistle: ['sfx_shell_whistle_0', 'sfx_shell_whistle_1'],
-            demo_beep: 'sfx_demo_beep',
-            mine_detonate: 'sfx_mine_detonate',
-            unit_promoted: 'sfx_unit_promoted',
-            jarmen_snipe_hit: 'sfx_jarmen_snipe_hit',
-            fire_start: 'sfx_fire_start',
-            a10_dive: ['sfx_a10_dive_0', 'sfx_a10_dive_1'],
-            a10_flyby: 'sfx_a10_flyby',
-            nuke_doors: 'sfx_nuke_doors',
-            nuke_launch: 'sfx_nuke_launch',
-            particle_annihilate: 'sfx_particle_annihilate',
-            anthrax_blast: 'sfx_anthrax_blast',
-            anthrax_hiss: 'sfx_anthrax_hiss',
-            artillery_fire: 'sfx_artillery_fire',
-            cluster_mines: 'sfx_cluster_mines',
-            emp_pulse: 'sfx_emp_pulse',
-            cash_hack: 'sfx_cash_hack',
-            frenzy: 'sfx_frenzy',
-            emergency_repair: 'sfx_emergency_repair',
-            spy_drone: 'sfx_spy_drone',
-            radar_scan: 'sfx_radar_scan',
-            rebel_ambush: 'sfx_rebel_ambush',
-            sneak_attack: 'sfx_sneak_attack',
-            gps_scrambler: 'sfx_gps_scrambler',
-            infantry_squish: 'sfx_infantry_squish',
-            scrap_pickup: 'sfx_salvage_pickup',
-            construction: 'sfx_place_building',
-            click: 'sfx_click',
-            gui_click: 'sfx_click',
-            gui_combo: 'sfx_gui_combo',
-            gui_blip: 'sfx_gui_blip',
-            gui_msg: 'sfx_gui_msg',
-            gui_error: 'sfx_gui_error',
-            gui_slider: 'sfx_gui_slider',
-            cash_up: 'sfx_cash_up',
-            cash_down: 'sfx_cash_down',
-            rally_set: 'sfx_rally_set',
-            rally_fail: 'sfx_rally_fail',
-            radar_alert: 'sfx_radar_alert',
-            radio_chirp: 'sfx_radar_ping',
-            radar_on: 'sfx_radar_on',
-            radar_off: 'sfx_radar_off',
-            crate_pickup: 'sfx_crate_pickup',
-            garrison_enter: ['sfx_garrison_enter_0', 'sfx_garrison_enter_1'],
-            garrison_exit: ['sfx_garrison_exit_0', 'sfx_garrison_exit_1'],
-            power_down: 'sfx_power_down',
-            power_up: 'sfx_power_up',
-            mine_place: 'sfx_mine_place',
-            nuke_artillery: 'sfx_nukecannon_fire',
-            nukecannon_deploy: 'sfx_nukecannon_deploy',
-            nukecannon_undeploy: 'sfx_nukecannon_undeploy',
-            overlord_cannon: 'sfx_overlord_fire',
-            speaker_pulse: 'sfx_speaker_tower',
-            orbital_beam: 'sfx_particle_beam',
-            nuke_detonation: 'sfx_nuke_blast',
-            scud_storm_volley: 'sfx_scud_alarm',
-            scud_detonation: 'sfx_scud_blast',
-            superweapon_siren: 'sfx_nuke_siren',
-            drone_repair: 'sfx_drone_fire',
-            patriot_fire: ['sfx_patriot_fire_0', 'sfx_patriot_fire_1', 'sfx_patriot_fire_2', 'sfx_patriot_fire_3'],
-            patriot_select: 'sfx_patriot_select'
-        };
-        const mapped = officialMap[type];
+        const mapped = OFFICIAL_AUDIO_MAP[type];
         const soundKey = Array.isArray(mapped) ? mapped[Math.floor(Math.random() * mapped.length)] : mapped;
         if (soundKey) {
-            // Authentic SAGE-style 3D world audio: volume falls off with distance from the camera "microphone"
-            // and sounds pan left/right; far-away fighting is quieter and eventually culled.
-            const worldPos = options.pos || (UI_AUDIO_TYPES.has(type) ? null : window._sfxPos);
-            const spatial = worldPos ? computeSpatialAudio(worldPos) : null;
-            if (spatial && spatial.cull) return;
-            const baseVol = options.volume || 0.90;
             if (playOfficialSound(soundKey, spatial ? baseVol * spatial.gain : baseVol, null, spatial ? spatial.pan : null)) {
                 return;
             }

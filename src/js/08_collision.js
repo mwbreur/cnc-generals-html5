@@ -415,6 +415,7 @@ function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
     if (instant && (type === 'supplyCenter' || type === 'supplyStash')) {
         structObj.spawnedHarvester = true;
         setTimeout(() => {
+                if (structObj.health <= 0 || !structures.includes(structObj)) return;
                 if (typeof spawnUnit === 'function') {
                     const hType = (type === 'supplyStash') ? 'worker' : (f === 'usa' ? 'chinook' : 'truck');
                     const spawnPos = pos.clone().add(new THREE.Vector3(0, hType === 'chinook' ? 4.5 : 0, 7.5));

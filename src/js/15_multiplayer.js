@@ -522,7 +522,7 @@ function initHostPeer() {
                     if (err.type === 'unavailable-id') {
                         setTimeout(initHostPeer, 500);
                     } else if (statusEl) {
-                        statusEl.innerHTML = `<span style="color:#ff6b6b;">Peer notice: ${err.message || err.type}</span>`;
+                        statusEl.innerHTML = `<span style="color:#ff6b6b;">Peer notice: ${escapeHtml(err.message || err.type || 'Unknown error')}</span>`;
                     }
             });
         } catch (err) {
@@ -541,7 +541,11 @@ function joinConnectToHost() {
         return;
     }
 
-    const cleanCode = rawCode.replace('CNC-', '').replace('CNC', '').trim();
+    const cleanCode = rawCode.replace(/^CNC-?/i, '').replace(/[^A-Z0-9-]/g, '').slice(0, 32);
+    if (!cleanCode) {
+        showNotification("Invalid room code (use letters, numbers, and hyphens only).", "error");
+        return;
+    }
     const targetPeerId = 'cnc-gen-' + cleanCode;
     currentRoomCode = 'CNC-' + cleanCode;
 
@@ -581,7 +585,7 @@ function joinConnectToHost() {
             netPeer.on('error', (err) => {
                     console.warn('Join error:', err);
                     if (statusEl) {
-                        statusEl.innerHTML = `<span style="color:#ff6b6b;">Connection failed: Could not reach host ${currentRoomCode}. Verify room code.</span>`;
+                        statusEl.innerHTML = `<span style="color:#ff6b6b;">Connection failed: Could not reach host ${escapeHtml(currentRoomCode)}. Verify room code.</span>`;
                     }
             });
         } catch (e) {
