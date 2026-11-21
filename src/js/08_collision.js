@@ -347,14 +347,15 @@ window.createStructureMeshForFaction = createStructureMeshForFaction;
 
 // Official INIZH.big Structure MaxHealth values
 const STRUCTURE_MAX_HEALTH_TABLE = {
-    center: 5000, commandCenter: 5000, fakeCommandCenter: 600,
+    center: 5000, commandCenter: 5000, fakeCommandCenter: 1250,
     particleCannon: 4000, nukeSilo: 4000, scudStorm: 4000,
     palace: 3000,
-    factory: 2000, supplyCenter: 2000, supplyStash: 2000, internetCenter: 2000,
-    airfield: 1500, strategyCenter: 1500, nuclearReactor: 1500, blackMarket: 1500, derrick: 1500,
-    barracks: 1000, propagandaCenter: 1000, supplyDrop: 1000,
-    bunker: 1000, patriot: 1000, gatlingCannon: 1000, stingerSite: 1000, speakerTower: 1000, tunnel: 1000,
-    power: 800, demoTrap: 300
+    internetCenter: 2500,
+    factory: 2000, supplyCenter: 2000, supplyStash: 2000, derrick: 2000, hospital: 2000,
+    airfield: 1500, strategyCenter: 1500, nuclearReactor: 1500,
+    barracks: 1000, propagandaCenter: 1000, supplyDrop: 1000, blackMarket: 1000,
+    bunker: 1000, patriot: 1000, gatlingCannon: 1000, stingerSite: 1000, tunnel: 1000,
+    power: 800, speakerTower: 300, demoTrap: 100
 };
 function getStructureMaxHealth(type) {
     return STRUCTURE_MAX_HEALTH_TABLE[type] || 1200;
@@ -498,7 +499,7 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     else if (type === 'dragon') { mesh = createDragonTankMesh(true); radius = 3.2; speed = 0.15; health = 280; scanRange = 12; }
     else if (type === 'crawler') { mesh = createTroopCrawlerMesh(true); radius = 3.6; speed = 0.15; health = 240; scanRange = 28; }
     else if (type === 'inferno') { mesh = createInfernoCannonMesh(true); radius = 3.2; speed = 0.10; health = 120; scanRange = 48; }
-    else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(true); radius = 2.6; speed = 0.08; health = 180; scanRange = 56; }
+    else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(true); radius = 2.6; speed = 0.08; health = 240; scanRange = 56; }
     else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 22; }
     else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
     else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.8; speed = 0.07; health = 100; scanRange = 14; }
@@ -573,10 +574,11 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
         else if (type === 'ambulance') cap = 4;
         else cap = 5;
     }
+    const visionRange = (typeof getUnitCombatVisionRange === 'function') ? getUnitCombatVisionRange(type, scanRange) : (scanRange || 24);
     const enemyObj = {
         type: type, mesh: mesh, selected: false, targetPosition: mesh.position.clone(),
         speed: speed, radius: radius, health: health, maxHealth: health,
-        scanRange: scanRange, _baseScanRange: scanRange, attackCooldown: 0, combatTarget: null,
+        scanRange: scanRange, _baseScanRange: scanRange, visionRange: visionRange, attackCooldown: 0, combatTarget: null,
         kills: 0, veterancy: 0,
         isStealthed: isNaturalStealth,
         detectsStealth: (type === 'crawler' || type === 'dozer' || type === 'worker' || type === 'pathfinder' || type === 'blacklotus' || type === 'burton' || type === 'jarmen'),

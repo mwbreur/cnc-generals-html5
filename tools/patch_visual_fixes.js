@@ -634,6 +634,21 @@ if (W3D_VEHICLE_DATA['a10_warthog']) {
     };
 }
 
+// 4d. Extract GLA Battle Bus (UVBattBus.W3D + uvbattbus.dds from W3DZH.big / TexturesZH.big)
+const bbusParsed = parseRawW3d('uvbattbus.w3d', {
+    dropRe: /muzzlefx|light\d*|smoke\d*|treadfx/i,
+    includeQuats: true,
+    fallbackTex: 'uvbattbus.dds'
+});
+W3D_VEHICLE_DATA['battlebus'] = {
+    f: 'gla',
+    s: 0.28,
+    p: bbusParsed.pivots,
+    h: bbusParsed.h,
+    m: bbusParsed.meshes
+};
+console.log('battlebus extracted meshes:', Object.keys(bbusParsed.meshes).length);
+
 // 5. Patch usa_power_upgrade (ABPWRPLANT_A1.W3D) & usa_power CYLINDER01/02 quaternions
 const pwrUpgParsed = parseRawW3d('ABPWRPLANT_A1.W3D', { includeQuats: true });
 W3D_BUILDING_DATA['usa_power_upgrade'] = {

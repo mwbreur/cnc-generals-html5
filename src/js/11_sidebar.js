@@ -4072,7 +4072,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
     else if (type === 'dragon') { mesh = createDragonTankMesh(false); radius = 3.2; speed = 0.15; health = 280; scanRange = 12; }
     else if (type === 'crawler') { mesh = createTroopCrawlerMesh(); radius = 3.6; speed = 0.15; health = 240; scanRange = 28; capacity = 8; garrisoned = []; }
     else if (type === 'inferno') { mesh = createInfernoCannonMesh(); radius = 3.2; speed = 0.10; health = 120; scanRange = 48; }
-    else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(); radius = 2.6; speed = 0.08; health = 180; scanRange = 56; }
+    else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(); radius = 2.6; speed = 0.08; health = 240; scanRange = 56; }
     else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 22; }
     else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
     else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.8; speed = 0.07; health = 100; }
@@ -4089,6 +4089,12 @@ function spawnUnit(type, position = null, factionOverride = null) {
     else if (type === 'bombtruck') { mesh = createBombTruckMesh(false); radius = 3.0; speed = 0.18; health = 220; scanRange = 14; }
     else if (type === 'scud') { mesh = createScudLauncherMesh(false); radius = 3.8; speed = 0.10; health = 180; scanRange = 56; }
     else if (type === 'radarvan') { mesh = createRadarVanMesh(); radius = 3.0; speed = 0.16; health = 200; }
+    else if (type === 'battlebus') {
+        mesh = (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['battlebus'])
+            ? createW3DVehicleMesh('battlebus', false)
+            : createTechnicalMesh(false);
+        radius = 3.4; speed = 0.16; health = 400; scanRange = 24; capacity = 8; garrisoned = [];
+    }
     else if (type === 'rebel') { mesh = createRebelMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 22; }
     else if (type === 'rpg') { mesh = createRPGTrooperMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
     else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.8; speed = 0.12; health = 120; scanRange = 8; }
@@ -4161,12 +4167,13 @@ function spawnUnit(type, position = null, factionOverride = null) {
     const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
     const isNaturalStealth = ['pathfinder', 'stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker', 'drone_scout'].includes(type) ||
     (type === 'comanche' && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche'));
+    const visionRange = (typeof getUnitCombatVisionRange === 'function') ? getUnitCombatVisionRange(type, scanRange) : (scanRange || 24);
     const newUnitObj = {
         type: type, mesh: mesh, selected: false, targetPosition: position.clone(),
         speed: speed, radius: radius, selectionCircle: null, taskState: 'Idle',
         aiState: isGatherer ? (type === 'worker' ? 'Idle' : 'MovingToDock') : 'Idle',
         cargoLoaded: 0, timerState: 0, targetStructure: null, supplyTarget: null,
-        health: health, maxHealth: health, scanRange: scanRange, _baseScanRange: scanRange, netId: myNetId,
+        health: health, maxHealth: health, scanRange: scanRange, _baseScanRange: scanRange, visionRange: visionRange, netId: myNetId,
         attackCooldown: 0, combatTarget: null, isAir: isAir,
         airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
         patrolCenter: position ? position.clone() : new THREE.Vector3(),

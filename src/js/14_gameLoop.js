@@ -3526,8 +3526,10 @@ function processEnemyCombat() {
                             const cR = cand.radius || defaultR;
                             const d = distBetween(enemy.mesh.position, cPos, !!(enemy.isAir || cand.isAir));
                             if (d <= effectiveScanRange + cR && d >= minRange && d < bestDist) {
-                                bestDist = d;
-                                bestOpp = cand;
+                                if (effectiveScanRange <= (enemy.visionRange || effectiveScanRange) || (typeof isTargetSpottedForUnit === 'function' && isTargetSpottedForUnit(enemy, cPos, cR))) {
+                                    bestDist = d;
+                                    bestOpp = cand;
+                                }
                             }
                         }
                     };

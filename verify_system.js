@@ -1643,6 +1643,74 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
         if (!trkCargo || trkCargo.visible !== false) {
             throw new Error('Expected China Supply Truck CARGO01 (cargoHold) to start hidden/empty on spawn!');
         }
+
+        // 8. Issue #55 regression: findNavigationPath preserves safeGoal when endPos is blocked by a building
+        structures.length = 0;
+        enemyStructures.length = 0;
+        mapObstacles.length = 0;
+        const blockingBld = { type: 'factory', health: 2000, maxHealth: 2000, radius: 10.0, position: new THREE.Vector3(60, 0, 60) };
+        enemyStructures.push(blockingBld);
+        rebuildPathfindGrid();
+        const blockedEnd = new THREE.Vector3(60, 0, 60);
+        const adjGoal = adjustToPossibleDestination(blockedEnd, null);
+        if (Math.hypot(adjGoal.x - blockedEnd.x, adjGoal.z - blockedEnd.z) < 5.0 ||
+            !isCellPassableOnGround(classifyPathfindPosition(adjGoal.x, adjGoal.z, null, 1.5))) {
+            throw new Error('Issue #55: adjustToPossibleDestination failed to move blocked destination outside building!');
+        }
+        const safeRoute = findNavigationPath(new THREE.Vector3(0, 0, 0), blockedEnd);
+        const finalWp = safeRoute[safeRoute.length - 1];
+        if (!finalWp || Math.hypot(finalWp.x - adjGoal.x, finalWp.z - adjGoal.z) > 0.05 ||
+            !isCellPassableOnGround(classifyPathfindPosition(finalWp.x, finalWp.z, null, 1.4))) {
+            throw new Error('Issue #55: findNavigationPath restored blocked endPos instead of ending at passable safeGoal!');
+        }
+
+        // 9. Issue #54 regression: playAudio respects explicit volume: 0 vs omitted default 0.90 vs custom volume
+        const origPlayOfficial = playOfficialSound;
+        let capturedVols = [];
+        playOfficialSound = (key, vol) => { capturedVols.push(vol); return true; };
+        playAudio('gui_click');
+        playAudio('gui_click', { volume: 0 });
+        playAudio('gui_click', { volume: 0.35 });
+        playOfficialSound = origPlayOfficial;
+        if (capturedVols.length !== 3 || Math.abs(capturedVols[0] - 0.90) > 1e-4 || capturedVols[1] !== 0 || Math.abs(capturedVols[2] - 0.35) > 1e-4) {
+            throw new Error('Issue #54: playAudio volume handling failed: ' + JSON.stringify(capturedVols));
+        }
+
+        // 10. Issue #49, #48, #47, #53 regressions (HP parity, BattleBus W3D, VisionRange vs scanRange)
+        const ncUnit = spawnUnit('nukecannon', new THREE.Vector3(0, 0, 0), 'china');
+        if (ncUnit.maxHealth !== 240 || getStructureMaxHealth('speakerTower') !== 300 ||
+            getStructureMaxHealth('demoTrap') !== 100 || getStructureMaxHealth('blackMarket') !== 1000 ||
+            getStructureMaxHealth('internetCenter') !== 2500 || getStructureMaxHealth('derrick') !== 2000 ||
+            getStructureMaxHealth('fakeCommandCenter') !== 1250) {
+            throw new Error('Issue #49: Nuke Cannon or structure MaxHealth mismatch!');
+        }
+        if (!window.W3D_VEHICLE_DATA['battlebus'] || Object.keys(window.W3D_VEHICLE_DATA['battlebus'].m).length < 10) {
+            throw new Error('Issue #53: W3D_VEHICLE_DATA.battlebus missing retail UVBattBus.W3D meshes!');
+        }
+        const bbusUnit = spawnUnit('battlebus', new THREE.Vector3(5, 0, 0), 'gla');
+        if (!bbusUnit.mesh || !bbusUnit.mesh.userData.isW3D || bbusUnit.capacity !== 8) {
+            throw new Error('Issue #53: spawnUnit("battlebus") failed to use W3D mesh or 8-slot garrison capacity!');
+        }
+        const chinookUnit = spawnUnit('chinook', new THREE.Vector3(0, 0, 0), 'usa');
+        const rebelUnit = spawnUnit('rebel', new THREE.Vector3(0, 0, 0), 'gla');
+        const tomUnit = spawnUnit('tomahawk', new THREE.Vector3(0, 0, 0), 'usa');
+        if (chinookUnit.visionRange !== 64.8 || chinookUnit.scanRange !== 0 ||
+            rebelUnit.visionRange <= rebelUnit.scanRange ||
+            tomUnit.visionRange >= tomUnit.scanRange) {
+            throw new Error('Issue #47: visionRange vs scanRange separation failed!');
+        }
+        units.length = 0;
+        structures.length = 0;
+        units.push(tomUnit);
+        // Alone at (0,0,0), Tomahawk (visionRange 38.9, scanRange 75.6) cannot self-spot target at distance 60
+        if (isTargetSpottedForUnit(tomUnit, new THREE.Vector3(60, 0, 0), 2.0) !== false) {
+            throw new Error('Issue #47: Isolated Tomahawk self-spotted target beyond its VisionRange!');
+        }
+        // With a friendly spotter at (50,0,0), target at (60,0,0) IS spotted for Tomahawk
+        const spotterRanger = spawnUnit('ranger', new THREE.Vector3(50, 0, 0), 'usa');
+        if (isTargetSpottedForUnit(tomUnit, new THREE.Vector3(60, 0, 0), 2.0) !== true) {
+            throw new Error('Issue #47: Friendly spotter failed to spot target for Tomahawk artillery!');
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

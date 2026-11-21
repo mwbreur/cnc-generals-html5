@@ -20,6 +20,39 @@ function canUnitTarget(attacker, target) {
 }
 if (typeof window !== 'undefined') window.canUnitTarget = canUnitTarget;
 
+// Checks whether a hostile target at targetPos is within the unit's own VisionRange or spotted by an allied unit/structure
+function isTargetSpottedForUnit(unit, targetPos, targetRadius = 0) {
+    if (!unit || !unit.mesh || !targetPos) return false;
+    const uPos = unit.mesh.position;
+    const ownVision = (unit.visionRange !== undefined ? unit.visionRange : unit.scanRange) + targetRadius;
+    const dx = uPos.x - targetPos.x, dz = uPos.z - targetPos.z;
+    if (dx * dx + dz * dz <= ownVision * ownVision) return true;
+
+    // Beyond own VisionRange (e.g. Tomahawk/NukeCannon/SCUD/Inferno artillery): requires friendly spotter
+    const friendUnits = unit.isAI ? (typeof enemyUnits !== 'undefined' ? enemyUnits : []) : (typeof units !== 'undefined' ? units : []);
+    for (let i = 0; i < friendUnits.length; i++) {
+        const f = friendUnits[i];
+        if (!f || f === unit || f.health <= 0 || !f.mesh) continue;
+        if (typeof isFriendly === 'function' && !isFriendly(unit, f)) continue;
+        const fVis = (f.visionRange !== undefined ? f.visionRange : (f.scanRange || 24)) + targetRadius;
+        const fdx = f.mesh.position.x - targetPos.x, fdz = f.mesh.position.z - targetPos.z;
+        if (fdx * fdx + fdz * fdz <= fVis * fVis) return true;
+    }
+    const friendStructs = unit.isAI ? (typeof enemyStructures !== 'undefined' ? enemyStructures : []) : (typeof structures !== 'undefined' ? structures : []);
+    for (let i = 0; i < friendStructs.length; i++) {
+        const s = friendStructs[i];
+        if (!s || s.health <= 0 || s.isBuilding) continue;
+        if (typeof isFriendly === 'function' && !isFriendly(unit, s)) continue;
+        const sp = s.position || (s.mesh && s.mesh.position);
+        if (!sp) continue;
+        const sVis = 43.0 + targetRadius;
+        const sdx = sp.x - targetPos.x, sdz = sp.z - targetPos.z;
+        if (sdx * sdx + sdz * sdz <= sVis * sVis) return true;
+    }
+    return false;
+}
+window.isTargetSpottedForUnit = isTargetSpottedForUnit;
+
 let _combatScanTick = 0;
 function processOverlordGatlingTower(unit) {
     if (!unit || unit.type !== 'overlord' || unit.overlordUpgrade !== 'gatling' || unit.health <= 0 || !unit.mesh) return;
@@ -226,21 +259,38 @@ function processCombatScanning() {
                     const minScanR = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
                     const minScanR2 = minScanR * minScanR;
                     let bestUnitDist2 = Infinity;
-                    // 1. Scan for nearest hostile unit in range (respecting siege minRange)
+                    // 1. Scan for nearest hostile unit in range (respecting siege minRange & VisionRange spotting)
+                    let bestSightEnemy = null;
+                    let bestSightDist2 = Infinity;
                     for (let ei = 0; ei < enemyUnits.length; ei++) {
                         const enemy = enemyUnits[ei];
                         if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
                             if (!canUnitTarget(unit, enemy)) continue;
                             const ep = enemy.mesh.position;
+                            const eRad = enemy.radius || 0;
                             const dx = uPos.x - ep.x, dz = uPos.z - ep.z;
-                            const effR = unit.scanRange + (enemy.radius || 0);
+                            const effR = unit.scanRange + eRad;
                             const d2 = dx * dx + dz * dz;
                             if (d2 >= minScanR2 && d2 <= effR * effR && d2 < bestUnitDist2) {
-                                bestUnitDist2 = d2;
-                                unit.combatTarget = enemy;
-                                if (unit.isAir) unit.airState = 'attacking';
+                                if (unit.scanRange <= (unit.visionRange || unit.scanRange) || isTargetSpottedForUnit(unit, ep, eRad)) {
+                                    bestUnitDist2 = d2;
+                                    unit.combatTarget = enemy;
+                                    if (unit.isAir) unit.airState = 'attacking';
+                                }
+                            } else if (unit.taskState === 'Idle' && !unit.isAir && (unit.visionRange || 0) > unit.scanRange && unit.scanRange > 0) {
+                                const visR = unit.visionRange + eRad;
+                                if (d2 <= visR * visR && d2 < bestSightDist2) {
+                                    bestSightDist2 = d2;
+                                    bestSightEnemy = enemy;
+                                }
                             }
                         }
+                    }
+                    // Infantry/units with VisionRange > AttackRange (e.g. Rebel 32.4 > 22): advance to weapon range when idle
+                    if (!unit.combatTarget && bestSightEnemy && bestSightEnemy.mesh) {
+                        unit.combatTarget = bestSightEnemy;
+                        unit.taskState = 'MovingToAttack';
+                        unit.targetPosition.copy(bestSightEnemy.mesh.position);
                     }
                     // 2. If no hostile units in range, auto-target nearest hostile structure
                     if (!unit.combatTarget && enemyStructures.length > 0) {
@@ -249,13 +299,16 @@ function processCombatScanning() {
                             const struct = enemyStructures[si];
                             if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
                                 const sPos = struct.position || struct.mesh.position;
-                                const effR = unit.scanRange + (struct.radius || 6);
+                                const sRad = struct.radius || 6;
+                                const effR = unit.scanRange + sRad;
                                 const dx = uPos.x - sPos.x, dz = uPos.z - sPos.z;
                                 const d2 = dx * dx + dz * dz;
                                 if (d2 >= minScanR2 && d2 <= effR * effR && d2 < bestStructDist2) {
-                                    bestStructDist2 = d2;
-                                    unit.combatTarget = struct;
-                                    if (unit.isAir) unit.airState = 'attacking';
+                                    if (unit.scanRange <= (unit.visionRange || unit.scanRange) || isTargetSpottedForUnit(unit, sPos, sRad)) {
+                                        bestStructDist2 = d2;
+                                        unit.combatTarget = struct;
+                                        if (unit.isAir) unit.airState = 'attacking';
+                                    }
                                 }
                             }
                         }
@@ -288,7 +341,9 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 3.0,
         FLAME: 1.5,
         TOXIN: 1.5,
-        CRUSH: 10.0
+        CRUSH: 10.0,
+        AURORA_BOMB: 1.0,
+        STEALTHJET_MISSILES: 0.5
     },
     light_vehicle: {
         SMALL_ARMS: 0.5,
@@ -298,7 +353,9 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.1,
         FLAME: 0.85,
         TOXIN: 0.6,
-        CRUSH: 0.0
+        CRUSH: 0.0,
+        AURORA_BOMB: 1.0,
+        STEALTHJET_MISSILES: 1.0
     },
     heavy_vehicle: {
         SMALL_ARMS: 0.2,
@@ -308,7 +365,9 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.05,
         FLAME: 0.5,
         TOXIN: 0.4,
-        CRUSH: 0.0
+        CRUSH: 0.0,
+        AURORA_BOMB: 1.0,
+        STEALTHJET_MISSILES: 1.0
     },
     aircraft: {
         SMALL_ARMS: 0.6,
@@ -318,7 +377,9 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.0,
         FLAME: 0.0,
         TOXIN: 0.0,
-        CRUSH: 0.0
+        CRUSH: 0.0,
+        AURORA_BOMB: 0.0,
+        STEALTHJET_MISSILES: 0.0
     },
     building: {
         SMALL_ARMS: 0.25,
@@ -328,7 +389,9 @@ const ARMOR_COEFFICIENTS = {
         SNIPER: 0.0,
         FLAME: 1.25,
         TOXIN: 0.25,
-        CRUSH: 0.0
+        CRUSH: 0.0,
+        AURORA_BOMB: 1.0,
+        STEALTHJET_MISSILES: 1.25
     }
 };
 
@@ -422,9 +485,13 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     }
 
     const cat = getArmorCategory(target);
-    const mult = (ARMOR_COEFFICIENTS[cat] && ARMOR_COEFFICIENTS[cat][damageType] !== undefined)
+    let mult = (ARMOR_COEFFICIENTS[cat] && ARMOR_COEFFICIENTS[cat][damageType] !== undefined)
     ? ARMOR_COEFFICIENTS[cat][damageType]
     : 1.0;
+    // INIZH.big BaseDefenseStructureArmor: Stealth Fighter Bunker-Busters deal 150% against base defenses
+    if (damageType === 'STEALTHJET_MISSILES' && cat === 'building' && ['patriot', 'gatlingCannon', 'stingerSite', 'bunker', 'tunnel'].includes(target.type)) {
+        mult = 1.5;
+    }
 
     // Respect 0.0 SAGE armor immunity (e.g., SNIPER vs building/aircraft, FLAME/TOXIN/CRUSH vs aircraft)
     if (mult <= 0 || baseDamage <= 0) return;
@@ -815,7 +882,7 @@ function executeWeaponFireInner(attacker, target) {
     const targetArmor = getArmorCategory(target);
 
     if (attacker.type === 'overlord') {
-        // Authentic Zero Hour Overlord Dual 125mm Cannons: 2-shot staggered salvo (220ms between barrels), 60 AP each (120 total), 3.0s reload
+        // Authentic Zero Hour Overlord Dual 125mm Cannons (OverlordTankGun): 2-shot staggered salvo (220ms between barrels), 80 AP each (160 total), 2.0s reload
         const fireOverlordBarrel = (xOff, isSecond) => {
             if (attacker.health <= 0) return;
             const mPos = getMuzzleWorldPosition(attacker, xOff);
@@ -840,7 +907,7 @@ function executeWeaponFireInner(attacker, target) {
             }
             playAudio('overlord_cannon', {}, 'china');
             if (target && target.health > 0) {
-                applyCalculatedDamage(attacker, target, 60, 'ARMOR_PIERCING');
+                applyCalculatedDamage(attacker, target, 80, 'ARMOR_PIERCING');
             }
         };
         fireOverlordBarrel(-0.45, false);
@@ -1149,17 +1216,24 @@ function executeWeaponFireInner(attacker, target) {
         }), 100);
         playAudio('jet_missile', {}, isMig ? 'china' : 'usa');
     } else if (attacker.type === 'stealthfighter') {
-        // USA Stealth Fighter: Laser-Guided Precision Bunker-Buster Bomb!
-        spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0x00d2d3, 0.6 * heroicScale);
-        spawnGuidedBomb(muzzlePos, targetPos, false, isHeroic);
+        // USA Stealth Fighter (StealthFighterMissileWeapon): 2x 100 STEALTHJET_MISSILES Bunker-Busters!
+        const mPosL = getMuzzleWorldPosition(attacker, -0.55);
+        const mPosR = getMuzzleWorldPosition(attacker, 0.55);
+        spawnMuzzleFlash(mPosL, isHeroic ? heroicFlashColor : 0x00d2d3, 0.6 * heroicScale);
+        spawnGuidedBomb(mPosL, targetPos, false, isHeroic);
+        setTimeout(() => {
+            spawnMuzzleFlash(mPosR, isHeroic ? heroicFlashColor : 0x00d2d3, 0.6 * heroicScale);
+            spawnGuidedBomb(mPosR, targetPos, false, isHeroic);
+        }, 110);
         playUSASound('jet_missile');
-        setTimeout(() => applyCalculatedDamage(attacker, target, 150, 'EXPLOSIVE'), 400);
+        setTimeout(() => applyCalculatedDamage(attacker, target, 100, 'STEALTHJET_MISSILES'), 380);
+        setTimeout(() => applyCalculatedDamage(attacker, target, 100, 'STEALTHJET_MISSILES'), 490);
     } else if (attacker.type === 'aurora') {
-        // USA Aurora Hypersonic Bomber: Fuel-Air Cluster Bomb with Massive Shockwave!
+        // USA Aurora Hypersonic Bomber (AuroraBombWeapon): 400 AURORA_BOMB Fuel-Air Bomb with Massive Shockwave!
         spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0x00d2d3, 1.2 * heroicScale);
         spawnGuidedBomb(muzzlePos, targetPos, true, isHeroic);
         playUSASound('daisycutter_drop');
-        setTimeout(() => applyCalculatedDamage(attacker, target, 220, 'EXPLOSIVE'), 500);
+        setTimeout(() => applyCalculatedDamage(attacker, target, 400, 'AURORA_BOMB'), 500);
     } else if (attacker.type === 'comanche') {
         // USA Comanche Attack Helicopter: 20mm Rotary Cannon + Hellfire Missiles!
         for (let b = 0; b < 2; b++) {

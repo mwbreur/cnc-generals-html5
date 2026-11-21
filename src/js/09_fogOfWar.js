@@ -129,6 +129,33 @@ const INIZH_SHROUD_RANGE = {
     blackMarket: 43, particleCannon: 43, nukeSilo: 43, scudStorm: 43, derrick: 43
 };
 
+// Official INIZH.big VisionRange values (combat sight / acquisition range, scaled at 150 SAGE = 32.4 game units => x 0.216)
+const INIZH_VISION_RANGE = {
+    // USA
+    chinook: 64.8, comanche: 43.2, raptor: 43.2, stealthfighter: 38.9, aurora: 38.9,
+    pathfinder: 43.2, dozer: 43.2, tomahawk: 38.9,
+    crusader: 32.4, tank: 32.4, paladin: 32.4, humvee: 32.4, burton: 32.4,
+    rocket: 32.4, missiledefender: 32.4, pilot: 32.4, drone_scout: 32.4,
+    ranger: 22.0, infantry: 22.0, ambulance: 22.0, truck: 32.4,
+    // China
+    blacklotus: 64.8, mig: 43.2, inferno: 38.9, nukecannon: 38.9, nuketank: 38.9, crawler: 37.8,
+    battlemaster: 32.4, overlord: 32.4, gatling: 32.4, gatlingTank: 32.4,
+    tankhunter: 32.4, hacker: 32.4,
+    redguard: 22.0, dragon: 22.0, dragonTank: 22.0,
+    // GLA
+    jarmen: 43.2, radarvan: 43.2, buggy: 38.9, scud: 38.9,
+    quad: 32.4, technical: 32.4, bombtruck: 32.4, battlebus: 32.4,
+    rebel: 32.4, rpg: 32.4, terrorist: 32.4, mob: 32.4,
+    scorpion: 27.0, marauder: 27.0,
+    toxintractor: 22.0, hijacker: 22.0, worker: 22.0
+};
+function getUnitCombatVisionRange(type, fallbackScanRange = 24) {
+    if (type && INIZH_VISION_RANGE[type] !== undefined) return INIZH_VISION_RANGE[type];
+    return fallbackScanRange || 24;
+}
+window.INIZH_VISION_RANGE = INIZH_VISION_RANGE;
+window.getUnitCombatVisionRange = getUnitCombatVisionRange;
+
 function updateFogOfWar() {
     if (!fogCanvas || !fogCtx || !fogMesh) return;
     fogUpdateTick++;

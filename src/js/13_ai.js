@@ -287,15 +287,15 @@ window.optimizeGroundPath = optimizeGroundPath;
 // Adjust destination outside impassable obstacles/water (ported from AIPathfind.cpp::adjustToPossibleDestination)
 function adjustToPossibleDestination(destPos, ignoreStruct = null) {
     if (!destPos) return new THREE.Vector3();
-    const cell = classifyPathfindPosition(destPos.x, destPos.z, ignoreStruct, 1.2);
+    const cell = classifyPathfindPosition(destPos.x, destPos.z, ignoreStruct, 1.5);
     if (isCellPassableOnGround(cell)) return destPos.clone();
 
-    for (let r = 3.0; r <= 24.0; r += 3.0) {
+    for (let r = 3.0; r <= 36.0; r += 3.0) {
         for (let step = 0; step < 12; step++) {
             const angle = (step / 12) * Math.PI * 2;
             const tx = destPos.x + Math.cos(angle) * r;
             const tz = destPos.z + Math.sin(angle) * r;
-            if (isCellPassableOnGround(classifyPathfindPosition(tx, tz, ignoreStruct, 1.2))) {
+            if (isCellPassableOnGround(classifyPathfindPosition(tx, tz, ignoreStruct, 1.5))) {
                 const ty = (typeof getTerrainHeight === 'function') ? getTerrainHeight(tx, tz) : (destPos.y || 0);
                 return new THREE.Vector3(tx, ty, tz);
             }
@@ -309,22 +309,23 @@ window.adjustToPossibleDestination = adjustToPossibleDestination;
 function findNavigationPath(startPos, endPos, options = {}) {
     if (!startPos || !endPos) return [];
     const ignoreStruct = options.ignoreStruct || null;
+    const safeGoal = adjustToPossibleDestination(endPos, ignoreStruct);
 
-    // Fast path: if direct line-of-sight is clear, no intermediate waypoints needed
-    if (isPathfindSegmentClear(startPos, endPos, ignoreStruct, 1.4)) {
-        return [endPos.clone()];
+    // Fast path: if direct line-of-sight to safeGoal is clear, no intermediate waypoints needed
+    if (isPathfindSegmentClear(startPos, safeGoal, ignoreStruct, 1.4)) {
+        return [safeGoal.clone()];
     }
 
     // Bridge-aware macro shortcut: if direct line crosses a river and bridges exist, route cleanly via bridge entry/exit ramps
     const hasBridges = typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0;
     if (hasBridges && typeof currentWaterLevel !== 'undefined' && currentWaterLevel > -100 && typeof getTerrainHeight === 'function') {
-        const segDist = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z);
+        const segDist = Math.hypot(safeGoal.x - startPos.x, safeGoal.z - startPos.z);
         const samples = Math.max(16, Math.min(120, Math.ceil(segDist / 8.0)));
         let hitsWater = false;
         for (let i = 1; i < samples; i++) {
             const t = i / samples;
-            const px = startPos.x + (endPos.x - startPos.x) * t;
-            const pz = startPos.z + (endPos.z - startPos.z) * t;
+            const px = startPos.x + (safeGoal.x - startPos.x) * t;
+            const pz = startPos.z + (safeGoal.z - startPos.z) * t;
             if (getTerrainHeight(px, pz) < currentWaterLevel + 0.15 && !mapBridges.some(b => isPointOnBridge(px, pz, b))) {
                 hitsWater = true;
                 break;
@@ -334,20 +335,20 @@ function findNavigationPath(startPos, endPos, options = {}) {
             let bestB = null, bestD = Infinity;
             for (let bi = 0; bi < mapBridges.length; bi++) {
                 const b = mapBridges[bi];
-                const d = Math.hypot(startPos.x - b.position.x, startPos.z - b.position.z) + Math.hypot(endPos.x - b.position.x, endPos.z - b.position.z);
+                const d = Math.hypot(startPos.x - b.position.x, startPos.z - b.position.z) + Math.hypot(safeGoal.x - b.position.x, safeGoal.z - b.position.z);
                 if (d < bestD) { bestD = d; bestB = b; }
             }
             if (bestB) {
                 const fwdX = Math.sin(bestB.rotationY);
                 const fwdZ = Math.cos(bestB.rotationY);
                 const halfLen = bestB.length * 0.44;
-                const r1 = new THREE.Vector3(bestB.position.x - fwdX * halfLen, bestB.deckY, bestB.position.z - fwdZ * halfLen);
+                const r1 = new THREE.Vector3(bestB.position.x - fwdX * halfLen, bestB.deckY, bestB.position.z - fwdX * 0 - fwdZ * halfLen);
                 const r2 = new THREE.Vector3(bestB.position.x + fwdX * halfLen, bestB.deckY, bestB.position.z + fwdZ * halfLen);
                 const d1 = Math.hypot(startPos.x - r1.x, startPos.z - r1.z);
                 const d2 = Math.hypot(startPos.x - r2.x, startPos.z - r2.z);
                 const entry = d1 <= d2 ? r1 : r2;
                 const exit = d1 <= d2 ? r2 : r1;
-                return [entry, exit, endPos.clone()];
+                return [entry, exit, safeGoal.clone()];
             }
         }
     }
@@ -362,14 +363,13 @@ function findNavigationPath(startPos, endPos, options = {}) {
     const toGrid = (wVal) => Math.max(0, Math.min(gridDim - 1, Math.floor((wVal + halfExtent) / cellSize)));
     const toWorld = (gIdx) => -halfExtent + (gIdx + 0.5) * cellSize;
 
-    const safeGoal = adjustToPossibleDestination(endPos, ignoreStruct);
     const sx = toGrid(startPos.x);
     const sz = toGrid(startPos.z);
     const gx = toGrid(safeGoal.x);
     const gz = toGrid(safeGoal.z);
 
     if (sx === gx && sz === gz) {
-        return [endPos.clone()];
+        return [safeGoal.clone()];
     }
 
     const totalCells = gridDim * gridDim;
@@ -494,7 +494,7 @@ function findNavigationPath(startPos, endPos, options = {}) {
     if (!found) return [];
     const traceTarget = goalIdx;
     if (traceTarget === startIdx) {
-        return [endPos.clone()];
+        return [safeGoal.clone()];
     }
 
     const rawPoints = [];
@@ -510,11 +510,11 @@ function findNavigationPath(startPos, endPos, options = {}) {
     }
     rawPoints.push(startPos.clone());
     rawPoints.reverse();
-    rawPoints[rawPoints.length - 1] = endPos.clone();
+    rawPoints[rawPoints.length - 1] = safeGoal.clone();
 
     const smoothed = optimizeGroundPath(rawPoints, ignoreStruct);
-    // Drop the starting point so returned array contains strictly forward waypoints ending at endPos
-    return smoothed.length > 1 ? smoothed.slice(1) : [endPos.clone()];
+    // Drop the starting point so returned array contains strictly forward waypoints ending at safeGoal
+    return smoothed.length > 1 ? smoothed.slice(1) : [safeGoal.clone()];
 }
 window.findNavigationPath = findNavigationPath;
 

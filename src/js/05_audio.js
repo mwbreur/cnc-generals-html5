@@ -222,7 +222,8 @@ function playAudio(type, options = {}, faction = null) {
     const worldPos = options.pos || (UI_AUDIO_TYPES.has(type) ? null : window._sfxPos);
     const spatial = worldPos ? computeSpatialAudio(worldPos) : null;
     if (spatial && spatial.cull) return;
-    const baseVol = options.volume || 0.90;
+    const rawVol = (options && options.volume !== undefined && options.volume !== null) ? Number(options.volume) : 0.90;
+    const baseVol = Number.isFinite(rawVol) ? Math.max(0, Math.min(1, rawVol)) : 0.90;
 
     // Trigger authentic retail WAV from 05b_official_audio.js when available
     if (typeof playOfficialSound === 'function') {
@@ -234,6 +235,7 @@ function playAudio(type, options = {}, faction = null) {
             }
         }
     }
+    if (baseVol <= 0) return;
 
     const ctx = getAudioContext();
     if (!ctx) return;
