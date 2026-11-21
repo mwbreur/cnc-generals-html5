@@ -811,6 +811,7 @@ function handleNetworkPacket(packet) {
         const cleanSlots = sanitizeMpSlots(packet.slots);
         if (cleanSlots) {
             mpSlots = cleanSlots;
+            if (typeof window !== 'undefined') window.mpSlots = mpSlots;
             if (typeof packet.mapEnv === 'string') {
                 const sel = document.getElementById('mp-map-env');
                 if (sel) sel.value = packet.mapEnv;
@@ -1108,6 +1109,7 @@ function startMultiplayerMatch(isHost, config) {
         faction: resolveConcreteMpFaction(s.faction, matchSeed, idx)
     }));
     mpSlots = activeSlots.slice();
+    if (typeof window !== 'undefined') window.mpSlots = mpSlots;
     const mySlot = isHost ? activeSlots.find(s => s.isHost) : activeSlots.find(s => !s.isHost && s.isHuman);
     const playerSlot = mySlot || activeSlots[0];
     if (!playerSlot) return;

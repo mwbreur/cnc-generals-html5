@@ -963,6 +963,7 @@ function updateSidebar() {
     if (selectedFaction !== 'gla') {
         structures.forEach(s => {
                 if (s.health <= 0 || s.isBuilding) return;
+                if (s.ownerId && s.ownerId !== 'player') return;
                 if (s.type === 'power') produced += (s.powerUpgraded ? 10 : 5);
                 if (s.type === 'nuclearReactor') produced += (s.overcharged ? 15 : 10);
                 const drain = (typeof STRUCTURE_POWER_DRAIN !== 'undefined' ? STRUCTURE_POWER_DRAIN[s.type] : 0) || 0;
@@ -1141,7 +1142,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                     };
             });
             if (u.type === 'worker') {
-                currentGridSlots[11] = {
+                currentGridSlots[12] = {
                     id: 'harvest',
                     name: 'HARVEST',
                     badge: 'GATHER',
@@ -3036,12 +3037,13 @@ function buildUnitGridSlot(type, spec, isConstructing) {
     const hasTech = !techReq || structures.some(s => s.type === techReq.building && !s.isBuilding && s.health > 0);
     const hasGenUnlock = typeof isUnitUnlockedByGeneralsPower === 'function' ? isUnitUnlockedByGeneralsPower(type) : true;
     const heroLimitReached = isHeroUnitActiveOrQueued(type);
-    const canAfford = playerResources >= spec.cost;
+    const effCost = getEffectiveUnitCost(type) || spec.cost;
+    const canAfford = playerResources >= effCost;
     const badge = heroLimitReached ? 'LIMIT 1' : (!hasGenUnlock ? 'GEN LVL' : (!hasTech ? 'LOCKED' : (canAfford ? 'READY' : 'FUNDS')));
     return {
         id: type,
         name: spec.name.toUpperCase(),
-        cost: spec.cost,
+        cost: effCost,
         badge: badge,
         disabled: heroLimitReached || !hasGenUnlock || !hasTech || !canAfford || isConstructing,
         action: () => produceUnit(type),
@@ -3935,9 +3937,9 @@ function processBuildingFunctions() {
                 });
             }
             if (structure.type === 'demoTrap') {
-                const target = enemyUnits.find(enemy => enemy.health > 0 && enemy.mesh.position.distanceTo(structure.position) < 7);
+                const target = enemyUnits.find(enemy => enemy && enemy.health > 0 && enemy.mesh && enemy.mesh.position && enemy.mesh.position.distanceTo(structure.position) < 7);
                 if (target) {
-                    enemyUnits.forEach(enemy => { if (enemy.mesh.position.distanceTo(structure.position) < 16) enemy.health -= 300; });
+                    enemyUnits.forEach(enemy => { if (enemy && enemy.mesh && enemy.mesh.position && enemy.mesh.position.distanceTo(structure.position) < 16) enemy.health -= 300; });
                     structure.health = 0;
                     createImpactExplosion(structure.position);
                 }
@@ -4274,8 +4276,8 @@ function processCameraKeyboardPanning() {
     if (keysPressed['arrowleft']) { cameraTarget.addScaledVector(right, -panSpeed); moved = true; }
     if (keysPressed['arrowright']) { cameraTarget.addScaledVector(right, panSpeed); moved = true; }
     if (!blueprintMesh && typeof cameraAlpha !== 'undefined') {
-        if (keysPressed['q']) { cameraAlpha -= 0.032; moved = true; }
-        if (keysPressed['e']) { cameraAlpha += 0.032; moved = true; }
+        if (keysPressed['alt'] && keysPressed['q']) { cameraAlpha -= 0.032; moved = true; }
+        if (keysPressed['alt'] && keysPressed['e']) { cameraAlpha += 0.032; moved = true; }
     }
     if (moved) updateCameraPosition();
 }

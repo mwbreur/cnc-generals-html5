@@ -1239,16 +1239,33 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
                 return false;
             }
 
-            if (this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh) {
+            const isHoming = !!(this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh);
+            if (isHoming) {
                 this.toPos.copy(this.metadata.target.mesh.position);
                 this.toPos.y += this.metadata.target.isAir ? 0.3 : 0.5;
-                this.distTotal = Math.max(1, (this.fromPos || fromPos).distanceTo(this.toPos));
-                (this.mesh || this.group).lookAt(this.toPos);
             }
 
             this.distTraveled += this.speed;
-            const alpha = Math.min(1.0, this.distTraveled / Math.max(0.1, this.distTotal));
-            this.curPos.lerpVectors(fromPos, this.toPos, alpha);
+            let alpha;
+            if (isHoming && !this.isHeavy) {
+                // Incremental homing steering avoids early detonation / backward slide when moving target closes or retreats
+                const toT = new THREE.Vector3().subVectors(this.toPos, this.curPos);
+                const rem = toT.length();
+                if (rem <= Math.max(1.2, this.speed)) {
+                    this.curPos.copy(this.toPos);
+                    alpha = 1.0;
+                    this.distTraveled = this.distTotal;
+                } else {
+                    toT.multiplyScalar(this.speed / rem);
+                    this.curPos.add(toT);
+                    alpha = Math.min(0.98, this.distTraveled / Math.max(0.1, this.distTraveled + rem));
+                    (this.mesh || this.group).lookAt(this.toPos);
+                }
+            } else {
+                alpha = Math.min(1.0, this.distTraveled / Math.max(0.1, this.distTotal));
+                this.curPos.lerpVectors(fromPos, this.toPos, alpha);
+                if (isHoming) (this.mesh || this.group).lookAt(this.toPos);
+            }
 
             if (this.isHeavy) {
                 const arcHeight = Math.sin(alpha * Math.PI) * 14.0;
@@ -2452,8 +2469,17 @@ function spawnScrapCrate(pos) {
     activeScrapCrates.push(crateObj);
 }
 
-// Update all FX every frame
+// Update all FX every frame (with hard safety cap to keep draw calls bounded in massive battles)
+const MAX_ACTIVE_FX = 450;
 function updateFXEngine() {
+    while (activeFX.length > MAX_ACTIVE_FX) {
+        const oldest = activeFX.shift();
+        if (oldest) {
+            if (typeof oldest.dispose === 'function') { try { oldest.dispose(); } catch (_) {} }
+            else if (oldest.mesh && typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(oldest.mesh);
+            else if (oldest.group && typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(oldest.group);
+        }
+    }
     for (let i = activeFX.length - 1; i >= 0; i--) {
         const alive = activeFX[i].update();
         if (!alive) {
