@@ -488,7 +488,7 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     else if (type === 'aurora') { mesh = createAuroraMesh(true); radius = 4.2; speed = 0.38; health = 180; scanRange = 40; isAir = true; }
     else if (type === 'infantry' || type === 'ranger') { mesh = createRangerMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 22; }
     else if (type === 'rocket' || type === 'missiledefender') { mesh = createMissileDefenderMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 38; }
-    else if (type === 'pathfinder') { mesh = createRangerMesh(); radius = 0.8; speed = 0.09; health = 120; scanRange = 65; }
+    else if (type === 'pathfinder') { mesh = createPathfinderMesh(true); radius = 0.8; speed = 0.09; health = 120; scanRange = 48; }
     else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.9; speed = 0.10; health = 350; scanRange = 27; }
 
     // China Forces
@@ -526,7 +526,7 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.8; speed = 0.12; health = 80; scanRange = 8; }
     else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 1.2; speed = 0.08; health = 280; scanRange = 26; }
     else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.8; speed = 0.11; health = 120; scanRange = 16; }
-    else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.09; health = 220; scanRange = 49; }
+    else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.09; health = 200; scanRange = 36; }
     else {
         mesh = createBattlemasterTankMesh(true);
     }
