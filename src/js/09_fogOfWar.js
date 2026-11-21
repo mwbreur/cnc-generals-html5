@@ -409,80 +409,81 @@ const factionCatalog = {
     usa: {
         label: 'USA', builder: 'dozer', starter: ['dozer'],
         barracks: {
-            infantry: ['Ranger', 100, 'Assault rifleman with flashbangs & capture ability.'],
-            rocket: ['Missile Defender', 175, 'Laser-guided anti-armor & anti-air missile infantry.'],
+            infantry: ['Ranger', 225, 'Assault rifleman with flashbangs & capture ability.'],
+            rocket: ['Missile Defender', 300, 'Laser-guided anti-armor & anti-air missile infantry.'],
             pathfinder: ['Pathfinder', 600, 'Elite sniper infantry, detects stealth.'],
             burton: ['Colonel Burton', 1500, 'Elite commando with C4 charges and combat knife.']
         },
         factory: {
-            crusader: ['Crusader Tank', 400, 'Main battle tank with 105mm cannon.'],
-            paladin: ['Paladin Tank', 600, 'Advanced battle tank with point-defense laser.'],
-            humvee: ['Humvee', 350, 'Fast scout transport. Carries 5 infantry.'],
-            ambulance: ['Ambulance', 300, 'Field medical unit. Cleans toxins & heals nearby troops.'],
+            crusader: ['Crusader Tank', 900, 'Main battle tank with 105mm cannon.'],
+            paladin: ['Paladin Tank', 1100, 'Advanced battle tank with point-defense laser.'],
+            humvee: ['Humvee', 700, 'Fast scout transport. Carries 5 infantry.'],
+            ambulance: ['Ambulance', 600, 'Field medical unit. Cleans toxins & heals nearby troops.'],
             tomahawk: ['Tomahawk Missile', 1200, 'Long-range cruise missile mobile artillery (100-350 range, blind spot).']
         },
         airfield: {
-            raptor: ['Raptor', 1100, 'Supersonic strike jet with laser-guided missiles.'],
-            stealthfighter: ['Stealth Fighter', 1400, 'Radar-invisible ground attack stealth jet.'],
-            aurora: ['Aurora Bomber', 1800, 'Mach-4 supersonic invincible bomb-run aircraft.'],
-            comanche: ['Comanche', 1000, 'Attack gunship helicopter with rocket pods.']
+            raptor: ['Raptor', 1400, 'Supersonic strike jet with laser-guided missiles.'],
+            stealthfighter: ['Stealth Fighter', 1600, 'Radar-invisible ground attack stealth jet.'],
+            aurora: ['Aurora Bomber', 2500, 'Mach-4 supersonic invincible bomb-run aircraft.'],
+            comanche: ['Comanche', 1500, 'Attack gunship helicopter with rocket pods.']
         },
         supplyCenter: {
             chinook: ['Chinook', 1200, 'Heavy supply and troop transport helicopter.']
         },
         commandCenter: {
-            dozer: ['Construction Dozer', 500, 'Constructs and repairs USA military installations.']
+            dozer: ['Construction Dozer', 1000, 'Constructs and repairs USA military installations.']
         },
         support: ['Construction Dozer', 'Pilot (unbuildable)', 'Scout Drone (attachment)', 'Battle Drone (attachment)']
     },
     china: {
         label: 'China', builder: 'dozer', starter: ['dozer'],
         barracks: {
-            redguard: ['Red Guard', 80, 'Assault rifle infantry trained in pairs.'],
-            tankhunter: ['Tank Hunter', 150, 'Anti-armor rocket infantry with TNT charges.'],
-            hacker: ['Hacker', 600, 'Stealth hacker, disables buildings & drains internet funds.'],
+            redguard: ['Red Guard', 300, 'Assault rifle infantry trained in pairs.'],
+            tankhunter: ['Tank Hunter', 300, 'Anti-armor rocket infantry with TNT charges.'],
+            hacker: ['Hacker', 625, 'Stealth hacker, disables buildings & drains internet funds.'],
             blacklotus: ['Black Lotus', 1500, 'Elite hacker hero, captures structures & disables armor.']
         },
         factory: {
-            battlemaster: ['Battle Master Tank', 400, 'Standard frontline battle tank.'],
-            dragon: ['Dragon Tank', 500, 'Flamethrower tank, flushes out garrisoned structures.'],
-            gatling: ['Gatling Tank', 500, 'Twin 20mm rotary anti-air/anti-infantry tank.'],
-            crawler: ['Troop Crawler', 700, 'Armored personnel carrier with 8 Red Guard soldiers.'],
-            overlord: ['Overlord Tank', 1500, 'Super-heavy double-barrel dreadnought tank.'],
+            battlemaster: ['Battle Master Tank', 800, 'Standard frontline battle tank.'],
+            dragon: ['Dragon Tank', 800, 'Flamethrower tank, flushes out garrisoned structures.'],
+            gatling: ['Gatling Tank', 800, 'Twin 20mm rotary anti-air/anti-infantry tank.'],
+            crawler: ['Troop Crawler', 1400, 'Armored personnel carrier with 8 Red Guard soldiers.'],
+            overlord: ['Overlord Tank', 2000, 'Super-heavy double-barrel dreadnought tank.'],
             inferno: ['Inferno Cannon', 900, 'Napalm siege artillery creating firestorms.'],
-            nukecannon: ['Nuke Tank (Nuke Cannon)', 1800, 'Mobile tactical nuclear siege tank firing atomic shells.']
+            nukecannon: ['Nuke Tank (Nuke Cannon)', 1600, 'Mobile tactical nuclear siege tank firing atomic shells.']
         },
         airfield: {
-            mig: ['MiG-29 Fighter', 1100, 'High-speed interceptor jet with napalm missiles.']
+            mig: ['MiG-29 Fighter', 1200, 'High-speed interceptor jet with napalm missiles.']
         },
         supplyCenter: {
             truck: ['Supply Truck', 600, 'Gathers supplies from resource depots.']
         },
         commandCenter: {
-            dozer: ['Construction Dozer', 500, 'Constructs and repairs Chinese military installations.']
+            dozer: ['Construction Dozer', 1000, 'Constructs and repairs Chinese military installations.']
         },
         support: ['Construction Dozer']
     },
     gla: {
         label: 'GLA', builder: 'worker', starter: ['worker'],
         barracks: {
-            rebel: ['Rebel', 80, 'Guerrilla assault infantry with capture ability.'],
-            rpg: ['RPG Trooper', 150, 'Anti-armor guerrilla rocket trooper.'],
+            rebel: ['Rebel', 150, 'Guerrilla assault infantry with capture ability.'],
+            rpg: ['RPG Trooper', 300, 'Anti-armor guerrilla rocket trooper.'],
             terrorist: ['Terrorist', 200, 'Suicide explosive infantry with devastating blast.'],
-            mob: ['Angry Mob', 700, 'Armed crowd throwing Molotov cocktails and bullets.'],
-            hijacker: ['Hijacker', 800, 'Stealth commando, steals enemy vehicles on contact.'],
+            mob: ['Angry Mob', 800, 'Armed crowd throwing Molotov cocktails and bullets.'],
+            hijacker: ['Hijacker', 400, 'Stealth commando, steals enemy vehicles on contact.'],
             jarmen: ['Jarmen Kell', 1500, 'Elite sniper hero, snipes vehicle drivers leaving them empty.']
         },
         factory: {
             radarvan: ['Radar Van', 500, 'Mobile radar van providing map radar & stealth detection.'],
-            technical: ['Technical', 300, 'Fast guerrilla pickup with mounted heavy machine gun.'],
-            scorpion: ['Scorpion Tank', 450, 'Light combat tank with rocket upgrade.'],
-            quad: ['Quad Cannon', 450, 'Four 23mm anti-aircraft and anti-infantry autocannons.'],
-            toxintractor: ['Toxin Tractor', 650, 'Corrosive chemical sprayer, cleans garrisoned buildings.'],
+            technical: ['Technical', 500, 'Fast guerrilla pickup with mounted heavy machine gun.'],
+            scorpion: ['Scorpion Tank', 600, 'Light combat tank with rocket upgrade.'],
+            quad: ['Quad Cannon', 700, 'Four 23mm anti-aircraft and anti-infantry autocannons.'],
+            toxintractor: ['Toxin Tractor', 600, 'Corrosive chemical sprayer, cleans garrisoned buildings.'],
             marauder: ['Marauder Tank', 800, 'Heavy salvage tank with double-cannon upgrades.'],
-            buggy: ['Rocket Buggy', 700, 'High-speed hit-and-run mobile rocket artillery.'],
-            bombtruck: ['Bomb Truck', 600, 'Disguised suicide vehicle packed with explosives.'],
-            scud: ['SCUD Launcher', 1200, 'Mobile tactical ballistic missile with anthrax payload.']
+            buggy: ['Rocket Buggy', 900, 'High-speed hit-and-run mobile rocket artillery.'],
+            bombtruck: ['Bomb Truck', 1200, 'Disguised suicide vehicle packed with explosives.'],
+            scud: ['SCUD Launcher', 1200, 'Mobile tactical ballistic missile with anthrax payload.'],
+            battlebus: ['Battle Bus', 1000, 'Armored garrison transport bus with 8 firing ports and second-life bunker.']
         },
         airfield: {},
         supplyCenter: {
@@ -651,22 +652,22 @@ const buildingUpgradesCatalog = {
 };
 const factionBuildings = {
     usa: [
-        ['power', 'Cold Fusion Reactor', 300], ['barracks', 'Barracks', 400], ['factory', 'War Factory', 700],
-        ['supplyCenter', 'Supply Center', 500], ['supplyDrop', 'Supply Drop Zone', 2500], ['airfield', 'Air Field', 1000],
-        ['strategyCenter', 'Strategy Center', 1500], ['detentionCamp', 'Detention Camp', 900],
-        ['patriot', 'Patriot Missile System', 1000], ['particleCannon', 'Particle Cannon', 2500]
+        ['power', 'Cold Fusion Reactor', 800], ['barracks', 'Barracks', 600], ['factory', 'War Factory', 2000],
+        ['supplyCenter', 'Supply Center', 2000], ['supplyDrop', 'Supply Drop Zone', 2500], ['airfield', 'Air Field', 1000],
+        ['strategyCenter', 'Strategy Center', 2500], ['detentionCamp', 'Detention Camp', 1000],
+        ['patriot', 'Patriot Missile System', 1000], ['particleCannon', 'Particle Cannon', 5000]
     ],
     china: [
-        ['barracks', 'Barracks', 400], ['factory', 'War Factory', 700], ['supplyCenter', 'Supply Center', 500],
-        ['airfield', 'Air Field', 1000], ['internetCenter', 'Internet Center', 1000], ['nuclearReactor', 'Nuclear Reactor', 500],
-        ['propagandaCenter', 'Propaganda Center', 1200], ['bunker', 'Bunker', 500], ['gatlingCannon', 'Gatling Cannon', 700],
-        ['speakerTower', 'Speaker Tower', 600], ['nukeSilo', 'Nuclear Missile Silo', 2500]
+        ['barracks', 'Barracks', 500], ['factory', 'War Factory', 2000], ['supplyCenter', 'Supply Center', 1500],
+        ['airfield', 'Air Field', 1000], ['internetCenter', 'Internet Center', 2500], ['nuclearReactor', 'Nuclear Reactor', 1000],
+        ['propagandaCenter', 'Propaganda Center', 2000], ['bunker', 'Bunker', 400], ['gatlingCannon', 'Gatling Cannon', 1200],
+        ['speakerTower', 'Speaker Tower', 500], ['nukeSilo', 'Nuclear Missile Silo', 5000]
     ],
     gla: [
-        ['barracks', 'Barracks', 400], ['factory', 'Arms Dealer', 700], ['supplyStash', 'Supply Stash', 500],
-        ['blackMarket', 'Black Market', 1200], ['tunnel', 'Tunnel Network', 700], ['stingerSite', 'Stinger Site', 700],
-        ['demoTrap', 'Demo Trap', 300], ['palace', 'Palace', 1500], ['fakeCommandCenter', 'Fake Command Center', 500], ['fakeBarracks', 'Fake Barracks', 200],
-        ['fakeArmsDealer', 'Fake Arms Dealer', 350], ['scudStorm', 'SCUD Storm', 2500]
+        ['barracks', 'Barracks', 500], ['factory', 'Arms Dealer', 2500], ['supplyStash', 'Supply Stash', 1500],
+        ['blackMarket', 'Black Market', 2500], ['tunnel', 'Tunnel Network', 800], ['stingerSite', 'Stinger Site', 900],
+        ['demoTrap', 'Demo Trap', 400], ['palace', 'Palace', 2500], ['fakeCommandCenter', 'Fake Command Center', 500], ['fakeBarracks', 'Fake Barracks', 125],
+        ['fakeArmsDealer', 'Fake Arms Dealer', 625], ['scudStorm', 'SCUD Storm', 5000]
     ]
 };
 let unitRoster = {};
@@ -878,85 +879,86 @@ function getUnitTechPrerequisite(type) {
 // Comprehensive C&C Generals Briefings Catalog for Floating Tooltips
 const tacticalBriefings = {
     // USA Units
-    infantry: { name: 'Ranger', role: 'Light Combat Infantry', cost: '$100', desc: 'Frontline rifleman equipped with combat armor and flashbang grenades. Can clear garrisons and capture enemy structures.', req: 'Barracks', unlock: 'Building Capture, Flashbangs' },
-    rocket: { name: 'Missile Defender', role: 'Anti-Armor / Anti-Air Infantry', cost: '$175', desc: 'Equipped with wire-guided anti-tank / anti-aircraft missile launcher. Features Laser Guided Targeting.', req: 'Barracks', unlock: 'Laser Guided Missiles' },
+    infantry: { name: 'Ranger', role: 'Light Combat Infantry', cost: '$225', desc: 'Frontline rifleman equipped with combat armor and flashbang grenades. Can clear garrisons and capture enemy structures.', req: 'Barracks', unlock: 'Building Capture, Flashbangs' },
+    rocket: { name: 'Missile Defender', role: 'Anti-Armor / Anti-Air Infantry', cost: '$300', desc: 'Equipped with wire-guided anti-tank / anti-aircraft missile launcher. Features Laser Guided Targeting.', req: 'Barracks', unlock: 'Laser Guided Missiles' },
     pathfinder: { name: 'Pathfinder', role: 'Sniper Scout', cost: '$600', desc: 'Elite designated marksman with thermal scope. Concealed in stealth when stationary. Eliminates infantry at extreme range.', req: 'Strategy Center', unlock: 'Stealth Scout, Anti-Infantry Dominance' },
     burton: { name: 'Colonel Burton', role: 'Hero Commando', cost: '$1500', desc: 'Colonel Burton - armed with rapid machine gun, timed C4 explosive charges, remote detonators, and combat knife.', req: 'Strategy Center', unlock: 'Timed C4 Charges, Remote Demolitions' },
-    tank: { name: 'Crusader Tank', role: 'Main Battle Tank', cost: '$400', desc: 'Frontline armored fighting vehicle with high-velocity smoothbore cannon and heavy composite glacis.', req: 'War Factory', unlock: 'Battle Drones, Laser Point Defense' },
-    crusader: { name: 'Crusader Tank', role: 'Main Battle Tank', cost: '$400', desc: 'Frontline armored fighting vehicle with high-velocity smoothbore cannon and heavy composite glacis.', req: 'War Factory', unlock: 'Battle Drones, Laser Point Defense' },
-    humvee: { name: 'Humvee', role: 'Rapid Recon Vehicle', cost: '$350', desc: 'High-mobility light combat transport. Mounts a heavy .50 cal gun and carries up to 5 infantry squads who can fire out.', req: 'War Factory', unlock: 'Fire-from-within, High Speed Raids' },
-    ambulance: { name: 'Ambulance', role: 'Field Support Vehicle', cost: '$300', desc: 'Mobile battlefield medical unit that decontaminates chemical/radiation zones and rapidly heals nearby friendly infantry.', req: 'War Factory', unlock: 'Mass Infantry Healing, Decontamination' },
-    paladin: { name: 'Paladin Tank', role: 'Advanced Defense Tank', cost: '$600', desc: 'High-tech main battle tank equipped with anti-missile Point Defense Laser and heavy 120mm cannon.', req: 'Strategy Center', unlock: 'Active Anti-Missile Laser Shield' },
+    tank: { name: 'Crusader Tank', role: 'Main Battle Tank', cost: '$900', desc: 'Frontline armored fighting vehicle with high-velocity smoothbore cannon and heavy composite glacis.', req: 'War Factory', unlock: 'Battle Drones, Laser Point Defense' },
+    crusader: { name: 'Crusader Tank', role: 'Main Battle Tank', cost: '$900', desc: 'Frontline armored fighting vehicle with high-velocity smoothbore cannon and heavy composite glacis.', req: 'War Factory', unlock: 'Battle Drones, Laser Point Defense' },
+    humvee: { name: 'Humvee', role: 'Rapid Recon Vehicle', cost: '$700', desc: 'High-mobility light combat transport. Mounts a heavy .50 cal gun and carries up to 5 infantry squads who can fire out.', req: 'War Factory', unlock: 'Fire-from-within, High Speed Raids' },
+    ambulance: { name: 'Ambulance', role: 'Field Support Vehicle', cost: '$600', desc: 'Mobile battlefield medical unit that decontaminates chemical/radiation zones and rapidly heals nearby friendly infantry.', req: 'War Factory', unlock: 'Mass Infantry Healing, Decontamination' },
+    paladin: { name: 'Paladin Tank', role: 'Advanced Defense Tank', cost: '$1100', desc: 'High-tech main battle tank equipped with anti-missile Point Defense Laser and heavy 120mm cannon.', req: 'Strategy Center', unlock: 'Active Anti-Missile Laser Shield' },
     tomahawk: { name: 'Tomahawk Launcher', role: 'Cruise Missile Artillery', cost: '$1200', desc: 'Mobile launcher firing long-range Tomahawk cruise missiles (150 dmg + splash, min-range blind spot). Vulnerable to aircraft & light rushes.', req: 'Strategy Center', unlock: 'Extreme Long-Range Bombardment' },
     chinook: { name: 'Chinook', role: 'Heavy Cargo Transport', cost: '$1200', desc: 'Twin-rotor heavy cargo helicopter. Gathers combat supplies from resource zones and transports heavy infantry.', req: 'Airfield', unlock: 'Supply Harvesting, Airborne Insertion' },
-    raptor: { name: 'Raptor', role: 'Air Superiority Fighter', cost: '$1100', desc: 'Supersonic tactical strike jet armed with 4 precision-guided Sidewinder / Maverick missiles.', req: 'Airfield', unlock: 'Precision Air Strikes, Hit-and-Run' },
-    comanche: { name: 'Comanche', role: 'Attack Gunship Helicopter', cost: '$1000', desc: 'Rotary-wing close air support gunship equipped with 20mm rotary vulcan cannon and rocket pods.', req: 'Airfield', unlock: 'Continuous Close Air Support' },
-    stealthfighter: { name: 'Stealth Fighter', role: 'Stealth Strike Jet', cost: '$1400', desc: 'Advanced stealth airframe invisible to standard radar. Delivers precision laser-guided bunker-busting bombs.', req: 'Strategy Center', unlock: 'Stealth Air Infiltration, Defense Bypassing' },
-    aurora: { name: 'Aurora Bomber', role: 'Hypersonic Strategic Bomber', cost: '$1800', desc: 'Mach 3+ strategic bomber. Immune to interception during supersonic attack run. Delivers fuel-air bombs.', req: 'Strategy Center', unlock: 'Unstoppable Precision Strike' },
-    dozer: { name: 'Construction Dozer', role: 'Combat Engineering Vehicle', cost: '$500', desc: 'Heavy engineering vehicle that builds, repairs, and clears battlefield infrastructure.', req: 'Command Center', unlock: 'Base Construction, Automated Repairs' },
+    raptor: { name: 'Raptor', role: 'Air Superiority Fighter', cost: '$1400', desc: 'Supersonic tactical strike jet armed with 4 precision-guided Sidewinder / Maverick missiles.', req: 'Airfield', unlock: 'Precision Air Strikes, Hit-and-Run' },
+    comanche: { name: 'Comanche', role: 'Attack Gunship Helicopter', cost: '$1500', desc: 'Rotary-wing close air support gunship equipped with 20mm rotary vulcan cannon and rocket pods.', req: 'Airfield', unlock: 'Continuous Close Air Support' },
+    stealthfighter: { name: 'Stealth Fighter', role: 'Stealth Strike Jet', cost: '$1600', desc: 'Advanced stealth airframe invisible to standard radar. Delivers precision laser-guided bunker-busting bombs.', req: 'Strategy Center', unlock: 'Stealth Air Infiltration, Defense Bypassing' },
+    aurora: { name: 'Aurora Bomber', role: 'Hypersonic Strategic Bomber', cost: '$2500', desc: 'Mach 3+ strategic bomber. Immune to interception during supersonic attack run. Delivers fuel-air bombs.', req: 'Strategy Center', unlock: 'Unstoppable Precision Strike' },
+    dozer: { name: 'Construction Dozer', role: 'Combat Engineering Vehicle', cost: '$1000', desc: 'Heavy engineering vehicle that builds, repairs, and clears battlefield infrastructure.', req: 'Command Center', unlock: 'Base Construction, Automated Repairs' },
     truck: { name: 'Supply Truck', role: 'Automated Logistics Transport', cost: '$600', desc: 'Heavy cargo transport. Automatically gathers supplies from fields and unloads at Supply Centers.', req: 'Supply Center', unlock: 'Resource Income Flow' },
 
     // China Units
-    redguard: { name: 'Red Guard', role: 'Conscript Infantry', cost: '$80', desc: 'Patriotic Chinese riflemen deployed in pairs. Can capture hostile buildings and gain horde firing bonuses.', req: 'Barracks', unlock: 'Building Capture, Red Army Horde Bonus' },
-    tankhunter: { name: 'Tank Hunter', role: 'Anti-Armor Rocket Squad', cost: '$150', desc: 'Infantry equipped with RPG rocket launchers and magnetic TNT tank-disabling charges.', req: 'Barracks', unlock: 'TNT Sabotage, Anti-Tank Ambush' },
-    hacker: { name: 'Hacker', role: 'Cyber Warfare Specialist', cost: '$600', desc: 'Espionage operative who hacks satellite networks for continuous funds or disables hostile base structures.', req: 'Propaganda Center', unlock: 'Continuous Cash Hack, Building Shutdown' },
+    redguard: { name: 'Red Guard', role: 'Conscript Infantry', cost: '$300', desc: 'Patriotic Chinese riflemen deployed in pairs. Can capture hostile buildings and gain horde firing bonuses.', req: 'Barracks', unlock: 'Building Capture, Red Army Horde Bonus' },
+    tankhunter: { name: 'Tank Hunter', role: 'Anti-Armor Rocket Squad', cost: '$300', desc: 'Infantry equipped with RPG rocket launchers and magnetic TNT tank-disabling charges.', req: 'Barracks', unlock: 'TNT Sabotage, Anti-Tank Ambush' },
+    hacker: { name: 'Hacker', role: 'Cyber Warfare Specialist', cost: '$625', desc: 'Espionage operative who hacks satellite networks for continuous funds or disables hostile base structures.', req: 'Propaganda Center', unlock: 'Continuous Cash Hack, Building Shutdown' },
     blacklotus: { name: 'Black Lotus', role: 'Special Agent Hero', cost: '$1500', desc: 'Stealth cyber operative capable of instant building capture, supply theft, and vehicle disabling from afar.', req: 'Propaganda Center', unlock: 'Stealth Espionage, Remote Tech Capture' },
-    battlemaster: { name: 'Battle Master Tank', role: 'Main Battle Tank', cost: '$400', desc: 'Reliable frontline armored tank armed with a 100mm rifled cannon. Gains firepower when grouped in packs.', req: 'War Factory', unlock: 'Nationalism Horde Firepower Bonus' },
-    dragon: { name: 'Dragon Tank', role: 'Incendiary Flame Tank', cost: '$500', desc: 'Armored flame vehicle that ejects high-temperature liquid napalm. Instantly clears garrisoned neutral buildings.', req: 'War Factory', unlock: 'Garrison Clearing, Anti-Infantry Inferno' },
-    gatling: { name: 'Gatling Tank', role: 'Anti-Infantry / Anti-Air Tank', cost: '$500', desc: 'Fast light tank mounting dual rotary cannons. Spins up to devastating fire rates against infantry and aircraft.', req: 'War Factory', unlock: 'Rapid Shredding Fire, Anti-Air Defense' },
-    crawler: { name: 'Troop Crawler', role: 'Troop Carrier & Radar', cost: '$700', desc: 'Heavy all-terrain transport carrying 8 Red Guards. Equipped with mobile base radar dish and medical station.', req: 'War Factory', unlock: 'Infantry Transport, Mobile Radar' },
-    overlord: { name: 'Overlord Tank', role: 'Super-Heavy Dual-Cannon Tank', cost: '$1500', desc: 'Massive siege tank featuring twin 125mm cannons. Can be upgraded with Gatling Cannon, Bunker, or Speaker Tower.', req: 'Propaganda Center', unlock: 'Crushes Vehicles, Mobile Bastion' },
+    battlemaster: { name: 'Battle Master Tank', role: 'Main Battle Tank', cost: '$800', desc: 'Reliable frontline armored tank armed with a 100mm rifled cannon. Gains firepower when grouped in packs.', req: 'War Factory', unlock: 'Nationalism Horde Firepower Bonus' },
+    dragon: { name: 'Dragon Tank', role: 'Incendiary Flame Tank', cost: '$800', desc: 'Armored flame vehicle that ejects high-temperature liquid napalm. Instantly clears garrisoned neutral buildings.', req: 'War Factory', unlock: 'Garrison Clearing, Anti-Infantry Inferno' },
+    gatling: { name: 'Gatling Tank', role: 'Anti-Infantry / Anti-Air Tank', cost: '$800', desc: 'Fast light tank mounting dual rotary cannons. Spins up to devastating fire rates against infantry and aircraft.', req: 'War Factory', unlock: 'Rapid Shredding Fire, Anti-Air Defense' },
+    crawler: { name: 'Troop Crawler', role: 'Troop Carrier & Radar', cost: '$1400', desc: 'Heavy all-terrain transport carrying 8 Red Guards. Equipped with mobile base radar dish and medical station.', req: 'War Factory', unlock: 'Infantry Transport, Mobile Radar' },
+    overlord: { name: 'Overlord Tank', role: 'Super-Heavy Dual-Cannon Tank', cost: '$2000', desc: 'Massive siege tank featuring twin 125mm cannons. Can be upgraded with Gatling Cannon, Bunker, or Speaker Tower.', req: 'Propaganda Center', unlock: 'Crushes Vehicles, Mobile Bastion' },
     inferno: { name: 'Inferno Cannon', role: 'Napalm Artillery', cost: '$900', desc: 'Self-propelled artillery firing combustible napalm canisters that trigger sweeping firestorms.', req: 'Propaganda Center', unlock: 'Napalm Firestorm Barrage' },
-    nukecannon: { name: 'Nuke Tank (Nuke Cannon)', role: 'Tactical Nuclear Artillery', cost: '$1800', desc: 'Heavy tracked nuclear siege tank firing miniaturized tactical atomic shells that leave radioactive fallout.', req: 'Propaganda Center', unlock: 'Tactical Nuclear Strikes, Area Denial' },
-    nuketank: { name: 'Nuke Tank (Nuke Cannon)', role: 'Tactical Nuclear Artillery', cost: '$1800', desc: 'Heavy tracked nuclear siege tank firing miniaturized tactical atomic shells that leave radioactive fallout.', req: 'Propaganda Center', unlock: 'Tactical Nuclear Strikes, Area Denial' },
+    nukecannon: { name: 'Nuke Tank (Nuke Cannon)', role: 'Tactical Nuclear Artillery', cost: '$1600', desc: 'Heavy tracked nuclear siege tank firing miniaturized tactical atomic shells that leave radioactive fallout.', req: 'Propaganda Center', unlock: 'Tactical Nuclear Strikes, Area Denial' },
+    nuketank: { name: 'Nuke Tank (Nuke Cannon)', role: 'Tactical Nuclear Artillery', cost: '$1600', desc: 'Heavy tracked nuclear siege tank firing miniaturized tactical atomic shells that leave radioactive fallout.', req: 'Propaganda Center', unlock: 'Tactical Nuclear Strikes, Area Denial' },
     mig: { name: 'MiG Fighter', role: 'Multirole Fighter Jet', cost: '$1200', desc: 'Delta-wing combat jet armed with dual Blackshark napalm rockets. Multiple MiGs trigger firestorms.', req: 'Airfield', unlock: 'Air Napalm Firestorms' },
 
     // GLA Units
-    rebel: { name: 'Rebel', role: 'Guerrilla Rifleman', cost: '$80', desc: 'Light insurgent infantry armed with Kalashnikov rifles. Stealthy and can capture buildings.', req: 'Barracks', unlock: 'Building Capture, Guerrilla Ambush' },
-    rpg: { name: 'RPG Trooper', role: 'Rocket Insurgent', cost: '$150', desc: 'Insurgent equipped with shoulder-launched rocket launcher. Fires effectively from civilian buildings and tunnels.', req: 'Barracks', unlock: 'Anti-Armor, Tunnel Network Ambush' },
+    rebel: { name: 'Rebel', role: 'Guerrilla Rifleman', cost: '$150', desc: 'Light insurgent infantry armed with Kalashnikov rifles. Stealthy and can capture buildings.', req: 'Barracks', unlock: 'Building Capture, Guerrilla Ambush' },
+    rpg: { name: 'RPG Trooper', role: 'Rocket Insurgent', cost: '$300', desc: 'Insurgent equipped with shoulder-launched rocket launcher. Fires effectively from civilian buildings and tunnels.', req: 'Barracks', unlock: 'Anti-Armor, Tunnel Network Ambush' },
     terrorist: { name: 'Terrorist', role: 'Explosive Martyr', cost: '$200', desc: 'Infiltrator equipped with explosive suicide belt. Can carjack civilian and military vehicles for mobile bombs.', req: 'Barracks', unlock: 'High-Explosive Sabotage' },
-    mob: { name: 'Angry Mob', role: 'Insurgent Riot Swarm', cost: '$700', desc: 'Large crowd of rioters throwing Molotov cocktails and firing assault rifles. Highly resilient to armor piercing.', req: 'Palace', unlock: 'Swarm Tactics, Molotov Bombardment' },
-    hijacker: { name: 'Hijacker', role: 'Vehicle Pirate', cost: '$800', desc: 'Inconspicuous operative who sprints toward enemy vehicles and commandeers them for the GLA.', req: 'Palace', unlock: 'Vehicle Hijacking & Stealing' },
+    mob: { name: 'Angry Mob', role: 'Insurgent Riot Swarm', cost: '$800', desc: 'Large crowd of rioters throwing Molotov cocktails and firing assault rifles. Highly resilient to armor piercing.', req: 'Palace', unlock: 'Swarm Tactics, Molotov Bombardment' },
+    hijacker: { name: 'Hijacker', role: 'Vehicle Pirate', cost: '$400', desc: 'Inconspicuous operative who sprints toward enemy vehicles and commandeers them for the GLA.', req: 'Palace', unlock: 'Vehicle Hijacking & Stealing' },
     jarmen: { name: 'Jarmen Kell', role: 'Legendary Sniper Hero', cost: '$1500', desc: 'Jarmen Kell - master sniper who snipes enemy vehicle drivers, allowing GLA troops to commandeer empty vehicles.', req: 'Palace', unlock: 'Driver Sniping, Stealth Marksmanship' },
-    technical: { name: 'Technical', role: 'Light Assault Truck', cost: '$300', desc: 'Fast pickup truck with mounted heavy machine gun. Upgrades instantly by salvaging battlefield wreckage.', req: 'Arms Dealer', unlock: 'Rapid Hit-and-Run, Salvage Upgrades' },
-    scorpion: { name: 'Scorpion Tank', role: 'Light Battle Tank', cost: '$450', desc: 'Mobile light tank armed with a 75mm cannon. Can mount a Scorpion Rocket launcher through salvage.', req: 'Arms Dealer', unlock: 'Scorpion Rocket, Salvage Scavenging' },
+    technical: { name: 'Technical', role: 'Light Assault Truck', cost: '$500', desc: 'Fast pickup truck with mounted heavy machine gun. Upgrades instantly by salvaging battlefield wreckage.', req: 'Arms Dealer', unlock: 'Rapid Hit-and-Run, Salvage Upgrades' },
+    scorpion: { name: 'Scorpion Tank', role: 'Light Battle Tank', cost: '$600', desc: 'Mobile light tank armed with a 75mm cannon. Can mount a Scorpion Rocket launcher through salvage.', req: 'Arms Dealer', unlock: 'Scorpion Rocket, Salvage Scavenging' },
     marauder: { name: 'Marauder Tank', role: 'Heavy Salvage Tank', cost: '$800', desc: 'Sturdy combat tank designed to scavenge enemy scrap metal to upgrade to twin heavy barrels.', req: 'Palace', unlock: 'Dual-Cannon Salvage Evolution' },
-    buggy: { name: 'Rocket Buggy', role: 'Dune Buggy Skirmisher', cost: '$700', desc: 'Fast desert dune buggy armed with long-range rocket pods. Excels at hit-and-run base harassment.', req: 'Palace', unlock: 'Long-Range Skirmishing' },
-    quad: { name: 'Quad Cannon', role: 'Anti-Infantry / Anti-Air Flak', cost: '$450', desc: 'Tracked vehicle with four heavy flak barrels. Shreds infantry, helicopters, and lightly armored vehicles.', req: 'Arms Dealer', unlock: 'Anti-Air Flak, Rapid Shredding' },
-    toxintractor: { name: 'Toxin Tractor', role: 'Chemical Sprayer', cost: '$650', desc: 'Armored agricultural tractor converted to spray lethal Anthrax toxin. Clears civilian garrisons and contaminates ground.', req: 'Arms Dealer', unlock: 'Anthrax Spray, Garrison Clearing' },
-    bombtruck: { name: 'Bomb Truck', role: 'Explosive Demolition Truck', cost: '$600', desc: 'Disguised transport packed with high explosives and optional anthrax or nuclear warheads.', req: 'Palace', unlock: 'Massive Base Demolition, Disguise' },
+    buggy: { name: 'Rocket Buggy', role: 'Dune Buggy Skirmisher', cost: '$900', desc: 'Fast desert dune buggy armed with long-range rocket pods. Excels at hit-and-run base harassment.', req: 'Palace', unlock: 'Long-Range Skirmishing' },
+    quad: { name: 'Quad Cannon', role: 'Anti-Infantry / Anti-Air Flak', cost: '$700', desc: 'Tracked vehicle with four heavy flak barrels. Shreds infantry, helicopters, and lightly armored vehicles.', req: 'Arms Dealer', unlock: 'Anti-Air Flak, Rapid Shredding' },
+    toxintractor: { name: 'Toxin Tractor', role: 'Chemical Sprayer', cost: '$600', desc: 'Armored agricultural tractor converted to spray lethal Anthrax toxin. Clears civilian garrisons and contaminates ground.', req: 'Arms Dealer', unlock: 'Anthrax Spray, Garrison Clearing' },
+    bombtruck: { name: 'Bomb Truck', role: 'Explosive Demolition Truck', cost: '$1200', desc: 'Disguised transport packed with high explosives and optional anthrax or nuclear warheads.', req: 'Palace', unlock: 'Massive Base Demolition, Disguise' },
     scud: { name: 'SCUD Launcher', role: 'Ballistic Missile Vehicle', cost: '$1200', desc: 'Heavy launcher firing long-range ballistic SCUD missiles tipped with high explosive or Anthrax warheads.', req: 'Palace', unlock: 'Ballistic Bombardment, Toxin Clouds' },
     radarvan: { name: 'Radar Van', role: 'Mobile Radar Station', cost: '$500', desc: 'Provides the GLA with tactical minimap radar and reconnaissance scan abilities.', req: 'Arms Dealer', unlock: 'GLA Base Radar, Recon Sweeps' },
+    battlebus: { name: 'Battle Bus', role: 'Armored Garrison Bus', cost: '$1000', desc: 'Armored transport bus carrying 8 infantry firing from within. Converts into an armored bunker when disabled once.', req: 'Palace', unlock: '8-Slot Fireport Transport, Second-Life Bunker' },
     worker: { name: 'Worker', role: 'GLA Laborer & Builder', cost: '$200', desc: 'GLA laborer who constructs buildings, gathers supply boxes by hand, and clears battlefield debris.', req: 'Command Center', unlock: 'Base Construction, Manual Harvesting' },
 
     // Buildings across all 3 factions
     center: { name: 'Command Center', role: 'Base Headquarters', cost: '$2000', desc: 'Main command base facility. Produces combat engineers and dozers, provides satellite radar uplink, and unlocks core tech.', req: 'None', unlock: 'Builders, Radar, Tier 1 Tech' },
-    power: { name: 'Cold Fusion Reactor', role: 'Clean Energy Production', cost: '$300', desc: 'USA Cold Fusion Reactor. Supplies clean electrical power to base structures and defenses.', req: 'Command Center', unlock: 'Supply Center, Barracks, Patriot Missiles' },
-    nuclearReactor: { name: 'Nuclear Reactor', role: 'Atomic Energy Production', cost: '$500', desc: 'China Nuclear Reactor. Generates massive power. Can be overcharged for +50% output.', req: 'Command Center', unlock: 'Supply Center, Barracks, Base Defenses' },
-    barracks: { name: 'Barracks', role: 'Infantry Training Facility', cost: '$400', desc: 'Trains ground infantry, rangers, and special forces. Heals nearby friendly infantry.', req: 'Power (USA/China)', unlock: 'Combat Infantry, Base Defenses' },
-    fakeBarracks: { name: 'Fake Barracks', role: 'Decoy Structure', cost: '$200', desc: 'Cheap wooden decoy structure that tricks enemy reconnaissance and can detonate or upgrade to real Barracks.', req: 'Command Center', unlock: 'Deception, Camouflage' },
-    factory: { name: 'War Factory / Arms Dealer', role: 'Armored Vehicle Plant', cost: '$700', desc: 'Produces main battle tanks, artillery, and armored transports. Automatically repairs nearby friendly vehicles.', req: 'Supply Center or Barracks', unlock: 'Armored Fighting Vehicles, Tier 2 Tech' },
-    fakeArmsDealer: { name: 'Fake Arms Dealer', role: 'Decoy Arms Dealer', cost: '$350', desc: 'Decoy vehicle workshop designed to mislead enemy bombers and satellite surveillance.', req: 'Barracks or Supply Stash', unlock: 'Deception, Decoy Defense' },
-    supplyCenter: { name: 'Supply Center', role: 'Logistics Resource Hub', cost: '$500', desc: 'Logistics hub that processes supply shipments. Comes equipped with an automated Supply Truck.', req: 'Power (USA/China)', unlock: 'Supply Harvesters, War Factory, Airfield' },
-    supplyStash: { name: 'Supply Stash', role: 'GLA Resource Depot', cost: '$500', desc: 'GLA warehouse where workers deposit salvaged supply crates. Unlocks Arms Dealer.', req: 'Command Center', unlock: 'Workers, Arms Dealer' },
+    power: { name: 'Cold Fusion Reactor', role: 'Clean Energy Production', cost: '$800', desc: 'USA Cold Fusion Reactor. Supplies clean electrical power to base structures and defenses.', req: 'Command Center', unlock: 'Supply Center, Barracks, Patriot Missiles' },
+    nuclearReactor: { name: 'Nuclear Reactor', role: 'Atomic Energy Production', cost: '$1000', desc: 'China Nuclear Reactor. Generates massive power. Can be overcharged for +50% output.', req: 'Command Center', unlock: 'Supply Center, Barracks, Base Defenses' },
+    barracks: { name: 'Barracks', role: 'Infantry Training Facility', cost: '$500 - $600', desc: 'Trains ground infantry, rangers, and special forces. Heals nearby friendly infantry.', req: 'Power (USA/China)', unlock: 'Combat Infantry, Base Defenses' },
+    fakeBarracks: { name: 'Fake Barracks', role: 'Decoy Structure', cost: '$125', desc: 'Cheap wooden decoy structure that tricks enemy reconnaissance and can detonate or upgrade to real Barracks.', req: 'Command Center', unlock: 'Deception, Camouflage' },
+    factory: { name: 'War Factory / Arms Dealer', role: 'Armored Vehicle Plant', cost: '$2000 - $2500', desc: 'Produces main battle tanks, artillery, and armored transports. Automatically repairs nearby friendly vehicles.', req: 'Supply Center or Barracks', unlock: 'Armored Fighting Vehicles, Tier 2 Tech' },
+    fakeArmsDealer: { name: 'Fake Arms Dealer', role: 'Decoy Arms Dealer', cost: '$625', desc: 'Decoy vehicle workshop designed to mislead enemy bombers and satellite surveillance.', req: 'Barracks or Supply Stash', unlock: 'Deception, Decoy Defense' },
+    supplyCenter: { name: 'Supply Center', role: 'Logistics Resource Hub', cost: '$1500 - $2000', desc: 'Logistics hub that processes supply shipments. Comes equipped with an automated Supply Harvester.', req: 'Power (USA/China)', unlock: 'Supply Harvesters, War Factory, Airfield' },
+    supplyStash: { name: 'Supply Stash', role: 'GLA Resource Depot', cost: '$1500', desc: 'GLA warehouse where workers deposit salvaged supply crates. Unlocks Arms Dealer.', req: 'Command Center', unlock: 'Workers, Arms Dealer' },
     airfield: { name: 'Air Field', role: 'Aviation Hangar', cost: '$1000', desc: 'Houses and re-arms combat aircraft. Automatically repairs and reloads docked aircraft.', req: 'Supply Center or War Factory', unlock: 'Fighters, Bombers, Attack Helicopters' },
-    strategyCenter: { name: 'Strategy Center', role: 'Strategic Operations Hub', cost: '$1500', desc: 'USA Advanced Tech Hub. Allows selection of Battle Plans (Hold the Line, Search & Destroy, Bombardment).', req: 'War Factory or Airfield', unlock: 'Paladin, Tomahawk, Aurora, Particle Cannon' },
-    propagandaCenter: { name: 'Propaganda Center', role: 'State Propaganda Hub', cost: '$1200', desc: 'China Tier 3 Tech Hub. Broadcasts party doctrines, healing friendly troops and boosting firing rates.', req: 'War Factory', unlock: 'Overlord Tank, Nuke Cannon, Nuclear Silo' },
-    palace: { name: 'Palace', role: 'Warlord Bastion Citadel', cost: '$1500', desc: 'GLA Citadel and High Command. Heavy garrison fortress allowing troops to fire out with reinforced armor.', req: 'Arms Dealer', unlock: 'Marauder Tank, SCUD Launcher, SCUD Storm' },
-    patriot: { name: 'Patriot Missile System', role: 'Guided Missile Battery', cost: '$800', desc: 'USA automated surface-to-air and anti-vehicle guided missile battery. Connects with nearby Patriots.', req: 'Cold Fusion Reactor', unlock: 'Automated Base Defense' },
-    gatlingCannon: { name: 'Gatling Cannon', role: 'Anti-Air / Anti-Infantry Defense', cost: '$700', desc: 'China rapid-fire dual rotating Gatling guns. Spins up to extreme velocity, shredding infantry and aircraft.', req: 'Nuclear Reactor', unlock: 'Anti-Air, Anti-Infantry Defense' },
-    bunker: { name: 'Concrete Bunker', role: 'Fortified Infantry Emplacement', cost: '$500', desc: 'Reinforced concrete bunker that protects up to 5 garrisoned infantry while allowing them to fire.', req: 'Barracks', unlock: 'Protected Infantry Firepoint' },
-    speakerTower: { name: 'Speaker Tower', role: 'Propaganda Loudspeaker', cost: '$600', desc: 'Broadcasts patriotic speeches that continuously heal friendly units and boost weapon reload speed.', req: 'Propaganda Center or Barracks', unlock: 'Horde Health Regeneration' },
-    tunnel: { name: 'Tunnel Network', role: 'Subterranean Transit Hub', cost: '$700', desc: 'GLA subterranean network with mounted anti-infantry gun. Units enter here and emerge instantly at any other tunnel.', req: 'Barracks', unlock: 'Instant Map Transit, Tunnel Defense' },
-    stingerSite: { name: 'Stinger Site', role: 'Surface-to-Air Missile Revetment', cost: '$700', desc: 'GLA fortified revetment housing 3 Stinger missile gunners. Deadly against enemy helicopters and aircraft.', req: 'Barracks', unlock: 'Anti-Air Defense' },
-    demoTrap: { name: 'Demo Trap', role: 'Concealed Demolitions Mine', cost: '$300', desc: 'Camouflaged explosive charge that detonates when enemy armor passes over, causing catastrophic damage.', req: 'Arms Dealer', unlock: 'Area Denial, Anti-Armor Ambush' },
-    particleCannon: { name: 'Particle Cannon', role: 'Orbital Particle Superweapon', cost: '$2500', desc: 'USA space-based orbital particle beam weapon. Channels high-energy particle stream across the battlefield.', req: 'Strategy Center', unlock: 'Orbital Particle Beam Strike' },
-    nukeSilo: { name: 'Nuclear Missile Silo', role: 'Thermonuclear ICBM Silo', cost: '$2500', desc: 'China thermonuclear ICBM silo. Delivers a devastating atomic warhead that incinerates entire bases.', req: 'Propaganda Center', unlock: 'Thermonuclear Ballistic Missile Strike' },
-    scudStorm: { name: 'SCUD Storm', role: 'Chemical Ballistic Superweapon', cost: '$2500', desc: 'GLA multiple ballistic missile complex. Salvo fires 9 chemical SCUD rockets loaded with Anthrax Beta.', req: 'Palace', unlock: 'SCUD Storm Ballistic Salvo' },
+    strategyCenter: { name: 'Strategy Center', role: 'Strategic Operations Hub', cost: '$2500', desc: 'USA Advanced Tech Hub. Allows selection of Battle Plans (Hold the Line, Search & Destroy, Bombardment).', req: 'War Factory or Airfield', unlock: 'Paladin, Tomahawk, Aurora, Particle Cannon' },
+    propagandaCenter: { name: 'Propaganda Center', role: 'State Propaganda Hub', cost: '$2000', desc: 'China Tier 3 Tech Hub. Broadcasts party doctrines, healing friendly troops and boosting firing rates.', req: 'War Factory', unlock: 'Overlord Tank, Nuke Cannon, Nuclear Silo' },
+    palace: { name: 'Palace', role: 'Warlord Bastion Citadel', cost: '$2500', desc: 'GLA Citadel and High Command. Heavy garrison fortress allowing troops to fire out with reinforced armor.', req: 'Arms Dealer', unlock: 'Marauder Tank, SCUD Launcher, SCUD Storm' },
+    patriot: { name: 'Patriot Missile System', role: 'Guided Missile Battery', cost: '$1000', desc: 'USA automated surface-to-air and anti-vehicle guided missile battery. Connects with nearby Patriots.', req: 'Cold Fusion Reactor', unlock: 'Automated Base Defense' },
+    gatlingCannon: { name: 'Gatling Cannon', role: 'Anti-Air / Anti-Infantry Defense', cost: '$1200', desc: 'China rapid-fire dual rotating Gatling guns. Spins up to extreme velocity, shredding infantry and aircraft.', req: 'Nuclear Reactor', unlock: 'Anti-Air, Anti-Infantry Defense' },
+    bunker: { name: 'Concrete Bunker', role: 'Fortified Infantry Emplacement', cost: '$400', desc: 'Reinforced concrete bunker that protects up to 5 garrisoned infantry while allowing them to fire.', req: 'Barracks', unlock: 'Protected Infantry Firepoint' },
+    speakerTower: { name: 'Speaker Tower', role: 'Propaganda Loudspeaker', cost: '$500', desc: 'Broadcasts patriotic speeches that continuously heal friendly units and boost weapon reload speed.', req: 'Propaganda Center or Barracks', unlock: 'Horde Health Regeneration' },
+    tunnel: { name: 'Tunnel Network', role: 'Subterranean Transit Hub', cost: '$800', desc: 'GLA subterranean network with mounted anti-infantry gun. Units enter here and emerge instantly at any other tunnel.', req: 'Barracks', unlock: 'Instant Map Transit, Tunnel Defense' },
+    stingerSite: { name: 'Stinger Site', role: 'Surface-to-Air Missile Revetment', cost: '$900', desc: 'GLA fortified revetment housing 3 Stinger missile gunners. Deadly against enemy helicopters and aircraft.', req: 'Barracks', unlock: 'Anti-Air Defense' },
+    demoTrap: { name: 'Demo Trap', role: 'Concealed Demolitions Mine', cost: '$400', desc: 'Camouflaged explosive charge that detonates when enemy armor passes over, causing catastrophic damage.', req: 'Arms Dealer', unlock: 'Area Denial, Anti-Armor Ambush' },
+    particleCannon: { name: 'Particle Cannon', role: 'Orbital Particle Superweapon', cost: '$5000', desc: 'USA space-based orbital particle beam weapon. Channels high-energy particle stream across the battlefield.', req: 'Strategy Center', unlock: 'Orbital Particle Beam Strike' },
+    nukeSilo: { name: 'Nuclear Missile Silo', role: 'Thermonuclear ICBM Silo', cost: '$5000', desc: 'China thermonuclear ICBM silo. Delivers a devastating atomic warhead that incinerates entire bases.', req: 'Propaganda Center', unlock: 'Thermonuclear Ballistic Missile Strike' },
+    scudStorm: { name: 'SCUD Storm', role: 'Chemical Ballistic Superweapon', cost: '$5000', desc: 'GLA multiple ballistic missile complex. Salvo fires 9 chemical SCUD rockets loaded with Anthrax Beta.', req: 'Palace', unlock: 'SCUD Storm Ballistic Salvo' },
     supplyDrop: { name: 'Supply Drop Zone', role: 'Airborne Resupply Zone', cost: '$2500', desc: 'USA Tier 3 logistics drop zone with red smoke signal. Calls a C-130 Hercules every 2 minutes to drop $1,500 crates ($1,650 with Supply Lines). Functions during power outages & EMP.', req: 'Strategy Center', unlock: 'C-130 Airborne Supply Drops' },
-    internetCenter: { name: 'Internet Center', role: 'Cyber Warfare Facility', cost: '$1000', desc: 'China electronic intelligence facility. Stations Hackers to steal funds and track enemy positions.', req: 'Propaganda Center', unlock: 'Global Satellite Spy Uplink' },
-    blackMarket: { name: 'Black Market', role: 'Covert Commerce Bazaar', cost: '$1200', desc: 'GLA subterranean black market. Generates continuous funds and sells illegal black market weapons tech.', req: 'Palace', unlock: 'Continuous Black Market Income' },
-    detentionCamp: { name: 'Detention Camp', role: 'Military Intelligence Facility', cost: '$900', desc: 'USA interrogation and surveillance facility. Grants radar intelligence sweeps of hostile forces.', req: 'Strategy Center', unlock: 'Hostile Intelligence Sweeps' },
+    internetCenter: { name: 'Internet Center', role: 'Cyber Warfare Facility', cost: '$2500', desc: 'China electronic intelligence facility. Stations Hackers to steal funds and track enemy positions.', req: 'Propaganda Center', unlock: 'Global Satellite Spy Uplink' },
+    blackMarket: { name: 'Black Market', role: 'Covert Commerce Bazaar', cost: '$2500', desc: 'GLA subterranean black market. Generates continuous funds and sells illegal black market weapons tech.', req: 'Palace', unlock: 'Continuous Black Market Income' },
+    detentionCamp: { name: 'Detention Camp', role: 'Military Intelligence Facility', cost: '$1000', desc: 'USA interrogation and surveillance facility. Grants radar intelligence sweeps of hostile forces.', req: 'Strategy Center', unlock: 'Hostile Intelligence Sweeps' },
 
     // Upgrades & Abilities
     radar: { name: 'Radar System', role: 'Telemetry Uplink', cost: '$500', desc: 'Activates tactical mini-map radar telemetry grid.', req: 'Command Center', unlock: 'Tactical Mini-Map Grid' },
@@ -1060,19 +1062,20 @@ function hideTacticalTooltip() {
 
 function refreshFactionRoster() {
     const faction = factionCatalog[selectedFaction];
+    // Official INIZH.big BuildTime values (in seconds)
     const OFFICIAL_UNIT_BUILD_TIME = {
-        infantry: 5.0, ranger: 5.0, redguard: 7.0, rebel: 5.0,
-        rocket: 5.0, tankhunter: 5.0, rpg: 5.0,
-        pathfinder: 10.0, hacker: 12.0, terrorist: 5.0, mob: 10.0, hijacker: 10.0,
+        infantry: 5.0, ranger: 5.0, redguard: 10.0, rebel: 5.0,
+        rocket: 5.0, missiledefender: 5.0, tankhunter: 5.0, rpg: 5.0,
+        pathfinder: 10.0, hacker: 20.0, terrorist: 5.0, mob: 15.0, hijacker: 10.0,
         burton: 20.0, blacklotus: 20.0, jarmen: 20.0,
-        technical: 5.0, humvee: 8.0, ambulance: 8.0, radarvan: 8.0,
-        toxintractor: 10.0, dragon: 10.0, crawler: 10.0, bombtruck: 12.0,
-        scorpion: 10.0, battlemaster: 10.0, crusader: 10.0, tank: 10.0,
-        gatling: 10.0, quad: 10.0, buggy: 10.0,
-        paladin: 12.0, marauder: 12.0, inferno: 15.0, scud: 15.0,
+        technical: 5.0, humvee: 10.0, ambulance: 10.0, radarvan: 10.0,
+        toxintractor: 5.0, dragon: 10.0, crawler: 15.0, bombtruck: 15.0, battlebus: 15.0,
+        scorpion: 7.0, battlemaster: 10.0, crusader: 10.0, tank: 10.0,
+        gatling: 10.0, quad: 6.0, buggy: 10.0,
+        paladin: 12.0, marauder: 10.0, inferno: 15.0, scud: 15.0,
         tomahawk: 20.0, nukecannon: 20.0, nuketank: 20.0, overlord: 20.0,
-        chinook: 10.0, comanche: 15.0, raptor: 15.0, mig: 15.0, stealthfighter: 15.0, aurora: 20.0,
-        truck: 10.0, dozer: 5.0, worker: 5.0
+        chinook: 10.0, comanche: 20.0, raptor: 20.0, mig: 10.0, stealthfighter: 25.0, aurora: 30.0,
+        truck: 10.0, dozer: 5.0, worker: 3.0
     };
     unitRoster = {};
 

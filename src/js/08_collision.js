@@ -481,15 +481,15 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     else if (type === 'tomahawk') { mesh = createTomahawkMesh(true); radius = 3.2; speed = 0.11; health = 180; scanRange = 56; }
     else if (type === 'dozer') { mesh = (faction === 'china' || (typeof enemyFaction !== 'undefined' && enemyFaction === 'china')) ? createChinaDozerMesh(true) : createUSADozerMesh(true); radius = 1.9; speed = 0.10; health = 250; scanRange = 18; }
     else if (type === 'truck') { mesh = createUSATruckMesh(true); radius = 3.2; speed = 0.13; health = 300; scanRange = 16; }
-    else if (type === 'chinook') { mesh = createChinookMesh(true); radius = 4.8; speed = 0.22; health = 300; scanRange = 0; isAir = true; }
-    else if (type === 'comanche') { mesh = createComancheMesh(true); radius = 3.8; speed = 0.26; health = 220; scanRange = 32; isAir = true; }
-    else if (type === 'mig') { mesh = createMigMesh(true); radius = 4.2; speed = 0.32; health = 160; scanRange = 51; isAir = true; }
-    else if (type === 'raptor') { mesh = createRaptorMesh(true); radius = 4.2; speed = 0.32; health = 160; scanRange = 51; isAir = true; }
-    else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(true); radius = 4.0; speed = 0.28; health = 120; scanRange = 36; isAir = true; }
-    else if (type === 'aurora') { mesh = createAuroraMesh(true); radius = 4.2; speed = 0.38; health = 80; scanRange = 48; isAir = true; }
+    else if (type === 'chinook') { mesh = createChinookMesh(true); radius = 4.8; speed = 0.38; health = 300; scanRange = 0; isAir = true; }
+    else if (type === 'comanche') { mesh = createComancheMesh(true); radius = 3.8; speed = 0.35; health = 220; scanRange = 32; isAir = true; }
+    else if (type === 'mig') { mesh = createMigMesh(true); radius = 4.2; speed = 0.46; health = 160; scanRange = 51; isAir = true; }
+    else if (type === 'raptor') { mesh = createRaptorMesh(true); radius = 4.2; speed = 0.50; health = 160; scanRange = 51; isAir = true; }
+    else if (type === 'stealthfighter') { mesh = createStealthFighterMesh(true); radius = 4.0; speed = 0.50; health = 120; scanRange = 36; isAir = true; }
+    else if (type === 'aurora') { mesh = createAuroraMesh(true); radius = 4.2; speed = 0.54; health = 80; scanRange = 48; isAir = true; }
     else if (type === 'infantry' || type === 'ranger') { mesh = createRangerMesh(); radius = 0.8; speed = 0.08; health = 180; scanRange = 22; }
     else if (type === 'rocket' || type === 'missiledefender') { mesh = createMissileDefenderMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
-    else if (type === 'pathfinder') { mesh = createPathfinderMesh(true); radius = 0.8; speed = 0.09; health = 120; scanRange = 65; }
+    else if (type === 'pathfinder') { mesh = createPathfinderMesh(true); radius = 0.8; speed = 0.095; health = 120; scanRange = 65; }
     else if (type === 'burton') { mesh = createBurtonMesh(); radius = 0.9; speed = 0.10; health = 200; scanRange = 27; }
 
     // China Forces (100% parity with spawnUnit & official INIZH.big)
@@ -500,17 +500,17 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     else if (type === 'crawler') { mesh = createTroopCrawlerMesh(true); radius = 3.6; speed = 0.15; health = 240; scanRange = 28; }
     else if (type === 'inferno') { mesh = createInfernoCannonMesh(true); radius = 3.2; speed = 0.10; health = 120; scanRange = 48; }
     else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(true); radius = 2.6; speed = 0.08; health = 240; scanRange = 56; }
-    else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 22; }
+    else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.8; speed = 0.085; health = 120; scanRange = 22; }
     else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
-    else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.8; speed = 0.07; health = 100; scanRange = 14; }
+    else if (type === 'hacker') { mesh = createHackerMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 14; }
     else if (type === 'blacklotus') { mesh = createBlackLotusMesh(); radius = 0.8; speed = 0.10; health = 200; scanRange = 24; }
 
     // GLA Forces (100% parity with spawnUnit & official INIZH.big)
-    else if (type === 'worker') { mesh = createGLAWorkerMesh(); radius = 0.8; speed = 0.10; health = 100; scanRange = 16; }
+    else if (type === 'worker') { mesh = createGLAWorkerMesh(); radius = 0.8; speed = 0.085; health = 100; scanRange = 16; }
     else if (type === 'technical') { mesh = createTechnicalMesh(true); radius = 2.6; speed = 0.22; health = 240; scanRange = 24; }
     else if (type === 'scorpion') { mesh = createScorpionTankMesh(true); radius = 3.2; speed = 0.16; health = 370; scanRange = 24; }
-    else if (type === 'marauder') { mesh = createMarauderTankMesh(true); radius = 3.4; speed = 0.13; health = 500; scanRange = 27; }
-    else if (type === 'buggy') { mesh = createRocketBuggyMesh(true); radius = 2.6; speed = 0.22; health = 120; scanRange = 48; }
+    else if (type === 'marauder') { mesh = createMarauderTankMesh(true); radius = 3.4; speed = 0.15; health = 500; scanRange = 27; }
+    else if (type === 'buggy') { mesh = createRocketBuggyMesh(true); radius = 2.6; speed = 0.24; health = 120; scanRange = 48; }
     else if (type === 'quad') { mesh = createQuadCannonMesh(true); radius = 3.2; speed = 0.17; health = 300; scanRange = 24; }
     else if (type === 'toxintractor') { mesh = createToxinTractorMesh(true); radius = 3.2; speed = 0.14; health = 240; scanRange = 16; }
     else if (type === 'bombtruck') { mesh = createBombTruckMesh(true); radius = 3.0; speed = 0.18; health = 220; scanRange = 14; }
@@ -520,14 +520,14 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
         mesh = (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['battlebus'])
             ? createW3DVehicleMesh('battlebus', true)
             : createTechnicalMesh(true);
-        radius = 3.4; speed = 0.16; health = 400; scanRange = 24;
+        radius = 3.4; speed = 0.20; health = 400; scanRange = 24;
     }
     else if (type === 'rebel') { mesh = createRebelMesh(); radius = 0.8; speed = 0.08; health = 120; scanRange = 22; }
     else if (type === 'rpg') { mesh = createRPGTrooperMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
-    else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.8; speed = 0.12; health = 120; scanRange = 8; }
-    else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 1.4; speed = 0.08; health = 280; scanRange = 26; }
-    else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.8; speed = 0.11; health = 100; scanRange = 16; }
-    else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.09; health = 200; scanRange = 49; }
+    else if (type === 'terrorist') { mesh = createTerroristMesh(); radius = 0.8; speed = 0.085; health = 120; scanRange = 8; }
+    else if (type === 'mob') { mesh = createAngryMobMesh(); radius = 1.4; speed = 0.072; health = 280; scanRange = 26; }
+    else if (type === 'hijacker') { mesh = createHijackerMesh(); radius = 0.8; speed = 0.095; health = 100; scanRange = 16; }
+    else if (type === 'jarmen') { mesh = createJarmenKellMesh(); radius = 0.8; speed = 0.095; health = 200; scanRange = 49; }
     else {
         mesh = createBattlemasterTankMesh(true);
     }
