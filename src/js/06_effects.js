@@ -3797,24 +3797,29 @@ function createC130FlyoverPlane(modelKey = 'c130') {
     return { plane, c130Props };
 }
 
-// Compute full edge-to-edge map-crossing flight path passing directly over dropCenter
+// Compute bounded map-crossing flight path passing directly over dropCenter (safe on 900..3000 maps)
 function computeMapCrossingFlightPath(dropCenter, flightY, dirX = 0.90, dirZ = 0.435, speedPerTick = 0.95) {
     const len = Math.hypot(dirX, dirZ) || 1;
     const ux = dirX / len, uz = dirZ / len;
-    const halfBound = ((typeof mapSize === 'number' && mapSize > 100) ? mapSize * 0.5 : 450) + 55;
-    // Ray-box intersection along ±(ux, uz) from dropCenter to padded map edges
+    const activeSize = (typeof currentMapSize === 'number' && currentMapSize > 100)
+        ? currentMapSize
+        : ((typeof mapSize === 'number' && mapSize > 100) ? mapSize : 1500);
+    const halfBound = Math.max(activeSize * 0.5 + 55, Math.abs(dropCenter.x) + 140, Math.abs(dropCenter.z) + 140);
+    // Ray-box intersection along ±(ux, uz) from dropCenter to padded map edges, capped so Epic 3000x3000 flyovers stay brisk
+    const maxLegDist = 380;
     const hitDist = (sx, sz) => {
         const tx = Math.abs(sx) > 1e-4 ? ((sx > 0 ? halfBound : -halfBound) - dropCenter.x) / sx : 1e9;
         const tz = Math.abs(sz) > 1e-4 ? ((sz > 0 ? halfBound : -halfBound) - dropCenter.z) / sz : 1e9;
-        return Math.max(95, Math.min(tx > 0 ? tx : 1e9, tz > 0 ? tz : 1e9));
+        const raw = Math.min(tx > 0 ? tx : maxLegDist, tz > 0 ? tz : maxLegDist);
+        return Math.max(110, Math.min(maxLegDist, raw));
     };
     const backDist = hitDist(-ux, -uz);
     const fwdDist = hitDist(ux, uz);
     const totalDist = backDist + fwdDist;
     const startPos = new THREE.Vector3(dropCenter.x - ux * backDist, flightY, dropCenter.z - uz * backDist);
     const endPos = new THREE.Vector3(dropCenter.x + ux * fwdDist, flightY, dropCenter.z + uz * fwdDist);
-    const dropT = Math.max(0.15, Math.min(0.85, backDist / Math.max(1, totalDist)));
-    const duration = Math.max(240, Math.round(totalDist / Math.max(0.35, speedPerTick)));
+    const dropT = backDist / Math.max(1, totalDist);
+    const duration = Math.max(180, Math.round(totalDist / Math.max(0.35, speedPerTick)));
     return { startPos, endPos, dropT, duration };
 }
 

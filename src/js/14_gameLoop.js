@@ -1450,7 +1450,19 @@ function animate() {
                         if (unit.type === 'chinook') unit.airState = 'hovering';
                     }
                 } else {
-                    unit.targetPosition.copy(unit.mesh.position);
+                    // All supply piles depleted: return Chinooks safely to home Supply Center instead of idling in the open
+                    if (unit.type === 'chinook' && !isAIUnit && typeof getSupplyDropoffPosition === 'function') {
+                        const homePos = getSupplyDropoffPosition(unit.mesh.position);
+                        if (homePos && Math.hypot(unit.mesh.position.x - homePos.x, unit.mesh.position.z - homePos.z) > 14.0) {
+                            unit.targetPosition.copy(homePos);
+                            unit.airState = 'flying';
+                        } else {
+                            unit.targetPosition.copy(unit.mesh.position);
+                            unit.airState = 'hovering';
+                        }
+                    } else {
+                        unit.targetPosition.copy(unit.mesh.position);
+                    }
                 }
                 break;
             }
