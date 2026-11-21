@@ -672,15 +672,95 @@ const factionBuildings = {
 };
 let unitRoster = {};
 
+// Official C&C Generals: Zero Hour 12 Generals Roster (PlayerTemplate.ini)
+const ZERO_HOUR_GENERALS = {
+    usa:             { id: 'usa',             baseFaction: 'usa',   name: 'USA',                        commander: 'USA High Command',              portraitKey: 'general_usa',             desc: 'Balanced USA arsenal with Crusaders, Paladins, Tomahawks, and full Air Force.', costMods: {}, structCostMods: {}, freePowers: [] },
+    usa_air:         { id: 'usa_air',         baseFaction: 'usa',   name: 'USA Air Force General',      commander: 'Gen. Malcolm "Ace" Granger',    portraitKey: 'general_usa_air',         desc: 'King Raptor & Stealth Fighter doctrine: Aircraft cost -20%, +20% HP, and start with laser countermeasures.', costMods: { raptor: 0.8, stealthfighter: 0.8, aurora: 0.8, comanche: 0.8, chinook: 0.8 }, structCostMods: { airfield: 0.8 }, freePowers: ['stealthFighterUnlock'] },
+    usa_laser:       { id: 'usa_laser',       baseFaction: 'usa',   name: 'USA Laser General',          commander: 'Gen. "Pinpoint" Townes',        portraitKey: 'general_usa_laser',       desc: 'Directed-energy armor & defenses: Laser Tanks and Laser Patriot batteries deal +25% beam damage.', costMods: { crusader: 0.9, paladin: 0.9 }, structCostMods: { patriot: 0.9 }, freePowers: ['paladinUnlock'] },
+    usa_superweapon: { id: 'usa_superweapon', baseFaction: 'usa',   name: 'USA Superweapon General',    commander: 'Gen. Alexis Alexander',         portraitKey: 'general_usa_superweapon', desc: 'Particle Cannon costs $2,500 (-50%), EMP Patriot batteries disable enemy vehicles, and Aurora Alpha bombers.', costMods: { aurora: 0.85 }, structCostMods: { particleCannon: 0.5, patriot: 0.8 }, freePowers: ['pathfinderUnlock'] },
+    china:           { id: 'china',           baseFaction: 'china', name: 'China',                      commander: 'PLA High Command',              portraitKey: 'general_china',           desc: 'Balanced PLA forces with Battlemasters, Overlords, Inferno & Nuke Cannons, and MiG air support.', costMods: {}, structCostMods: {}, freePowers: [] },
+    china_tank:      { id: 'china_tank',      baseFaction: 'china', name: 'China Tank General',         commander: 'Gen. Ta Hun Kwai',              portraitKey: 'general_china_tank',      desc: 'Emperor Overlord & armored division: All tanks cost -20%, deploy at Veteran rank, and start with Autoloaders.', costMods: { battlemaster: 0.8, overlord: 0.8, gatling: 0.8, dragon: 0.8 }, structCostMods: {}, freePowers: [] },
+    china_infantry:  { id: 'china_infantry',  baseFaction: 'china', name: 'China Infantry General',     commander: 'Gen. "Anvil" Shin Fai',         portraitKey: 'general_china_infantry',  desc: 'Mini-Gunner & Assault Crawler doctrine: All infantry deploy at Veteran rank (+25% HP) and Crawlers cost -20%.', costMods: { redguard: 0.8, tankhunter: 0.85, crawler: 0.8, hacker: 0.85 }, structCostMods: { bunker: 0.75 }, freePowers: ['redGuardTraining'] },
+    china_nuke:      { id: 'china_nuke',      baseFaction: 'china', name: 'China Nuke General',         commander: 'Gen. Tsing Shi Tao',            portraitKey: 'general_china_nuke',      desc: 'Atomic warfare specialist: Tanks start with Uranium Shells & Nuclear Engines (+25% speed/damage); Nuke Cannon unlocked at Rank 1.', costMods: { nukecannon: 0.85 }, structCostMods: { nukeSilo: 0.8, nuclearReactor: 0.8 }, freePowers: ['nukeCannonUnlock'] },
+    gla:             { id: 'gla',             baseFaction: 'gla',   name: 'GLA',                        commander: 'GLA High Council',              portraitKey: 'general_gla',             desc: 'Balanced guerrilla arsenal with Scorpion & Marauder tanks, Toxin weapons, and SCUD Storm.', costMods: {}, structCostMods: {}, freePowers: [] },
+    gla_toxin:       { id: 'gla_toxin',       baseFaction: 'gla',   name: 'GLA Toxin General',          commander: 'Dr. Thrax',                     portraitKey: 'general_gla_toxin',       desc: 'Anthrax Gamma chemical arsenal: All tanks & rockets start with Toxin Shells and Anthrax Beta (+25% toxin damage).', costMods: { toxintractor: 0.8, scud: 0.85 }, structCostMods: { scudStorm: 0.85 }, freePowers: ['scudUnlock'] },
+    gla_demo:        { id: 'gla_demo',        baseFaction: 'gla',   name: 'GLA Demolition General',     commander: 'Gen. Rodall "Demo" Juhziz',     portraitKey: 'general_gla_demo',        desc: 'High-explosive insurgency: All units start with Demolitions; Terrorists, Bomb Trucks & Demo Traps cost -20% (+35% blast damage).', costMods: { terrorist: 0.8, bombtruck: 0.8, rpg: 0.85 }, structCostMods: { demoTrap: 0.75 }, freePowers: [] },
+    gla_stealth:     { id: 'gla_stealth',     baseFaction: 'gla',   name: 'GLA Stealth General',        commander: 'Prince Kassad',                 portraitKey: 'general_gla_stealth',     desc: 'Covert ambush warfare: Rebels start camouflaged, Hijackers are unlocked at Rank 1 and stay stealthed while moving.', costMods: { hijacker: 0.75, rebel: 0.85, quad: 0.9 }, structCostMods: { tunnel: 0.8 }, freePowers: ['hijackerUnlock'] }
+};
+let selectedGeneral = 'usa';
+window.ZERO_HOUR_GENERALS = ZERO_HOUR_GENERALS;
+window.selectedGeneral = selectedGeneral;
+
+function renderGeneralSelectorCards(baseFaction) {
+    if (typeof document === 'undefined') return;
+    const container = document.getElementById('zh-generals-selector');
+    if (!container) return;
+    const fac = (baseFaction || selectedFaction || 'usa').toLowerCase();
+    const gens = Object.values(ZERO_HOUR_GENERALS).filter(g => g.baseFaction === fac);
+    if (gens.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = gens.map(g => {
+        const isAct = (selectedGeneral === g.id);
+        const port = (window.OFFICIAL_UI_ASSETS && window.OFFICIAL_UI_ASSETS[g.portraitKey]) || '';
+        return `<button type="button" class="rts-btn zh-general-card ${isAct ? 'active' : ''}" data-general="${g.id}" onclick="selectGeneral('${g.id}')" title="${g.commander}: ${g.desc}" style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;margin:2px;font-size:11px;border:1px solid ${isAct ? '#ffd700' : '#3a4a3e'};background:${isAct ? 'rgba(255,215,0,0.16)' : 'rgba(16,24,20,0.85)'};">
+            ${port ? `<img src="${port}" alt="${g.name}" style="width:26px;height:26px;object-fit:contain;border-radius:3px;" />` : ''}
+            <span><strong>${g.name.replace(/^(USA|China|GLA)\s*/, '') || 'Standard'}</strong><br><small style="color:#a8b8aa;font-size:9px;">${g.commander}</small></span>
+        </button>`;
+    }).join('');
+}
+window.renderGeneralSelectorCards = renderGeneralSelectorCards;
+
+function selectGeneral(generalId) {
+    const gDef = ZERO_HOUR_GENERALS[generalId] || ZERO_HOUR_GENERALS[selectedFaction] || ZERO_HOUR_GENERALS.usa;
+    selectedGeneral = gDef.id;
+    window.selectedGeneral = selectedGeneral;
+    if (selectedFaction !== gDef.baseFaction) {
+        selectedFaction = gDef.baseFaction;
+    }
+    if (gDef.freePowers && typeof unlockedGeneralsPowers !== 'undefined') {
+        gDef.freePowers.forEach(pId => unlockedGeneralsPowers.add(pId));
+    }
+    refreshFactionRoster();
+    renderGeneralSelectorCards(selectedFaction);
+    const overviewEl = (typeof document !== 'undefined') ? document.getElementById('faction-overview') : null;
+    if (overviewEl) overviewEl.textContent = `${gDef.name} (${gDef.commander}) — ${gDef.desc}`;
+    const spBriefingEl = (typeof document !== 'undefined') ? document.getElementById('sp-faction-briefing') : null;
+    if (spBriefingEl) spBriefingEl.textContent = `${gDef.name} (${gDef.commander}) — ${gDef.desc}`;
+    const spCrest = (typeof document !== 'undefined') ? document.getElementById('sp-intel-crest') : null;
+    if (spCrest && window.OFFICIAL_UI_ASSETS && window.OFFICIAL_UI_ASSETS[gDef.portraitKey]) {
+        spCrest.src = window.OFFICIAL_UI_ASSETS[gDef.portraitKey];
+        spCrest.style.display = '';
+    }
+    if (typeof spSlots !== 'undefined' && spSlots[0]) {
+        spSlots[0].faction = selectedFaction;
+        spSlots[0].general = selectedGeneral;
+    }
+    return gDef;
+}
+window.selectGeneral = selectGeneral;
+
 function selectFaction(faction, button) {
+    if (ZERO_HOUR_GENERALS[faction]) {
+        selectedGeneral = faction;
+        window.selectedGeneral = faction;
+        faction = ZERO_HOUR_GENERALS[faction].baseFaction;
+    } else if (!ZERO_HOUR_GENERALS[selectedGeneral] || ZERO_HOUR_GENERALS[selectedGeneral].baseFaction !== faction) {
+        selectedGeneral = faction;
+        window.selectedGeneral = faction;
+    }
     selectedFaction = faction;
     if (faction !== 'random' && factionCatalog[faction]) {
         refreshFactionRoster();
+        renderGeneralSelectorCards(faction);
     }
     // Synchronize the top 3 big faction buttons
-    document.querySelectorAll('.faction-card').forEach(card => {
-            card.classList.toggle('active', card.getAttribute('data-faction') === faction);
-    });
+    if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+        document.querySelectorAll('.faction-card').forEach(card => {
+                card.classList.toggle('active', card.getAttribute('data-faction') === faction);
+        });
+    }
 
     // Update faction overview description & Skirmish briefing
     let overviewText = 'Random — Faction assigned randomly at deployment (USA, China, or GLA).';
@@ -731,7 +811,12 @@ window.isBuildingAvailableForFaction = isBuildingAvailableForFaction;
 
 function getStructureCost(type, faction = selectedFaction) {
     const entry = (factionBuildings[faction] || []).find(building => building[0] === type);
-    return entry ? entry[2] : 0;
+    const baseCost = entry ? entry[2] : 0;
+    const gDef = ZERO_HOUR_GENERALS[selectedGeneral];
+    if (gDef && gDef.baseFaction === faction && gDef.structCostMods && gDef.structCostMods[type]) {
+        return Math.round(baseCost * gDef.structCostMods[type]);
+    }
+    return baseCost;
 }
 
 function getStructureFootprint(type) {
@@ -1078,43 +1163,49 @@ function refreshFactionRoster() {
         truck: 10.0, dozer: 5.0, worker: 3.0
     };
     unitRoster = {};
+    const gDef = ZERO_HOUR_GENERALS[selectedGeneral];
+    const modCost = (t, baseC) => (gDef && gDef.baseFaction === selectedFaction && gDef.costMods && gDef.costMods[t])
+        ? Math.round(baseC * gDef.costMods[t])
+        : baseC;
 
     // 1. Barracks Infantry
     if (faction.barracks) {
         Object.entries(faction.barracks).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'barracks', role: data[2] || 'Infantry', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 5.0 };
+                unitRoster[type] = { name: data[0], cost: modCost(type, data[1]), building: 'barracks', role: data[2] || 'Infantry', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 5.0 };
         });
     }
     // 2. War Factory Ground Armor
     if (faction.factory) {
         Object.entries(faction.factory).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'factory', role: data[2] || 'Ground Vehicle', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 10.0 };
+                unitRoster[type] = { name: data[0], cost: modCost(type, data[1]), building: 'factory', role: data[2] || 'Ground Vehicle', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 10.0 };
         });
     }
     // 3. Airfield Aircraft & Helicopters
     if (faction.airfield) {
         Object.entries(faction.airfield).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'airfield', role: data[2] || 'Aircraft', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 15.0 };
+                unitRoster[type] = { name: data[0], cost: modCost(type, data[1]), building: 'airfield', role: data[2] || 'Aircraft', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 15.0 };
         });
     }
     // 4. Logistics (Supply Center)
     if (faction.supplyCenter) {
         Object.entries(faction.supplyCenter).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'supplyCenter', role: data[2] || 'Logistics', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 10.0 };
+                unitRoster[type] = { name: data[0], cost: modCost(type, data[1]), building: 'supplyCenter', role: data[2] || 'Logistics', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 10.0 };
         });
     }
     // 5. Command Center (Dozers / Workers)
     if (faction.commandCenter) {
         Object.entries(faction.commandCenter).forEach(([type, data]) => {
-                unitRoster[type] = { name: data[0], cost: data[1], building: 'commandCenter', role: data[2] || 'Construction', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 5.0 };
+                unitRoster[type] = { name: data[0], cost: modCost(type, data[1]), building: 'commandCenter', role: data[2] || 'Construction', buildTime: OFFICIAL_UNIT_BUILD_TIME[type] || 5.0 };
         });
     }
 
     // Update Start Menu active faction buttons
-    document.querySelectorAll('[data-faction]').forEach(button => {
-            if (button.dataset.faction === selectedFaction) button.classList.add('active');
-            else button.classList.remove('active');
-    });
+    if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+        document.querySelectorAll('[data-faction]').forEach(button => {
+                if (button.dataset && button.dataset.faction === selectedFaction) button.classList.add('active');
+                else if (button.classList) button.classList.remove('active');
+        });
+    }
 
     // Update Faction badge in Top HUD
     const badge = document.getElementById('sidebar-faction-badge');

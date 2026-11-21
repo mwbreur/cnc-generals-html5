@@ -508,6 +508,13 @@ const CAMEO_MAP = {
     'gpsScrambler': 'SUGPS01',
     'leafletDrop': 'SALeaflet',
     'technicalTraining': 'SSTechTraining',
+    'napalmStrike': 'SNFirestorm',
+    'neutronMissile': 'SNNeutShell',
+    'dirtyNuke': 'SSTerroristCarBomb',
+    'blackMarketNuke': 'SSExplosiveScud',
+    'terrorCell': 'SUTerrorist',
+    'defector': 'SSBLCapture',
+    'moab': 'SAMOAB',
 
     // Superweapon Launch Icons
     'superweapon_usa': 'SSParticleFire',
@@ -596,7 +603,21 @@ const UI_ASSET_SPECS = {
 
     // End-Game Banners
     banner_victory: { name: 'Victorious', maxWidth: 380, quantizeBits: 2 },
-    banner_defeat: { name: 'Defeated', maxWidth: 380, quantizeBits: 2 }
+    banner_defeat: { name: 'Defeated', maxWidth: 380, quantizeBits: 2 },
+
+    // Official Zero Hour 12 Generals Portraits & Medallions (PlayerTemplate.ini GeneralImage / MedallionSelect)
+    general_usa: { name: 'USA_Logo', maxWidth: 64, quantizeBits: 1 },
+    general_usa_air: { name: 'USA_Air', maxWidth: 64, quantizeBits: 1 },
+    general_usa_laser: { name: 'USA_Laser', maxWidth: 64, quantizeBits: 1 },
+    general_usa_superweapon: { name: 'USA_Superweapon', maxWidth: 64, quantizeBits: 1 },
+    general_china: { name: 'China_Logo', maxWidth: 64, quantizeBits: 1 },
+    general_china_tank: { name: 'China_Tank', maxWidth: 64, quantizeBits: 1 },
+    general_china_infantry: { name: 'China_Infantry', maxWidth: 64, quantizeBits: 1 },
+    general_china_nuke: { name: 'China_Nuke', maxWidth: 64, quantizeBits: 1 },
+    general_gla: { name: 'GLA_Logo', maxWidth: 64, quantizeBits: 1 },
+    general_gla_toxin: { name: 'GLA_Toxin', maxWidth: 64, quantizeBits: 1 },
+    general_gla_demo: { name: 'GLA_Demo', maxWidth: 64, quantizeBits: 1 },
+    general_gla_stealth: { name: 'GLA_Stealth', maxWidth: 64, quantizeBits: 1 }
 };
 
 const outputUiAssets = {};

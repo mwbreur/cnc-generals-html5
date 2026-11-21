@@ -533,6 +533,16 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     }
 
     // Additional Tech Munition Buffs (Attacker — strictly player-owned)
+    const activePlayerGeneral = (isAttackerPlayer && typeof window !== 'undefined' && window.selectedGeneral) ? window.selectedGeneral : '';
+    if (activePlayerGeneral === 'usa_laser' && ['tank', 'crusader', 'paladin', 'patriot'].includes(attacker.type)) {
+        finalDmg = Math.round(finalDmg * 1.25);
+    } else if (activePlayerGeneral === 'china_nuke' && (attacker.type === 'battlemaster' || attacker.type === 'overlord')) {
+        finalDmg = Math.round(finalDmg * 1.25);
+    } else if (activePlayerGeneral === 'gla_toxin' && (damageType === 'TOXIN' || ['toxintractor', 'scud', 'scorpion', 'marauder', 'rebel', 'rpg'].includes(attacker.type))) {
+        finalDmg = Math.round(finalDmg * 1.25);
+    } else if (activePlayerGeneral === 'gla_demo' && ['terrorist', 'bombtruck', 'rpg', 'scud'].includes(attacker.type)) {
+        finalDmg = Math.round(finalDmg * 1.35);
+    }
     if (isAttackerPlayer && typeof researchedTechs !== 'undefined') {
         if (researchedTechs.has('laserMissiles') && ['raptor', 'comanche', 'stealthfighter'].includes(attacker.type)) {
             finalDmg = Math.round(finalDmg * 1.25);

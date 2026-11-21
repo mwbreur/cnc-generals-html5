@@ -5005,6 +5005,135 @@ function triggerSneakAttackFX(targetPos) {
     spawnExplosionDebris(targetPos, 7, 1.2, true);
 }
 
+function triggerNapalmStrikeFX(targetPos, pseudoAttacker) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const dropCenter = targetPos.clone();
+    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
+    const flightY = groundY + 24.0;
+    const { startPos, endPos, dropT, duration: totalFrames } = computeMapCrossingFlightPath(dropCenter, flightY, 0.85, 0.52, 1.45);
+
+    const migs = [];
+    [-3.5, 3.5].forEach(latOff => {
+        const mMesh = (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA['mig'])
+            ? createW3DVehicleMesh('mig', false)
+            : new THREE.Group();
+        mMesh.position.set(startPos.x + latOff, flightY, startPos.z - latOff);
+        if (typeof mMesh.lookAt === 'function') mMesh.lookAt(endPos.x + latOff, flightY, endPos.z - latOff);
+        scene.add(mMesh);
+        migs.push({ mesh: mMesh, latOff });
+    });
+    if (typeof playAudio === 'function') playAudio('a10_flyby', { volume: 0.82 }, 'china');
+
+    let frame = 0;
+    let dropped = false;
+    const cleanup = () => {
+        migs.forEach(m => { if (m.mesh.parent) scene.remove(m.mesh); });
+    };
+    activeFX.push({
+        persistent: true,
+        dispose: cleanup,
+        update() {
+            frame++;
+            const t = frame / totalFrames;
+            migs.forEach(m => {
+                m.mesh.position.set(
+                    startPos.x + (endPos.x - startPos.x) * t + m.latOff,
+                    flightY,
+                    startPos.z + (endPos.z - startPos.z) * t - m.latOff
+                );
+            });
+            if (!dropped && t >= dropT) {
+                dropped = true;
+                if (typeof playAudio === 'function') playAudio('dragon_flame', { volume: 0.9 }, 'china');
+                for (let b = -2; b <= 2; b++) {
+                    const hitPt = dropCenter.clone().add(new THREE.Vector3(b * 3.8, 0, b * 2.2));
+                    hitPt.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(hitPt.x, hitPt.z) : groundY;
+                    spawnEnhancedExplosion(hitPt, 0xff5500, 3.4, true, 'expl_fire');
+                    spawnCraterDecal(hitPt, 3.5, 480, 'flame');
+                    if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(hitPt);
+                }
+                if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
+                if (typeof damageHostilesInRadius === 'function') {
+                    damageHostilesInRadius(dropCenter, 16.0, 260, 'FLAME', pseudoAttacker);
+                }
+            }
+            if (frame < totalFrames) return true;
+            cleanup();
+            return false;
+        }
+    });
+}
+window.triggerNapalmStrikeFX = triggerNapalmStrikeFX;
+
+function triggerNeutronMissileFX(targetPos, pseudoAttacker) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const center = targetPos.clone();
+    center.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(center.x, center.z) : 0;
+    if (typeof playAudio === 'function') playAudio('expl_neutron', { volume: 0.95 }, 'china');
+    if (typeof spawnNeutronBlast === 'function') spawnNeutronBlast(center);
+    else spawnEnhancedExplosion(center, 0x00f2fe, 5.2, true, 'none');
+    if (typeof triggerScreenShake === 'function') triggerScreenShake(1.1);
+    spawnCraterDecal(center, 5.5, 600, 'ion');
+
+    // Authentic Neutron radiation wave: kills all enemy infantry and vehicle crews in 20m radius, leaving hulls unmanned!
+    const hostiles = (typeof enemyUnits !== 'undefined') ? enemyUnits : [];
+    let depopulated = 0;
+    for (let i = 0; i < hostiles.length; i++) {
+        const e = hostiles[i];
+        if (!e || e.health <= 0 || !e.mesh) continue;
+        if (Math.hypot(e.mesh.position.x - center.x, e.mesh.position.z - center.z) <= 20.0) {
+            const isInf = (typeof isInfantryType === 'function' && isInfantryType(e.type));
+            if (isInf) {
+                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(pseudoAttacker, e, 999, 'TOXIN');
+                else e.health = 0;
+            } else if (!e.isAir) {
+                e.isUnmanned = true;
+                e.disabledUntil = 999999;
+                e.combatTarget = null;
+                if (e.targetPosition && e.mesh) e.targetPosition.copy(e.mesh.position);
+                depopulated++;
+            }
+        }
+    }
+    return depopulated;
+}
+window.triggerNeutronMissileFX = triggerNeutronMissileFX;
+
+function triggerDirtyNukeFX(targetPos, pseudoAttacker) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const center = targetPos.clone();
+    center.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(center.x, center.z) : 0;
+    if (typeof playAudio === 'function') playAudio('expl_mininuke', { volume: 0.95 }, 'gla');
+    if (typeof spawnMiniNukeMushroom === 'function') spawnMiniNukeMushroom(center);
+    spawnEnhancedExplosion(center, 0x2ecc71, 4.6, true, 'none');
+    spawnCraterDecal(center, 5.0, 600, 'nuke');
+    if (typeof spawnLingeringToxinCloud === 'function') {
+        spawnLingeringToxinCloud(center, 9.0, 900);
+    }
+    if (typeof triggerScreenShake === 'function') triggerScreenShake(1.1);
+    if (typeof damageHostilesInRadius === 'function') {
+        damageHostilesInRadius(center, 16.0, 380, 'EXPLOSIVE', pseudoAttacker);
+        damageHostilesInRadius(center, 18.0, 140, 'TOXIN', pseudoAttacker);
+    }
+}
+window.triggerDirtyNukeFX = triggerDirtyNukeFX;
+
+function triggerBlackMarketNukeFX(targetPos, pseudoAttacker) {
+    if (!targetPos || typeof scene === 'undefined') return;
+    const center = targetPos.clone();
+    center.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(center.x, center.z) : 0;
+    if (typeof playAudio === 'function') playAudio('nuke_detonation', { volume: 0.95 }, 'gla');
+    if (typeof spawnNuclearMushroomCloud === 'function') spawnNuclearMushroomCloud(center, 0.65);
+    else if (typeof spawnMiniNukeMushroom === 'function') spawnMiniNukeMushroom(center);
+    spawnCraterDecal(center, 6.5, 720, 'nuke');
+    if (typeof spawnLingeringToxinCloud === 'function') spawnLingeringToxinCloud(center, 10.5, 1080);
+    if (typeof triggerScreenShake === 'function') triggerScreenShake(1.35);
+    if (typeof damageHostilesInRadius === 'function') {
+        damageHostilesInRadius(center, 20.0, 520, 'EXPLOSIVE', pseudoAttacker);
+    }
+}
+window.triggerBlackMarketNukeFX = triggerBlackMarketNukeFX;
+
 // =========================================================================
 // NIGHT & DUSK LIGHTING FX: VEHICLE HEADLIGHTS, BUILDING GLOWS & SEARCHLIGHTS
 // (Zero-cost additive translucent geometry — no dynamic PointLight/SpotLight shader spikes!)

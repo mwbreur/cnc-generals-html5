@@ -1711,6 +1711,27 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
         if (isTargetSpottedForUnit(tomUnit, new THREE.Vector3(60, 0, 0), 2.0) !== true) {
             throw new Error('Issue #47: Friendly spotter failed to spot target for Tomahawk artillery!');
         }
+
+        // 11. Issue #50 & #51 regressions: Zero Hour 12 Generals + NapalmStrike, NeutronMissile, DirtyNuke, BlackMarketNuke, TerrorCell, Defector
+        if (!window.ZERO_HOUR_GENERALS || Object.keys(window.ZERO_HOUR_GENERALS).length !== 12) {
+            throw new Error('Issue #51: Expected 12 Zero Hour Generals in ZERO_HOUR_GENERALS!');
+        }
+        for (const g of Object.values(window.ZERO_HOUR_GENERALS)) {
+            if (!window.OFFICIAL_UI_ASSETS || !window.OFFICIAL_UI_ASSETS[g.portraitKey]) {
+                throw new Error('Issue #51: Missing official portrait UI asset for general ' + g.id + ' (' + g.portraitKey + ')');
+            }
+        }
+        for (const pId of ['a10Strike', 'napalmStrike', 'neutronMissile', 'dirtyNuke', 'blackMarketNuke', 'terrorCell', 'defector']) {
+            const pDef = getGeneralPowerDef(pId);
+            if (!pDef || !window.OFFICIAL_CAMEOS[pDef.cameo]) {
+                throw new Error('Issue #50: Missing General Power definition or official cameo for ' + pId);
+            }
+        }
+        selectGeneral('usa_superweapon');
+        if (getStructureCost('particleCannon', 'usa') !== 2500) {
+            throw new Error('Issue #51: USA Superweapon General should discount Particle Cannon to $2,500!');
+        }
+        selectGeneral('usa');
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

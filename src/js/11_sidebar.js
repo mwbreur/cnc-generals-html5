@@ -4162,6 +4162,18 @@ function spawnUnit(type, position = null, factionOverride = null) {
             speed *= 1.25;
         }
     }
+    const activeGen = (typeof window !== 'undefined' && window.selectedGeneral) ? window.selectedGeneral : spawnFaction;
+    if (activeGen === 'usa_air' && isAir) {
+        health = Math.floor(health * 1.20);
+    } else if (activeGen === 'china_tank' && ['battlemaster', 'overlord', 'gatling', 'dragon'].includes(type)) {
+        initialVeterancy = Math.max(initialVeterancy, 1);
+        health = Math.floor(health * 1.20);
+    } else if (activeGen === 'china_infantry' && ['redguard', 'tankhunter', 'hacker', 'blacklotus'].includes(type)) {
+        initialVeterancy = Math.max(initialVeterancy, 1);
+        health = Math.floor(health * 1.25);
+    } else if (activeGen === 'china_nuke' && (type === 'battlemaster' || type === 'overlord')) {
+        speed *= 1.25;
+    }
 
     const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
     const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
@@ -4455,12 +4467,14 @@ const GENERALS_POWERS_TREES = {
         { id: 'nukeCannonUnlock', rank: 1, kind: 'unlock', unit: 'nukecannon', cameo: 'nukecannon', label: 'NUKE CANNON', name: 'Nuke Cannon', desc: 'Unlocks the long-range tactical Nuclear Cannon at the War Factory.' },
         // Level 3
         { id: 'clusterMines', rank: 3, kind: 'active', cooldownTicks: 4500, cameo: 'clusterMines', label: 'MINES', name: 'Cluster Mines', desc: 'Airdrops a field of anti-tank and anti-personnel cluster mines at target coordinates.' },
+        { id: 'napalmStrike', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'napalmStrike', label: 'NAPALM', name: 'Napalm Strike', desc: 'Calls in twin MiG strike jets to drop Black Napalm canisters, igniting a wide firestorm.' },
         { id: 'carpetBomber', rank: 3, kind: 'active', cooldownTicks: 6300, cameo: 'carpetBomb', label: 'CARPET BOMB', name: 'Carpet Bomber', desc: 'Calls in a heavy bomber fleet to drop a devastating line of bombs across the target zone.' },
         { id: 'artilleryBarrage', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'artilleryBarrage', label: 'ARTILLERY', name: 'Artillery Barrage', desc: 'Calls down a sustained off-map 152mm artillery shell rain onto target coordinates.' },
         { id: 'cashHack', rank: 3, kind: 'active', cooldownTicks: 7200, cameo: 'networkHack', label: 'CASH HACK', name: 'Cash Hack', desc: 'Siphons $1,500 directly from enemy supply/command networks into your treasury.' },
         { id: 'frenzy', rank: 3, kind: 'active', cooldownTicks: 4500, cameo: 'frenzy', label: 'FRENZY', name: 'Frenzy', desc: 'Temporarily boosts speed, fire rate, and damage (+30%) of friendly Chinese units in an area for 15s.' },
         // Level 5
-        { id: 'empPulse', rank: 5, kind: 'active', cooldownTicks: 8100, cameo: 'empPulse', label: 'EMP PULSE', name: 'EMP Pulse', desc: 'Detonates an electromagnetic pulse disabling enemy vehicles and defenses in radius for 12s.' }
+        { id: 'empPulse', rank: 5, kind: 'active', cooldownTicks: 8100, cameo: 'empPulse', label: 'EMP PULSE', name: 'EMP Pulse', desc: 'Detonates an electromagnetic pulse disabling enemy vehicles and defenses in radius for 12s.' },
+        { id: 'neutronMissile', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'neutronMissile', label: 'NEUTRON', name: 'Neutron Missile', desc: 'Detonates a tactical neutron radiation warhead that kills all enemy infantry and vehicle crews, leaving empty hulls.' }
     ],
     gla: [
         // Level 1
@@ -4470,10 +4484,14 @@ const GENERALS_POWERS_TREES = {
         // Level 3
         { id: 'hijackerUnlock', rank: 3, kind: 'unlock', unit: 'hijacker', cameo: 'hijacker', label: 'HIJACKER', name: 'Hijacker', desc: 'Unlocks the stealthy Hijacker operative at the Barracks to commandeer enemy vehicles.' },
         { id: 'rebelAmbush', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'rebelAmbush', label: 'AMBUSH', name: 'Rebel Ambush', desc: 'Surfaces a hidden guerrilla squad of 5 Rebel fighters anywhere on the map.' },
+        { id: 'terrorCell', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'terrorCell', label: 'TERROR CELL', name: 'Terror Cell', desc: 'Deploys a covert cell of 4 GLA Terrorist demolition operatives at target coordinates.' },
+        { id: 'defector', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'defector', label: 'DEFECTOR', name: 'Defector', desc: 'Bribes and converts an enemy ground unit at target coordinates to defect to your command.' },
         { id: 'cashBounty', rank: 3, kind: 'passive', cameo: 'cashBounty', label: 'BOUNTY', name: 'Cash Bounty', desc: 'Grants a +20% cash bounty bonus whenever you destroy enemy units or structures.' },
         { id: 'emergencyRepair', rank: 3, kind: 'active', cooldownTicks: 3600, cameo: 'emergencyRepair', label: 'REPAIR', name: 'Emergency Repair', desc: 'Quickly repairs damaged GLA vehicles and structures in the targeted area.' },
         // Level 5
         { id: 'anthraxBomb', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'anthraxBomb', label: 'ANTHRAX', name: 'Anthrax Beta Bomb', desc: 'Drops a chemical Anthrax Beta bomb that leaves a lingering toxic cloud melting enemy infantry.' },
+        { id: 'dirtyNuke', rank: 5, kind: 'active', cooldownTicks: 8100, cameo: 'dirtyNuke', label: 'DIRTY NUKE', name: 'Detonate Dirty Nuke', desc: 'Detonates a radiological dirty bomb that blasts structures and blankets the area in toxic fallout.' },
+        { id: 'blackMarketNuke', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'blackMarketNuke', label: 'BM NUKE', name: 'Black Market Nuke', desc: 'Detonates a covert Black Market tactical nuclear warhead at target coordinates.' },
         { id: 'sneakAttack', rank: 5, kind: 'active', cooldownTicks: 8100, cameo: 'sneakAttack', label: 'SNEAK ATK', name: 'Sneak Attack', desc: 'Drills a surprise Sneak Attack tunnel anywhere on the map and deploys ambush forces.' },
         { id: 'gpsScrambler', rank: 5, kind: 'active', cooldownTicks: 7200, cameo: 'gpsScrambler', label: 'SCRAMBLER', name: 'GPS Scrambler', desc: 'Cloaks all friendly units in the target area in stealth for 30 seconds.' }
     ]
@@ -4531,6 +4549,12 @@ function resetGeneralsPowersState() {
     generalsRank = 1;
     generalsPoints = 1;
     unlockedGeneralsPowers = new Set();
+    if (typeof ZERO_HOUR_GENERALS !== 'undefined' && typeof selectedGeneral !== 'undefined' && ZERO_HOUR_GENERALS[selectedGeneral]) {
+        const gDef = ZERO_HOUR_GENERALS[selectedGeneral];
+        if (Array.isArray(gDef.freePowers)) {
+            gDef.freePowers.forEach(pId => unlockedGeneralsPowers.add(pId));
+        }
+    }
     generalPowerCooldowns = {};
     activeGeneralPower = null;
     updateGeneralsRankHUD();
@@ -5088,6 +5112,68 @@ function executeGeneralsPowerAt(pos) {
         else if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x2ecc71, 4.0);
         if (typeof playAudio === 'function') playAudio('gps_scrambler', { volume: 0.9 }, 'gla');
         showNotification(`★ GPS Scrambler cloaked ${cloaked} friendly unit(s) for 30s!`, 'success');
+        return true;
+    } else if (p === 'napalmStrike') {
+        showNotification('★ Twin MiG Black Napalm Strike inbound!', 'warning');
+        if (typeof triggerNapalmStrikeFX === 'function') {
+            triggerNapalmStrikeFX(pos, pseudoAttacker);
+        } else {
+            if (typeof playAudio === 'function') playAudio('dragon_flame', { volume: 0.9 }, 'china');
+            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(pos, 0xff5500, 4.5, true, 'expl_fire');
+            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 16.0, 260, 'FLAME', pseudoAttacker);
+        }
+        return true;
+    } else if (p === 'neutronMissile') {
+        const depop = (typeof triggerNeutronMissileFX === 'function') ? triggerNeutronMissileFX(pos, pseudoAttacker) : 0;
+        showNotification(`★ Neutron Missile detonated! ${depop} enemy vehicle(s) depopulated and ready to capture!`, 'success');
+        return true;
+    } else if (p === 'dirtyNuke') {
+        if (typeof triggerDirtyNukeFX === 'function') triggerDirtyNukeFX(pos, pseudoAttacker);
+        else if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 16.0, 380, 'EXPLOSIVE', pseudoAttacker);
+        showNotification('★ Dirty Nuke detonated! Radiological fallout cloud active!', 'warning');
+        return true;
+    } else if (p === 'blackMarketNuke') {
+        if (typeof triggerBlackMarketNukeFX === 'function') triggerBlackMarketNukeFX(pos, pseudoAttacker);
+        else if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(pos, 20.0, 520, 'EXPLOSIVE', pseudoAttacker);
+        showNotification('★ Black Market Nuke detonated!', 'warning');
+        return true;
+    } else if (p === 'terrorCell') {
+        if (typeof triggerRebelAmbushFX === 'function') triggerRebelAmbushFX(pos);
+        else if (typeof playAudio === 'function') playAudio('rebel_ambush', { volume: 0.9 }, 'gla');
+        for (let i = 0; i < 4; i++) {
+            const rPos = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6));
+            if (typeof spawnUnit === 'function') spawnUnit('terrorist', rPos);
+        }
+        showNotification('★ GLA Terror Cell deployed at target coordinates!', 'warning');
+        return true;
+    } else if (p === 'defector') {
+        let bestEnemy = null;
+        let bestD = 18.0;
+        if (typeof enemyUnits !== 'undefined') {
+            for (let i = 0; i < enemyUnits.length; i++) {
+                const eu = enemyUnits[i];
+                if (!eu || eu.health <= 0 || eu.isAir || !eu.mesh) continue;
+                const d = Math.hypot(eu.mesh.position.x - pos.x, eu.mesh.position.z - pos.z);
+                if (d <= bestD) { bestD = d; bestEnemy = eu; }
+            }
+        }
+        if (bestEnemy) {
+            const idx = enemyUnits.indexOf(bestEnemy);
+            if (idx !== -1) enemyUnits.splice(idx, 1);
+            bestEnemy.teamId = typeof playerTeamId !== 'undefined' ? playerTeamId : 1;
+            bestEnemy.ownerId = 'player';
+            bestEnemy.isAI = false;
+            bestEnemy.isUnmanned = false;
+            bestEnemy.disabledUntil = 0;
+            bestEnemy.combatTarget = null;
+            units.push(bestEnemy);
+            if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(bestEnemy.mesh.position, 0x2ecc71, 2.5);
+            if (typeof playAudio === 'function') playAudio('cash_up', { volume: 0.85 }, 'gla');
+            showNotification(`★ Defector converted enemy ${bestEnemy.type.toUpperCase()} to your command!`, 'success');
+        } else {
+            if (typeof spawnSmokePuff === 'function') spawnSmokePuff(pos, 0x2ecc71);
+            showNotification('★ Defector signal broadcast (no eligible enemy ground unit within 18m).', 'info');
+        }
         return true;
     }
     return false;
