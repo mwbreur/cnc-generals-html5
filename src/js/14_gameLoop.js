@@ -737,7 +737,7 @@ function animate() {
                     if (drone.timer % 35 === 0) {
                         const dmX = dMesh.position.x;
                         const dmZ = dMesh.position.z;
-                        const maxDistSq = 18.0 * 18.0;
+                        const maxDistSq = 23.8 * 23.8; // Retail INIZH.big BattleDroneMachineGun (110 * 0.216)
                         const enemyInf = getLivingUnits().find(e => {
                                 if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
                                 const dx = e.mesh.position.x - dmX;
@@ -760,7 +760,7 @@ function animate() {
                     if (drone.timer % 80 === 0) {
                         const dmX = dMesh.position.x;
                         const dmZ = dMesh.position.z;
-                        const maxDistSq = 24.0 * 24.0;
+                        const maxDistSq = 32.4 * 32.4; // Retail INIZH.big HellfireMissileWeapon (150 * 0.216)
                         let hellfireTarget = getLivingUnits().find(e => {
                                 if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
                                 const dx = e.mesh.position.x - dmX;

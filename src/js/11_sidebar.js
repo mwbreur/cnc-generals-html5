@@ -1475,9 +1475,13 @@ function renderStructureInspectorAndGrid(inspector, structure) {
     // 2-Row Production Grid (2x7: strictly units built by this structure + upgrades + rally + sell)
     currentGridSlots = new Array(14).fill(null);
 
-    const productionType = structure.type === 'center' ? 'commandCenter' : structure.type;
+    const productionType = structure.type === 'center' ? 'commandCenter'
+        : (structure.type === 'supplyStash' ? 'supplyCenter' : structure.type);
     const producers = Object.entries(unitRoster).filter(([type, spec]) => {
-            return spec.building === productionType;
+            if (spec.building === productionType) return true;
+            // Retail Zero Hour: GLA Supply Stash trains Workers just like Command Center
+            if (type === 'worker' && (structure.type === 'supplyStash' || structure.type === 'supplyCenter')) return true;
+            return false;
     });
 
     const lookupKey = structure.type === 'center' ? 'commandCenter' : structure.type;
@@ -3145,12 +3149,14 @@ function produceUnit(type) {
     let fac = null;
     if (selectedStructure && !selectedStructure.isBuilding && selectedStructure.health > 0) {
         if (spec.building === 'commandCenter' && selectedStructure.type === 'center') fac = selectedStructure;
+        else if (type === 'worker' && (selectedStructure.type === 'supplyStash' || selectedStructure.type === 'supplyCenter')) fac = selectedStructure;
         else if (selectedStructure.type === spec.building) fac = selectedStructure;
     }
     if (!fac) {
         fac = structures.find(s => {
                 if (s.isBuilding || s.health <= 0) return false;
                 if (spec.building === 'commandCenter' && s.type === 'center') return true;
+                if (type === 'worker' && (s.type === 'supplyStash' || s.type === 'supplyCenter')) return true;
                 if (s.type === spec.building) return true;
                 return false;
         });
@@ -3888,18 +3894,19 @@ function processBuildingFunctions() {
                         }
                     }
 
-                    // Patriot Network Linking: share target lock & extended assist range (85u, matching official PatriotMissileAssistWeapon) with nearby Patriots (<=55u)
+                    // Patriot Network Linking: share target lock & extended assist range (97.2u = 450*0.216, matching official PatriotMissileAssistWeapon) with nearby Patriots (<=55u)
                     let target = null;
                     if (structure.type === 'patriot' && structure._sharedTarget) {
-                        if (structure._sharedTarget.health > 0 && structure._sharedTarget.mesh && structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 85) {
+                        if (structure._sharedTarget.health > 0 && structure._sharedTarget.mesh && structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 97.2) {
                             target = structure._sharedTarget;
                         } else {
                             structure._sharedTarget = null;
                         }
                     }
                     if (!target) {
-                        const groundRange = 45;
-                        const airRange = (structure.type === 'patriot') ? 58 : 45;
+                        // Retail INIZH.big * 0.216: Ground 225 (48.6u), Patriot Air 350 (75.6u), Stinger Site Air 400 (86.4u)
+                        const groundRange = 48.6;
+                        const airRange = (structure.type === 'patriot') ? 75.6 : (structure.type === 'stingerSite' ? 86.4 : 48.6);
                         // Patriots prioritize aircraft & vehicles; less effective against small infantry
                         const inRange = enemyUnits.filter(enemy => enemy.health > 0 && enemy.mesh && !(enemy.isStealthed && !(enemy.revealedUntil && enemy.revealedUntil > buildingTick)) && enemy.mesh.position.distanceTo(structure.position) < (enemy.isAir ? airRange : groundRange));
                         target = inRange.find(e => e.isAir) ||
@@ -3933,12 +3940,13 @@ function processBuildingFunctions() {
                         if (structure.type === 'patriot') {
                             const mPos = structure.position.clone().add(new THREE.Vector3(0, 2.4, 0));
                             const isInfTarget = typeof getArmorCategory === 'function' && getArmorCategory(target) === 'infantry';
-                            spawnMuzzleFlash(mPos, 0xff9f43, 0.7);
+                            const laserGenMult = (typeof getActiveGeneral === 'function' && getActiveGeneral().id === 'usa_laser') ? 1.25 : 1.0;
+                            spawnMuzzleFlash(mPos, laserGenMult > 1 ? 0x00d2ff : 0xff9f43, 0.7);
                             spawnRocketProjectile(mPos, targetPos, false, false, {
                                     attacker: structure,
                                     target: target,
                                     isGuided: true,
-                                    damage: isInfTarget ? 22 : 68,
+                                    damage: Math.round((isInfTarget ? 22 : 68) * laserGenMult),
                                     damageType: 'EXPLOSIVE',
                                     splashRadius: isInfTarget ? 1.0 : 2.5
                             });

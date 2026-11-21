@@ -1363,7 +1363,7 @@ function processBaseDefenseCombat() {
                     if (!t || t.health <= 0 || t.garrisonedIn || !t.mesh || isFriendly(def, t)) return false;
                     if (t.isStealthed && !(t.revealedUntil && t.revealedUntil > curTick)) return false;
                     const tPos = t.position || t.mesh.position;
-                    const maxR = (t.isAir ? 72.0 : 48.6) + (t.radius || 0);
+                    const maxR = (t.isAir ? 86.4 : 48.6) + (t.radius || 0); // Retail INIZH.big: 400 Air / 225 Ground (* 0.216)
                     return Math.hypot(defCenter.x - tPos.x, defCenter.z - tPos.z) <= maxR;
                 };
                 let target = isValidDefTarget(def._gatTarget) ? def._gatTarget : null;
@@ -1444,14 +1444,16 @@ function processBaseDefenseCombat() {
             // Acquire closest target within official INIZH.big defense range (AttackRange = 225.0 => 48.6 units) strictly filtering !isFriendly
             if (def.attackCooldown === 0) {
                 const defRange = 48.6;
+                const defAirRange = (def.type === 'stingerSite') ? 86.4 : (def.type === 'patriot' ? 75.6 : 86.4);
                 let closestEnemy = null;
-                let closestDistSq = defRange * defRange;
+                let closestDistSq = Infinity;
                 for (let target of allLivingUnits) {
                     if (target.health > 0 && !target.garrisonedIn && target.mesh && !isFriendly(def, target)) {
                         const dx = defCenter.x - target.mesh.position.x;
                         const dz = defCenter.z - target.mesh.position.z;
                         const dSq = dx * dx + dz * dz;
-                        if (dSq < closestDistSq) {
+                        const maxR = target.isAir ? defAirRange : defRange;
+                        if (dSq < maxR * maxR && dSq < closestDistSq) {
                             closestDistSq = dSq;
                             closestEnemy = target;
                         }
