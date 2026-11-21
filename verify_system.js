@@ -1777,6 +1777,91 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             doesMapMatchBattlefieldSize('desert', 1500) !== true) {
             throw new Error('Strict Battlefield Size map category filtering failed!');
         }
+
+        // 14. Issue #56 regression: Delta state_sync compression, instant du/ds eviction, keyframe recovery, jitter-buffer yaw wrap & cmdSeq
+        {
+            const sentPackets = [];
+            const prevConn = netConn;
+            const prevActive = isMultiplayerActive;
+            const prevHost = isMultiplayerHost;
+            resetMultiplayerTransportState();
+            netConn = { open: true, send: (pkt) => sentPackets.push(JSON.parse(JSON.stringify(pkt))) };
+            isMultiplayerActive = true;
+            isMultiplayerHost = true;
+
+            units.length = 0; enemyUnits.length = 0; structures.length = 0; enemyStructures.length = 0;
+            const uA = spawnUnit('tank', new THREE.Vector3(10, 0, 10), 'usa'); uA.netId = 'u_a';
+            const uB = spawnUnit('tank', new THREE.Vector3(30, 0, 30), 'usa'); uB.netId = 'u_b';
+            if (sentPackets.length !== 2 || sentPackets[0].cmdSeq !== 1 || sentPackets[1].cmdSeq !== 2) {
+                throw new Error('Issue #56: spawn_unit broadcasts did not stamp monotonic cmdSeq!');
+            }
+            sentPackets.length = 0;
+
+            // First sync = full keyframe (k: 1, both units)
+            _mpLastStateSyncMs = -1000;
+            broadcastHostStateSync();
+            if (sentPackets.length !== 1 || sentPackets[0].k !== 1 || sentPackets[0].u.length !== 2) {
+                throw new Error('Issue #56: First state_sync must be a full keyframe (k=1) with all 2 units! Got: ' + JSON.stringify(sentPackets));
+            }
+            // Second sync with zero movement = skipped (0 bandwidth)
+            _mpLastStateSyncMs = -1000;
+            broadcastHostStateSync();
+            if (sentPackets.length !== 1) {
+                throw new Error('Issue #56: Idle battlefield should not broadcast empty delta packets!');
+            }
+            // Move only uA -> delta packet (k: 0) with only 1 unit
+            uA.mesh.position.x = 15;
+            _mpLastStateSyncMs = -1000;
+            broadcastHostStateSync();
+            if (sentPackets.length !== 2 || sentPackets[1].k !== 0 || sentPackets[1].u.length !== 1 || sentPackets[1].u[0][0] !== 'u_a') {
+                throw new Error('Issue #56: Delta state_sync should only serialize moved unit u_a!');
+            }
+            // Kill uB -> delta packet includes du: ['u_b']
+            uB.health = 0;
+            _mpLastStateSyncMs = -1000;
+            broadcastHostStateSync();
+            if (sentPackets.length !== 3 || !Array.isArray(sentPackets[2].du) || sentPackets[2].du[0] !== 'u_b') {
+                throw new Error('Issue #56: Killed unit u_b must be emitted immediately in delta du array!');
+            }
+
+            // Guest-side validation: delta packet must NOT kill unchanged unit, du MUST kill dead unit, yaw wrap must take shortest arc
+            isMultiplayerHost = false;
+            resetMultiplayerTransportState();
+            uA.health = uA.maxHealth; uB.health = uB.maxHealth;
+            uA._mpSeenOnce = true; uB._mpSeenOnce = true;
+            uA.mesh.rotation.y = 3.0;
+            handleNetworkPacket({ v: 2, seq: 1, type: 'state_sync', k: 0, u: [['u_a', 20, 10, -3.0, 100]], s: [] });
+            if (uB.health <= 0) {
+                throw new Error('Issue #56: Delta packet (k=0) prematurely evicted unchanged unit u_b!');
+            }
+            handleNetworkPacket({ v: 2, seq: 2, type: 'state_sync', k: 0, u: [], s: [], du: ['u_b'] });
+            if (uB.health !== 0) {
+                throw new Error('Issue #56: Guest did not evict unit listed in delta du array!');
+            }
+            enemyUnits.push(uA);
+            units.length = 0;
+            uA._mpSnapBuf = [{ t: performance.now() - 150, x: 10, z: 10, ry: 3.0 }, { t: performance.now() - 50, x: 20, z: 10, ry: -3.0 }];
+            updateMultiplayerInterpolation();
+            if (Math.abs(uA.mesh.rotation.y) < 2.5) {
+                throw new Error('Issue #56: Yaw interpolation spun the long way around instead of crossing +/-PI! Got: ' + uA.mesh.rotation.y);
+            }
+
+            // Command pipeline sequencing (cmdSeq)
+            isMultiplayerHost = true;
+            resetMultiplayerTransportState();
+            const cmd1 = { v: 2, seq: 10, cmdSeq: 2, type: 'move_units', unitNetIds: ['u_a'], targetPos: { x: 0, y: 0, z: 0 } };
+            const cmdStale = { v: 2, seq: 11, cmdSeq: 1, type: 'move_units', unitNetIds: ['u_a'], targetPos: { x: 5, y: 0, z: 5 } };
+            handleNetworkPacket(cmd1);
+            if (handleNetworkPacket(cmdStale) !== false) {
+                throw new Error('Issue #56: Out-of-order stale cmdSeq command was not dropped!');
+            }
+
+            netConn = prevConn;
+            isMultiplayerActive = prevActive;
+            isMultiplayerHost = prevHost;
+            resetMultiplayerTransportState();
+            units.length = 0; enemyUnits.length = 0;
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

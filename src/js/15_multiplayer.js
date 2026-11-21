@@ -10,12 +10,21 @@ let netIdSequence = 100;
 
 const MP_PROTOCOL_VERSION = 2;
 const MP_ALLOWED_FACTIONS = new Set(['usa', 'china', 'gla', 'random']);
+const MP_COMMAND_PACKET_TYPES = new Set(['move_units', 'attack_target', 'spawn_unit', 'build_structure']);
 let _mpTxSeq = 0;
 let _mpLastRxSeq = 0;
 let _mpLastRxStateSeq = 0;
+let _mpCmdTxSeq = 0;
+let _mpLastRxCmdSeq = 0;
 let _mpRateWindowStart = 0;
 let _mpRateWindowCount = 0;
 const MP_RATE_LIMIT_PER_SEC = 120;
+const MP_KEYFRAME_INTERVAL = 30; // Full keyframe every 30 broadcasts (3.0s at 10 Hz)
+const MP_INTERP_DELAY_MS = 100;  // 100ms client jitter buffer matching 10 Hz host sync
+const MP_MAX_ENTITY_SAMPLES = 5;
+let _mpStateSyncCount = 0;
+const _mpLastUnitSnapMap = new Map();
+const _mpLastStructSnapMap = new Map();
 
 function generateRoomToken(length = 6) {
     const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Unambiguous uppercase alphanumeric (32 chars)
@@ -34,8 +43,13 @@ function resetMultiplayerTransportState() {
     _mpTxSeq = 0;
     _mpLastRxSeq = 0;
     _mpLastRxStateSeq = 0;
+    _mpCmdTxSeq = 0;
+    _mpLastRxCmdSeq = 0;
     _mpRateWindowStart = 0;
     _mpRateWindowCount = 0;
+    _mpStateSyncCount = 0;
+    _mpLastUnitSnapMap.clear();
+    _mpLastStructSnapMap.clear();
 }
 
 function cleanupPeerSession() {
@@ -62,6 +76,9 @@ function validateNetworkPacket(packet, isHostReceiver = false) {
     }
     if (packet.seq !== undefined && (!Number.isInteger(packet.seq) || packet.seq < 0)) {
         return { valid: false, reason: 'invalid_sequence' };
+    }
+    if (packet.cmdSeq !== undefined && (!Number.isInteger(packet.cmdSeq) || packet.cmdSeq < 0)) {
+        return { valid: false, reason: 'invalid_command_sequence' };
     }
     // Host-only authoritative packet types that a client peer is never allowed to forge
     const hostOnlyTypes = new Set(['lobby_sync', 'start_battle', 'state_sync', 'host_left', 'unit_damage']);
@@ -110,6 +127,15 @@ function validateNetworkPacket(packet, isHostReceiver = false) {
             return { valid: true };
         case 'state_sync':
             if (!Array.isArray(packet.u) || !Array.isArray(packet.s)) {
+                return { valid: false, reason: 'invalid_state_sync' };
+            }
+            if (packet.k !== undefined && packet.k !== 0 && packet.k !== 1) {
+                return { valid: false, reason: 'invalid_state_sync' };
+            }
+            if (packet.du !== undefined && !Array.isArray(packet.du)) {
+                return { valid: false, reason: 'invalid_state_sync' };
+            }
+            if (packet.ds !== undefined && !Array.isArray(packet.ds)) {
                 return { valid: false, reason: 'invalid_state_sync' };
             }
             return { valid: true };
@@ -760,6 +786,9 @@ function broadcastNetPacket(packet) {
         try {
             packet.v = MP_PROTOCOL_VERSION;
             packet.seq = ++_mpTxSeq;
+            if (MP_COMMAND_PACKET_TYPES.has(packet.type)) {
+                packet.cmdSeq = ++_mpCmdTxSeq;
+            }
             packet.ts = Math.round(typeof performance !== 'undefined' ? performance.now() : Date.now());
             netConn.send(packet);
         } catch (e) {
@@ -787,13 +816,20 @@ function handleNetworkPacket(packet) {
         return false;
     }
 
-    // 3. Sequence ordering: drop stale out-of-order state_sync snapshots
+    // 3. Sequence ordering: drop stale out-of-order state_sync snapshots & player commands
     if (typeof packet.seq === 'number') {
         if (packet.type === 'state_sync') {
             if (packet.seq <= _mpLastRxStateSeq) return false;
             _mpLastRxStateSeq = packet.seq;
         }
         if (packet.seq > _mpLastRxSeq) _mpLastRxSeq = packet.seq;
+    }
+    if (MP_COMMAND_PACKET_TYPES.has(packet.type) && typeof packet.cmdSeq === 'number') {
+        if (packet.cmdSeq <= _mpLastRxCmdSeq) {
+            console.warn('Dropping stale out-of-order player command:', packet.type, packet.cmdSeq);
+            return false;
+        }
+        _mpLastRxCmdSeq = packet.cmdSeq;
     }
 
     try {
@@ -977,6 +1013,8 @@ function handleNetworkPacket(packet) {
     }
     else if (packet.type === 'state_sync' && !isMultiplayerHost) {
         const halfMap = (typeof currentMapSize === 'number' && currentMapSize > 0 ? currentMapSize : 1500) * 0.5;
+        // Treat legacy packets without `k` as full keyframes for backwards compatibility
+        const isKeyframe = (packet.k === undefined) ? true : Boolean(packet.k);
         const seenUnitIds = new Set();
         const unitMap = new Map();
         const localSet = new Set();
@@ -998,22 +1036,38 @@ function handleNetworkPacket(packet) {
                     ent._mpSeenOnce = true;
                     ent.health = Math.max(0, Math.min(ent.maxHealth || 10000, rawHp));
                     if (ent.mesh) {
+                        if (!Array.isArray(ent._mpSnapBuf)) ent._mpSnapBuf = [];
+                        ent._mpSnapBuf.push({ t: nowMs, x, z, ry });
+                        while (ent._mpSnapBuf.length > MP_MAX_ENTITY_SAMPLES) {
+                            ent._mpSnapBuf.shift();
+                        }
                         const drift = Math.hypot(x - ent.mesh.position.x, z - ent.mesh.position.z);
                         // Avoid rubber-banding local player units unless drift exceeds 2.5 units
                         if (!localSet.has(ent) || drift > 2.5) {
-                            ent._mpNetTarget = { x, z, ry };
+                            ent._mpNetTarget = { x, z, ry, isLocal: localSet.has(ent) };
                         } else {
                             ent._mpNetTarget = null;
                         }
                     }
                 }
             }
-            // Clean up ghost units that died on host between snapshots
-            unitMap.forEach((ent, nid) => {
-                    if (ent._mpSeenOnce && !seenUnitIds.has(nid) && ent.health > 0) {
-                        ent.health = 0;
-                    }
-            });
+            // Immediate death eviction for explicit delta-destroyed unit IDs
+            if (Array.isArray(packet.du)) {
+                const duLim = Math.min(packet.du.length, 400);
+                for (let i = 0; i < duLim; i++) {
+                    const deadId = packet.du[i];
+                    const ent = typeof deadId === 'string' ? unitMap.get(deadId) : null;
+                    if (ent && ent.health > 0) ent.health = 0;
+                }
+            }
+            // Full ghost-unit reconciliation only on keyframe snapshots so delta frames never kill idle units
+            if (isKeyframe) {
+                unitMap.forEach((ent, nid) => {
+                        if (ent._mpSeenOnce && !seenUnitIds.has(nid) && ent.health > 0) {
+                            ent.health = 0;
+                        }
+                });
+            }
         }
         if (Array.isArray(packet.s)) {
             const seenStructIds = new Set();
@@ -1033,11 +1087,21 @@ function handleNetworkPacket(packet) {
                     st.health = Math.max(0, Math.min(st.maxHealth || 10000, rawHp));
                 }
             }
-            structMap.forEach((st, nid) => {
-                    if (st._mpSeenOnce && !seenStructIds.has(nid) && st.health > 0) {
-                        st.health = 0;
-                    }
-            });
+            if (Array.isArray(packet.ds)) {
+                const dsLim = Math.min(packet.ds.length, 250);
+                for (let i = 0; i < dsLim; i++) {
+                    const deadId = packet.ds[i];
+                    const st = typeof deadId === 'string' ? structMap.get(deadId) : null;
+                    if (st && st.health > 0) st.health = 0;
+                }
+            }
+            if (isKeyframe) {
+                structMap.forEach((st, nid) => {
+                        if (st._mpSeenOnce && !seenStructIds.has(nid) && st.health > 0) {
+                            st.health = 0;
+                        }
+                });
+            }
         }
     }
     else if (packet.type === 'chat') {
@@ -1075,6 +1139,11 @@ function hostLaunchBattle() {
 function startMultiplayerMatch(isHost, config) {
     isMultiplayerActive = true;
     isMultiplayerHost = isHost;
+    _mpStateSyncCount = 0;
+    _mpCmdTxSeq = 0;
+    _mpLastRxCmdSeq = 0;
+    _mpLastUnitSnapMap.clear();
+    _mpLastStructSnapMap.clear();
 
     // Seed deterministic simulation PRNG from host match seed so both peers share identical RNG stream
     const matchSeed = (Number(config.seed) >>> 0) || 424242;
@@ -1477,41 +1546,151 @@ function onHostDisconnected(reason = "The host commander has left or closed the 
 }
 window.onHostDisconnected = onHostDisconnected;
 
-let _mpLastStateSyncMs = 0;
+let _mpLastStateSyncMs = -1000;
 function broadcastHostStateSync() {
     if (!isMultiplayerActive || !isMultiplayerHost) return;
-    const now = performance.now();
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (now - _mpLastStateSyncMs < 100) return; // 10 Hz host-authoritative delta snapshot
     _mpLastStateSyncMs = now;
+
+    _mpStateSyncCount++;
+    const isKeyframe = (_mpStateSyncCount === 1) || (_mpStateSyncCount % MP_KEYFRAME_INTERVAL === 0);
+
     const uSnap = [];
+    const currentUnitIds = new Set();
     const packUnits = (arr) => {
         for (let i = 0; i < arr.length; i++) {
             const u = arr[i];
             if (u && u.netId && u.health > 0 && u.mesh) {
-                uSnap.push([
-                        u.netId,
-                        Math.round(u.mesh.position.x * 10) / 10,
-                        Math.round(u.mesh.position.z * 10) / 10,
-                        Math.round(u.mesh.rotation.y * 100) / 100,
-                        Math.round(u.health)
-                ]);
+                const x = Math.round(u.mesh.position.x * 10) / 10;
+                const z = Math.round(u.mesh.position.z * 10) / 10;
+                const ry = Math.round(u.mesh.rotation.y * 100) / 100;
+                const hp = Math.round(u.health);
+                currentUnitIds.add(u.netId);
+                const prev = _mpLastUnitSnapMap.get(u.netId);
+                const changed = isKeyframe || !prev ||
+                    Math.abs(x - prev.x) > 0.05 ||
+                    Math.abs(z - prev.z) > 0.05 ||
+                    Math.abs(ry - prev.ry) > 0.02 ||
+                    hp !== prev.hp;
+                if (changed) {
+                    uSnap.push([u.netId, x, z, ry, hp]);
+                    _mpLastUnitSnapMap.set(u.netId, { x, z, ry, hp });
+                }
             }
         }
     };
     packUnits(units);
     packUnits(enemyUnits);
+
+    const du = [];
+    _mpLastUnitSnapMap.forEach((_, nid) => {
+        if (!currentUnitIds.has(nid)) {
+            du.push(nid);
+            _mpLastUnitSnapMap.delete(nid);
+        }
+    });
+
     const sSnap = [];
+    const currentStructIds = new Set();
     const packStructs = (arr) => {
         for (let i = 0; i < arr.length; i++) {
             const s = arr[i];
             if (s && s.netId && s.health > 0) {
-                sSnap.push([s.netId, Math.round(s.health)]);
+                const hp = Math.round(s.health);
+                currentStructIds.add(s.netId);
+                const prevHp = _mpLastStructSnapMap.get(s.netId);
+                if (isKeyframe || prevHp === undefined || prevHp !== hp) {
+                    sSnap.push([s.netId, hp]);
+                    _mpLastStructSnapMap.set(s.netId, hp);
+                }
             }
         }
     };
     packStructs(structures);
     packStructs(enemyStructures);
-    broadcastNetPacket({ type: 'state_sync', u: uSnap, s: sSnap });
+
+    const ds = [];
+    _mpLastStructSnapMap.forEach((_, nid) => {
+        if (!currentStructIds.has(nid)) {
+            ds.push(nid);
+            _mpLastStructSnapMap.delete(nid);
+        }
+    });
+
+    // Skip empty delta packets when battlefield state is completely unchanged
+    if (!isKeyframe && uSnap.length === 0 && sSnap.length === 0 && du.length === 0 && ds.length === 0) {
+        return;
+    }
+
+    const pkt = { type: 'state_sync', k: isKeyframe ? 1 : 0, u: uSnap, s: sSnap };
+    if (du.length > 0) pkt.du = du;
+    if (ds.length > 0) pkt.ds = ds;
+    broadcastNetPacket(pkt);
+}
+
+function updateMultiplayerInterpolation() {
+    if (!isMultiplayerActive || isMultiplayerHost) return;
+    const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const renderTime = nowMs - MP_INTERP_DELAY_MS;
+
+    const shortestAngleDelta = (from, to) => {
+        let diff = to - from;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        return diff;
+    };
+
+    const interpolateEntity = (ent, isLocal) => {
+        if (!ent || ent.health <= 0 || !ent.mesh) return;
+        const buf = ent._mpSnapBuf;
+        let targetX = null, targetZ = null, targetRy = null;
+
+        if (Array.isArray(buf) && buf.length >= 2) {
+            let older = null, newer = null;
+            for (let j = 0; j < buf.length - 1; j++) {
+                if (buf[j].t <= renderTime && buf[j + 1].t >= renderTime) {
+                    older = buf[j];
+                    newer = buf[j + 1];
+                    break;
+                }
+            }
+            if (!older || !newer) {
+                older = buf[buf.length - 2];
+                newer = buf[buf.length - 1];
+            }
+            const span = newer.t - older.t;
+            const alpha = span > 0 ? Math.max(0, Math.min(1, (renderTime - older.t) / span)) : 1.0;
+            targetX = older.x + (newer.x - older.x) * alpha;
+            targetZ = older.z + (newer.z - older.z) * alpha;
+            targetRy = older.ry + shortestAngleDelta(older.ry, newer.ry) * alpha;
+        } else if (ent._mpNetTarget) {
+            targetX = ent._mpNetTarget.x;
+            targetZ = ent._mpNetTarget.z;
+            targetRy = ent._mpNetTarget.ry;
+        } else {
+            return;
+        }
+
+        if (isLocal) {
+            const drift = Math.hypot(targetX - ent.mesh.position.x, targetZ - ent.mesh.position.z);
+            if (drift <= 2.5) return;
+            const blend = drift > 6.0 ? 0.30 : 0.14;
+            ent.mesh.position.x += (targetX - ent.mesh.position.x) * blend;
+            ent.mesh.position.z += (targetZ - ent.mesh.position.z) * blend;
+            ent.mesh.rotation.y += shortestAngleDelta(ent.mesh.rotation.y, targetRy) * blend;
+        } else {
+            ent.mesh.position.x += (targetX - ent.mesh.position.x) * 0.45;
+            ent.mesh.position.z += (targetZ - ent.mesh.position.z) * 0.45;
+            ent.mesh.rotation.y += shortestAngleDelta(ent.mesh.rotation.y, targetRy) * 0.45;
+            if (!ent.isAir && typeof getTerrainHeight === 'function') {
+                ent.mesh.position.y = getTerrainHeight(ent.mesh.position.x, ent.mesh.position.z);
+            }
+        }
+    };
+
+    for (let i = 0; i < units.length; i++) interpolateEntity(units[i], true);
+    for (let i = 0; i < enemyUnits.length; i++) interpolateEntity(enemyUnits[i], false);
 }
 
 function leaveMultiplayerSessionToMenu() {
