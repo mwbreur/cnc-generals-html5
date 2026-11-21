@@ -1633,6 +1633,21 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         };
         return;
     }
+    if (structure.type === 'bunker' || structure.type === 'palace' || structure.type === 'internetCenter') {
+        const gCount = (structure.garrisoned || []).length;
+        const cap = structure.capacity || (structure.type === 'internetCenter' ? 8 : 5);
+        const freeSlot = currentGridSlots.findIndex(s => !s);
+        const targetSlot = freeSlot >= 0 && freeSlot < 13 ? freeSlot : 12;
+        currentGridSlots[targetSlot] = {
+            id: 'evacuate',
+            name: `EVACUATE (${gCount}/${cap})`,
+            cost: '',
+            badge: 'EXIT',
+            disabled: gCount === 0,
+            action: () => unloadTransportPassengers(structure),
+            desc: `Evacuate all garrisoned troops from this ${structure.type}`
+        };
+    }
 
     // Slot 13 (Bottom-Right): SELL STRUCTURE
     currentGridSlots[13] = {

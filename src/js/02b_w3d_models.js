@@ -1007,6 +1007,13 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         craneBoomPivot.add(craneHookPivot);
         root.add(craneMast);
         root.add(craneBoomPivot);
+    } else if (buildingKey === 'china_gatlingCannon') {
+        // Retail NBGattling.W3D: BARRELS02 mesh vertices already point forward along +Z (identical to BARRELS01),
+        // so clearing BARRELS02's 90° pivot quaternion prevents the right barrel from pointing straight up into the sky!
+        const b2 = root.getObjectByName('gatlingBarrels2') || root.getObjectByName('BARRELS02');
+        if (b2 && b2.quaternion && typeof b2.quaternion.set === 'function') {
+            b2.quaternion.set(0, 0, 0, 1);
+        }
     } else if (buildingKey === 'china_nukeSilo') {
         const nukeTipGroup = new THREE.Group();
         nukeTipGroup.name = 'nukeTip';

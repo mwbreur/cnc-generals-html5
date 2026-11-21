@@ -198,7 +198,7 @@ function processCombatScanning() {
             if (unit.isUnmanned || (unit.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < unit.disabledUntil)) return;
             if (unit.garrisonedIn) {
                 const tr = unit.garrisonedIn;
-                const isBuildingGarrison = !!(tr && (tr.isWorldBuilding || tr.type === 'bunker'));
+                const isBuildingGarrison = !!(tr && (tr.isWorldBuilding || tr.type === 'bunker' || tr.type === 'palace'));
                 const isOverlordBunker = !!(tr && tr.type === 'overlord' && tr.overlordUpgrade === 'bunker');
                 const hasFireports = tr && tr.health > 0 && tr.mesh && (isBuildingGarrison || isOverlordBunker || tr.type === 'humvee' || tr.type === 'technical' || tr.type === 'battlebus');
                 if (!hasFireports) return;

@@ -1934,7 +1934,7 @@ function animate() {
                 const tPos = transport.position || (transport.mesh && transport.mesh.position);
                 if (transport.health > 0 && tPos) {
                     unit.targetPosition.copy(tPos);
-                    const cap = transport.capacity || (transport.type === 'internetCenter' ? 8 : 0);
+                    const cap = transport.capacity || (transport.type === 'internetCenter' ? 8 : ((transport.type === 'bunker' || transport.type === 'palace') ? 5 : 0));
                     const distToT = Math.hypot(unit.mesh.position.x - tPos.x, unit.mesh.position.z - tPos.z);
                     if (distToT < ((transport.radius || 1.4) + 2.8)) {
                         if (!transport.garrisoned) transport.garrisoned = [];

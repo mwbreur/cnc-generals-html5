@@ -2605,11 +2605,16 @@ function issueMoveCommand(e) {
 
     const friendlyMeshes = units.filter(u => u.capacity > 0 && !u.garrisonedIn).map(u => u.mesh);
     const selectedHackers = units.filter(u => u.selected && u.type === 'hacker');
+    const selectedInfantryForStruct = units.filter(u => u.selected && isInfantryType(u.type));
     const icStructures = (selectedHackers.length > 0 && typeof structures !== 'undefined')
     ? structures.filter(s => s.health > 0 && !s.isBuilding && s.type === 'internetCenter' && s.mesh)
     : [];
+    const garrisonStructures = (selectedInfantryForStruct.length > 0 && typeof structures !== 'undefined')
+    ? structures.filter(s => s.health > 0 && !s.isBuilding && (s.type === 'bunker' || s.type === 'palace') && s.mesh)
+    : [];
     const icMeshes = icStructures.map(s => s.mesh);
-    const transportHits = raycaster.intersectObjects([...friendlyMeshes, ...icMeshes], true);
+    const garrisonStructMeshes = garrisonStructures.map(s => s.mesh);
+    const transportHits = raycaster.intersectObjects([...friendlyMeshes, ...icMeshes, ...garrisonStructMeshes], true);
     if (transportHits.length > 0) {
         let hitObj = transportHits[0].object;
         while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
@@ -2624,6 +2629,22 @@ function issueMoveCommand(e) {
                     h.targetPosition.copy(icTarget.position);
             });
             showNotification(`Hackers ordered to garrison Internet Center (${icTarget.garrisoned.length}/${icTarget.capacity} slots) for accelerated hacking.`, 'info');
+            updateSidebar();
+            return;
+        }
+        const gStruct = garrisonStructures.find(s => s.mesh === hitObj);
+        if (gStruct && selectedInfantryForStruct.length > 0) {
+            if (!gStruct.capacity) gStruct.capacity = 5;
+            if (!gStruct.garrisoned) gStruct.garrisoned = [];
+            if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(gStruct.position, 'garrison');
+            selectedInfantryForStruct.forEach(inf => {
+                    inf.embarkTarget = gStruct;
+                    inf.taskState = 'MovingToEmbark';
+                    inf.combatTarget = null;
+                    inf.targetPosition.copy(gStruct.position);
+            });
+            const sLabel = gStruct.type === 'palace' ? 'Palace' : 'Bunker';
+            showNotification(`Infantry ordered to garrison ${sLabel} (${gStruct.garrisoned.length}/${gStruct.capacity} slots).`, 'info');
             updateSidebar();
             return;
         }
