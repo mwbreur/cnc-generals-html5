@@ -2272,6 +2272,8 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
     };
 
     activeFX.push({
+        persistent: true,
+        dispose: cleanup,
         group: rootGrp,
         dispose: cleanup,
         update() {
@@ -2502,11 +2504,17 @@ function spawnScrapCrate(pos) {
     activeScrapCrates.push(crateObj);
 }
 
-// Update all FX every frame (with hard safety cap to keep draw calls bounded in massive battles)
+// Update all FX every frame (with hard safety cap to keep draw calls bounded in massive battles;
+// never evict persistent gameplay flyovers/crates/superweapons like Supply Drop C-130s!)
 const MAX_ACTIVE_FX = 450;
 function updateFXEngine() {
-    while (activeFX.length > MAX_ACTIVE_FX) {
-        const oldest = activeFX.shift();
+    let evictScanIdx = 0;
+    while (activeFX.length > MAX_ACTIVE_FX && evictScanIdx < activeFX.length) {
+        if (activeFX[evictScanIdx] && activeFX[evictScanIdx].persistent) {
+            evictScanIdx++;
+            continue;
+        }
+        const oldest = activeFX.splice(evictScanIdx, 1)[0];
         if (oldest) {
             if (typeof oldest.dispose === 'function') { try { oldest.dispose(); } catch (_) {} }
             else if (oldest.mesh && typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(oldest.mesh);
@@ -2514,7 +2522,14 @@ function updateFXEngine() {
         }
     }
     for (let i = activeFX.length - 1; i >= 0; i--) {
-        const alive = activeFX[i].update();
+        const fx = activeFX[i];
+        let alive = false;
+        try {
+            alive = !!(fx && typeof fx.update === 'function' && fx.update());
+        } catch (_) {
+            if (fx && typeof fx.dispose === 'function') { try { fx.dispose(); } catch (_e) {} }
+            alive = false;
+        }
         if (!alive) {
             activeFX.splice(i, 1);
         }
@@ -2782,6 +2797,8 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
     const originCenter = targetPos.clone();
 
     activeFX.push({
+            persistent: true,
+            group: group,
             life: duration,
             update() {
                 life--;
@@ -2978,6 +2995,8 @@ function animateNukeStrike(siloPos, targetPos) {
     let frame = 0;
 
     activeFX.push({
+            persistent: true,
+            group: missileGroup,
             life: 220,
             update() {
                 frame++;
@@ -3782,7 +3801,18 @@ function spawnWaypointMarker(pos, orderType = 'move') {
 
     let life = 0;
     const maxLife = isAttack ? 34 : 30;
+    const cleanupWaypoint = () => {
+        scene.remove(group);
+        ringGeo.dispose();
+        ringMat.dispose();
+        tickGeo.dispose();
+        tickMat.dispose();
+        if (beamGeo) beamGeo.dispose();
+        if (beamMat) beamMat.dispose();
+    };
+
     activeFX.push({
+        dispose: cleanupWaypoint,
         update() {
             life++;
             const t = life / maxLife;
@@ -3965,6 +3995,8 @@ function triggerSupplyDropZoneDelivery(structure) {
         let lifeTicks = 0;
 
         activeFX.push({
+                persistent: true,
+                dispose: disposeCrate,
                 update() {
                     lifeTicks++;
                     if (!landed) {
@@ -4006,12 +4038,37 @@ function triggerSupplyDropZoneDelivery(structure) {
                         disposeCrate();
                         return false;
                     }
-                    return lifeTicks < 1200;
+                    if (lifeTicks >= 1200) {
+                        disposeCrate();
+                        return false;
+                    }
+                    return true;
                 }
         });
     }
 
+    const cleanupSupplyC130 = () => {
+        if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+            const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+            if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+        }
+        scene.remove(plane);
+        if (!(plane.userData && plane.userData.isW3D)) {
+            const mats = new Set();
+            plane.traverse(c => {
+                    if (c.geometry && typeof c.geometry.dispose === 'function') c.geometry.dispose();
+                    if (c.material) {
+                        if (Array.isArray(c.material)) c.material.forEach(m => mats.add(m));
+                        else mats.add(c.material);
+                    }
+            });
+            mats.forEach(m => { if (m && typeof m.dispose === 'function') m.dispose(); });
+        }
+    };
+
     activeFX.push({
+            persistent: true,
+            dispose: cleanupSupplyC130,
             update() {
                 planeTick++;
                 const t = planeTick / planeDuration;
@@ -4028,22 +4085,7 @@ function triggerSupplyDropZoneDelivery(structure) {
                     });
                 }
                 if (planeTick >= planeDuration) {
-                    if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
-                        const idx = window.activeSupplyPlanes.indexOf(planeTracker);
-                        if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
-                    }
-                    scene.remove(plane);
-                    if (!(plane.userData && plane.userData.isW3D)) {
-                        const mats = new Set();
-                        plane.traverse(c => {
-                                if (c.geometry && typeof c.geometry.dispose === 'function') c.geometry.dispose();
-                                if (c.material) {
-                                    if (Array.isArray(c.material)) c.material.forEach(m => mats.add(m));
-                                    else mats.add(c.material);
-                                }
-                        });
-                        mats.forEach(m => { if (m && typeof m.dispose === 'function') m.dispose(); });
-                    }
+                    cleanupSupplyC130();
                     return false;
                 }
                 return true;
@@ -4078,7 +4120,17 @@ function triggerC130Paradrop(targetPos) {
 
     let frame = 0;
     let dropped = false;
+    const cleanupParadropC130 = () => {
+        planeTracker.alive = false;
+        if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+            const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+            if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+        }
+        scene.remove(plane);
+    };
     activeFX.push({
+        persistent: true,
+        dispose: cleanupParadropC130,
         update() {
             frame++;
             const t = frame / totalFrames;
@@ -4097,6 +4149,8 @@ function triggerC130Paradrop(targetPos) {
                     scene.add(chute);
                     let dropTick = 0;
                     activeFX.push({
+                        persistent: true,
+                        dispose() { scene.remove(chute); chute.geometry.dispose(); chuteMat.dispose(); },
                         update() {
                             dropTick++;
                             const dt = Math.min(1, dropTick / 65);
@@ -4114,12 +4168,7 @@ function triggerC130Paradrop(targetPos) {
             }
 
             if (frame < totalFrames) return true;
-            planeTracker.alive = false;
-            if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
-                const idx = window.activeSupplyPlanes.indexOf(planeTracker);
-                if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
-            }
-            scene.remove(plane);
+            cleanupParadropC130();
             return false;
         }
     });
@@ -4148,8 +4197,17 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
 
     let frame = 0;
     let dropped = false;
+    const cleanupFabC130 = () => {
+        if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+            const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+            if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+        }
+        scene.remove(plane);
+    };
 
     activeFX.push({
+        persistent: true,
+        dispose: cleanupFabC130,
         update() {
             frame++;
             const t = frame / totalFrames;
@@ -4171,6 +4229,12 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
 
                 let dropTick = 0;
                 activeFX.push({
+                    persistent: true,
+                    dispose() {
+                        scene.remove(canisterGrp);
+                        canister.geometry.dispose(); canisterMat.dispose();
+                        chute.geometry.dispose(); chuteMat.dispose();
+                    },
                     update() {
                         dropTick++;
                         const dt = Math.min(1, dropTick / 68);
@@ -4198,11 +4262,7 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
             }
 
             if (frame < totalFrames) return true;
-            if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
-                const idx = window.activeSupplyPlanes.indexOf(planeTracker);
-                if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
-            }
-            scene.remove(plane);
+            cleanupFabC130();
             return false;
         }
     });
@@ -4239,7 +4299,20 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
         window.activeSupplyPlanes.push(planeTracker);
     }
 
+    const cleanupSpectre = () => {
+        if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+            const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+            if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+        }
+        scene.remove(plane);
+        scene.remove(targetRing);
+        ringGeo.dispose();
+        ringMat.dispose();
+    };
+
     activeFX.push({
+        persistent: true,
+        dispose: cleanupSpectre,
         update() {
             frame++;
             angle += angularSpeed;
@@ -4313,7 +4386,17 @@ function triggerChinaCarpetBomber(targetPos, pseudoAttacker) {
     let frame = 0;
     const droppedIdx = new Set();
 
+    const cleanupCarpetBomber = () => {
+        if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
+            const idx = window.activeSupplyPlanes.indexOf(planeTracker);
+            if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
+        }
+        scene.remove(plane);
+    };
+
     activeFX.push({
+        persistent: true,
+        dispose: cleanupCarpetBomber,
         update() {
             frame++;
             const t = frame / totalFrames;
@@ -4444,6 +4527,7 @@ function triggerA10Strike(targetPos, pseudoAttacker) {
         };
 
         activeFX.push({
+            persistent: true,
             dispose: cleanupPlane,
             update() {
                 if (!launched) {
@@ -4552,6 +4636,7 @@ function triggerSpyDronePower(targetPos) {
         ringMat.dispose();
     };
     activeFX.push({
+        persistent: true,
         life,
         dispose: cleanupDrone,
         update() {
@@ -4644,6 +4729,7 @@ function triggerArtilleryBarrageFX(targetPos, pseudoAttacker) {
     let fired = 0;
     // Fixed 60Hz activeFX barrage with falling 152mm arcing shells (no setTimeout!)
     activeFX.push({
+        persistent: true,
         update() {
             tick++;
             if (fired < totalShells && (tick === 1 || tick % 16 === 0)) {
@@ -4707,6 +4793,7 @@ function triggerAnthraxBombFX(targetPos, pseudoAttacker) {
     };
 
     activeFX.push({
+        persistent: true,
         dispose: cleanup,
         update() {
             if (!detonated) {
@@ -4774,6 +4861,7 @@ function triggerLeafletDropFX(targetPos, onDrop = null) {
         else scene.remove(plane);
     };
     activeFX.push({
+        persistent: true,
         dispose: cleanupPlane,
         update() {
             frame++;

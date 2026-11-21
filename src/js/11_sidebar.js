@@ -1629,8 +1629,8 @@ function renderSupplyInspectorAndGrid(inspector, supplyPoint) {
 }
 
 function renderBaseOverviewInspectorAndGrid(inspector) {
-    const combatCount = units.filter(u => !['dozer', 'worker', 'truck'].includes(u.type)).length;
-    const harvesterCount = units.filter(u => u.type === 'truck' || u.type === 'worker').length;
+    const combatCount = units.filter(u => !['dozer', 'worker', 'truck', 'chinook'].includes(u.type)).length;
+    const harvesterCount = units.filter(u => u.type === 'truck' || u.type === 'worker' || u.type === 'chinook').length;
     const builderCount = units.filter(u => u.type === 'dozer' || u.type === 'worker').length;
 
     const factionCrests = {
@@ -2745,7 +2745,7 @@ window.addEventListener('keydown', e => {
             const isDouble = (now - lastQPressTime) < 380;
             lastQPressTime = now;
             deselectAll();
-            const combatList = units.filter(u => u.health > 0 && !['dozer', 'worker', 'truck'].includes(u.type));
+            const combatList = units.filter(u => u.health > 0 && !['dozer', 'worker', 'truck', 'chinook'].includes(u.type));
             const toSelect = isDouble ? combatList : combatList.filter(u => isUnitVisibleOnScreen(u));
             toSelect.forEach(u => { u.selected = true; addSelectionCircle(u); });
             updateSidebar();
@@ -2760,7 +2760,7 @@ window.addEventListener('keydown', e => {
             const isDouble = (now - lastWPressTime) < 380;
             lastWPressTime = now;
             deselectAll();
-            const airList = units.filter(u => u.health > 0 && u.isAir);
+            const airList = units.filter(u => u.health > 0 && u.isAir && u.type !== 'chinook');
             const toSelect = isDouble ? airList : airList.filter(u => isUnitVisibleOnScreen(u));
             toSelect.forEach(u => { u.selected = true; addSelectionCircle(u); });
             updateSidebar();

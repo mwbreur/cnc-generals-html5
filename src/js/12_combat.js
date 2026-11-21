@@ -1478,10 +1478,14 @@ function executeWeaponFireInner(attacker, target) {
                 if (typeof spawnRocketBackblast === 'function') spawnRocketBackblast(muzzlePos, targetPos, 0.8 * heroicScale);
                 spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 32, damageType: 'EXPLOSIVE' });
             }
-            // Fire-From-Within: Garrisoned troops fire out
-            if (attacker.garrisoned && attacker.garrisoned.length > 0) {
-                vehDmg += attacker.garrisoned.length * 6;
-            }
+        } else if (attacker.isAI && (attacker.difficulty === 'hard' || attacker.difficulty === 'medium')) {
+            // AI Rockvees on Medium/Hard fire TOW missiles
+            if (typeof spawnRocketBackblast === 'function') spawnRocketBackblast(muzzlePos, targetPos, 0.8 * heroicScale);
+            spawnRocketProjectile(muzzlePos, targetPos, false, false, { attacker, target, damage: 32, damageType: 'EXPLOSIVE' });
+        }
+        // Fire-From-Within: Garrisoned troops fire out (Player & AI)
+        if (attacker.garrisoned && attacker.garrisoned.length > 0) {
+            vehDmg += attacker.garrisoned.length * 6;
         }
         applyCalculatedDamage(attacker, target, vehDmg, 'SMALL_ARMS');
     } else {

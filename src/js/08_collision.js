@@ -590,7 +590,7 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
         isAir: isAir,
         airState: isAir ? (type === 'comanche' || type === 'chinook' ? 'hovering' : 'circling') : 'none',
         aiState: isGatherer ? (type === 'worker' ? 'Idle' : 'MovingToDock') : 'Idle',
-        taskState: isBuilder ? 'Idle' : (isGatherer ? 'MovingToDock' : 'Idle'),
+        taskState: 'Idle',
         cargoLoaded: 0, timerState: 0, supplyTarget: null,
         patrolCenter: mesh.position.clone()
     };

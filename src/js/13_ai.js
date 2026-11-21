@@ -29,7 +29,7 @@ const ZERO_HOUR_AI_DATA = {
     aiDozerBoredRadiusModifier: 2.0,
     repairHealthPercentPerSecond: 0.02,
     resourceGatherers: { easy: 1, medium: 2, hard: 2 },
-    maxStrikeTeamSize: { easy: 3, medium: 4, hard: 5 }
+    maxStrikeTeamSize: { easy: 5, medium: 8, hard: 11 }
 };
 window.ZERO_HOUR_AI_DATA = ZERO_HOUR_AI_DATA;
 
@@ -803,65 +803,128 @@ function scoreAITargetPriority(attacker, target, cmd = null) {
 }
 window.scoreAITargetPriority = scoreAITargetPriority;
 
-// Choose optimal unit type based on faction, facility, and enemy threat profile
-function chooseAICounterUnitType(cmd, facilityType) {
+// Choose optimal unit type based on faction, facility, enemy threat profile, and current wave role diversity
+function chooseAICounterUnitType(cmd, facilityType, existingUnits = []) {
     const f = cmd.faction || 'usa';
+    const diff = cmd.difficulty || 'medium';
     const counter = (cmd.threatProfile && cmd.threatProfile.preferredCounter) || 'balanced';
-
-    if (facilityType === 'airfield') {
-        if (f === 'china') return 'mig';
-        if (f === 'usa') return simRandom() < 0.55 ? 'comanche' : 'raptor';
-        return null;
-    }
-
-    if (facilityType === 'barracks') {
-        if (f === 'china') {
-            if (counter === 'anti_air' || counter === 'anti_armor') return 'tankhunter';
-            return simRandom() < 0.45 ? 'tankhunter' : 'redguard';
-        } else if (f === 'gla') {
-            if (counter === 'anti_air' || counter === 'anti_armor') return 'rpg';
-            return simRandom() < 0.45 ? 'rpg' : 'rebel';
-        } else {
-            if (counter === 'anti_air' || counter === 'anti_armor') return 'missiledefender';
-            return simRandom() < 0.45 ? 'missiledefender' : 'ranger';
-        }
-    }
-
-    // War Factory / Arms Dealer vehicles (combined-arms roster)
     const hasTier3 = typeof enemyStructures !== 'undefined' && enemyStructures.some(
         s => s.ownerId === cmd.ownerId && !s.isBuilding && s.health > 0 &&
         (s.type === 'propagandaCenter' || s.type === 'strategyCenter' || s.type === 'palace')
     );
+    const countType = (types) => existingUnits.filter(u => types.includes(u.type)).length;
+
+    if (facilityType === 'airfield') {
+        if (f === 'china') return 'mig';
+        if (f === 'usa') {
+            const r = simRandom();
+            if (hasTier3 && diff !== 'easy' && countType(['aurora']) < (diff === 'hard' ? 2 : 1) && r < 0.25) return 'aurora';
+            if (diff !== 'easy' && countType(['stealthfighter']) < 1 && r < 0.45) return 'stealthfighter';
+            return simRandom() < 0.55 ? 'comanche' : 'raptor';
+        }
+        return null;
+    }
+
+    if (facilityType === 'barracks') {
+        // Blend threat counter (~35%) with full infantry/specialist variety (~65%) so barracks never spams 100% one unit
+        const useCounter = (counter === 'anti_air' || counter === 'anti_armor') && simRandom() < 0.35;
+        if (f === 'china') {
+            if (hasTier3 && diff !== 'easy' && countType(['blacklotus']) === 0 && simRandom() < 0.16) return 'blacklotus';
+            if (useCounter) return 'tankhunter';
+            const thCount = countType(['tankhunter']);
+            const rgCount = countType(['redguard']);
+            if (thCount > rgCount + 1) return 'redguard';
+            if (rgCount > thCount + 1) return 'tankhunter';
+            return simRandom() < 0.52 ? 'tankhunter' : 'redguard';
+        } else if (f === 'gla') {
+            if (hasTier3 && diff !== 'easy') {
+                if (countType(['jarmen']) === 0 && simRandom() < 0.18) return 'jarmen';
+                if (countType(['mob']) < (diff === 'hard' ? 2 : 1) && simRandom() < 0.24) return 'mob';
+                if (diff === 'hard' && countType(['hijacker']) === 0 && simRandom() < 0.14) return 'hijacker';
+            }
+            if (diff !== 'easy' && countType(['terrorist']) < 1 && simRandom() < 0.14) return 'terrorist';
+            if (useCounter) return 'rpg';
+            const rpgCount = countType(['rpg']);
+            const rebCount = countType(['rebel']);
+            if (rpgCount > rebCount + 1) return 'rebel';
+            if (rebCount > rpgCount + 1) return 'rpg';
+            return simRandom() < 0.52 ? 'rpg' : 'rebel';
+        } else {
+            if (hasTier3 && diff !== 'easy') {
+                if (countType(['burton']) === 0 && simRandom() < 0.18) return 'burton';
+                if (countType(['pathfinder']) < (diff === 'hard' ? 2 : 1) && simRandom() < 0.28) return 'pathfinder';
+            }
+            if (useCounter) return 'missiledefender';
+            const mdCount = countType(['missiledefender', 'rocket']);
+            const rngCount = countType(['ranger', 'infantry']);
+            if (mdCount > rngCount + 1) return 'ranger';
+            if (rngCount > mdCount + 1) return 'missiledefender';
+            return simRandom() < 0.52 ? 'missiledefender' : 'ranger';
+        }
+    }
+
+    // War Factory / Arms Dealer vehicles: enforce combined-arms role diversity in every wave!
+    // Blend threat counter (~35%) with role-balanced combined-arms selection (~65%)
+    const useVehicleCounter = counter !== 'balanced' && simRandom() < 0.35;
+
     if (f === 'china') {
-        if (counter === 'anti_air') return simRandom() < 0.75 ? 'gatling' : 'battlemaster';
-        if (counter === 'anti_infantry') return simRandom() < 0.45 ? 'dragon' : (simRandom() < 0.65 ? 'gatling' : 'battlemaster');
-        if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.45) ? 'overlord' : 'battlemaster';
+        if (useVehicleCounter) {
+            if (counter === 'anti_air') return 'gatling';
+            if (counter === 'anti_infantry') return simRandom() < 0.5 ? 'dragon' : (simRandom() < 0.5 ? 'crawler' : 'gatling');
+            if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.55) ? 'overlord' : 'battlemaster';
+        }
+        // Fill missing combined-arms roles first (AA escort, flame/transport, siege artillery, heavy armor)
+        if (countType(['gatling']) === 0 && existingUnits.length >= 2) return 'gatling';
+        if (diff !== 'easy' && countType(['crawler', 'dragon']) === 0 && existingUnits.length >= 3) {
+            return simRandom() < 0.55 ? 'crawler' : 'dragon';
+        }
+        if (diff !== 'easy' && countType(['inferno', 'nukecannon']) === 0 && existingUnits.length >= 4) {
+            return (hasTier3 && simRandom() < 0.55) ? 'nukecannon' : 'inferno';
+        }
         const r = simRandom();
-        if (hasTier3 && r < 0.24) return 'overlord';
-        if (hasTier3 && cmd.difficulty !== 'easy' && r < 0.34) return 'nukecannon';
-        if (r < 0.48) return 'gatling';
-        if (r < 0.62) return 'dragon';
-        if (r < 0.72) return 'inferno';
+        if (hasTier3 && r < (diff === 'hard' ? 0.28 : 0.20)) return 'overlord';
+        if (hasTier3 && diff !== 'easy' && r < (diff === 'hard' ? 0.42 : 0.32)) return 'nukecannon';
+        if (diff !== 'easy' && r < 0.54) return 'inferno';
+        if (r < 0.68) return 'gatling';
+        if (r < 0.79) return 'crawler';
+        if (r < 0.88) return 'dragon';
         return 'battlemaster';
     } else if (f === 'gla') {
-        if (counter === 'anti_air') return simRandom() < 0.75 ? 'quad' : 'scorpion';
-        if (counter === 'anti_infantry') return simRandom() < 0.45 ? 'toxintractor' : (simRandom() < 0.7 ? 'quad' : 'buggy');
-        if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.45) ? 'marauder' : 'scorpion';
+        if (useVehicleCounter) {
+            if (counter === 'anti_air') return 'quad';
+            if (counter === 'anti_infantry') return simRandom() < 0.5 ? 'toxintractor' : 'quad';
+            if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.55) ? 'marauder' : (simRandom() < 0.65 ? 'scorpion' : 'buggy');
+        }
+        if (countType(['quad']) === 0 && existingUnits.length >= 2) return 'quad';
+        if (diff !== 'easy' && countType(['buggy', 'scud']) === 0 && existingUnits.length >= 3) {
+            return (hasTier3 && simRandom() < 0.5) ? 'scud' : 'buggy';
+        }
+        if (countType(['toxintractor', 'technical']) === 0 && existingUnits.length >= 4) {
+            return simRandom() < 0.55 ? 'toxintractor' : 'technical';
+        }
         const r = simRandom();
-        if (hasTier3 && cmd.difficulty !== 'easy' && r < 0.22) return 'scud';
-        if (r < 0.42) return 'marauder';
-        if (r < 0.62) return 'quad';
-        if (r < 0.74) return 'buggy';
-        if (r < 0.84) return 'toxintractor';
+        if (hasTier3 && diff !== 'easy' && r < (diff === 'hard' ? 0.22 : 0.16)) return 'scud';
+        if (hasTier3 && diff === 'hard' && countType(['bombtruck']) === 0 && r < 0.29) return 'bombtruck';
+        if (hasTier3 && r < 0.48) return 'marauder';
+        if (r < 0.64) return 'quad';
+        if (r < 0.76) return 'buggy';
+        if (r < 0.85) return 'toxintractor';
+        if (r < 0.91) return 'technical';
         return 'scorpion';
     } else {
-        if (counter === 'anti_air') return simRandom() < 0.75 ? 'humvee' : 'paladin';
-        if (counter === 'anti_infantry') return simRandom() < 0.65 ? 'humvee' : 'tank';
-        if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.45) ? 'paladin' : 'tank';
+        if (useVehicleCounter) {
+            if (counter === 'anti_air') return 'humvee';
+            if (counter === 'anti_infantry') return simRandom() < 0.7 ? 'humvee' : 'ambulance';
+            if (counter === 'anti_armor') return (hasTier3 && simRandom() < 0.55) ? 'paladin' : 'tank';
+        }
+        if (countType(['humvee']) === 0 && existingUnits.length >= 2) return 'humvee';
+        if (hasTier3 && diff !== 'easy' && countType(['tomahawk']) === 0 && existingUnits.length >= 3) return 'tomahawk';
+        if (diff !== 'easy' && countType(['ambulance']) === 0 && existingUnits.length >= 5) return 'ambulance';
         const r = simRandom();
-        if (hasTier3 && cmd.difficulty !== 'easy' && r < 0.22) return 'tomahawk';
-        if (r < 0.48) return 'paladin';
+        if (hasTier3 && diff !== 'easy' && r < (diff === 'hard' ? 0.22 : 0.16)) return 'tomahawk';
+        if (hasTier3 && r < (diff === 'hard' ? 0.52 : 0.42)) return 'paladin';
         if (r < 0.72) return 'humvee';
+        if (diff !== 'easy' && countType(['ambulance']) < 1 && r < 0.80) return 'ambulance';
         return 'tank';
     }
 }
@@ -1203,14 +1266,14 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // --- 1. AI Production Engine with Threat Counter Selection ---
+            // --- 1. AI Production Engine with Combined-Arms Variety & Threat Counter Selection ---
             cmd.productionTimer++;
             const isWealthy = (cmd.resources || 0) >= ZERO_HOUR_AI_DATA.resourcesWealthy;
-            const baseProdInterval = cmd.difficulty === 'hard' ? 7 : cmd.difficulty === 'easy' ? 22 : 12;
-            const prodInterval = isWealthy ? Math.max(4, Math.floor(baseProdInterval * 0.65)) : baseProdInterval;
-            const maxUnits = cmd.difficulty === 'hard' ? 24 : cmd.difficulty === 'easy' ? 10 : 15;
+            const baseProdInterval = cmd.difficulty === 'hard' ? 6 : cmd.difficulty === 'easy' ? 18 : 10;
+            const prodInterval = isWealthy ? Math.max(3, Math.floor(baseProdInterval * 0.65)) : baseProdInterval;
+            const maxUnits = cmd.difficulty === 'hard' ? 30 : cmd.difficulty === 'easy' ? 12 : 20;
 
-            const combatUnits = myUnits.filter(u => u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck' && u.type !== 'chinook');
+            const combatUnits = myUnits.filter(u => !u.garrisonedIn && u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck' && u.type !== 'chinook');
             if (cmd.productionTimer >= prodInterval && combatUnits.length < maxUnits && (cmd.resources || 0) >= 500) {
                 cmd.productionTimer = 0;
                 const fac = myStructures.find(es => !es.isBuilding && es.type === 'factory' && es.health > 0);
@@ -1218,17 +1281,20 @@ function processEnemyAIEngine() {
                 const air = myStructures.find(es => !es.isBuilding && es.type === 'airfield' && es.health > 0);
                 const existingAirCount = combatUnits.filter(u => u.isAir).length;
                 const maxAir = cmd.difficulty === 'hard' ? 4 : (cmd.difficulty === 'easy' ? 1 : 2);
-                // Combined arms: mix armor/vehicles (~55%), counter infantry (~25%), and aircraft (~20% when Airfield operational)
+                // Combined arms: mix armor/vehicles (~60%), infantry/specialists (~25%), and aircraft (~15-20% when Airfield operational)
                 let chosenFacility = null;
-                if (air && existingAirCount < maxAir && simRandom() < 0.24) {
+                if (air && existingAirCount < maxAir && simRandom() < 0.22) {
                     chosenFacility = air;
                 } else if (fac && bar) {
-                    chosenFacility = simRandom() < 0.70 ? fac : bar;
+                    const infCount = combatUnits.filter(u => typeof isInfantryType === 'function' ? isInfantryType(u.type) : false).length;
+                    const vehCount = combatUnits.length - infCount - existingAirCount;
+                    const facBias = (infCount * 2 < vehCount) ? 0.52 : 0.68;
+                    chosenFacility = simRandom() < facBias ? fac : bar;
                 } else {
                     chosenFacility = fac || bar || (air && existingAirCount < maxAir ? air : null);
                 }
                 if (chosenFacility) {
-                    const uType = chooseAICounterUnitType(cmd, chosenFacility.type);
+                    const uType = chooseAICounterUnitType(cmd, chosenFacility.type, combatUnits);
                     if (uType) {
                         const rawSpawn = chosenFacility.position.clone().add(new THREE.Vector3(10 + simRandom() * 4, 0, 8 + simRandom() * 4));
                         const spawnPos = adjustToPossibleDestination(rawSpawn, chosenFacility);
@@ -1242,6 +1308,34 @@ function processEnemyAIEngine() {
                             eu.ownerId = cmd.ownerId;
                             eu.isAI = true;
                             eu.difficulty = cmd.difficulty;
+                            // Ensure any pre-garrisoned passengers (e.g. China Troop Crawler Red Guards) inherit commander team/owner
+                            if (Array.isArray(eu.garrisoned) && eu.garrisoned.length > 0) {
+                                eu.garrisoned.forEach(p => {
+                                    p.teamId = cmd.teamId;
+                                    p.ownerId = cmd.ownerId;
+                                    p.isAI = true;
+                                    p.difficulty = cmd.difficulty;
+                                });
+                            }
+                            // Medium & Hard AI loads USA Humvees ("Rockvees") and GLA Technicals with rocket/rifle infantry
+                            if ((uType === 'humvee' || uType === 'technical') && cmd.difficulty !== 'easy' && typeof spawnEnemyUnit === 'function') {
+                                const passTypes = uType === 'humvee'
+                                    ? (cmd.difficulty === 'hard' ? ['missiledefender', 'missiledefender', 'ranger'] : ['missiledefender', 'ranger'])
+                                    : (cmd.difficulty === 'hard' ? ['rpg', 'rpg', 'rebel'] : ['rpg', 'rebel']);
+                                for (let pi = 0; pi < passTypes.length; pi++) {
+                                    const pass = spawnEnemyUnit(passTypes[pi], spawnPos.clone(), null, cmd.faction);
+                                    if (pass) {
+                                        pass.teamId = cmd.teamId;
+                                        pass.ownerId = cmd.ownerId;
+                                        pass.isAI = true;
+                                        pass.difficulty = cmd.difficulty;
+                                        pass.garrisonedIn = eu;
+                                        if (pass.mesh) pass.mesh.visible = false;
+                                        if (!Array.isArray(eu.garrisoned)) eu.garrisoned = [];
+                                        eu.garrisoned.push(pass);
+                                    }
+                                }
+                            }
                             // Add newly produced combat unit to staging strike team at rally point (AISkirmishPlayer::processTeamBuilding)
                             if (!cmd.stagingTeam) cmd.stagingTeam = [];
                             cmd.stagingTeam.push(eu.netId);
@@ -1259,18 +1353,35 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // --- 2. Reconnaissance & Scout Squad Assembly (Original Generals: form a 2-3 unit recon group before setting out) ---
+            // --- 2. Reconnaissance & Scout Squad Assembly (Original Generals: form a 2-unit recon group ONCE before enemy base is found; never trickle 1-by-1!) ---
             for (let sId of cmd.scoutNetIds) {
-                if (!myUnits.some(u => u.netId === sId)) cmd.scoutNetIds.delete(sId);
+                if (!combatUnits.some(u => u.netId === sId)) cmd.scoutNetIds.delete(sId);
             }
-            const reconSquadSize = (cmd.difficulty === 'easy') ? 2 : 3;
-            while (cmd.scoutNetIds.size < reconSquadSize && combatUnits.length > cmd.scoutNetIds.size) {
-                const candidateScout = combatUnits.find(u => !u.combatTarget && !u._releasedForAttack && !cmd.scoutNetIds.has(u.netId));
-                if (!candidateScout) break;
-                candidateScout.isScout = true;
-                cmd.scoutNetIds.add(candidateScout.netId);
-                if (cmd.stagingTeam) {
-                    cmd.stagingTeam = cmd.stagingTeam.filter(id => id !== candidateScout.netId);
+            const hasDiscoveredBase = (cmd.discoveredEnemyBases && cmd.discoveredEnemyBases.length > 0);
+            if (hasDiscoveredBase && cmd.scoutNetIds.size > 0) {
+                // Enemy base has been located: fold scouts back into the main strike force instead of wandering alone!
+                cmd.scoutNetIds.forEach(sId => {
+                    const su = combatUnits.find(u => u.netId === sId);
+                    if (su) {
+                        su.isScout = false;
+                        if (!su._releasedForAttack && cmd.stagingTeam && !cmd.stagingTeam.includes(su.netId)) {
+                            cmd.stagingTeam.push(su.netId);
+                        }
+                    }
+                });
+                cmd.scoutNetIds.clear();
+            }
+            const reconSquadSize = 2;
+            // Only assemble the initial recon squad BEFORE it launches (never endlessly steal newly produced units 1-by-1 out of stagingTeam as scouts die!)
+            if (!cmd._reconLaunched && !hasDiscoveredBase) {
+                while (cmd.scoutNetIds.size < reconSquadSize && combatUnits.length > cmd.scoutNetIds.size) {
+                    const candidateScout = combatUnits.find(u => !u.combatTarget && !u._releasedForAttack && !cmd.scoutNetIds.has(u.netId) && !u.isAir);
+                    if (!candidateScout) break;
+                    candidateScout.isScout = true;
+                    cmd.scoutNetIds.add(candidateScout.netId);
+                    if (cmd.stagingTeam) {
+                        cmd.stagingTeam = cmd.stagingTeam.filter(id => id !== candidateScout.netId);
+                    }
                 }
             }
 
@@ -1351,8 +1462,15 @@ function processEnemyAIEngine() {
                     }
                 }
             } else {
-                cmd._reconLaunched = false;
-                cmd._reconGoal = null;
+                // Do not reset _reconLaunched if an enemy base was already discovered; if all scouts died before finding a base, wait 30 AI ticks before forming another pair
+                if (!hasDiscoveredBase) {
+                    cmd._reconRetryCooldown = (cmd._reconRetryCooldown || 0) + 1;
+                    if (cmd._reconRetryCooldown >= 30) {
+                        cmd._reconRetryCooldown = 0;
+                        cmd._reconLaunched = false;
+                        cmd._reconGoal = null;
+                    }
+                }
             }
 
             // --- 3. Line-of-Sight & Recon Detection Pass (NO OMNISCIENCE!) ---
@@ -1425,8 +1543,8 @@ function processEnemyAIEngine() {
             });
 
             const elapsedSec = (Date.now() - (cmd.matchStartTime || (typeof matchStartTime !== 'undefined' ? matchStartTime : Date.now()))) / 1000;
-            const attackDelays = { easy: 150, medium: 90, hard: 60 };
-            const attackDelaySec = attackDelays[cmd.difficulty] || 90;
+            const attackDelays = { easy: 135, medium: 85, hard: 60 };
+            const attackDelaySec = attackDelays[cmd.difficulty] || 85;
             const canLaunchOffensive = elapsedSec >= attackDelaySec;
 
             if (canLaunchOffensive && !cmd.hasAnnouncedOffensive) {
@@ -1439,13 +1557,28 @@ function processEnemyAIEngine() {
                 }
             }
 
-            // Clean dead units from stagingTeam
+            // Clean dead units from stagingTeam and ensure ALL non-scout, non-released combat units stage at rallyPoint together!
             if (!cmd.stagingTeam) cmd.stagingTeam = [];
             cmd.stagingTeam = cmd.stagingTeam.filter(id => combatUnits.some(u => u.netId === id));
-            const targetWaveSize = ZERO_HOUR_AI_DATA.maxStrikeTeamSize[cmd.difficulty] || 4;
+            const releasedGroundUnits = combatUnits.filter(u => u._releasedForAttack && !u.isAir);
+            combatUnits.forEach(u => {
+                if (u.isScout) return;
+                // If a previously released unit is left isolated near home base after defending, fold it back into stagingTeam so it regroups with the next wave instead of trickling 1-by-1!
+                if (u._releasedForAttack && !u.combatTarget && u.mesh.position.distanceTo(cmd.basePos) < 75 && releasedGroundUnits.length < 3) {
+                    u._releasedForAttack = false;
+                    u._waveGoal = null;
+                    u._waveId = 0;
+                }
+                if (!u._releasedForAttack && !cmd.stagingTeam.includes(u.netId)) {
+                    cmd.stagingTeam.push(u.netId);
+                }
+            });
+
+            const targetWaveSize = ZERO_HOUR_AI_DATA.maxStrikeTeamSize[cmd.difficulty] || 8;
+            const minTimeoutWaveSize = Math.max(4, targetWaveSize - 2);
             const hasKnownEnemy = (cmd.discoveredEnemyTargets.length > 0 || cmd.discoveredEnemyBases.length > 0);
-            const waveWaitTicks = (cmd.stagingTeam.length >= 2 && canLaunchOffensive) ? (cmd.attackWaveTimer = (cmd.attackWaveTimer || 0) + 1) : (cmd.attackWaveTimer = 0);
-            const waveReady = canLaunchOffensive && (cmd.stagingTeam.length >= targetWaveSize || (cmd.stagingTeam.length >= Math.max(2, targetWaveSize - 1) && waveWaitTicks >= 60));
+            const waveWaitTicks = (cmd.stagingTeam.length >= minTimeoutWaveSize && canLaunchOffensive) ? (cmd.attackWaveTimer = (cmd.attackWaveTimer || 0) + 1) : (cmd.attackWaveTimer = 0);
+            const waveReady = canLaunchOffensive && (cmd.stagingTeam.length >= targetWaveSize || (cmd.stagingTeam.length >= minTimeoutWaveSize && waveWaitTicks >= 110));
 
             if (waveReady) {
                 // If scouts haven't found an enemy base yet, pick a search-and-destroy sweep point (enemy spawn) so AI never huddles forever!
@@ -1457,7 +1590,7 @@ function processEnemyAIEngine() {
                         sweepTarget = spawnPool[cmd._sweepIdx].clone();
                     }
                 }
-                // Release staging team as a coordinated combined-arms (land + air) strike wave!
+                // Release staging team as a coordinated combined-arms (land + air) strike wave with synchronized convoy march speed!
                 const waveTargetPos = sweepTarget
                     ? sweepTarget.clone()
                     : (cmd.discoveredEnemyBases.length > 0
@@ -1466,16 +1599,22 @@ function processEnemyAIEngine() {
                 const waveMembers = cmd.stagingTeam
                     .map(id => combatUnits.find(u => u.netId === id))
                     .filter(Boolean);
+                const waveId = (cmd._nextWaveId = (cmd._nextWaveId || 0) + 1);
+                // Synchronized convoy march speed so fast buggies/humvees escort main battle tanks & infantry instead of rushing ahead 1-by-1
+                const convoySpeed = 0.145;
                 waveMembers.forEach((member, mi) => {
                         member._releasedForAttack = true;
+                        member._waveId = waveId;
+                        member._waveConvoySpeed = convoySpeed;
                         const spreadAng = (mi / Math.max(1, waveMembers.length)) * Math.PI * 2;
-                        const formOffset = member.isAir ? 0 : 4.5;
+                        const formOffset = member.isAir ? 0 : (4.5 + (mi % 2) * 3.0);
                         if (waveTargetPos) {
                             const dest = new THREE.Vector3(
                                 waveTargetPos.x + Math.cos(spreadAng) * formOffset,
                                 waveTargetPos.y || 0,
                                 waveTargetPos.z + Math.sin(spreadAng) * formOffset
                             );
+                            member._waveGoal = waveTargetPos.clone();
                             if (sweepTarget) member._sweepTarget = dest.clone();
                             if (member.isAir) {
                                 member.airState = 'flying';
@@ -1483,6 +1622,7 @@ function processEnemyAIEngine() {
                                 member.targetPosition.copy(dest);
                             } else {
                                 assignAIGroundRoute(member, dest);
+                                member.taskState = 'Moving';
                             }
                         }
                 });
@@ -1500,14 +1640,16 @@ function processEnemyAIEngine() {
 
             combatUnits.forEach((enemy, enemyIdx) => {
                     if (enemy.isScout && !enemy.combatTarget) return;
+                    const isStaging = !enemy._releasedForAttack;
 
                     // If unit is already engaged in active combat with valid hostile target:
                     if (enemy.combatTarget && enemy.combatTarget.health > 0 && !isFriendly(enemy, enemy.combatTarget)) {
                         const targetPos = enemy.combatTarget.position || enemy.combatTarget.mesh.position;
-                        if (!canLaunchOffensive && targetPos && enemy.mesh.position.distanceTo(cmd.basePos) > 55) {
+                        // Staged units defending the base perimeter must NOT chase an intruder across the map 1-by-1!
+                        if ((!canLaunchOffensive || isStaging) && targetPos && (enemy.mesh.position.distanceTo(cmd.basePos) > 72 || targetPos.distanceTo(cmd.basePos) > 80)) {
                             enemy.combatTarget = null;
                         } else {
-                            if (enemy.mesh.position.distanceTo(targetPos) > enemy.scanRange) {
+                            if (enemy.mesh.position.distanceTo(targetPos) > (enemy.scanRange || 22)) {
                                 // Never overwrite active bridge/A* waypoints while already routing toward target!
                                 if (!enemy.waypoints || enemy.waypoints.length === 0) {
                                     assignAIGroundRoute(enemy, targetPos, enemy.combatTarget);
@@ -1519,13 +1661,14 @@ function processEnemyAIEngine() {
                         enemy.combatTarget = null;
                     }
 
-                    // Defend base perimeter against close intruders at all times (guardInnerModifierAI)
+                    // Defend base perimeter against close intruders (for staging units, only engage intruders actually near base/rallyPoint!)
                     let localIntruder = null;
-                    let minDist = 38 * ZERO_HOUR_AI_DATA.guardInnerModifierAI;
+                    let minDist = 36 * ZERO_HOUR_AI_DATA.guardInnerModifierAI;
                     hostileUnits.forEach(hu => {
                             if (hu.mesh) {
                                 if (typeof canUnitTarget === 'function' && !canUnitTarget(enemy, hu)) return;
                                 if (hu.isStealthed && !(hu.revealedUntil && hu.revealedUntil > buildingTick)) return;
+                                if (isStaging && hu.mesh.position.distanceTo(cmd.basePos) > 72 && hu.mesh.position.distanceTo(cmd.rallyPoint) > 38) return;
                                 const d = enemy.mesh.position.distanceTo(hu.mesh.position);
                                 if (d < minDist) { minDist = d; localIntruder = hu; }
                             }
@@ -1548,8 +1691,7 @@ function processEnemyAIEngine() {
                         return;
                     }
 
-                    // Hold in staging rally area until wave is full or offensive grace expires
-                    const isStaging = cmd.stagingTeam.includes(enemy.netId) && !enemy._releasedForAttack;
+                    // Hold in staging rally area until full wave is assembled (5 on Easy, 8 on Medium, 11 on Hard)
                     if (!canLaunchOffensive || isStaging || !hasKnownEnemy) {
                         if (enemy.waypoints && enemy.waypoints.length > 0) return;
                         const slotIdx = hashSlotId(enemy.netId !== undefined ? enemy.netId : enemyIdx);
@@ -1568,6 +1710,22 @@ function processEnemyAIEngine() {
                             enemy.taskState = 'Idle';
                         }
                         return;
+                    }
+
+                    // Cohesive Wave March: keep released wave members advancing together toward their shared wave objective
+                    // until the wave arrives within assault staging distance (52u) of the target base!
+                    if (enemy._waveGoal && !enemy.isAir) {
+                        const distToWaveGoal = Math.hypot(enemy.mesh.position.x - enemy._waveGoal.x, enemy.mesh.position.z - enemy._waveGoal.z);
+                        if (distToWaveGoal > 52) {
+                            if (!enemy.waypoints || enemy.waypoints.length === 0) {
+                                if (Math.hypot(enemy.mesh.position.x - enemy.targetPosition.x, enemy.mesh.position.z - enemy.targetPosition.z) <= 5.0) {
+                                    assignAIGroundRoute(enemy, enemy._waveGoal);
+                                }
+                            }
+                            return;
+                        } else {
+                            enemy._waveGoal = null;
+                        }
                     }
 
                     // Select highest-priority discovered target using Zero Hour distance-weighted priority!

@@ -497,7 +497,18 @@ function animate() {
                     const productionFaction = structure.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
                     const newUnit = spawnUnit(item.type, spawnPos, productionFaction);
 
-                    if (newUnit.isAir) {
+                    const isHarvesterUnit = (newUnit.type === 'chinook' || newUnit.type === 'truck' || (newUnit.type === 'worker' && (structure.type === 'supplyStash' || structure.type === 'supplyCenter')));
+                    if (isHarvesterUnit) {
+                        newUnit.taskState = 'Idle';
+                        newUnit.aiState = 'MovingToDock';
+                        newUnit.supplyTarget = (typeof findNearestSupplyPoint === 'function') ? findNearestSupplyPoint(newUnit.mesh.position) : null;
+                        if (newUnit.supplyTarget) {
+                            newUnit.targetPosition.copy(newUnit.supplyTarget.position);
+                            if (newUnit.type === 'chinook') newUnit.airState = 'flying';
+                        } else if (newUnit.type === 'chinook') {
+                            newUnit.airState = 'hovering';
+                        }
+                    } else if (newUnit.isAir) {
                         if (structure.rallyPoint) {
                             const airSpread = ((rallyIdx % 6) - 2.5) * 4.5;
                             const targetAirX = structure.rallyPoint.x + airSpread;
@@ -1460,8 +1471,14 @@ function animate() {
                     }
                 } else {
                     // All supply piles depleted: return Chinooks safely to home Supply Center instead of idling in the open
-                    if (unit.type === 'chinook' && !isAIUnit && typeof getSupplyDropoffPosition === 'function') {
-                        const homePos = getSupplyDropoffPosition(unit.mesh.position);
+                    if (unit.type === 'chinook') {
+                        let homePos = null;
+                        if (isAIUnit) {
+                            const aiHome = enemyStructures.find(s => s.ownerId === unit.ownerId && !s.isBuilding && s.health > 0 && (s.type === 'supplyCenter' || s.type === 'center' || s.type === 'commandCenter'));
+                            if (aiHome) homePos = aiHome.position;
+                        } else if (typeof getSupplyDropoffPosition === 'function') {
+                            homePos = getSupplyDropoffPosition(unit.mesh.position);
+                        }
                         if (homePos && Math.hypot(unit.mesh.position.x - homePos.x, unit.mesh.position.z - homePos.z) > 14.0) {
                             unit.targetPosition.copy(homePos);
                             unit.airState = 'flying';
@@ -2991,7 +3008,7 @@ function applyViewShake(dt) {
 function processEnemyMovement() {
     separateGroundUnits(enemyUnits);
     enemyUnits.forEach((enemy, eIdx) => {
-            if (enemy.health <= 0) return;
+            if (enemy.health <= 0 || enemy.garrisonedIn) return;
             const isDisabled = Boolean(enemy.isUnmanned || (enemy.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < enemy.disabledUntil));
             if (isDisabled) {
                 if (enemy.mesh && (buildingTick + eIdx) % 28 === 0 && typeof spawnEMPDisableSparks === 'function') {
@@ -3144,7 +3161,18 @@ function processEnemyMovement() {
             if (dist2D > 0.4) {
                 const dirX = dx / dist2D;
                 const dirZ = dz / dist2D;
-                const step = Math.min(dist2D, enemy.speed * combatDeltaScale);
+                let effectiveSpeed = enemy.speed;
+                if (enemy._releasedForAttack && enemy._waveConvoySpeed && !enemy.isAir) {
+                    const inCombatRange = target && target.health > 0 && targetPos &&
+                        Math.hypot(enemy.mesh.position.x - targetPos.x, enemy.mesh.position.z - targetPos.z) <= ((enemy.scanRange || 24) + targetRadius + 14);
+                    if (!inCombatRange) {
+                        // Keep mixed-speed strike waves marching as a cohesive combined-arms group until reaching engagement range
+                        effectiveSpeed = enemy.speed > enemy._waveConvoySpeed
+                            ? enemy._waveConvoySpeed
+                            : Math.min(enemy._waveConvoySpeed, enemy.speed * 1.45);
+                    }
+                }
+                const step = Math.min(dist2D, effectiveSpeed * combatDeltaScale);
                 enemy.mesh.position.x += dirX * step;
                 enemy.mesh.position.z += dirZ * step;
                 if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type)) spinVehicleWheels(enemy, step);
@@ -3456,11 +3484,14 @@ function processEnemyCombat() {
             if (enemy.garrisonedIn) {
                 const host = enemy.garrisonedIn;
                 if (!host || host.health <= 0 || !host.mesh) return;
+                const canFireFromInside = host.type === 'overlord' || host.type === 'humvee' || host.type === 'battlebus' || host.type === 'bunker' || host.type === 'palace' || !!host.isWorldBuilding;
+                if (!canFireFromInside) return;
                 enemy.mesh.position.copy(host.position || host.mesh.position);
                 enemy.mesh.position.y += 4.2;
             }
             if (enemy.attackCooldown > 0) enemy.attackCooldown = Math.max(0, enemy.attackCooldown - combatDeltaScale);
-            if (!enemy.scanRange || enemy.scanRange <= 0) return;
+            const effectiveScanRange = enemy.scanRange > 0 ? enemy.scanRange : (enemy.type === 'blacklotus' ? 24 : (enemy.type === 'hijacker' ? 18 : 0));
+            if (effectiveScanRange <= 0) return;
 
             const minRange = (enemy.type === 'tomahawk' || enemy.type === 'nukecannon' || enemy.type === 'nuketank') ? (enemy.minRange || 16.0) : 0;
             const distBetween = (aPos, bPos, use3D) => use3D
@@ -3479,7 +3510,7 @@ function processEnemyCombat() {
             let canHitTarget = fireTarget ? ((typeof canUnitTarget === 'function') ? canUnitTarget(enemy, fireTarget) : !(enemy.type === 'tomahawk' && fireTarget.isAir)) : false;
 
             // Fire-on-the-move auto-scan across ALL hostile units & structures (player AND hostile AI teams!)
-            if (!fireTarget || !targetPos || distToTarget > (enemy.scanRange + targetRadius) || distToTarget < minRange || !canHitTarget) {
+            if (!fireTarget || !targetPos || distToTarget > (effectiveScanRange + targetRadius) || distToTarget < minRange || !canHitTarget) {
                 if ((buildingTick + eIdx) % 3 === 0 || enemy.attackCooldown === 0) {
                     let bestOpp = null;
                     let bestDist = Infinity;
@@ -3494,7 +3525,7 @@ function processEnemyCombat() {
                             if (typeof canUnitTarget === 'function' && !canUnitTarget(enemy, cand)) continue;
                             const cR = cand.radius || defaultR;
                             const d = distBetween(enemy.mesh.position, cPos, !!(enemy.isAir || cand.isAir));
-                            if (d <= enemy.scanRange + cR && d >= minRange && d < bestDist) {
+                            if (d <= effectiveScanRange + cR && d >= minRange && d < bestDist) {
                                 bestDist = d;
                                 bestOpp = cand;
                             }
@@ -3517,7 +3548,16 @@ function processEnemyCombat() {
                 }
             }
 
-            if (fireTarget && targetPos && distToTarget <= (enemy.scanRange + targetRadius) && distToTarget >= minRange && canHitTarget) {
+            if (fireTarget && targetPos && distToTarget <= (effectiveScanRange + targetRadius) && distToTarget >= minRange && canHitTarget) {
+                // Official C&C Generals AssaultTransportAIUpdate: China Troop Crawler automatically unloads its Red Guard squad upon entering combat!
+                if (enemy.type === 'crawler' && enemy.garrisoned && enemy.garrisoned.length > 0 && typeof evacuateGarrisonedUnits === 'function') {
+                    const deployed = enemy.garrisoned.slice();
+                    evacuateGarrisonedUnits(enemy);
+                    deployed.forEach(p => {
+                        p._releasedForAttack = true;
+                        p.combatTarget = fireTarget;
+                    });
+                }
                 const turret = getCachedNode(enemy.mesh, "turretSystem");
                 if (turret && turret.parent) {
                     const localTarget = turret.parent.worldToLocal(targetPos.clone());

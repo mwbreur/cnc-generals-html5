@@ -1172,9 +1172,9 @@ function selectUnitsByType(category) {
     units.forEach(u => {
             let match = false;
             if (category === 'combat') {
-                match = !['dozer', 'worker', 'truck'].includes(u.type);
+                match = !['dozer', 'worker', 'truck', 'chinook'].includes(u.type);
             } else if (category === 'harvesters') {
-                match = (u.type === 'truck' || u.type === 'worker');
+                match = (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook');
             } else if (category === 'builders') {
                 match = (u.type === 'dozer' || u.type === 'worker');
             }
