@@ -64,17 +64,20 @@ window.markPathfindGridDirty = markPathfindGridDirty;
 function isTerrainCliffAt(wx, wz, hCenter) {
     if (typeof getTerrainHeight !== 'function') return false;
     const h = (hCenter !== undefined) ? hCenter : getTerrainHeight(wx, wz);
-    const mapKey = (typeof currentMapType !== 'undefined') ? currentMapType : '';
+    const rawMapKey = (typeof currentMapType !== 'undefined') ? currentMapType : '';
+    const mapKey = (rawMapKey === 'desert') ? 'tournament_desert' : rawMapKey;
     const offMap = (typeof window !== 'undefined' && window.OFFICIAL_SKIRMISH_MAPS) ? window.OFFICIAL_SKIRMISH_MAPS[mapKey] : null;
     if (offMap && offMap.grid && offMap.grid.length > 1) {
         // Scale-independent native grid cliff check so sheer ledges remain impassable at 900, 1500, 2200, and 3000 map sizes
         const sz = (typeof currentMapSize !== 'undefined' && currentMapSize > 0) ? currentMapSize : 1500;
         const step = sz / (offMap.grid.length - 1);
+        const vScale = (typeof getOfficialMapVerticalScale === 'function') ? getOfficialMapVerticalScale(sz) : 1.0;
+        const cliffThresh = 3.8 * vScale;
         const hXp = getTerrainHeight(wx + step, wz);
         const hXm = getTerrainHeight(wx - step, wz);
         const hZp = getTerrainHeight(wx, wz + step);
         const hZm = getTerrainHeight(wx, wz - step);
-        return (Math.abs(hXp - h) > 3.8 || Math.abs(hXm - h) > 3.8 || Math.abs(hZp - h) > 3.8 || Math.abs(hZm - h) > 3.8);
+        return (Math.abs(hXp - h) > cliffThresh || Math.abs(hXm - h) > cliffThresh || Math.abs(hZp - h) > cliffThresh || Math.abs(hZm - h) > cliffThresh);
     }
     const d = 2.5;
     const hXp = getTerrainHeight(wx + d, wz);

@@ -22,6 +22,18 @@ if (typeof Image !== 'undefined') {
     });
 }
 
+function getOfficialMapVerticalScale(size) {
+    var sz = (typeof size === 'number' && size > 0) ? size : ((typeof currentMapSize !== 'undefined' && currentMapSize) ? currentMapSize : 1500);
+    return Math.max(1.45, Math.min(2.75, 1.55 + Math.max(0, (sz - 900) / 2100) * 1.10));
+}
+window.getOfficialMapVerticalScale = getOfficialMapVerticalScale;
+
+function scaleOfficialElevation(rawH, size) {
+    var vs = getOfficialMapVerticalScale(size);
+    return rawH > 0 ? rawH * vs : rawH;
+}
+window.scaleOfficialElevation = scaleOfficialElevation;
+
 function getOfficialMapHeight(mapType, x, z) {
     var mapKey = (mapType === 'desert') ? 'tournament_desert' : mapType;
     var mapObj = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapKey];
@@ -41,7 +53,7 @@ function getOfficialMapHeight(mapType, x, z) {
     var h01 = grid[z1][x0], h11 = grid[z1][x1];
     var h0 = h00 * (1 - fx) + h10 * fx;
     var h1 = h01 * (1 - fx) + h11 * fx;
-    return h0 * (1 - fz) + h1 * fz;
+    return scaleOfficialElevation(h0 * (1 - fz) + h1 * fz, size);
 }
 window.getOfficialMapHeight = getOfficialMapHeight;
 

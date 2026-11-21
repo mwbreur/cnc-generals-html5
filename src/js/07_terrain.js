@@ -876,13 +876,22 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 1500) {
     const normAttr = geo.attributes.normal;
     for (let i = 0; i < posAttr.count; i++) {
         const h = posAttr.getY(i);
+        const nx = normAttr ? normAttr.getX(i) : 0.0;
         const ny = normAttr ? normAttr.getY(i) : 1.0;
+        const nz = normAttr ? normAttr.getZ(i) : 0.0;
         const slope = 1.0 - Math.max(0, Math.min(1, ny));
         let cr = 0.84, cg = 0.63, cb = 0.35;
         if (isOfficialTexMap) {
-            // Neutral bright lighting modulation so retail BlendTileData + Terrain.big macro texture displays at full fidelity
-            const shade = Math.max(0.84, Math.min(1.06, 0.98 - slope * 0.24 + Math.min(0.06, Math.max(-0.06, h * 0.008))));
-            cr = shade; cg = shade; cb = shade;
+            // Authentic Zero Hour directional sun hillshading + stratified cliff-face contrast so plateaus & canyons pop
+            const sunDot = Math.max(0, Math.min(1, nx * 0.55 + ny * 0.72 + nz * 0.42));
+            const cliffDarken = slope > 0.08 ? Math.min(0.32, (slope - 0.08) * 1.15) : 0;
+            const strata = slope > 0.10 ? Math.sin(h * 1.15) * 0.055 * Math.min(1, (slope - 0.10) * 4.0) : 0;
+            const heightLift = Math.max(-0.09, Math.min(0.08, h * 0.0032));
+            const shade = Math.max(0.56, Math.min(1.10, 0.72 + sunDot * 0.36 - cliffDarken + strata + heightLift));
+            // Subtle warm sunlit plateau vs cool shadowed canyon rock tint
+            cr = shade * (1.0 + (sunDot - 0.55) * 0.05);
+            cg = shade;
+            cb = shade * (1.0 - (sunDot - 0.55) * 0.06);
         } else if (effectiveTheme === 'jungle') {
             cr = 0.34; cg = 0.48; cb = 0.24;
             if (slope > 0.10) {
@@ -1545,7 +1554,10 @@ function spawnMapProps(theme, mapSize) {
                     const endOffset = bLen * 0.48;
                     const end1H = getTerrainHeight(bx - Math.sin(bAngle) * endOffset, bz - Math.cos(bAngle) * endOffset);
                     const end2H = getTerrainHeight(bx + Math.sin(bAngle) * endOffset, bz + Math.cos(bAngle) * endOffset);
-                    const bankY = Math.max(b.deckH !== undefined ? b.deckH : -999, end1H, end2H, getTerrainHeight(bx, bz));
+                    const scaledDeckH = (b.deckH !== undefined)
+                        ? b.deckH * ((typeof getOfficialMapVerticalScale === 'function') ? getOfficialMapVerticalScale(mapSize) : 1.0)
+                        : -999;
+                    const bankY = Math.max(scaledDeckH, end1H, end2H, getTerrainHeight(bx, bz));
                     const by = (currentWaterLevel > -100)
                         ? Math.max(bankY, currentWaterLevel + 1.15)
                         : bankY;
