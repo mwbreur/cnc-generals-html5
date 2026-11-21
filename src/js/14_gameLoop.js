@@ -3927,11 +3927,15 @@ function initShellMapDemo() {
 window.initShellMapDemo = initShellMapDemo;
 
 function updateShellMapDemo(dt) {
+    if ((!window._shellMapState || !window._shellMapState.group) && typeof initShellMapDemo === 'function') {
+        initShellMapDemo();
+    }
     const st = window._shellMapState;
     if (!st || !st.group) return;
     if (typeof camera === 'undefined' || !camera) return;
 
-    st.time += dt;
+    const safeDt = Math.min(0.05, Math.max(0.001, dt || 0.016));
+    st.time += safeDt;
     const t = st.time;
     const hAt = (x, z) => (typeof getTerrainHeight === 'function' ? getTerrainHeight(x, z) : 0);
 
@@ -3944,7 +3948,7 @@ function updateShellMapDemo(dt) {
     camera.position.set(camX, camY, camZ);
     camera.lookAt(Math.sin(t * 0.11) * 26, hAt(0, 0) + 5, Math.cos(t * 0.09) * 18);
 
-    // Move armored columns & fire periodic tracers across the valley
+    // Move armored columns, aim turrets & fire live tracers/rockets/explosions across the valley
     for (let i = 0; i < st.convoys.length; i++) {
         const c = st.convoys[i];
         const ang = t * c.speed + c.phase;
@@ -3955,25 +3959,36 @@ function updateShellMapDemo(dt) {
         c.mesh.position.set(x, hAt(x, z), z);
         c.mesh.rotation.y = Math.atan2(dx, dz);
 
-        c.fireTimer -= dt;
+        const opp = st.convoys[(i + 3) % st.convoys.length];
+        if (opp && opp.mesh) {
+            const turret = (typeof getCachedNode === 'function') ? getCachedNode(c.mesh, 'turretSystem') : null;
+            if (turret && turret.parent && typeof turret.parent.worldToLocal === 'function') {
+                const localT = turret.parent.worldToLocal(opp.mesh.position.clone());
+                turret.rotation.y = Math.atan2(localT.x, localT.z);
+            }
+        }
+
+        c.fireTimer -= safeDt;
         if (c.fireTimer <= 0) {
-            c.fireTimer = 1.6 + Math.random() * 2.6;
-            const opp = st.convoys[(i + 3) % st.convoys.length];
+            c.fireTimer = 1.1 + Math.random() * 1.8;
             if (opp && opp.mesh) {
                 const startPos = c.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
-                const endPos = opp.mesh.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 1.5, (Math.random() - 0.5) * 8));
-                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(startPos, c.isEnemy ? 0xff7733 : 0xffcc44, 0.75);
-                if (typeof spawnTracer === 'function') {
-                    spawnTracer(startPos, endPos, c.isEnemy ? 0xff5533 : 0xffdd55);
+                const endPos = opp.mesh.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, 1.5, (Math.random() - 0.5) * 6));
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(startPos, c.isEnemy ? 0xff7733 : 0xffcc44, 0.8);
+                if (typeof spawnBulletTracer === 'function') {
+                    spawnBulletTracer(startPos, endPos, c.isEnemy ? 0xff5533 : 0xffdd55, 2.4);
                 }
-                if (typeof spawnExplosion === 'function' && Math.random() < 0.45) {
-                    spawnExplosion(endPos, 0xff8833, 1.4, 'expl_small');
+                if (typeof spawnRocketProjectile === 'function' && Math.random() < 0.35) {
+                    spawnRocketProjectile(startPos, endPos, false, false, null);
+                }
+                if (typeof spawnExplosion === 'function' && Math.random() < 0.55) {
+                    spawnExplosion(endPos, 0xff8833, 1.4, null);
                 }
             }
         }
     }
 
-    // Fly aircraft overhead in banked passes
+    // Fly aircraft overhead in banked passes with periodic missile salvos
     for (let i = 0; i < st.aircraft.length; i++) {
         const a = st.aircraft[i];
         const ang = t * a.speed + a.phase;
@@ -3984,6 +3999,15 @@ function updateShellMapDemo(dt) {
         a.mesh.position.set(x, hAt(x, z) + a.alt + Math.sin(t * 0.9 + i) * 2.5, z);
         a.mesh.rotation.y = Math.atan2(dx, dz);
         a.mesh.rotation.z = (a.speed > 0 ? -1 : 1) * 0.24;
+        if (a.fireTimer === undefined) a.fireTimer = 1.5 + i * 0.9;
+        a.fireTimer -= safeDt;
+        if (a.fireTimer <= 0) {
+            a.fireTimer = 2.6 + Math.random() * 2.2;
+            const targetConvoy = st.convoys[(a.isEnemy ? 0 : 3) + (i % 3)];
+            if (targetConvoy && targetConvoy.mesh && typeof spawnRocketProjectile === 'function') {
+                spawnRocketProjectile(a.mesh.position.clone(), targetConvoy.mesh.position.clone(), false, false, null);
+            }
+        }
     }
 }
 window.updateShellMapDemo = updateShellMapDemo;
