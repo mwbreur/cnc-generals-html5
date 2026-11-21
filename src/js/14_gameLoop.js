@@ -314,6 +314,10 @@ function separateGroundUnits(list) {
                     const j = bucket[b];
                     if (j <= i) continue; // each pair handled once
                     const u2 = ground[j];
+                    // Retail SupplyTruckAIUpdate: active harvesters pass smoothly on the supply lane instead of deadlocking/bouncing
+                    const isHarv1 = (u1.type === 'truck' || u1.type === 'worker') && (u1.aiState === 'MovingToDock' || u1.aiState === 'MovingToCenter' || u1.aiState === 'Harvesting' || u1.aiState === 'Depositing');
+                    const isHarv2 = (u2.type === 'truck' || u2.type === 'worker') && (u2.aiState === 'MovingToDock' || u2.aiState === 'MovingToCenter' || u2.aiState === 'Harvesting' || u2.aiState === 'Depositing');
+                    if (isHarv1 && isHarv2) continue;
                     const dx = p1.x - u2.mesh.position.x;
                     const dz = p1.z - u2.mesh.position.z;
                     const min = ((u1.radius || 1.2) + (u2.radius || 1.2)) * 0.95;
@@ -1553,29 +1557,31 @@ function animate() {
             break;
             case 'MovingToCenter': {
                 let dropoffPosition = null;
-                if (isAIUnit) {
-                    const aiSupplyCenters = enemyStructures.filter(s => s.ownerId === unit.ownerId && !s.isBuilding && s.health > 0 && (s.type === 'supplyCenter' || s.type === 'supplyStash'));
-                    const candidates = aiSupplyCenters.length > 0
-                        ? aiSupplyCenters
-                        : enemyStructures.filter(s => s.ownerId === unit.ownerId && !s.isBuilding && s.health > 0 && (s.type === 'center' || s.type === 'commandCenter'));
-                    let bestCenter = candidates[0] || null;
-                    if (candidates.length > 1 && unit.mesh) {
-                        let bestDist = Infinity;
-                        for (let ci = 0; ci < candidates.length; ci++) {
-                            const c = candidates[ci];
-                            const d = Math.hypot(unit.mesh.position.x - c.position.x, unit.mesh.position.z - c.position.z);
-                            if (d < bestDist) { bestDist = d; bestCenter = c; }
-                        }
+                let bestCenter = null;
+                const structPool = isAIUnit
+                    ? enemyStructures.filter(s => s.ownerId === unit.ownerId && !s.isBuilding && s.health > 0)
+                    : structures.filter(s => !s.isBuilding && s.health > 0);
+                const supplyCenters = structPool.filter(s => s.type === 'supplyCenter' || s.type === 'supplyStash');
+                const candidates = supplyCenters.length > 0
+                    ? supplyCenters
+                    : structPool.filter(s => s.type === 'center' || s.type === 'commandCenter');
+                bestCenter = candidates[0] || null;
+                if (candidates.length > 1 && unit.mesh) {
+                    let bestDist = Infinity;
+                    for (let ci = 0; ci < candidates.length; ci++) {
+                        const c = candidates[ci];
+                        const d = Math.hypot(unit.mesh.position.x - c.position.x, unit.mesh.position.z - c.position.z);
+                        if (d < bestDist) { bestDist = d; bestCenter = c; }
                     }
-                    if (bestCenter) {
-                        dropoffPosition = (typeof getSupplyDockSlotPosition === 'function' && unit.type !== 'chinook')
+                }
+                if (bestCenter) {
+                    dropoffPosition = (typeof getSupplyDockSlotPosition === 'function' && unit.type !== 'chinook')
                         ? getSupplyDockSlotPosition(bestCenter, unit, true)
                         : bestCenter.position;
-                    } else {
-                        dropoffPosition = unit.mesh.position;
-                    }
-                } else {
+                } else if (!isAIUnit && typeof getSupplyDropoffPosition === 'function') {
                     dropoffPosition = getSupplyDropoffPosition(unit.mesh.position);
+                } else {
+                    dropoffPosition = unit.mesh.position;
                 }
                 if (!unit.waypoints || unit.waypoints.length === 0) {
                     const dDrop = Math.hypot(unit.mesh.position.x - dropoffPosition.x, unit.mesh.position.z - dropoffPosition.z);
@@ -1594,8 +1600,12 @@ function animate() {
                 }
                 if (cargoHold && cargoHold.scale.y < 1.0) cargoHold.scale.y += 0.015;
                 const distToDropoff = Math.hypot(unit.mesh.position.x - dropoffPosition.x, unit.mesh.position.z - dropoffPosition.z);
-                const centerDistThreshold = (unit.type === 'chinook') ? 14.0 : 9.5;
-                if (distToDropoff < centerDistThreshold) {
+                const distToStruct = (bestCenter && bestCenter.position)
+                    ? Math.hypot(unit.mesh.position.x - bestCenter.position.x, unit.mesh.position.z - bestCenter.position.z)
+                    : distToDropoff;
+                const structReach = bestCenter ? ((bestCenter.radius || 8.5) + (unit.radius || 3.2) + 2.5) : 9.5;
+                const centerDistThreshold = (unit.type === 'chinook') ? 14.0 : 6.0;
+                if (distToDropoff < centerDistThreshold || (unit.type !== 'chinook' && distToStruct < structReach)) {
                     unit.aiState = 'Depositing';
                     unit.timerState = 0;
                     unit._harvNavCenter = false;
