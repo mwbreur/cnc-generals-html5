@@ -1270,10 +1270,105 @@ function processBaseDefenseCombat() {
     const allLivingStructures = [...structures, ...enemyStructures];
 
     allDefenses.forEach(def => {
-            if (def.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < def.disabledUntil) return;
+            if (def.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < def.disabledUntil) {
+                def._gatTarget = null;
+                return;
+            }
+            const isPlayerDef = !def.isEnemy && typeof structures !== 'undefined' && structures.includes(def);
+            if (isPlayerDef && (def.type === 'patriot' || def.type === 'gatlingCannon') && typeof isPlayerLowPower !== 'undefined' && isPlayerLowPower) {
+                def._gatTarget = null;
+                return;
+            }
             if (def.attackCooldown === undefined) def.attackCooldown = 0;
             if (def.attackCooldown > 0) {
                 def.attackCooldown = Math.max(0, def.attackCooldown - combatDeltaScale);
+            }
+
+            const defCenter = def.position || def.mesh.position;
+            const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+
+            // China Gatling Cannon: continuous target-locked 3-stage spool-up fire (INIZH.big: 250ms -> 125ms -> 62ms, 2.0s coast)
+            if (def.type === 'gatlingCannon') {
+                const isValidDefTarget = (t) => {
+                    if (!t || t.health <= 0 || t.garrisonedIn || !t.mesh || isFriendly(def, t)) return false;
+                    if (t.isStealthed && !(t.revealedUntil && t.revealedUntil > curTick)) return false;
+                    const tPos = t.position || t.mesh.position;
+                    const maxR = (t.isAir ? 72.0 : 48.6) + (t.radius || 0);
+                    return Math.hypot(defCenter.x - tPos.x, defCenter.z - tPos.z) <= maxR;
+                };
+                let target = isValidDefTarget(def._gatTarget) ? def._gatTarget : null;
+                if (!target) {
+                    let bestDistSq = Infinity;
+                    for (let t of allLivingUnits) {
+                        if (!isValidDefTarget(t)) continue;
+                        const dx = defCenter.x - t.mesh.position.x;
+                        const dz = defCenter.z - t.mesh.position.z;
+                        const dSq = dx * dx + dz * dz;
+                        // Prioritize aircraft slightly, otherwise closest enemy
+                        const effSq = t.isAir ? dSq * 0.65 : dSq;
+                        if (effSq < bestDistSq) { bestDistSq = effSq; target = t; }
+                    }
+                    if (!target) {
+                        for (let st of allLivingStructures) {
+                            if (!isValidDefTarget(st)) continue;
+                            target = st;
+                            break;
+                        }
+                    }
+                    def._gatTarget = target;
+                }
+                if (target) {
+                    const targetPos = (target.position || target.mesh.position).clone();
+                    targetPos.y += (target.isAir ? 0.3 : 0.6);
+                    // Track turret smoothly every tick while locked onto enemy
+                    const turret = getCachedNode(def.mesh, "turretSystem");
+                    if (turret && turret.parent) {
+                        const localTarget = turret.parent.worldToLocal(targetPos.clone());
+                        turret.rotation.y = Math.atan2(localTarget.x, localTarget.z);
+                    }
+                    if (def.attackCooldown === 0) {
+                        def._gatSpin = Math.min(12, (def._gatSpin || 0) + 1);
+                        def._gatCoastTicks = 120; // 2.0s ContinuousFireCoast
+                        def.attackCooldown = def._gatSpin >= 5 ? 4 : (def._gatSpin >= 1 ? 8 : 15);
+                        def._gatlingSpinVel = def._gatSpin >= 5 ? 0.98 : (def._gatSpin >= 1 ? 0.68 : 0.42);
+                        if (def.mesh && typeof def.mesh.updateMatrixWorld === 'function') def.mesh.updateMatrixWorld(true);
+                        const m1 = def.mesh && typeof def.mesh.getObjectByName === 'function' ? def.mesh.getObjectByName("MUZZLE01") : null;
+                        const m2 = def.mesh && typeof def.mesh.getObjectByName === 'function' ? def.mesh.getObjectByName("MUZZLE02") : null;
+                        const fallbackPos = defCenter.clone();
+                        fallbackPos.y += 3.2;
+                        const muzzleL = (m1 && typeof m1.getWorldPosition === 'function') ? m1.getWorldPosition(new THREE.Vector3()) : fallbackPos;
+                        const muzzleR = (m2 && typeof m2.getWorldPosition === 'function') ? m2.getWorldPosition(new THREE.Vector3()) : null;
+                        spawnMuzzleFlash(muzzleL, 0xffa502, 0.42);
+                        spawnBulletTracer(muzzleL, targetPos, 0xf1c40f, 2.8);
+                        if (typeof spawnBulletImpactFX === 'function' && typeof getArmorCategory === 'function') {
+                            spawnBulletImpactFX(targetPos, getArmorCategory(target), false);
+                        }
+                        if (muzzleR) {
+                            spawnMuzzleFlash(muzzleR, 0xffa502, 0.42);
+                            spawnBulletTracer(muzzleR, targetPos, 0xffd32a, 2.8);
+                        }
+                        if ((!def.mesh || def.mesh.visible) && Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
+                        if (typeof applyCalculatedDamage === 'function') {
+                            applyCalculatedDamage(def, target, target.isAir ? 6 : 10, 'GATLING');
+                        } else {
+                            target.health -= (target.isAir ? 6 : 10);
+                        }
+                        if (isMultiplayerActive && netConn && netConn.open && isMultiplayerHost && target.netId) {
+                            broadcastNetPacket({
+                                type: 'unit_damage',
+                                targetNetId: target.netId,
+                                remainingHealth: Math.max(0, target.health)
+                            });
+                        }
+                    }
+                } else {
+                    if (def._gatCoastTicks > 0) {
+                        def._gatCoastTicks = Math.max(0, def._gatCoastTicks - combatDeltaScale);
+                    } else if (def._gatSpin > 0) {
+                        def._gatSpin = Math.max(0, def._gatSpin - 0.12 * combatDeltaScale);
+                    }
+                }
+                return;
             }
 
             // Acquire closest target within official INIZH.big defense range (AttackRange = 225.0 => 48.6 units) strictly filtering !isFriendly
@@ -1281,7 +1376,6 @@ function processBaseDefenseCombat() {
                 const defRange = 48.6;
                 let closestEnemy = null;
                 let closestDistSq = defRange * defRange;
-                const defCenter = def.position || def.mesh.position;
                 for (let target of allLivingUnits) {
                     if (target.health > 0 && !target.garrisonedIn && target.mesh && !isFriendly(def, target)) {
                         const dx = defCenter.x - target.mesh.position.x;

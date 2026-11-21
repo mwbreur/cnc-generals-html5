@@ -108,72 +108,94 @@ function processCombatScanning() {
                 }
             }
 
-            // Autonomous Overlord Roof Gatling Cannon (Anti-Air & Anti-Infantry)
+            // Gatling Tank ContinuousFireCoast: hold spool-up briefly across target switches, then wind down smoothly
+            if (unit.type === 'gatling' || unit.type === 'gatlingTank') {
+                if (unit._gatlingCoastTicks > 0) {
+                    unit._gatlingCoastTicks = Math.max(0, unit._gatlingCoastTicks - combatDeltaScale);
+                } else if (unit.gatlingSpin > 0) {
+                    unit.gatlingSpin = Math.max(0, unit.gatlingSpin - 0.12 * combatDeltaScale);
+                }
+            }
+
+            // Autonomous Overlord Roof Gatling Cannon (Anti-Air & Anti-Infantry) — continuous fire until target destroyed/gone
             if (unit.type === 'overlord' && unit.overlordUpgrade === 'gatling' && unit.health > 0) {
                 if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
                 if (unit.overlordGatCooldown > 0) unit.overlordGatCooldown = Math.max(0, unit.overlordGatCooldown - combatDeltaScale);
-                if (unit.overlordGatCooldown === 0) {
-                    const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
-                    let bestTarget = null;
+                const gatRange = 43.2;
+                const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+                const isValidGatTarget = (h) => {
+                    if (!h || h.health <= 0 || isFriendly(unit, h)) return false;
+                    if (h.isStealthed && !(h.revealedUntil && h.revealedUntil > curTick)) return false;
+                    const hPos = h.position || (h.mesh && h.mesh.position);
+                    if (!hPos) return false;
+                    return Math.hypot(unit.mesh.position.x - hPos.x, unit.mesh.position.z - hPos.z) <= gatRange + (h.radius || 0);
+                };
+                // Keep firing continuously at current locked target until it is destroyed or leaves range
+                let bestTarget = isValidGatTarget(unit._overlordGatTarget) ? unit._overlordGatTarget : null;
+                if (!bestTarget) {
+                    const hostiles = unit.isEnemy
+                        ? [...(typeof units !== 'undefined' ? units : []), ...(typeof structures !== 'undefined' ? structures : [])]
+                        : [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
                     let bestScore = -Infinity;
-                    // Authentic Zero Hour OverlordGattlingCannon: AttackRange 200 vs OverlordTankGun 175 (37.8) => 43.2 horizontal range (both Air & Ground)
-                    const gatRange = 43.2;
                     for (let hi = 0; hi < hostiles.length; hi++) {
                         const h = hostiles[hi];
-                        const hPos = h && (h.position || (h.mesh && h.mesh.position));
-                        if (!h || h.health <= 0 || !hPos || isFriendly(unit, h)) continue;
-                        if (h.isStealthed && !h.isDetected) continue;
+                        if (!isValidGatTarget(h)) continue;
+                        const hPos = h.position || h.mesh.position;
                         const d = Math.hypot(unit.mesh.position.x - hPos.x, unit.mesh.position.z - hPos.z);
-                        if (d <= gatRange + (h.radius || 0)) {
-                            let score = 100 - d;
-                            if (h.isAir) score += 60; // Prioritize airborne aircraft!
-                            if (getArmorCategory(h) === 'infantry') score += 30;
-                            if (score > bestScore) { bestScore = score; bestTarget = h; }
-                        }
+                        let score = 100 - d;
+                        if (h.isAir) score += 60;
+                        if (getArmorCategory(h) === 'infantry') score += 30;
+                        if (score > bestScore) { bestScore = score; bestTarget = h; }
                     }
-                    if (bestTarget) {
-                        // Authentic Zero Hour 3-stage OverlordGattlingCannon spool-up:
-                        // Stage 1 (spin 0..3): 16 ticks (0.27s) -> Stage 2 (4..7): 10 ticks (0.17s) -> Stage 3 (8+): 6 ticks (0.10s)
-                        unit._overlordGatSpin = Math.min(12, (unit._overlordGatSpin || 0) + 1);
-                        let gatCd = unit._overlordGatSpin >= 8 ? 6 : (unit._overlordGatSpin >= 4 ? 10 : 16);
-                        if (unit.veterancy === 1) gatCd = Math.max(4, Math.floor(gatCd * 0.91));
-                        else if (unit.veterancy === 2) gatCd = Math.max(4, Math.floor(gatCd * 0.80));
-                        else if (unit.veterancy >= 3) gatCd = Math.max(3, Math.floor(gatCd * 0.65));
-                        if (unit.isHordeActive) gatCd = Math.max(3, Math.floor(gatCd * 0.80));
-                        unit.overlordGatCooldown = gatCd;
-                        unit._gatlingSpinVel = unit._overlordGatSpin >= 8 ? 0.95 : (unit._overlordGatSpin >= 4 ? 0.65 : 0.42);
-                        const upgMesh = unit.overlordUpgradeMesh || getCachedNode(unit.mesh, "overlordUpgrade");
-                        const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
-                        tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
-                        if (upgMesh) {
-                            const gatTurret = getCachedNode(upgMesh, "turretSystem") || upgMesh.getObjectByName("TURRET01");
-                            if (gatTurret && gatTurret.parent) {
-                                const localT = gatTurret.parent.worldToLocal(tPos.clone());
-                                gatTurret.rotation.y = Math.atan2(localT.x, localT.z);
-                            }
-                            const barrelSpinStep = unit._overlordGatSpin >= 8 ? 2.4 : (unit._overlordGatSpin >= 4 ? 1.8 : 1.2);
-                            upgMesh.traverse(c => { if (c.name === "gatlingBarrels" || c.name === "gatlingBarrels2") c.rotation.z += barrelSpinStep; });
-                            upgMesh.updateMatrixWorld(true);
-                        }
-                        const m1 = upgMesh && upgMesh.getObjectByName("MUZZLE01");
-                        const m2 = upgMesh && upgMesh.getObjectByName("MUZZLE02");
-                        const fallbackMuzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
-                        const muzzleL = m1 ? m1.getWorldPosition(new THREE.Vector3()) : fallbackMuzzle;
-                        const muzzleR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : null;
-                        const isHeroicOverlord = (unit.veterancy >= 3);
-                        const gatFlashColor = isHeroicOverlord ? 0xff1111 : 0xffa502;
-                        const gatTracerColor = isHeroicOverlord ? 0xff1a1a : 0xf1c40f;
-                        spawnMuzzleFlash(muzzleL, gatFlashColor, isHeroicOverlord ? 0.55 : 0.4);
-                        spawnBulletTracer(muzzleL, tPos, gatTracerColor, isHeroicOverlord ? 3.8 : 2.8);
-                        if (typeof spawnBulletImpactFX === 'function') spawnBulletImpactFX(tPos, getArmorCategory(bestTarget), isHeroicOverlord);
-                        if (muzzleR) {
-                            spawnMuzzleFlash(muzzleR, gatFlashColor, isHeroicOverlord ? 0.55 : 0.4);
-                            spawnBulletTracer(muzzleR, tPos, gatTracerColor, isHeroicOverlord ? 3.8 : 2.8);
-                        }
-                        if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
-                        applyCalculatedDamage(unit, bestTarget, 10, 'GATLING');
+                    unit._overlordGatTarget = bestTarget;
+                }
+                const upgMesh = unit.overlordUpgradeMesh || getCachedNode(unit.mesh, "overlordUpgrade");
+                if (bestTarget && upgMesh) {
+                    const aimPos = (bestTarget.position || bestTarget.mesh.position).clone();
+                    aimPos.y += (bestTarget.isAir ? 0.3 : 0.6);
+                    const gatTurret = getCachedNode(upgMesh, "turretSystem") || upgMesh.getObjectByName("TURRET01");
+                    if (gatTurret && gatTurret.parent) {
+                        const localT = gatTurret.parent.worldToLocal(aimPos.clone());
+                        gatTurret.rotation.y = Math.atan2(localT.x, localT.z);
+                    }
+                }
+                if (bestTarget && unit.overlordGatCooldown === 0) {
+                    // Authentic Zero Hour 3-stage OverlordGattlingCannon spool-up:
+                    // Stage 1 (spin 0..3): 16 ticks (0.27s) -> Stage 2 (4..7): 10 ticks (0.17s) -> Stage 3 (8+): 6 ticks (0.10s)
+                    unit._overlordGatSpin = Math.min(12, (unit._overlordGatSpin || 0) + 1);
+                    unit._overlordGatCoastTicks = 90; // 1.5s ContinuousFireCoast
+                    let gatCd = unit._overlordGatSpin >= 8 ? 6 : (unit._overlordGatSpin >= 4 ? 10 : 16);
+                    if (unit.veterancy === 1) gatCd = Math.max(4, Math.floor(gatCd * 0.91));
+                    else if (unit.veterancy === 2) gatCd = Math.max(4, Math.floor(gatCd * 0.80));
+                    else if (unit.veterancy >= 3) gatCd = Math.max(3, Math.floor(gatCd * 0.65));
+                    if (unit.isHordeActive) gatCd = Math.max(3, Math.floor(gatCd * 0.80));
+                    unit.overlordGatCooldown = gatCd;
+                    unit._gatlingSpinVel = unit._overlordGatSpin >= 8 ? 0.98 : (unit._overlordGatSpin >= 4 ? 0.68 : 0.42);
+                    const tPos = (bestTarget.position || bestTarget.mesh.position).clone();
+                    tPos.y += (bestTarget.isAir ? 0.3 : 0.6);
+                    if (upgMesh && typeof upgMesh.updateMatrixWorld === 'function') upgMesh.updateMatrixWorld(true);
+                    const m1 = upgMesh && upgMesh.getObjectByName("MUZZLE01");
+                    const m2 = upgMesh && upgMesh.getObjectByName("MUZZLE02");
+                    const fallbackMuzzle = upgMesh ? upgMesh.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.6, 0)) : unit.mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+                    const muzzleL = m1 ? m1.getWorldPosition(new THREE.Vector3()) : fallbackMuzzle;
+                    const muzzleR = m2 ? m2.getWorldPosition(new THREE.Vector3()) : null;
+                    const isHeroicOverlord = (unit.veterancy >= 3);
+                    const gatFlashColor = isHeroicOverlord ? 0xff1111 : 0xffa502;
+                    const gatTracerColor = isHeroicOverlord ? 0xff1a1a : 0xf1c40f;
+                    spawnMuzzleFlash(muzzleL, gatFlashColor, isHeroicOverlord ? 0.55 : 0.4);
+                    spawnBulletTracer(muzzleL, tPos, gatTracerColor, isHeroicOverlord ? 3.8 : 2.8);
+                    if (typeof spawnBulletImpactFX === 'function') spawnBulletImpactFX(tPos, getArmorCategory(bestTarget), isHeroicOverlord);
+                    if (muzzleR) {
+                        spawnMuzzleFlash(muzzleR, gatFlashColor, isHeroicOverlord ? 0.55 : 0.4);
+                        spawnBulletTracer(muzzleR, tPos, gatTracerColor, isHeroicOverlord ? 3.8 : 2.8);
+                    }
+                    if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
+                    applyCalculatedDamage(unit, bestTarget, 10, 'GATLING');
+                } else if (!bestTarget) {
+                    if (unit._overlordGatCoastTicks > 0) {
+                        unit._overlordGatCoastTicks = Math.max(0, unit._overlordGatCoastTicks - combatDeltaScale);
                     } else if (unit._overlordGatSpin > 0) {
-                        unit._overlordGatSpin = Math.max(0, unit._overlordGatSpin - 0.5);
+                        unit._overlordGatSpin = Math.max(0, unit._overlordGatSpin - 0.12 * combatDeltaScale);
                     }
                 }
             }
@@ -689,9 +711,10 @@ function executeWeaponFireInner(attacker, target) {
     };
     let baseCooldown = cncCooldowns[attacker.type] || 120;
 
-    // Authentic Zero Hour 3-Stage Gatling Spool-Up Fire Rate Acceleration (16 -> 10 -> 6 ticks)
+    // Authentic Zero Hour 3-Stage Gatling Spool-Up Fire Rate Acceleration (16 -> 10 -> 6 ticks, ContinuousFireCoast 1.5s)
     if (attacker.type === 'gatling' || attacker.type === 'gatlingTank' || attacker.type === 'gatlingCannon') {
         attacker.gatlingSpin = Math.min(12, (attacker.gatlingSpin || 0) + 1);
+        attacker._gatlingCoastTicks = 90;
         baseCooldown = attacker.gatlingSpin >= 8 ? 6 : (attacker.gatlingSpin >= 4 ? 10 : 16);
     } else if (attacker.gatlingSpin) {
         attacker.gatlingSpin = 0;
@@ -755,11 +778,10 @@ function executeWeaponFireInner(attacker, target) {
         }
     }
 
-    // Spin Gatling barrels when firing (sets momentum for smooth continuous spin in gameLoop)
-    const gatling = getCachedNode(attacker.mesh, "gatlingBarrels");
-    if (gatling) gatling.rotation.z += 1.2;
-    if (attacker.type === 'gatling' || attacker.type === 'gatlingTank' || attacker.type === 'gatlingCannon' || attacker.overlordUpgrade === 'gatling') {
-        attacker._gatlingSpinVel = 0.55;
+    // Spin Gatling barrels when firing (sets stage-scaled momentum for smooth continuous spin in gameLoop)
+    if (attacker.type === 'gatling' || attacker.type === 'gatlingTank' || attacker.type === 'gatlingCannon') {
+        const gSpin = attacker.gatlingSpin || 0;
+        attacker._gatlingSpinVel = gSpin >= 8 ? 0.98 : (gSpin >= 4 ? 0.68 : 0.42);
     }
 
     // Firing uncloaks stealth units for their retail StealthDelay (INIZH.big StealthUpdate; 60 ticks = 1 s).

@@ -1122,12 +1122,12 @@ function animate() {
                     }
                 }
             }
-            // China Gatling Cannon defense structure spinning barrels
+            // China Gatling Cannon defense structure spinning barrels (both BARRELS01 & BARRELS02)
             if (s.type === 'gatlingCannon' && s.mesh && !s.isBuilding && s.health > 0) {
                 if (s._gatlingBarrels === undefined) {
                     s._gatlingBarrels = [];
                     s.mesh.traverse(c => {
-                        if (c.name === 'gatlingBarrels') s._gatlingBarrels.push(c);
+                        if (c.name === 'gatlingBarrels' || c.name === 'gatlingBarrels2') s._gatlingBarrels.push(c);
                     });
                 }
                 if (s._gatlingSpinVel && s._gatlingSpinVel > 0.005) {

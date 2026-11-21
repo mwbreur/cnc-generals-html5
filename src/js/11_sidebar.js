@@ -3806,8 +3806,9 @@ function processBuildingFunctions() {
                     }
                 }
 
-                const fireInterval = (structure.type === 'gatlingCannon') ? 15 : 45;
-                if (!defenseOffline && buildingTick % fireInterval === 0) {
+                // Gatling Cannon continuous 3-stage spool-up firing is handled authoritatively by processBaseDefenseCombat()
+                const fireInterval = 45;
+                if (!defenseOffline && structure.type !== 'gatlingCannon' && buildingTick % fireInterval === 0) {
                     // Ballistic Missile Interception (SCUD / Tomahawk) by operational Patriot Missile Systems
                     if (structure.type === 'patriot' && typeof activeMissiles !== 'undefined' && activeMissiles.length > 0) {
                         const incoming = activeMissiles.find(m =>
