@@ -979,10 +979,15 @@ const OFFICIAL_MAP_LIST = [
     { id: 'final_crusade', folder: 'final crusade', name: 'Final Crusade', theme: 'jungle', waterLevel: -0.8 },
     { id: 'heartland_shield', folder: 'heartland shield', name: 'Heartland Shield', theme: 'jungle', waterLevel: -0.8 },
     { id: 'lone_eagle', folder: 'lone eagle', name: 'Lone Eagle', theme: 'jungle', waterLevel: -0.8 },
-    { id: 'twilight_flame', folder: 'twilight flame', name: 'Twilight Flame', theme: 'desert', waterLevel: -999 }
+    { id: 'defcon6', folder: 'defcon6', name: 'DEFCON 6', theme: 'jungle', waterLevel: -999 },
+    { id: 'green_pastures', folder: 'green pastures', name: 'Green Pastures', theme: 'jungle', waterLevel: -0.8 },
+    { id: 'hostile_dawn', folder: 'hostile dawn', name: 'Hostile Dawn', theme: 'desert', waterLevel: -999 },
+    { id: 'red_rock', folder: 'red rock', name: 'Red Rock', theme: 'desert', waterLevel: -999 },
+    { id: 'twilight_flame', folder: 'twilight flame', name: 'Twilight Flame', theme: 'desert', waterLevel: -999 },
+    { id: 'fortress_avalanche', folder: 'fortress avalanche', name: 'Fortress Avalanche', theme: 'snow', waterLevel: -0.8 }
 ];
 
-console.log('Extracting 12 Official EA Skirmish Maps from MapsZH.big & Maps.big...');
+console.log(`Extracting ${OFFICIAL_MAP_LIST.length} Official EA Skirmish Maps from MapsZH.big & Maps.big...`);
 const officialMaps = {};
 for (const meta of OFFICIAL_MAP_LIST) {
     officialMaps[meta.id] = parseOfficialMap(meta.id, meta);
