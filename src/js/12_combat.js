@@ -2,9 +2,9 @@ const AA_CAPABLE_UNITS = new Set([
     'rocket', 'missiledefender', 'humvee', 'patriot', 'avenger',
     'tankhunter', 'gatling', 'gatlingTank', 'gatlingCannon',
     'rpg', 'quad', 'stingerSite',
-    'raptor', 'mig', 'comanche'
+    'raptor', 'mig'
 ]);
-const GROUND_ONLY_AIRCRAFT = new Set(['aurora', 'stealthfighter']);
+const GROUND_ONLY_AIRCRAFT = new Set(['aurora', 'stealthfighter', 'comanche']);
 
 function hasHumveeTowMissile(unit) {
     if (!unit || unit.type !== 'humvee') return false;

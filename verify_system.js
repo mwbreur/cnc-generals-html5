@@ -1899,6 +1899,14 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             if (canUnitTarget(mockHv, mockAir) !== false) {
                 throw new Error('Humvee WITHOUT TOW Missile upgrade should NOT be able to target aircraft!');
             }
+            // Aircraft air-to-air vs air-to-ground parity (INIZH.big Weapon.ini)
+            const mockGround = { type: 'tank', isAir: false, health: 100 };
+            for (const [aType, canAA] of [['raptor', true], ['mig', true], ['comanche', false], ['stealthfighter', false], ['aurora', false]]) {
+                const ac = { type: aType, isAir: true, health: 100 };
+                if (canUnitTarget(ac, mockAir) !== canAA || canUnitTarget(ac, mockGround) !== true) {
+                    throw new Error('Aircraft targeting capability mismatch for ' + aType + ' (expected AA=' + canAA + ')!');
+                }
+            }
         }
 
         // 16. Official & Procedural Map Roads, 100% Official W3D Assets, and AI Corridor Pathfinding Rules
