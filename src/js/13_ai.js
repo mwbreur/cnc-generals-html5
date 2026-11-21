@@ -511,23 +511,28 @@ function getSupplyDockSlotPosition(dockObj, harvester, isCenter = false) {
     const basePos = dockObj.position || (dockObj.mesh && dockObj.mesh.position) || dockObj;
     if (!dockObj._dockSlots) {
         dockObj._dockSlots = [null, null, null, null];
+        dockObj._dockSlotRefs = [null, null, null, null];
     }
     const unitId = (harvester && (harvester.netId || harvester._dockUnitId)) ||
     (harvester ? (harvester._dockUnitId = 'harv_' + Math.floor(simRandom() * 1000000)) : 'harv_0');
 
     let slotIdx = dockObj._dockSlots.indexOf(unitId);
     if (slotIdx === -1) {
-        // Reclaim dead or different-target slots first
+        // Reclaim empty or dead-harvester slots first so destroyed harvesters never permanently block bays
         for (let i = 0; i < dockObj._dockSlots.length; i++) {
-            if (!dockObj._dockSlots[i]) {
+            const ref = dockObj._dockSlotRefs && dockObj._dockSlotRefs[i];
+            const isDead = Boolean(ref && typeof ref.health === 'number' && ref.health <= 0);
+            if (!dockObj._dockSlots[i] || isDead) {
                 slotIdx = i;
                 dockObj._dockSlots[i] = unitId;
+                if (dockObj._dockSlotRefs) dockObj._dockSlotRefs[i] = harvester || null;
                 break;
             }
         }
         if (slotIdx === -1) {
             slotIdx = Math.abs(unitId.charCodeAt(unitId.length - 1) || 0) % 4;
             dockObj._dockSlots[slotIdx] = unitId;
+            if (dockObj._dockSlotRefs) dockObj._dockSlotRefs[slotIdx] = harvester || null;
         }
     }
 
@@ -982,8 +987,8 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     );
     if (!availBuilder) return;
 
-    // If an existing AI foundation lost its builder, dispatch the idle builder to finish it first!
-    const unfinishedStruct = myStructures.find(s => s.isBuilding && (!s.dozerRef || s.dozerRef.health <= 0));
+    // If an existing AI foundation lost its builder or builder moved on, dispatch the idle builder to finish it first!
+    const unfinishedStruct = myStructures.find(s => s.isBuilding && (!s.dozerRef || s.dozerRef.health <= 0 || s.dozerRef.targetStructure !== s));
     if (unfinishedStruct) {
         if (typeof assignDozerToStructure === 'function') {
             assignDozerToStructure(availBuilder, unfinishedStruct);
@@ -1150,7 +1155,8 @@ function processEnemyAIEngine() {
             const maxUnits = cmd.difficulty === 'hard' ? 24 : cmd.difficulty === 'easy' ? 10 : 15;
 
             const combatUnits = myUnits.filter(u => u.type !== 'dozer' && u.type !== 'worker' && u.type !== 'truck' && u.type !== 'chinook');
-            if (cmd.productionTimer % prodInterval === 0 && combatUnits.length < maxUnits && (cmd.resources || 0) >= 500) {
+            if (cmd.productionTimer >= prodInterval && combatUnits.length < maxUnits && (cmd.resources || 0) >= 500) {
+                cmd.productionTimer = 0;
                 const fac = myStructures.find(es => !es.isBuilding && es.type === 'factory' && es.health > 0);
                 const bar = myStructures.find(es => !es.isBuilding && es.type === 'barracks' && es.health > 0);
                 const air = myStructures.find(es => !es.isBuilding && es.type === 'airfield' && es.health > 0);
@@ -1814,7 +1820,8 @@ function assignDozerToStructure(builder, structure) {
             const dx = perimeterPoint.x - builder.mesh.position.x;
             const dz = perimeterPoint.z - builder.mesh.position.z;
             const d = Math.hypot(dx, dz) || 1;
-            const sideSign = ((builder.netId || 1) % 2 === 0 ? 1 : -1);
+            const builderNum = parseInt(String(builder.netId || '1').replace(/\D/g, ''), 10) || 1;
+            const sideSign = (builderNum % 2 === 0 ? 1 : -1);
             const detour = new THREE.Vector3(
                 builder.mesh.position.x + (dx * 0.5 - dz * 0.4 * sideSign),
                 perimeterPoint.y || 0,

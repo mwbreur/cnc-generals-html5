@@ -190,8 +190,10 @@ function processCombatScanning() {
             if (!unit.combatTarget && ((_combatScanTick + ui) % scanMod === 0) && !isNonCombatSupport) {
                 if (!(unit.isAir && unit.taskState === 'Moving')) {
                     const uPos = unit.mesh.position;
+                    const minScanR = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
+                    const minScanR2 = minScanR * minScanR;
                     let bestUnitDist2 = Infinity;
-                    // 1. Scan for nearest hostile unit in range
+                    // 1. Scan for nearest hostile unit in range (respecting siege minRange)
                     for (let ei = 0; ei < enemyUnits.length; ei++) {
                         const enemy = enemyUnits[ei];
                         if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
@@ -200,7 +202,7 @@ function processCombatScanning() {
                             const dx = uPos.x - ep.x, dz = uPos.z - ep.z;
                             const effR = unit.scanRange + (enemy.radius || 0);
                             const d2 = dx * dx + dz * dz;
-                            if (d2 <= effR * effR && d2 < bestUnitDist2) {
+                            if (d2 >= minScanR2 && d2 <= effR * effR && d2 < bestUnitDist2) {
                                 bestUnitDist2 = d2;
                                 unit.combatTarget = enemy;
                                 if (unit.isAir) unit.airState = 'attacking';
@@ -217,7 +219,7 @@ function processCombatScanning() {
                                 const effR = unit.scanRange + (struct.radius || 6);
                                 const dx = uPos.x - sPos.x, dz = uPos.z - sPos.z;
                                 const d2 = dx * dx + dz * dz;
-                                if (d2 <= effR * effR && d2 < bestStructDist2) {
+                                if (d2 >= minScanR2 && d2 <= effR * effR && d2 < bestStructDist2) {
                                     bestStructDist2 = d2;
                                     unit.combatTarget = struct;
                                     if (unit.isAir) unit.airState = 'attacking';
@@ -459,10 +461,16 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         for (let gi = target.garrisoned.length - 1; gi >= 0; gi--) {
             const gUnit = target.garrisoned[gi];
             if (!gUnit) { target.garrisoned.splice(gi, 1); continue; }
+            const wasOccAlive = gUnit.health > 0;
             gUnit.health = Math.max(0, gUnit.health - clearDmg);
             if (gUnit.health <= 0) {
                 gUnit.garrisonedIn = null;
                 target.garrisoned.splice(gi, 1);
+                if (wasOccAlive && attacker && attacker.health > 0) {
+                    attacker.kills = (attacker.kills || 0) + 1;
+                    if (typeof checkVeterancyPromotion === 'function') checkVeterancyPromotion(attacker);
+                    if (typeof awardGeneralsXP === 'function' && isAttackerPlayer) awardGeneralsXP(10);
+                }
             }
         }
         if (typeof updateWorldBuildingGarrisonVisual === 'function') {
@@ -1574,10 +1582,17 @@ function updateBlueprintPosition(intersectPoint) {
         isBlueprintValid = false;
     }
 
-    // 3. Distance to existing structures
+    // 3. Distance to existing structures (both player and enemy/neutral)
     for (let s of structures) {
         const d = intersectPoint.distanceTo(s.position);
         if (d < (rBoundary + s.radius)) { isBlueprintValid = false; break; }
+    }
+    if (isBlueprintValid && typeof enemyStructures !== 'undefined') {
+        for (let es of enemyStructures) {
+            if (!es || es.health <= 0 || !es.position) continue;
+            const d = intersectPoint.distanceTo(es.position);
+            if (d < (rBoundary + (es.radius || 8))) { isBlueprintValid = false; break; }
+        }
     }
 
     // 4. Map edge bounds

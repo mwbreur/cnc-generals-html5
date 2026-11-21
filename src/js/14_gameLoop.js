@@ -3148,7 +3148,8 @@ function processEnemyMovement() {
                                 enemy.waypoints = reroute.slice(1);
                                 enemy.targetPosition.copy(reroute[0]);
                             } else {
-                                const sideAngle = ((enemy.netId || 1) % 2 === 0 ? 1 : -1) * (Math.PI / 2);
+                                const enemyNum = parseInt(String(enemy.netId || '1').replace(/\D/g, ''), 10) || 1;
+                                const sideAngle = (enemyNum % 2 === 0 ? 1 : -1) * (Math.PI / 2);
                                 const perpX = Math.cos(sideAngle) * dirX - Math.sin(sideAngle) * dirZ;
                                 const perpZ = Math.sin(sideAngle) * dirX + Math.cos(sideAngle) * dirZ;
                                 const rawDetour = new THREE.Vector3(enemy.mesh.position.x + perpX * 14, 0, enemy.mesh.position.z + perpZ * 14);
