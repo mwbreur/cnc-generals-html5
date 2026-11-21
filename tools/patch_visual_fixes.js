@@ -525,6 +525,115 @@ console.log('drone_battle verified upright bboxes:', {
     gun_Z: [bdGunBBox.min[2].toFixed(1), bdGunBBox.max[2].toFixed(1)]
 });
 
+// 4b. Patch scorpion (UVLiteTank.W3D): bake rest-pose worldR into hull/treads/turret/housecolor01 vertices so CHASSIS & TURRET01 are 100% upright with identity pivot rotations
+const scRaw = parseRawW3d('UVLiteTank.W3D', {
+    dropRe: /muzzlefx\d*|smoke\d*|treadfx\d*/i,
+    includeQuats: true,
+    fallbackTex: 'uvlitetank.dds'
+});
+const { worldR: scWorldR, worldT: scWorldT } = computeWorldPose(scRaw.pivots);
+const scIdx = new Map(scRaw.pivots.map((p, idx) => [p[0].toUpperCase(), idx]));
+const scICh = scIdx.get('CHASSIS');
+const scITL = scIdx.get('TREADSL01');
+const scIHC1 = scIdx.get('HOUSECOLOR01');
+const scITR = scIdx.get('TREADSR01');
+const scITur = scIdx.get('TURRET01');
+const scIRack = scIdx.get('MISSLERACK01');
+const scIWpn = scIdx.get('WEAPONA01');
+const scIHC2 = scIdx.get('HOUSECOLOR02');
+const scIEl = scIdx.get('TURRETEL');
+const scIBar = scIdx.get('BARREL01');
+const scIMuz = scIdx.get('MUZZLE01');
+const scRel = (a, b) => [
+    parseFloat((scWorldT[a][0] - scWorldT[b][0]).toFixed(2)),
+    parseFloat((scWorldT[a][1] - scWorldT[b][1]).toFixed(2)),
+    parseFloat((scWorldT[a][2] - scWorldT[b][2]).toFixed(2))
+];
+const scPivotsClean = [
+    ['ROOTTRANSFORM', -1, 0, 0, 0],
+    ['CHASSIS', 0, scWorldT[scICh][0], scWorldT[scICh][1], scWorldT[scICh][2]],
+    ['TURRET01', 1, ...scRel(scITur, scICh)],
+    ['MISSLERACK01', 2, ...scRel(scIRack, scITur), -0.342, 0, 0, 0.9397],
+    ['WEAPONA01', 3, 0.47, 1.52, 0.61, -0.0087, 0, 0, 1],
+    ['MISSILE', 3, 0.47, 1.52, 0.61, -0.0087, 0, 0, 1],
+    ['HOUSECOLOR02', 5, 0, 0, 0],
+    ['TURRETEL', 2, ...scRel(scIEl, scITur)],
+    ['BARREL01', 7, ...scRel(scIBar, scIEl)],
+    ['MUZZLE01', 8, ...scRel(scIMuz, scIBar)],
+    ['TREADSL01', 1, ...scRel(scITL, scICh)],
+    ['HOUSECOLOR01', 1, ...scRel(scIHC1, scICh)],
+    ['TREADSR01', 1, ...scRel(scITR, scICh)]
+];
+const scBakeList = [
+    [scITR, 12, 'uvlitetank.treadsr01', true],
+    [scIHC1, 11, 'uvlitetank.housecolor01', true],
+    [scITL, 10, 'uvlitetank.treadsl01', true],
+    [scIBar, 8, 'uvlitetank.barrel01', true],
+    [scIEl, 7, 'uvlitetank.turretel', true],
+    [scIHC2, 6, 'uvlitetank.housecolor02', false],
+    [scIWpn, 5, 'uvlitetank.weapona01', false, 'uvlitetank.missile'],
+    [scIRack, 3, 'uvlitetank.misslerack01', false],
+    [scITur, 2, 'uvlitetank.turret01', true],
+    [scICh, 1, 'uvlitetank.chassis', true]
+];
+const scMeshesClean = {};
+const scHClean = [];
+for (const [oldBi, newBi, srcMeshName, bakeRot, outMeshName] of scBakeList) {
+    const m = scRaw.meshes[srcMeshName];
+    if (!m) throw new Error('Missing scorpion mesh ' + srcMeshName);
+    const finalName = outMeshName || srcMeshName;
+    if (bakeRot) {
+        const R = scWorldR[oldBi];
+        const rotV = [];
+        for (let k = 0; k < m.v.length; k += 3) {
+            const rv = mulMatVec(R, [m.v[k], m.v[k + 1], m.v[k + 2]]);
+            rotV.push(parseFloat(rv[0].toFixed(2)), parseFloat(rv[1].toFixed(2)), parseFloat(rv[2].toFixed(2)));
+        }
+        scMeshesClean[finalName] = { v: rotV, i: m.i, u: m.u, tex: m.tex };
+    } else {
+        scMeshesClean[finalName] = { v: m.v.slice(), i: m.i, u: m.u, tex: m.tex };
+    }
+    scHClean.push([newBi, finalName]);
+}
+W3D_VEHICLE_DATA['scorpion'] = {
+    f: 'gla',
+    s: W3D_VEHICLE_DATA['scorpion'] ? W3D_VEHICLE_DATA['scorpion'].s : 0.31,
+    p: scPivotsClean,
+    h: scHClean,
+    m: scMeshesClean
+};
+const scChBB = getMeshWorldBBox(scPivotsClean, scHClean, scMeshesClean, /chassis/i);
+const scTurBB = getMeshWorldBBox(scPivotsClean, scHClean, scMeshesClean, /turret01/i);
+console.log('scorpion verified upright bboxes:', {
+    chassis_X: [scChBB.min[0].toFixed(1), scChBB.max[0].toFixed(1)],
+    chassis_Y: [scChBB.min[1].toFixed(1), scChBB.max[1].toFixed(1)],
+    turret_Y: [scTurBB.min[1].toFixed(1), scTurBB.max[1].toFixed(1)]
+});
+
+// 4c. Patch scud (UVScudLchr.W3D MISSILE pivot quaternion) & a10_warthog (AVWarthog.W3D upright pivot quaternions)
+if (W3D_VEHICLE_DATA['scud']) {
+    for (let i = 0; i < W3D_VEHICLE_DATA['scud'].p.length; i++) {
+        const p = W3D_VEHICLE_DATA['scud'].p[i];
+        if (p[0].toUpperCase() === 'MISSILE') {
+            W3D_VEHICLE_DATA['scud'].p[i] = [p[0], p[1], p[2], p[3], p[4], 0.7071, 0, 0, 0.7071];
+        }
+    }
+}
+if (W3D_VEHICLE_DATA['a10_warthog']) {
+    const a10Parsed = parseRawW3d('AVWarthog.W3D', {
+        dropRe: /muzzlefx|light\d*|smoke\d*|treadfx|wingtip/i,
+        includeQuats: true,
+        fallbackTex: 'avwarthog.dds'
+    });
+    W3D_VEHICLE_DATA['a10_warthog'] = {
+        f: 'usa',
+        s: W3D_VEHICLE_DATA['a10_warthog'].s || 0.25,
+        p: a10Parsed.pivots,
+        h: a10Parsed.h,
+        m: a10Parsed.meshes
+    };
+}
+
 // 5. Patch usa_power_upgrade (ABPWRPLANT_A1.W3D) & usa_power CYLINDER01/02 quaternions
 const pwrUpgParsed = parseRawW3d('ABPWRPLANT_A1.W3D', { includeQuats: true });
 W3D_BUILDING_DATA['usa_power_upgrade'] = {
@@ -606,6 +715,7 @@ injectMissingSubmeshesFromW3D('usa_patriot', 'ABPatriot.W3D', /abpatriot\.housec
 injectMissingSubmeshesFromW3D('usa_strategyCenter', 'ABStrategy.W3D', /abstrategy\.ac box__tex_atgradient/i);
 injectMissingSubmeshesFromW3D('usa_detentionCamp', 'ABPrison.W3D', /abprison\.building__tex_atgradient/i);
 injectMissingSubmeshesFromW3D('gla_commandCenter', 'UBCmdHQ.W3D', /ubcmdhq\.ubcmdhq__tex_atgradient/i);
+injectMissingSubmeshesFromW3D('gla_scudStorm', 'UBScudStrm.W3D', /ubscudstrm\.weapona0[1-9]/i);
 
 // 6c. Patch exact W3D pivot quaternions on ALL buildings whose submesh pivots have non-identity W3D rotations
 // (Fixes floating/90-deg-misoriented HOUSECOLOR01 on usa_supplyCenter, HOUSECOLOR02 on usa_patriot,
@@ -663,6 +773,88 @@ for (const [bKey, w3dFile] of fullQuatPatchTargets) {
     totalQuatPivotsPatched += patchAllBuildingPivotQuatsFromW3D(bKey, w3dFile);
 }
 console.log(`Patched ${totalQuatPivotsPatched} retail W3D pivot quaternions across ${fullQuatPatchTargets.length} faction & tech buildings.`);
+
+// 6d. Patch gla_scudStorm (UBScudStrm.W3D + UBScudStrm_A1.W3D):
+// - Strip underground DOOR01..09 submeshes (Y = -12.34 .. -2.00) so foundation sits flush on ground
+// - Apply UBScudStrm_A1.W3D upright launch-ready frame-99 pose (translation + quaternion) to RACK01..09 & PISTON01..09
+//   and attach animPoses metadata for charge-ratio elevation interpolation
+if (W3D_BUILDING_DATA['gla_scudStorm']) {
+    const scudBld = W3D_BUILDING_DATA['gla_scudStorm'];
+    for (const mName of Object.keys(scudBld.m)) {
+        if (/^ubscudstrm\.door0[1-9]$/i.test(mName)) {
+            delete scudBld.m[mName];
+        }
+    }
+    scudBld.h = scudBld.h.filter(([, mn]) => !/^ubscudstrm\.door0[1-9]$/i.test(mn));
+
+    const scudAnimBuf = getBigFileBuffer('UBScudStrm_A1.W3D', [w3dZhBig, w3dBig]);
+    if (!scudAnimBuf) throw new Error('Missing UBScudStrm_A1.W3D in W3D archives');
+    const endQuats = new Map();
+    const endTransW = new Map();
+    const walkScudAnim = (s, e) => {
+        let p = s;
+        while (p + 8 <= e) {
+            const t = scudAnimBuf.readUInt32LE(p);
+            const sz = scudAnimBuf.readUInt32LE(p + 4) & 0x7FFFFFFF;
+            const hasSub = (scudAnimBuf.readUInt32LE(p + 4) & 0x80000000) !== 0;
+            const ds = p + 8, de = ds + sz;
+            if (de > e) break;
+            if (t === 0x202) {
+                const firstFrame = scudAnimBuf.readUInt16LE(ds);
+                const lastFrame = scudAnimBuf.readUInt16LE(ds + 2);
+                const vecLen = scudAnimBuf.readUInt16LE(ds + 4);
+                const type = scudAnimBuf.readUInt16LE(ds + 6);
+                const piv = scudAnimBuf.readUInt16LE(ds + 8);
+                const nFrames = lastFrame - firstFrame + 1;
+                if (type === 6 && vecLen === 4) {
+                    const lastOff = ds + 12 + (nFrames - 1) * 16;
+                    const qxW = scudAnimBuf.readFloatLE(lastOff);
+                    const qyW = scudAnimBuf.readFloatLE(lastOff + 4);
+                    const qzW = scudAnimBuf.readFloatLE(lastOff + 8);
+                    const qwW = scudAnimBuf.readFloatLE(lastOff + 12);
+                    endQuats.set(piv, toCompactQuat(qxW, qyW, qzW, qwW));
+                } else if (type <= 2 && vecLen === 1) {
+                    const lastOff = ds + 12 + (nFrames - 1) * 4;
+                    if (!endTransW.has(piv)) endTransW.set(piv, [0, 0, 0]);
+                    endTransW.get(piv)[type] = scudAnimBuf.readFloatLE(lastOff);
+                }
+            } else if (hasSub) {
+                walkScudAnim(ds, de);
+            }
+            p = de;
+        }
+    };
+    walkScudAnim(0, scudAnimBuf.length);
+
+    const mulQ = (a, b) => [
+        a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+        a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+        a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+        a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]
+    ];
+
+    const scudBaseRaw = parseRawW3d('UBScudStrm.W3D', { dropRe: null, includeQuats: true });
+    const animPoses = {};
+    for (let idx = 0; idx < scudBld.p.length; idx++) {
+        if (!endQuats.has(idx) && !endTransW.has(idx)) continue;
+        const baseP = scudBaseRaw.pivots[idx];
+        const pname = baseP[0];
+        const t0 = [baseP[2], baseP[3], baseP[4]];
+        const q0 = baseP.length >= 9 ? [baseP[5], baseP[6], baseP[7], baseP[8]] : [0, 0, 0, 1];
+        const dw = endTransW.get(idx) || [0, 0, 0];
+        const t1 = [
+            parseFloat((t0[0] - dw[1]).toFixed(2)),
+            parseFloat((t0[1] + dw[2]).toFixed(2)),
+            parseFloat((t0[2] + dw[0]).toFixed(2))
+        ];
+        const q1 = (endQuats.has(idx) ? mulQ(q0, endQuats.get(idx)) : q0).map(v => parseFloat(v.toFixed(4)));
+        animPoses[pname] = { t0, q0, t1, q1 };
+        scudBld.p[idx] = [pname, baseP[1], t1[0], t1[1], t1[2], q1[0], q1[1], q1[2], q1[3]];
+    }
+    scudBld.animPoses = animPoses;
+    const scudWpnBB = getMeshWorldBBox(scudBld.p, scudBld.h, scudBld.m, /weapona0[1-9]|housecolor0[1-9]/i);
+    console.log('gla_scudStorm 9 rockets upright bbox Y:', [scudWpnBB.min[1].toFixed(1), scudWpnBB.max[1].toFixed(1)], 'animated bones:', Object.keys(animPoses).length);
+}
 
 // 7. Patch supply_drop_crate (PMUNCrate03.W3D) & chinook_cargo_net (PMCargoNet.W3D)
 const crateParsed = parseRawW3d('PMUNCrate03.W3D', {

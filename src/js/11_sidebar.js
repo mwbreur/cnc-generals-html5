@@ -3729,7 +3729,10 @@ function processBuildingFunctions() {
                             spawnSmokePuff(structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4, 2.5, (Math.random() - 0.5) * 4 - 4)), 0xdcdde1, 0.7);
                         }
                     } else if (structure.type === 'scudStorm') {
-                        // Elevate all 4 SCUD Storm missile gantries toward vertical launch angle (owned by charge while charging)
+                        // Elevate all 9 retail W3D SCUD Storm launcher arms & pistons (UBScudStrm_A1.W3D) + procedural fallback gantries
+                        if (typeof applyScudStormElevation === 'function' && structure.mesh && structure.mesh.userData && structure.mesh.userData.isW3D) {
+                            applyScudStormElevation(structure.mesh, 0.55 + 0.45 * chargeRatio);
+                        }
                         const gantryNames = ['scudGantry', 'scudGantry_1', 'scudGantry_2', 'scudGantry_3'];
                         for (let gi = 0; gi < gantryNames.length; gi++) {
                             const gantry = getCachedNode(structure.mesh, gantryNames[gi]);
