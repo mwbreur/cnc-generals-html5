@@ -3843,6 +3843,9 @@ function initShellMapDemo() {
             setupMapEnvironment('tournament_desert', 600);
         }
     }
+    if (typeof fogMesh !== 'undefined' && fogMesh) {
+        fogMesh.visible = false;
+    }
 
     const group = new THREE.Group();
     group.name = 'ShellMapDemoGroup';
@@ -3871,9 +3874,9 @@ function initShellMapDemo() {
 
     // East Ridge: China / GLA Forward Position
     placeBuilding('china_commandCenter', typeof createChinaCommandCenter === 'function' ? createChinaCommandCenter : null, 95, 30, -2.5, true);
-    placeBuilding('china_warFactory', typeof createChinaWarFactory === 'function' ? createChinaWarFactory : null, 118, -12, -2.7, true);
+    placeBuilding('china_factory', typeof createChinaWarFactory === 'function' ? createChinaWarFactory : null, 118, -12, -2.7, true);
     placeBuilding('china_propagandaCenter', typeof createPropagandaCenter === 'function' ? createPropagandaCenter : null, 72, 58, -2.2, true);
-    placeBuilding('gla_bunker', null, 52, 16, -2.4, true);
+    placeBuilding('civilian_bunker', null, 52, 16, -2.4, true);
 
     const makeUnit = (key, isEnemy) => {
         if (typeof createW3DVehicleMesh === 'function' && window.W3D_VEHICLE_DATA && window.W3D_VEHICLE_DATA[key]) {

@@ -72,6 +72,8 @@ function initFogOfWar(mapSize) {
     fogMesh = new THREE.Mesh(fogGeo, fogMat);
     fogMesh.position.set(0, 0, 0);
     fogMesh.renderOrder = 99;
+    // Keep Fog of War hidden on the Main Menu ShellMap diorama & Map Editor so the sunlit 3D battlefield is visible!
+    fogMesh.visible = Boolean(typeof isMatchActive !== 'undefined' && isMatchActive && !(typeof isMapEditorMode !== 'undefined' && isMapEditorMode));
     scene.add(fogMesh);
 }
 
@@ -158,6 +160,9 @@ window.getUnitCombatVisionRange = getUnitCombatVisionRange;
 
 function updateFogOfWar() {
     if (!fogCanvas || !fogCtx || !fogMesh) return;
+    const shouldShowFog = Boolean(typeof isMatchActive !== 'undefined' && isMatchActive && !(typeof isMapEditorMode !== 'undefined' && isMapEditorMode));
+    fogMesh.visible = shouldShowFog;
+    if (!shouldShowFog) return;
     fogUpdateTick++;
     if (fogUpdateTick % 6 !== 0) return; // Smooth ~10Hz fog-of-war updates
 
