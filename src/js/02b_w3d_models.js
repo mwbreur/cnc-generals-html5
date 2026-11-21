@@ -381,10 +381,37 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             cargoHold.add(rope);
         });
         if (window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['chinook_cargo_net']) {
-            const netMesh = createW3DBuildingMesh('chinook_cargo_net', isEnemy);
-            netMesh.scale.set(0.62, 0.72, 0.62);
-            netMesh.position.set(0.3, -16.8, -1.8);
-            cargoHold.add(netMesh);
+            // PMCargoNet.W3D is an open-bottom dome; combine top + mirrored bottom shell + inner supply crates for a full 3D net bundle
+            const fixNetMat = (node) => {
+                if (!node || typeof node.traverse !== 'function') return;
+                node.traverse(c => {
+                    if (c && c.isMesh && c.material) {
+                        c.material.alphaTest = 0.08;
+                        c.material.transparent = true;
+                        c.material.side = THREE.DoubleSide;
+                    }
+                });
+            };
+            const netTop = createW3DBuildingMesh('chinook_cargo_net', isEnemy);
+            netTop.scale.set(0.62, 0.72, 0.62);
+            netTop.position.set(0.3, -16.2, -1.8);
+            fixNetMat(netTop);
+            cargoHold.add(netTop);
+
+            const netBottom = createW3DBuildingMesh('chinook_cargo_net', isEnemy);
+            netBottom.scale.set(0.62, -0.58, 0.62);
+            netBottom.position.set(0.3, -15.8, -1.8);
+            fixNetMat(netBottom);
+            cargoHold.add(netBottom);
+
+            // Solid olive-drab & tan supply crate stack tucked inside the cargo net
+            const crateMatA = new THREE.MeshStandardMaterial({ color: 0x5c6848, roughness: 0.8, metalness: 0.12 });
+            const crateMatB = new THREE.MeshStandardMaterial({ color: 0x8a7852, roughness: 0.82, metalness: 0.1 });
+            const crateBase = new THREE.Mesh(new THREE.BoxGeometry(8.2, 4.4, 7.6), crateMatA);
+            crateBase.position.set(0.3, -16.0, -1.8);
+            const crateTop = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.8, 5.2), crateMatB);
+            crateTop.position.set(0.3, -12.8, -1.8);
+            cargoHold.add(crateBase, crateTop);
         }
         const chBone = root.getObjectByName('CHASSIS') || root;
         chBone.add(cargoHold);
