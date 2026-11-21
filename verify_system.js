@@ -1885,6 +1885,54 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             }
             researchedTechs.delete('towMissile');
         }
+
+        // 16. Official & Procedural Map Roads, 100% Official W3D Assets, and AI Corridor Pathfinding Rules
+        {
+            // A. Official map retail roads exported and rendered
+            if (!Array.isArray(window.OFFICIAL_SKIRMISH_MAPS.tournament_desert.roads) || window.OFFICIAL_SKIRMISH_MAPS.tournament_desert.roads.length < 50) {
+                throw new Error('Tournament Desert missing official EA retail roads array!');
+            }
+            setupMapEnvironment('tournament_desert', 600);
+            const hasOffRoads = mapPropsGroup && mapPropsGroup.children.some(c => c && (c.name === 'mapRoads_asphalt' || c.name === 'mapRoads_dirt'));
+            if (!hasOffRoads) {
+                throw new Error('Official map Tournament Desert did not render 3D road ribbons!');
+            }
+
+            // B. Procedural maps: guaranteed roads, 100% official W3D assets, zero obstacles blocking road corridors, valid AI pathfinding
+            for (const pMap of ['jungle', 'snow', 'city', 'random']) {
+                setupMapEnvironment(pMap, 600);
+                if (!Array.isArray(_activeProceduralRoads) || _activeProceduralRoads.length < 4) {
+                    throw new Error('Procedural map ' + pMap + ' failed to generate guaranteed AI road network!');
+                }
+                const hasProcRoads = mapPropsGroup && mapPropsGroup.children.some(c => c && (c.name === 'mapRoads_asphalt' || c.name === 'mapRoads_dirt'));
+                if (!hasProcRoads) {
+                    throw new Error('Procedural map ' + pMap + ' did not render 3D road ribbons!');
+                }
+                // Verify zero obstacles intrude into the guaranteed road corridors
+                for (const ob of mapObstacles) {
+                    if (!ob || !ob.position || ob.nonBlocking) continue;
+                    for (const r of _activeProceduralRoads) {
+                        const d = distPointToSegment2D(ob.position.x, ob.position.z, r.x1, r.z1, r.x2, r.z2);
+                        if (d < 18) {
+                            throw new Error('Procedural map ' + pMap + ' placed blocking obstacle inside AI road corridor (dist=' + d.toFixed(1) + ')!');
+                        }
+                    }
+                }
+                // Verify 100% of world buildings use official W3D models
+                for (const wb of worldBuildings) {
+                    if (!wb.mesh || !wb.mesh.userData || !wb.mesh.userData.isW3D) {
+                        throw new Error('Procedural map ' + pMap + ' spawned a non-official primitive building!');
+                    }
+                }
+                // Verify AI pathfinding cleanly connects spawn 0 -> spawn 1
+                const sp = getSpawnPointsForMap(600, pMap, null);
+                const navPath = findNavigationPath(new THREE.Vector3(sp[0].x, 0, sp[0].z), new THREE.Vector3(sp[1].x, 0, sp[1].z), false);
+                if (!Array.isArray(navPath) || navPath.length === 0) {
+                    throw new Error('Procedural map ' + pMap + ' failed AI pathfinding between spawns!');
+                }
+            }
+            setupMapEnvironment('tournament_desert', 600);
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

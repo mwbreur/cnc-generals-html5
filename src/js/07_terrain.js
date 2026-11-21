@@ -386,6 +386,82 @@ function getTerrainHeight(x, z) {
     return h;
 }
 
+let _activeProceduralRoads = [];
+let _activeProceduralSpawns = [];
+
+function distPointToSegment2D(px, pz, x1, z1, x2, z2) {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const lenSq = dx * dx + dz * dz;
+    if (lenSq < 1e-6) return Math.hypot(px - x1, pz - z1);
+    let t = ((px - x1) * dx + (pz - z1) * dz) / lenSq;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    return Math.hypot(px - (x1 + t * dx), pz - (z1 + t * dz));
+}
+
+function buildProceduralRoadNetwork(mapType, mapSize) {
+    _activeProceduralRoads = [];
+    _activeProceduralSpawns = [];
+    const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType];
+    if (officialMap || activeCustomMap) return;
+
+    const spawns = (typeof getSpawnPointsForMap === 'function')
+        ? getSpawnPointsForMap(mapSize, mapType, null)
+        : [];
+    if (!Array.isArray(spawns) || spawns.length < 2) return;
+    _activeProceduralSpawns = spawns;
+
+    const roadKind = (mapType === 'desert' || mapType === 'random') ? 'dirt' : 'asphalt';
+    // Sort spawns radially so ring-road connects adjacent spawns cleanly around the map perimeter
+    const ordered = spawns.slice().sort((a, b) => Math.atan2(a.z, a.x) - Math.atan2(b.z, b.x));
+
+    // 1. Perimeter ring highway connecting all neighboring spawn points
+    for (let i = 0; i < ordered.length; i++) {
+        const a = ordered[i];
+        const b = ordered[(i + 1) % ordered.length];
+        _activeProceduralRoads.push({ x1: a.x, z1: a.z, x2: b.x, z2: b.z, kind: roadKind });
+    }
+    // 2. Spokes from every spawn to the central strategic hub (0, 0)
+    for (let i = 0; i < ordered.length; i++) {
+        const a = ordered[i];
+        _activeProceduralRoads.push({ x1: a.x, z1: a.z, x2: 0, z2: 0, kind: roadKind });
+    }
+}
+
+function applyProceduralMapRulesToHeight(x, z, rawH, mapSize) {
+    let h = rawH;
+    // Rule 1: Flat buildable base plateaus around every spawn point (radius ~10% of map, smooth ramp)
+    const plateauR = Math.min(50, mapSize * 0.095);
+    const blendR = plateauR + 22;
+    const baseTargetH = (currentMapType === 'city') ? 2.0 : 3.2;
+    for (let i = 0; i < _activeProceduralSpawns.length; i++) {
+        const sp = _activeProceduralSpawns[i];
+        const d = Math.hypot(x - sp.x, z - sp.z);
+        if (d < blendR) {
+            const t = d <= plateauR ? 1.0 : (1.0 - (d - plateauR) / (blendR - plateauR));
+            const s = t * t * (3 - 2 * t);
+            h = h * (1 - s) + baseTargetH * s;
+        }
+    }
+    // Rule 2: Guaranteed passable, gently graded AI road corridors (never impassable cliffs or dips)
+    if (_activeProceduralRoads.length > 0 && h > -0.8) {
+        let minRoadDist = 1e9;
+        for (let i = 0; i < _activeProceduralRoads.length; i++) {
+            const r = _activeProceduralRoads[i];
+            const d = distPointToSegment2D(x, z, r.x1, r.z1, r.x2, r.z2);
+            if (d < minRoadDist) minRoadDist = d;
+        }
+        if (minRoadDist < 22) {
+            const t = minRoadDist <= 9 ? 1.0 : (1.0 - (minRoadDist - 9) / 13);
+            const s = t * t * (3 - 2 * t);
+            const targetRoadH = Math.max(1.8, Math.min(4.2, h));
+            h = h * (1 - s) + targetRoadH * s;
+        }
+    }
+    return h;
+}
+
 function getRawTerrainHeight(x, z) {
     if (window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType] && typeof getOfficialMapHeight === 'function') {
         return getOfficialMapHeight(currentMapType, x, z);
@@ -418,7 +494,7 @@ function getRawTerrainHeight(x, z) {
         if (dOasis < size * 0.08) {
             h -= (1 - dOasis / (size * 0.08)) * 8.5;
         }
-        return h;
+        return applyProceduralMapRulesToHeight(x, z, h, size);
     } else if (currentMapType === 'jungle') {
         // Lush tropical hills and a defined river channel with shallow fords - 98% accessible land!
         const riverZ = Math.sin(x * 0.012) * (size * 0.09);
@@ -436,7 +512,7 @@ function getRawTerrainHeight(x, z) {
                 h -= rf * rf * 9.5;
             }
         }
-        return h;
+        return applyProceduralMapRulesToHeight(x, z, h, size);
     } else if (currentMapType === 'snow') {
         // Siberian ridges and central ice pond - 99% accessible land!
         const ridge = Math.abs(Math.sin(x * 0.014 + z * 0.012)) * 4.5;
@@ -449,7 +525,7 @@ function getRawTerrainHeight(x, z) {
             const lf = 1 - (dLake / lakeRadius);
             h -= lf * lf * 8.0;
         }
-        return h;
+        return applyProceduralMapRulesToHeight(x, z, h, size);
     } else if (currentMapType === 'city') {
         // Urban street grid with sunken concrete canal - 97% accessible land!
         const canalDist = Math.abs(x - size * 0.05);
@@ -458,7 +534,7 @@ function getRawTerrainHeight(x, z) {
         if (canalDist < canalWidth) {
             h -= (1 - canalDist / canalWidth) * 7.5;
         }
-        return h;
+        return applyProceduralMapRulesToHeight(x, z, h, size);
     } else if (currentMapType === 'random') {
         // Procedural Warzone with narrow stream and multiple crossings - 97.5% accessible land!
         const riverZ = Math.sin(x * 0.014 + randomMapSeed) * (size * 0.10);
@@ -477,7 +553,7 @@ function getRawTerrainHeight(x, z) {
                 h -= f * f * 9.2;
             }
         }
-        return h;
+        return applyProceduralMapRulesToHeight(x, z, h, size);
     }
     return 2.0;
 }
@@ -793,6 +869,7 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 600) {
     }
 
     const officialMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType];
+    buildProceduralRoadNetwork(mapType, mapSize);
     const effectiveTheme = (activeCustomMap && activeCustomMap.theme)
     ? activeCustomMap.theme
     : (officialMap ? officialMap.theme : (mapType === 'random' ? 'jungle' : (['desert', 'jungle', 'snow', 'city', 'tournament_desert'].includes(mapType) ? mapType : 'desert')));
@@ -1455,56 +1532,236 @@ function createWreckCarMesh() {
     return g;
 }
 
-// Spawn Map Props (Trees, Rocks, Palms, City Buildings)
+const _roadRibbonMatCache = {};
+function _getRoadRibbonMaterial(kind) {
+    const key = kind === 'dirt' ? 'dirt' : 'asphalt';
+    if (_roadRibbonMatCache[key]) return _roadRibbonMatCache[key];
+    let tex = null;
+    if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+        const can = document.createElement('canvas');
+        can.width = 128;
+        can.height = 128;
+        const ctx = can.getContext && can.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, 128, 128);
+            if (key === 'asphalt') {
+                // Soft dusty shoulder fade -> dark weathered Generals asphalt -> faded dashed yellow centerline
+                const grad = ctx.createLinearGradient(0, 0, 128, 0);
+                grad.addColorStop(0.0, 'rgba(92,86,74,0.0)');
+                grad.addColorStop(0.10, 'rgba(84,80,72,0.75)');
+                grad.addColorStop(0.16, 'rgba(54,56,58,0.96)');
+                grad.addColorStop(0.50, 'rgba(62,64,66,0.96)');
+                grad.addColorStop(0.84, 'rgba(54,56,58,0.96)');
+                grad.addColorStop(0.90, 'rgba(84,80,72,0.75)');
+                grad.addColorStop(1.0, 'rgba(92,86,74,0.0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 128, 128);
+                // Edge white/dust lines
+                ctx.fillStyle = 'rgba(186,182,168,0.42)';
+                ctx.fillRect(20, 0, 3, 128);
+                ctx.fillRect(105, 0, 3, 128);
+                // Faded dashed yellow highway centerline
+                ctx.fillStyle = 'rgba(208,176,74,0.78)';
+                ctx.fillRect(62, 12, 4, 42);
+                ctx.fillRect(62, 76, 4, 42);
+            } else {
+                // Packed desert / dirt military road with wheel ruts & soft feathered edges
+                const grad = ctx.createLinearGradient(0, 0, 128, 0);
+                grad.addColorStop(0.0, 'rgba(138,116,84,0.0)');
+                grad.addColorStop(0.14, 'rgba(138,116,84,0.72)');
+                grad.addColorStop(0.32, 'rgba(104,88,64,0.88)');
+                grad.addColorStop(0.50, 'rgba(128,108,78,0.82)');
+                grad.addColorStop(0.68, 'rgba(104,88,64,0.88)');
+                grad.addColorStop(0.86, 'rgba(138,116,84,0.72)');
+                grad.addColorStop(1.0, 'rgba(138,116,84,0.0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 128, 128);
+            }
+            tex = new THREE.CanvasTexture(can);
+            tex.wrapS = THREE.ClampToEdgeWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            if ('anisotropy' in tex) tex.anisotropy = 8;
+        }
+    }
+    const mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        color: key === 'asphalt' ? 0xffffff : 0xdfd3be,
+        roughness: 0.94,
+        metalness: 0.04,
+        transparent: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2
+    });
+    _roadRibbonMatCache[key] = mat;
+    return mat;
+}
+
+function spawnMapRoads(mapType, mapSize) {
+    if (!mapPropsGroup) return;
+    const offMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType];
+    const segments = [];
+
+    if (offMap && Array.isArray(offMap.roads) && offMap.roads.length > 0) {
+        for (let i = 0; i < offMap.roads.length; i++) {
+            const r = offMap.roads[i];
+            if (!Array.isArray(r) || r.length < 4) continue;
+            segments.push({
+                x1: r[0] * mapSize,
+                z1: r[1] * mapSize,
+                x2: r[2] * mapSize,
+                z2: r[3] * mapSize,
+                kind: r[4] === 'dirt' ? 'dirt' : 'asphalt'
+            });
+        }
+    } else if (_activeProceduralRoads.length > 0) {
+        for (let i = 0; i < _activeProceduralRoads.length; i++) {
+            segments.push(_activeProceduralRoads[i]);
+        }
+    }
+    if (segments.length === 0) return;
+
+    // Batch all segments per road material into 1 merged BufferGeometry (at most 2 draw calls total!)
+    const buckets = { asphalt: { pos: [], uv: [], idx: [] }, dirt: { pos: [], uv: [], idx: [] } };
+    for (let s = 0; s < segments.length; s++) {
+        const seg = segments[s];
+        const dx = seg.x2 - seg.x1;
+        const dz = seg.z2 - seg.z1;
+        const len = Math.hypot(dx, dz);
+        if (len < 2.0) continue;
+        const kind = seg.kind === 'dirt' ? 'dirt' : 'asphalt';
+        const b = buckets[kind];
+        const halfW = kind === 'dirt' ? 4.6 : 5.4;
+        const nx = -dz / len;
+        const nz = dx / len;
+        const steps = Math.max(2, Math.min(48, Math.ceil(len / 9)));
+        let vOffset = b.pos.length / 3;
+        let prevValid = false;
+
+        for (let k = 0; k <= steps; k++) {
+            const frac = k / steps;
+            const cx = seg.x1 + dx * frac;
+            const cz = seg.z1 + dz * frac;
+            const cy = getTerrainHeight(cx, cz);
+            // Skip submerged river channel slices where bridges span above water
+            if (cy < currentWaterLevel + 0.15) {
+                prevValid = false;
+                continue;
+            }
+            const lx = cx + nx * halfW;
+            const lz = cz + nz * halfW;
+            const rx = cx - nx * halfW;
+            const rz = cz - nz * halfW;
+            const ly = getTerrainHeight(lx, lz) + 0.16;
+            const ry = getTerrainHeight(rx, rz) + 0.16;
+            const vCoord = (frac * len) / 14.0;
+            const curBase = b.pos.length / 3;
+            b.pos.push(lx, ly, lz, rx, ry, rz);
+            b.uv.push(0, vCoord, 1, vCoord);
+            if (prevValid) {
+                b.idx.push(vOffset, curBase, vOffset + 1, vOffset + 1, curBase, curBase + 1);
+            }
+            vOffset = curBase;
+            prevValid = true;
+        }
+    }
+
+    ['asphalt', 'dirt'].forEach(kind => {
+        const b = buckets[kind];
+        if (b.idx.length === 0) return;
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+        geom.setIndex(b.idx);
+        geom.computeVertexNormals();
+        const roadMesh = new THREE.Mesh(geom, _getRoadRibbonMaterial(kind));
+        roadMesh.name = 'mapRoads_' + kind;
+        roadMesh.receiveShadow = true;
+        mapPropsGroup.add(roadMesh);
+    });
+}
+
+// Spawn Map Props (100% Official EA W3D Trees, Bushes, Rocks & Civilian Buildings + Roads)
 function spawnMapProps(theme, mapSize) {
-    // 1. If custom map has explicit bridges, spawn them
+    const offMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType];
+
+    // 1. Spawn Bridges FIRST so props & AI clearance rules always respect every bridge
     if (activeCustomMap && activeCustomMap.bridges && activeCustomMap.bridges.length > 0) {
         activeCustomMap.bridges.forEach(b => {
                 const by = (activeCustomMap.waterLevel !== undefined ? Number(activeCustomMap.waterLevel) : -1.0) + 1.8;
                 spawnBridge(b.x, by, b.z, b.angle || 0, b.width || 20, b.length || 60);
         });
+    } else if (!activeCustomMap && !offMap) {
+        if (currentMapType === 'jungle') {
+            const x1 = -mapSize * 0.24;
+            const z1 = Math.sin(x1 * 0.012) * (mapSize * 0.09);
+            spawnBridge(x1, 1.0, z1, 0, 22, 60);
+
+            const x2 = 0;
+            const z2 = Math.sin(x2 * 0.012) * (mapSize * 0.09);
+            spawnBridge(x2, 1.0, z2, 0, 22, 60);
+
+            const x3 = mapSize * 0.24;
+            const z3 = Math.sin(x3 * 0.012) * (mapSize * 0.09);
+            spawnBridge(x3, 1.0, z3, 0, 22, 60);
+        } else if (currentMapType === 'city') {
+            spawnBridge(mapSize * 0.05, 1.0, -mapSize * 0.24, Math.PI / 2, 22, 56);
+            spawnBridge(mapSize * 0.05, 1.0, 0, Math.PI / 2, 22, 56);
+            spawnBridge(mapSize * 0.05, 1.0, mapSize * 0.24, Math.PI / 2, 22, 56);
+        } else if (currentMapType === 'snow') {
+            spawnBridge(0, 1.0, 0, 0, 22, 64);
+        } else if (currentMapType === 'random') {
+            const rx1 = -mapSize * 0.24;
+            const rz1 = Math.sin(rx1 * 0.014 + randomMapSeed) * (mapSize * 0.10);
+            spawnBridge(rx1, 1.0, rz1, 0, 22, 60);
+
+            const rx2 = 0;
+            const rz2 = Math.sin(randomMapSeed) * (mapSize * 0.10);
+            spawnBridge(rx2, 1.0, rz2, 0, 22, 60);
+
+            const rx3 = mapSize * 0.24;
+            const rz3 = Math.sin(rx3 * 0.014 + randomMapSeed) * (mapSize * 0.10);
+            spawnBridge(rx3, 1.0, rz3, 0, 22, 60);
+        }
     }
 
-    // 2. If custom map has explicit props, spawn them
+    // 2. Render crisp terrain-conforming 3D road ribbons (official Maps.big/MapsZH.big roads + procedural AI highways)
+    spawnMapRoads(currentMapType, mapSize);
+
+    const spawnOfficialProp = (w3dKey, x, y, z, rotY, scaleMult = 1.0) => {
+        if (typeof createW3DBuildingMesh !== 'function' || !window.W3D_BUILDING_DATA || !window.W3D_BUILDING_DATA[w3dKey]) return null;
+        const m = createW3DBuildingMesh(w3dKey, false);
+        m.position.set(x, y, z);
+        m.rotation.y = rotY;
+        if (scaleMult !== 1.0) m.scale.multiplyScalar(scaleMult);
+        mapPropsGroup.add(m);
+        return m;
+    };
+
+    // 3. If custom map has explicit props, spawn official EA W3D assets only
     if (activeCustomMap && activeCustomMap.props && activeCustomMap.props.length > 0) {
         activeCustomMap.props.forEach(p => {
                 const py = getTerrainHeight(p.x, p.z);
                 if (theme === 'desert') {
-                    const palm = createPalmTreeMesh();
-                    palm.position.set(p.x, py, p.z);
-                    mapPropsGroup.add(palm);
-                    mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 1.8 });
-                } else if (theme === 'jungle') {
-                    const tree = createJungleTreeMesh();
-                    tree.position.set(p.x, py, p.z);
-                    mapPropsGroup.add(tree);
-                    mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 2.4 });
-                } else if (theme === 'snow') {
-                    const pine = createSnowPineMesh();
-                    pine.position.set(p.x, py, p.z);
-                    mapPropsGroup.add(pine);
-                    mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 2.0 });
+                    const palm = spawnOfficialProp('prop_palm', p.x, py, p.z, (p.x + p.z) % 6.28);
+                    if (palm) mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 1.8, kind: 'palm', mesh: palm, crushable: true, toppled: false });
+                } else if (theme === 'jungle' || theme === 'snow') {
+                    const tree = spawnOfficialProp('prop_tree', p.x, py, p.z, (p.x + p.z) % 6.28);
+                    if (tree) mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 2.2, kind: 'tree', mesh: tree, crushable: true, toppled: false });
                 } else if (theme === 'city') {
                     const urbanKeys = ['civilian_euro', 'civilian_soviet', 'civilian_house2'];
                     const uKey = urbanKeys[Math.abs(Math.round(p.x + p.z)) % urbanKeys.length];
-                    let building = null;
-                    let usedKey = null;
-                    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA[uKey]) {
-                        building = createW3DBuildingMesh(uKey, false);
-                        usedKey = uKey;
-                    } else {
-                        building = createCitySkyscraperMesh();
+                    const building = spawnOfficialProp(uKey, p.x, py, p.z, 0);
+                    if (building) {
+                        mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 5.5 });
+                        registerWorldBuilding(building, p.x, py, p.z, 0, 5.5, false, uKey);
                     }
-                    building.position.set(p.x, py, p.z);
-                    mapPropsGroup.add(building);
-                    mapObstacles.push({ position: new THREE.Vector3(p.x, py, p.z), radius: 5.5 });
-                    registerWorldBuilding(building, p.x, py, p.z, 0, 5.5, false, usedKey);
                 }
         });
     }
 
-    // 3. Map props: use authentic EA ObjectsList props on official maps (no random procedural clutter!)
-    const offMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType];
+    // 4. Map props: use authentic EA ObjectsList props on official maps (no random procedural clutter!)
     if (offMap && !activeCustomMap && Array.isArray(offMap.props) && offMap.props.length > 0) {
         offMap.props.forEach(p => {
                 const x = p[0] * mapSize;
@@ -1513,35 +1770,17 @@ function spawnMapProps(theme, mapSize) {
                 const y = getTerrainHeight(x, z);
                 if (y < currentWaterLevel + 0.3) return;
                 if (kind === 'palm') {
-                    const palm = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_palm'])
-                    ? createW3DBuildingMesh('prop_palm', false)
-                    : createPalmTreeMesh();
-                    palm.position.set(x, y, z);
-                    mapPropsGroup.add(palm);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.6, kind: 'palm', mesh: palm, crushable: true, toppled: false });
+                    const palm = spawnOfficialProp('prop_palm', x, y, z, (x + z) % 6.28);
+                    if (palm) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.6, kind: 'palm', mesh: palm, crushable: true, toppled: false });
                 } else if (kind === 'tree') {
-                    const tree = (theme !== 'snow' && typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_tree'])
-                    ? createW3DBuildingMesh('prop_tree', false)
-                    : ((theme === 'snow') ? createSnowPineMesh() : createJungleTreeMesh());
-                    tree.position.set(x, y, z);
-                    mapPropsGroup.add(tree);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0, kind: 'tree', mesh: tree, crushable: true, toppled: false });
+                    const tree = spawnOfficialProp('prop_tree', x, y, z, (x + z) % 6.28);
+                    if (tree) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0, kind: 'tree', mesh: tree, crushable: true, toppled: false });
                 } else if (kind === 'bush') {
-                    const bush = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_bush'])
-                    ? createW3DBuildingMesh('prop_bush', false)
-                    : createJungleTreeMesh();
-                    if (!bush.userData || !bush.userData.isW3D) bush.scale.set(0.5, 0.45, 0.5);
-                    bush.position.set(x, y, z);
-                    mapPropsGroup.add(bush);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: bush, crushable: true, toppled: false, nonBlocking: true });
+                    const bush = spawnOfficialProp('prop_bush', x, y, z, (x + z) % 6.28);
+                    if (bush) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: bush, crushable: true, toppled: false, nonBlocking: true });
                 } else if (kind === 'rock') {
-                    const rockCol = theme === 'snow' ? 0xbdc3c7 : theme === 'jungle' ? 0x5d6d5a : 0x8a775b;
-                    const rock = (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['prop_rock'])
-                    ? createW3DBuildingMesh('prop_rock', false)
-                    : createRockMesh(rockCol);
-                    rock.position.set(x, y + (rock.userData && rock.userData.isW3D ? 0 : 0.4), z);
-                    mapPropsGroup.add(rock);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
+                    const rock = spawnOfficialProp('prop_rock', x, y, z, (x + z) % 6.28);
+                    if (rock) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
                 }
         });
         // Spawn official EA bridges & civilian structures/bunkers from ObjectsList
@@ -1620,172 +1859,118 @@ function spawnMapProps(theme, mapSize) {
             });
         }
     } else {
+        // Procedural Map Rules:
+        // 1. 100% official EA W3D assets only (trees, palms, bushes, rocks, garrisonable civilian buildings).
+        // 2. Strict AI pathfinding clearance along every road corridor, spawn plateau, bridge, and supply dock.
         const count = activeCustomMap
         ? Math.min(32, Math.floor(mapSize * 0.035))
-        : (mapSize > 1000 ? 110 : mapSize > 600 ? 75 : 45);
+        : (mapSize > 1000 ? 110 : mapSize > 750 ? 80 : 52);
         const bound = mapSize * 0.42;
         const propRng = (typeof simRandom === 'function') ? simRandom : Math.random;
+        const mapSpawns = (typeof getSpawnPointsForMap === 'function')
+            ? getSpawnPointsForMap(mapSize, currentMapType, activeCustomMap)
+            : [];
+
+        const isNearProceduralRoad = (px, pz, minClear) => {
+            for (let ri = 0; ri < _activeProceduralRoads.length; ri++) {
+                const r = _activeProceduralRoads[ri];
+                if (distPointToSegment2D(px, pz, r.x1, r.z1, r.x2, r.z2) < minClear) return true;
+            }
+            return false;
+        };
+
+        const civPools = {
+            desert: ['civilian_desert_house', 'civilian_house1', 'civilian_bunker'],
+            jungle: ['civilian_cottage', 'civilian_house1', 'civilian_bunker'],
+            snow:   ['civilian_chalet', 'civilian_soviet', 'civilian_bunker'],
+            city:   ['civilian_euro', 'civilian_soviet', 'civilian_house1', 'civilian_house2', 'civilian_hangar', 'civilian_bunker']
+        };
 
         for (let i = 0; i < count; i++) {
             const x = (propRng() - 0.5) * 2 * bound;
             const z = (propRng() - 0.5) * 2 * bound;
             const y = getTerrainHeight(x, z);
 
-            // Do not spawn in water
-            if (y < currentWaterLevel + 0.4 && theme !== 'city') continue;
-            // Leave base centers and spawn points clear
-            if (Math.hypot(x, z) < 45) continue;
-            if (typeof getSpawnPointsForMap === 'function') {
-                const mapSpawns = getSpawnPointsForMap(mapSize, currentMapType, activeCustomMap);
-                if (mapSpawns && mapSpawns.some(sp => Math.hypot(x - sp.x, z - sp.z) < 48)) continue;
-            }
-            const offMap = window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[currentMapType];
-            if (offMap && offMap.supplies && offMap.supplies.some(s => Math.hypot(x - s.nx * mapSize, z - s.nz * mapSize) < 28)) continue;
-            // Avoid blocking bridges
-            if (mapBridges.some(br => Math.hypot(x - br.position.x, z - br.position.z) < br.width + 6)) continue;
+            // Never spawn in water or steep underwater banks
+            if (y < currentWaterLevel + 0.5 && theme !== 'city') continue;
+            // Keep central hub clear for AI pathing & battles
+            if (Math.hypot(x, z) < 36) continue;
+            // Keep every spawn base plateau completely clear
+            if (mapSpawns && mapSpawns.some(sp => Math.hypot(x - sp.x, z - sp.z) < 46)) continue;
+            // Keep every guaranteed AI road corridor wide and obstacle-free (22u clearance)
+            if (isNearProceduralRoad(x, z, 22)) continue;
+            // Keep every bridge & bridge approach completely clear
+            if (mapBridges.some(br => Math.hypot(x - br.position.x, z - br.position.z) < br.width + 14)) continue;
+            // Avoid overlapping previously placed obstacles
+            if (mapObstacles.some(ob => ob && ob.position && Math.hypot(x - ob.position.x, z - ob.position.z) < (ob.radius || 3) + 5.5)) continue;
 
-            if (theme === 'desert') {
-                const roll = propRng();
-                if (roll > 0.6) {
-                    const palm = createPalmTreeMesh();
-                    palm.position.set(x, y, z);
-                    mapPropsGroup.add(palm);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.8, kind: 'palm', mesh: palm, crushable: true, toppled: false });
-                } else if (roll > 0.3) {
-                    const cactus = createCactusMesh();
-                    cactus.position.set(x, y, z);
-                    mapPropsGroup.add(cactus);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.4, kind: 'bush', mesh: cactus, crushable: true, toppled: false });
-                } else if (roll > 0.1) {
-                    const rock = createRockMesh(0x8a775b);
-                    rock.position.set(x, y + 0.5, z);
-                    mapPropsGroup.add(rock);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
+            const roll = propRng();
+            const rotY = propRng() * Math.PI * 2;
+            const pool = civPools[theme] || civPools.desert;
+
+            if (theme === 'city') {
+                if (Math.abs(x - mapSize * 0.05) <= 28) continue;
+                if (roll > 0.30) {
+                    const uKey = pool[Math.floor(propRng() * pool.length) % pool.length];
+                    const bRot = Math.floor(propRng() * 4) * (Math.PI / 2);
+                    const bld = spawnOfficialProp(uKey, x, y, z, bRot);
+                    if (bld) {
+                        const isBunk = (uKey === 'civilian_bunker');
+                        const r = isBunk ? 5.0 : 6.0;
+                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: r });
+                        registerWorldBuilding(bld, x, y, z, bRot, r, isBunk, uKey);
+                    }
+                } else if (roll > 0.14) {
+                    const tree = spawnOfficialProp('prop_tree', x, y, z, rotY);
+                    if (tree) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0, kind: 'tree', mesh: tree, crushable: true, toppled: false });
                 } else {
-                    const pipe = createPipelineMesh(20);
-                    pipe.position.set(x, y, z);
-                    pipe.rotation.y = propRng() * Math.PI;
-                    mapPropsGroup.add(pipe);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 3.5 });
+                    const bush = spawnOfficialProp('prop_bush', x, y, z, rotY);
+                    if (bush) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: bush, crushable: true, toppled: false, nonBlocking: true });
                 }
-            } else if (theme === 'jungle') {
-                const roll = propRng();
+            } else if (theme === 'desert') {
+                if (roll > 0.55) {
+                    const palm = spawnOfficialProp('prop_palm', x, y, z, rotY);
+                    if (palm) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.6, kind: 'palm', mesh: palm, crushable: true, toppled: false });
+                } else if (roll > 0.30) {
+                    const bush = spawnOfficialProp('prop_bush', x, y, z, rotY);
+                    if (bush) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: bush, crushable: true, toppled: false, nonBlocking: true });
+                } else if (roll > 0.14) {
+                    const rock = spawnOfficialProp('prop_rock', x, y, z, rotY);
+                    if (rock) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
+                } else {
+                    const uKey = pool[Math.floor(propRng() * pool.length) % pool.length];
+                    const bRot = Math.floor(propRng() * 4) * (Math.PI / 2);
+                    const bld = spawnOfficialProp(uKey, x, y, z, bRot);
+                    if (bld) {
+                        const isBunk = (uKey === 'civilian_bunker');
+                        const r = isBunk ? 5.0 : 6.0;
+                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: r });
+                        registerWorldBuilding(bld, x, y, z, bRot, r, isBunk, uKey);
+                    }
+                }
+            } else {
+                // Jungle / Snow / Random: official W3D trees, bushes, rocks, and themed garrisonable civilian structures
                 if (roll > 0.45) {
-                    const tree = createJungleTreeMesh();
-                    tree.position.set(x, y, z);
-                    mapPropsGroup.add(tree);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.4, kind: 'tree', mesh: tree, crushable: true, toppled: false });
-                } else if (roll > 0.25) {
-                    const fern = createFernMesh();
-                    fern.position.set(x, y, z);
-                    mapPropsGroup.add(fern);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: fern, crushable: true, toppled: false, nonBlocking: true });
-                } else if (roll > 0.1) {
-                    const reed = createReedMesh();
-                    reed.position.set(x, y, z);
-                    mapPropsGroup.add(reed);
+                    const tree = spawnOfficialProp('prop_tree', x, y, z, rotY);
+                    if (tree) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0, kind: 'tree', mesh: tree, crushable: true, toppled: false });
+                } else if (roll > 0.24) {
+                    const bush = spawnOfficialProp('prop_bush', x, y, z, rotY);
+                    if (bush) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.1, kind: 'bush', mesh: bush, crushable: true, toppled: false, nonBlocking: true });
+                } else if (roll > 0.12) {
+                    const rock = spawnOfficialProp('prop_rock', x, y, z, rotY);
+                    if (rock) mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
                 } else {
-                    const rock = createRockMesh(0x27ae60);
-                    rock.position.set(x, y + 0.5, z);
-                    mapPropsGroup.add(rock);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0 });
-                }
-            } else if (theme === 'snow') {
-                const roll = propRng();
-                if (roll > 0.45) {
-                    const pine = createSnowPineMesh();
-                    pine.position.set(x, y, z);
-                    mapPropsGroup.add(pine);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.0, kind: 'tree', mesh: pine, crushable: true, toppled: false });
-                } else if (roll > 0.2) {
-                    const ice = createIceSpikeMesh();
-                    ice.position.set(x, y, z);
-                    mapPropsGroup.add(ice);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 1.8 });
-                } else {
-                    const rock = createRockMesh(0xbdc3c7);
-                    rock.position.set(x, y + 0.5, z);
-                    mapPropsGroup.add(rock);
-                    mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.2 });
-                }
-            } else if (theme === 'city') {
-                const roll = propRng();
-                if (Math.abs(x - mapSize * 0.06) > 35) {
-                    if (roll > 0.7) {
-                        const building = createCitySkyscraperMesh();
-                        building.position.set(x, y, z);
-                        mapPropsGroup.add(building);
-                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 5.5 });
-                        registerWorldBuilding(building, x, y, z, 0, 5.5, false, null);
-                    } else if (roll > 0.4) {
-                        const urbanKeys = ['civilian_euro', 'civilian_soviet', 'civilian_house2'];
-                        const uKey = urbanKeys[Math.abs(Math.round(x + z)) % urbanKeys.length];
-                        let building = null;
-                        let usedKey = null;
-                        if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA[uKey]) {
-                            building = createW3DBuildingMesh(uKey, false);
-                            building.rotation.y = Math.floor(propRng() * 4) * (Math.PI / 2);
-                            usedKey = uKey;
-                        } else {
-                            building = createCitySkyscraperMesh();
-                        }
-                        building.position.set(x, y, z);
-                        mapPropsGroup.add(building);
-                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 5.5 });
-                        registerWorldBuilding(building, x, y, z, building.rotation.y, 5.5, false, usedKey);
-                    } else if (roll > 0.2) {
-                        const light = createStreetLightMesh();
-                        light.position.set(x, y, z);
-                        mapPropsGroup.add(light);
-                    } else {
-                        const wreck = createWreckCarMesh();
-                        wreck.position.set(x, y, z);
-                        wreck.rotation.y = propRng() * Math.PI * 2;
-                        mapPropsGroup.add(wreck);
-                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: 2.5 });
+                    const uKey = pool[Math.floor(propRng() * pool.length) % pool.length];
+                    const bRot = Math.floor(propRng() * 4) * (Math.PI / 2);
+                    const bld = spawnOfficialProp(uKey, x, y, z, bRot);
+                    if (bld) {
+                        const isBunk = (uKey === 'civilian_bunker');
+                        const r = isBunk ? 5.0 : 6.0;
+                        mapObstacles.push({ position: new THREE.Vector3(x, y, z), radius: r });
+                        registerWorldBuilding(bld, x, y, z, bRot, r, isBunk, uKey);
                     }
                 }
             }
-        }
-    }
-
-    // 4. Default Bridges for Preset Maps (only if not a custom map and not an official EA dry-valley map)
-    if (!activeCustomMap && !offMap) {
-        if (currentMapType === 'jungle') {
-            const x1 = -mapSize * 0.24;
-            const z1 = Math.sin(x1 * 0.012) * (mapSize * 0.09);
-            spawnBridge(x1, 1.0, z1, 0, 20, 60);
-
-            const x2 = 0;
-            const z2 = Math.sin(x2 * 0.012) * (mapSize * 0.09);
-            spawnBridge(x2, 1.0, z2, 0, 20, 60);
-
-            const x3 = mapSize * 0.24;
-            const z3 = Math.sin(x3 * 0.012) * (mapSize * 0.09);
-            spawnBridge(x3, 1.0, z3, 0, 20, 60);
-        } else if (currentMapType === 'city') {
-            spawnBridge(mapSize * 0.05, 1.0, -mapSize * 0.24, Math.PI / 2, 20, 56);
-            spawnBridge(mapSize * 0.05, 1.0, 0, Math.PI / 2, 20, 56);
-            spawnBridge(mapSize * 0.05, 1.0, mapSize * 0.24, Math.PI / 2, 20, 56);
-        } else if (currentMapType === 'snow') {
-            spawnBridge(0, 1.0, 0, 0, 20, 64);
-        } else if (currentMapType === 'tournament_desert') {
-            spawnBridge(-140, -5.5, 0, 0, 22, 68);
-            spawnBridge(140, -5.5, 0, 0, 22, 68);
-        } else if (currentMapType === 'desert') {
-            spawnBridge(mapSize * 0.20, 1.0, mapSize * 0.20, Math.PI / 4, 18, 56);
-        } else if (currentMapType === 'random') {
-            const rx1 = -mapSize * 0.24;
-            const rz1 = Math.sin(rx1 * 0.014 + randomMapSeed) * (mapSize * 0.10);
-            spawnBridge(rx1, 1.0, rz1, 0, 20, 60);
-
-            const rx2 = 0;
-            const rz2 = Math.sin(randomMapSeed) * (mapSize * 0.10);
-            spawnBridge(rx2, 1.0, rz2, 0, 20, 60);
-
-            const rx3 = mapSize * 0.24;
-            const rz3 = Math.sin(rx3 * 0.014 + randomMapSeed) * (mapSize * 0.10);
-            spawnBridge(rx3, 1.0, rz3, 0, 20, 60);
         }
     }
 }

@@ -954,6 +954,13 @@ function parseOfficialMap(mapKey, meta) {
         bridges: rawBridges,
         buildings: rawBuildings,
         props: rawProps,
+        roads: rawRoads.map(rd => [
+            Number(rd.x1.toFixed(4)),
+            Number(rd.z1.toFixed(4)),
+            Number(rd.x2.toFixed(4)),
+            Number(rd.z2.toFixed(4)),
+            /dirt|sand|mud|trail|gravel/i.test(rd.tName || '') ? 'dirt' : 'asphalt'
+        ]),
         waterPolygons,
         tgaDataUrl,
         terrainDataUrl
