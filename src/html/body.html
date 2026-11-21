@@ -1,3 +1,39 @@
+<!-- Zero Hour Options Modal (top-level so it works from Main Menu, Pause Menu & HUD) -->
+<div id="zh-options-modal" class="zh-map-modal" style="z-index: 3000;" hidden onclick="if (event.target === this) closeOptionsModal()">
+    <div class="zh-map-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="zh-options-modal-title" style="max-width:460px;">
+        <div class="zh-map-modal-header">
+            <span id="zh-options-modal-title">⚙️ OPTIONS</span>
+            <button type="button" class="zh-btn zh-btn-mini" onclick="closeOptionsModal()">X</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;color:#dce8f5;font-size:13px;">
+            <div class="zh-opt-group">
+                <label for="opt-graphics-quality">Graphics Quality</label>
+                <select id="opt-graphics-quality" class="zh-skirmish-select" onchange="onOptionsFormChange()">
+                    <option value="high">High (Full Resolution &amp; Shadows)</option>
+                    <option value="medium">Medium (Balanced for Large Armies)</option>
+                    <option value="low">Low (Max FPS — No Shadows)</option>
+                </select>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input id="opt-shadows" type="checkbox" checked onchange="onOptionsFormChange()" />
+                <span>Dynamic Shadows (turn off for huge 200+ unit battles)</span>
+            </label>
+            <div class="zh-opt-group">
+                <label for="opt-master-volume">Master Audio Volume: <span id="opt-master-volume-val">100%</span></label>
+                <input id="opt-master-volume" type="range" min="0" max="100" step="5" value="100" oninput="onOptionsFormChange()" />
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input id="opt-show-fps" type="checkbox" onchange="onOptionsFormChange()" />
+                <span>Show Live FPS &amp; Unit Counter</span>
+            </label>
+        </div>
+        <div class="zh-map-modal-footer">
+            <button type="button" class="zh-btn zh-btn-primary" onclick="closeOptionsModal()">Accept</button>
+        </div>
+    </div>
+</div>
+<div id="fps-perf-badge" style="display:none;position:fixed;top:44px;left:12px;z-index:1200;background:rgba(10,18,28,0.82);border:1px solid rgba(94,168,255,0.45);color:#7bed9f;font-family:monospace;font-size:12px;padding:4px 8px;border-radius:3px;pointer-events:none;">60 FPS • 0 Units</div>
+
 <div id="start-menu" class="main-menu-transparent">
         <!-- TOP-RIGHT LIVE SCREEN OVERLAY -->
         <div id="pause-screen-clock" class="pause-screen-clock" style="display: none;">00:00:00</div>
@@ -239,42 +275,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Zero Hour Options Modal (Graphics, Shadows, Audio, Performance HUD) -->
-            <div id="zh-options-modal" class="zh-map-modal" hidden onclick="if (event.target === this) closeOptionsModal()">
-                <div class="zh-map-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="zh-options-modal-title" style="max-width:460px;">
-                    <div class="zh-map-modal-header">
-                        <span id="zh-options-modal-title">⚙️ OPTIONS</span>
-                        <button type="button" class="zh-btn zh-btn-mini" onclick="closeOptionsModal()">X</button>
-                    </div>
-                    <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;color:#dce8f5;font-size:13px;">
-                        <div class="zh-opt-group">
-                            <label for="opt-graphics-quality">Graphics Quality</label>
-                            <select id="opt-graphics-quality" class="zh-skirmish-select" onchange="onOptionsFormChange()">
-                                <option value="high">High (Full Resolution &amp; Shadows)</option>
-                                <option value="medium">Medium (Balanced for Large Armies)</option>
-                                <option value="low">Low (Max FPS — No Shadows)</option>
-                            </select>
-                        </div>
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                            <input id="opt-shadows" type="checkbox" checked onchange="onOptionsFormChange()" />
-                            <span>Dynamic Shadows (turn off for huge 200+ unit battles)</span>
-                        </label>
-                        <div class="zh-opt-group">
-                            <label for="opt-master-volume">Master Audio Volume: <span id="opt-master-volume-val">100%</span></label>
-                            <input id="opt-master-volume" type="range" min="0" max="100" step="5" value="100" oninput="onOptionsFormChange()" />
-                        </div>
-                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                            <input id="opt-show-fps" type="checkbox" onchange="onOptionsFormChange()" />
-                            <span>Show Live FPS &amp; Unit Counter</span>
-                        </label>
-                    </div>
-                    <div class="zh-map-modal-footer">
-                        <button type="button" class="zh-btn zh-btn-primary" onclick="closeOptionsModal()">Accept</button>
-                    </div>
-                </div>
-            </div>
-            <div id="fps-perf-badge" style="display:none;position:fixed;top:44px;left:12px;z-index:1200;background:rgba(10,18,28,0.82);border:1px solid rgba(94,168,255,0.45);color:#7bed9f;font-family:monospace;font-size:12px;padding:4px 8px;border-radius:3px;pointer-events:none;">60 FPS • 0 Units</div>
 
             <!-- ============================================================== -->
             <!-- 2. MULTIPLAYER SETUP PANEL                                     -->
