@@ -3457,6 +3457,7 @@ function attachOverlordUpgrade(tank, upgradeType) {
             unloadTransportPassengers(tank);
         }
         tank.capacity = 0;
+        if (upgradeType === 'gatling') tank.detectsStealth = true;
     }
     tank.overlordUpgrade = upgradeType;
 
@@ -3614,22 +3615,6 @@ function attachOverlordUpgrade(tank, upgradeType) {
 
     turretSys.add(group);
     tank.overlordUpgradeMesh = group;
-    if (upgradeType === 'bunker') {
-        tank.capacity = 5;
-        if (!Array.isArray(tank.garrisoned)) tank.garrisoned = [];
-    } else {
-        if (Array.isArray(tank.garrisoned) && tank.garrisoned.length > 0 && typeof unloadTransportPassengers === 'function') {
-            unloadTransportPassengers(tank);
-        }
-        tank.capacity = 0;
-    }
-    tank.overlordUpgrade = upgradeType;
-    if (upgradeType === 'bunker') {
-        tank.capacity = 5;
-        if (!tank.garrisoned) tank.garrisoned = [];
-    } else if (upgradeType === 'gatling') {
-        tank.detectsStealth = true;
-    }
 
     if (typeof playOfficialSound === 'function') {
         playOfficialSound('sfx_overlord_upgrade', 0.90);
@@ -3640,7 +3625,9 @@ function attachOverlordUpgrade(tank, upgradeType) {
     } else {
         playAudio('construction', {}, 'china');
     }
-    showNotification(`OVERLORD upgraded with ${upgradeType.toUpperCase()}!`, 'success');
+    if (!tank.isEnemy && !tank.isAI && typeof showNotification === 'function') {
+        showNotification(`OVERLORD upgraded with ${upgradeType.toUpperCase()}!`, 'success');
+    }
 }
 
 // =========================================================================

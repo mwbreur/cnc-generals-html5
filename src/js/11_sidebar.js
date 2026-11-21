@@ -520,6 +520,14 @@ function showMainMenuScreen() {
     const mainMenuScreen = document.getElementById('main-menu-screen');
     const setupScreen = document.getElementById('start-setup-screen');
     if (!menu || !startCard || !mainMenuScreen || !setupScreen) return;
+    // Clear any leftover finished-match units, structures, and AI state before showing the ShellMap diorama
+    const hasLeftoverMatch = (typeof units !== 'undefined' && units.length > 0) ||
+        (typeof enemyUnits !== 'undefined' && enemyUnits.length > 0) ||
+        (typeof structures !== 'undefined' && structures.length > 0) ||
+        (typeof enemyStructures !== 'undefined' && enemyStructures.length > 0);
+    if (hasLeftoverMatch && typeof resetEntireBattlefieldState === 'function') {
+        resetEntireBattlefieldState(typeof currentMapSize !== 'undefined' ? currentMapSize : 900);
+    }
     menu.style.display = 'flex';
     menu.classList.remove('pause-mode');
     menu.classList.remove('zh-skirmish-backdrop');
@@ -924,9 +932,10 @@ function applyOfficialMenuArt(facOverride) {
 window.applyOfficialMenuArt = applyOfficialMenuArt;
 if (typeof window !== 'undefined') {
     setTimeout(() => {
-            applyOfficialMenuArt();
-            if (typeof initShellMapDemo === 'function' && (typeof isMatchActive === 'undefined' || !isMatchActive)) {
-                initShellMapDemo();
+            if (typeof isMatchActive === 'undefined' || !isMatchActive) {
+                showMainMenuScreen();
+            } else {
+                applyOfficialMenuArt();
             }
             const updateMenuClock = () => {
                 const el = document.getElementById('zh-menu-clock');
@@ -1688,13 +1697,14 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
                 };
         });
     } else if (activeGridCategory === 'units') {
-        // Quick Units production across operational facilities
+        // Quick Units production across operational facilities (respecting Tech Refinery discount)
         currentGridSlots = Object.entries(unitRoster).slice(0, 14).map(([type, spec]) => {
-                const canAfford = playerResources >= spec.cost;
+                const effCost = (typeof getEffectiveUnitCost === 'function') ? getEffectiveUnitCost(type) : spec.cost;
+                const canAfford = playerResources >= effCost;
                 return {
                     id: type,
                     name: spec.name.toUpperCase(),
-                    cost: spec.cost,
+                    cost: effCost,
                     badge: canAfford ? 'TRAIN' : 'FUNDS',
                     disabled: !canAfford,
                     action: () => produceUnit(type),
@@ -1753,6 +1763,16 @@ function getCameoSVG(id, faction = 'usa', name = '') {
             <polygon points="24,6 40,6 50,16 50,30 40,38 24,38 14,30 14,16" fill="#c0392b" stroke="#e74c3c" stroke-width="1.5"/>
             <rect x="22" y="14" width="20" height="15" rx="1" fill="#fff"/>
             <polygon points="20,20 22,14 22,25 20,25" fill="#fff"/>
+        `);
+    }
+
+    // 3b. MISSILE DEFENDER / ROCKET INFANTRY (must precede 'def' guard check!)
+    if (key === 'missiledefender' || key === 'rocket' || key.includes('missile')) {
+        return wrap(`
+            <rect x="10" y="17" width="32" height="8" rx="2" fill="#4b6584" stroke="#a5b1c2" stroke-width="1.2"/>
+            <polygon points="42,16 54,21 42,26" fill="#ff4757" stroke="#ffd32a" stroke-width="1"/>
+            <path d="M8 21 L2 17 M8 21 L2 25" stroke="#ff9f43" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="24" cy="32" r="5" fill="#2d3436" stroke="#74b9ff" stroke-width="1.2"/>
         `);
     }
 
@@ -3708,8 +3728,16 @@ function processBuildingFunctions() {
                             spawnSmokePuff(structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4, 2.5, (Math.random() - 0.5) * 4 - 4)), 0xdcdde1, 0.7);
                         }
                     } else if (structure.type === 'scudStorm') {
-                        const gantry = getCachedNode(structure.mesh, 'scudGantry');
-                        if (gantry) gantry.rotation.x = -0.15 - chargeRatio * 0.75; // Elevate 9 Scuds toward vertical launch angle
+                        // Elevate all 4 SCUD Storm missile gantries toward vertical launch angle (owned by charge while charging)
+                        const gantryNames = ['scudGantry', 'scudGantry_1', 'scudGantry_2', 'scudGantry_3'];
+                        for (let gi = 0; gi < gantryNames.length; gi++) {
+                            const gantry = getCachedNode(structure.mesh, gantryNames[gi]);
+                            if (gantry) {
+                                gantry.rotation.x = -0.15 - chargeRatio * 0.75;
+                                if (!gantry.userData) gantry.userData = {};
+                                gantry.userData._chargeControlled = true;
+                            }
+                        }
                     } else if (structure.type === 'particleCannon') {
                         const glowLight = getCachedNode(structure.mesh, 'particleCannonGlowLight');
                         if (glowLight) {

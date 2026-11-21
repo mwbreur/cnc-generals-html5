@@ -374,6 +374,13 @@ function animate() {
     }
     if (typeof updateTopplingTrees === 'function') updateTopplingTrees(combatDeltaScale);
 
+    // When in the main menu (not in an active match or map editor), render only the ShellMap diorama + FX (no background gameplay simulation)
+    if ((typeof isMatchActive === 'undefined' || !isMatchActive) && (typeof isMapEditorMode === 'undefined' || !isMapEditorMode)) {
+        if (typeof updateShellMapDemo === 'function') updateShellMapDemo(dt);
+        renderer.render(scene, camera);
+        return;
+    }
+
     // Update Top-Right Match Clock (Zero Hour style)
     if (typeof isMatchActive !== 'undefined' && isMatchActive && typeof matchStartTime !== 'undefined' && matchStartTime > 0) {
         const totalSec = Math.floor((Date.now() - matchStartTime) / 1000);
@@ -1039,9 +1046,11 @@ function animate() {
             } else if (obj.name === "nukeBlastDoorR") {
                 const openAmt = Math.max(0, Math.sin(animTime * 1.5)) * 0.35;
                 obj.position.x = 2.2 + openAmt;
-            } else if (obj.name === "scudGantry") {
-                // SCUD Storm launch gantry breathing angle
-                obj.rotation.x = -Math.PI / 5.5 + Math.sin(animTime * 1.2) * 0.03;
+            } else if (obj.name === "scudGantry" || (obj.name && obj.name.startsWith("scudGantry_"))) {
+                // SCUD Storm launch gantry breathing angle (skip while superweapon charge owns rotation.x)
+                if (!(obj.userData && obj.userData._chargeControlled)) {
+                    obj.rotation.x = -Math.PI / 5.5 + Math.sin(animTime * 1.2) * 0.03;
+                }
             } else if (obj.name === "factionFlag") {
                 // Barracks cloth flagpole flag waving in wind
                 obj.rotation.y = Math.sin(animTime * 3.8) * 0.18;
