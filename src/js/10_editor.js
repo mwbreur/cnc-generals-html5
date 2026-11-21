@@ -989,6 +989,7 @@ function setupGameDeployment() {
 
     hasSpawnedInitialEnemyBase = true;
     isMatchActive = true;
+    if (typeof document !== 'undefined' && document.body) document.body.classList.remove('in-main-menu');
     matchStartTime = Date.now();
     if (typeof initAICommanders === 'function') initAICommanders();
     updateSidebar();

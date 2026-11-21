@@ -881,8 +881,9 @@ function applyOfficialMenuArt(facOverride) {
     const startCard = document.getElementById('start-card');
     if (startCard) {
         const isMain = startCard.classList.contains('main-menu-active');
+        const inMenuOverlay = (!startMenu || startMenu.style.display !== 'none') && (typeof isMatchActive === 'undefined' || !isMatchActive);
         if (typeof document !== 'undefined' && document.body) {
-            document.body.classList.toggle('in-main-menu', isMain && (!startMenu || startMenu.style.display !== 'none'));
+            document.body.classList.toggle('in-main-menu', inMenuOverlay);
         }
         if (startMenu) startMenu.classList.toggle('main-menu-transparent', isMain);
         if (isMain) {
