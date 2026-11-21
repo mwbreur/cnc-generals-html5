@@ -1267,13 +1267,13 @@ if (typeof window !== 'undefined') {
 // --- SKIRMISH & MULTIPLAYER LOBBY SLOTS STATE ---
 let spSlots = [
     { id: 1, name: 'Player (You)', isPlayer: true, isHuman: true, active: true, team: 1, faction: 'usa', color: 'blue', spawnId: 1, difficulty: 'medium' },
-    { id: 2, name: 'AI Opponent 1', isPlayer: false, isHuman: false, active: true, team: 2, faction: 'china', color: 'red', spawnId: 2, difficulty: 'medium' },
-    { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'gla', color: 'green', spawnId: 3, difficulty: 'medium' },
-    { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, active: false, team: 1, faction: 'usa', color: 'yellow', spawnId: 4, difficulty: 'medium' },
-    { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'china', color: 'cyan', spawnId: 5, difficulty: 'medium' },
-    { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'gla', color: 'orange', spawnId: 6, difficulty: 'medium' },
-    { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'usa', color: 'purple', spawnId: 7, difficulty: 'medium' },
-    { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, active: false, team: 4, faction: 'china', color: 'pink', spawnId: 8, difficulty: 'medium' }
+    { id: 2, name: 'AI Opponent 1', isPlayer: false, isHuman: false, active: true, team: 2, faction: 'random', color: 'red', spawnId: 2, difficulty: 'medium' },
+    { id: 3, name: 'AI Slot 3', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'random', color: 'green', spawnId: 3, difficulty: 'medium' },
+    { id: 4, name: 'AI Slot 4', isPlayer: false, isHuman: false, active: false, team: 1, faction: 'random', color: 'yellow', spawnId: 4, difficulty: 'medium' },
+    { id: 5, name: 'AI Slot 5', isPlayer: false, isHuman: false, active: false, team: 2, faction: 'random', color: 'cyan', spawnId: 5, difficulty: 'medium' },
+    { id: 6, name: 'AI Slot 6', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'random', color: 'orange', spawnId: 6, difficulty: 'medium' },
+    { id: 7, name: 'AI Slot 7', isPlayer: false, isHuman: false, active: false, team: 3, faction: 'random', color: 'purple', spawnId: 7, difficulty: 'medium' },
+    { id: 8, name: 'AI Slot 8', isPlayer: false, isHuman: false, active: false, team: 4, faction: 'random', color: 'pink', spawnId: 8, difficulty: 'medium' }
 ];
 
 let mpSlots = [

@@ -1163,27 +1163,28 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
     const baseUnderAttack = hostileUnits.some(hu => hu.mesh && hu.mesh.position.distanceTo(cmd.basePos) < 35);
     if (baseUnderAttack || cmd.resources < 600) return;
 
-    // Find a clear, non-overlapping build site with enough clearance for Dozers/Workers and vehicles to pass between buildings
+    // Find a clear, non-overlapping build site with wide avenues so heavy tanks (Overlords) & Dozers never wedge between buildings
     function findAIStructureBuildLocation(cmd, type, desiredPos) {
         const newR = (typeof getStructureFootprint === 'function') ? (getStructureFootprint(type).radius || 6.0) : 6.0;
-        const minClearanceGap = 16.0; // Wide corridors so heavy tanks (e.g. Overlords) & Dozers never wedge between buildings
-        const mapHalf = (typeof currentMapSize !== 'undefined' ? currentMapSize * 0.46 : 680);
+        const mapHalf = (typeof currentMapSize !== 'undefined' ? currentMapSize * 0.45 : 270);
         const allStructs = [
             ...(typeof structures !== 'undefined' ? structures : []),
             ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])
         ];
 
-        const isClear = (cx, cz) => {
+        const isClear = (cx, cz, clearanceGap) => {
             if (Math.abs(cx) > mapHalf || Math.abs(cz) > mapHalf) return false;
-            if (typeof getTerrainHeight === 'function' && typeof currentWaterLevel !== 'undefined') {
-                if (getTerrainHeight(cx, cz) < currentWaterLevel + 0.3) return false;
+            if (typeof getTerrainHeight === 'function') {
+                const h = getTerrainHeight(cx, cz);
+                if (typeof currentWaterLevel !== 'undefined' && h < currentWaterLevel + 0.3) return false;
+                if (typeof isTerrainCliffAt === 'function' && isTerrainCliffAt(cx, cz, h)) return false;
             }
             for (let i = 0; i < allStructs.length; i++) {
                 const s = allStructs[i];
                 if (!s || s.health <= 0) continue;
                 const sp = s.position || (s.mesh && s.mesh.position);
                 if (!sp) continue;
-                const minD = (s.radius || 6.0) + newR + minClearanceGap;
+                const minD = (s.radius || 6.0) + newR + clearanceGap;
                 const dx = cx - sp.x, dz = cz - sp.z;
                 if (dx * dx + dz * dz < minD * minD) return false;
             }
@@ -1191,7 +1192,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
                 for (let i = 0; i < supplyPoints.length; i++) {
                     const sp = supplyPoints[i];
                     if (!sp || !sp.position) continue;
-                    const minD = (sp.radius || 5.0) + newR + 8.0;
+                    const minD = (sp.radius || 5.0) + newR + 10.0;
                     const dx = cx - sp.position.x, dz = cz - sp.position.z;
                     if (dx * dx + dz * dz < minD * minD) return false;
                 }
@@ -1199,23 +1200,26 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
             return true;
         };
 
-        if (isClear(desiredPos.x, desiredPos.z)) {
+        const preferredGap = 22.0;
+        if (isClear(desiredPos.x, desiredPos.z, preferredGap)) {
             const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(desiredPos.x, desiredPos.z) : 0;
             return new THREE.Vector3(desiredPos.x, y, desiredPos.z);
         }
 
-        for (let ring = 10; ring <= 90; ring += 10) {
-            for (let step = 0; step < 12; step++) {
-                const ang = (step / 12) * Math.PI * 2;
-                const cx = desiredPos.x + Math.cos(ang) * ring;
-                const cz = desiredPos.z + Math.sin(ang) * ring;
-                if (isClear(cx, cz)) {
-                    const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(cx, cz) : 0;
-                    return new THREE.Vector3(cx, y, cz);
+        for (const gap of [22.0, 15.0]) {
+            for (let ring = 12; ring <= 110; ring += 12) {
+                for (let step = 0; step < 16; step++) {
+                    const ang = (step / 16) * Math.PI * 2;
+                    const cx = desiredPos.x + Math.cos(ang) * ring;
+                    const cz = desiredPos.z + Math.sin(ang) * ring;
+                    if (isClear(cx, cz, gap)) {
+                        const y = typeof getTerrainHeight === 'function' ? getTerrainHeight(cx, cz) : 0;
+                        return new THREE.Vector3(cx, y, cz);
+                    }
                 }
             }
         }
-        return adjustToPossibleDestination(desiredPos);
+        return null;
     }
 
     // Essential base structures to construct / reconstruct in priority order
@@ -1242,6 +1246,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         if (f === 'gla' && (item.build === 'power' || item.build === 'nuclearReactor')) continue;
         if (!myStructures.some(item.check) && cmd.resources >= item.cost) {
             const candidatePos = findAIStructureBuildLocation(cmd, item.build, cmd.basePos.clone().add(item.offset));
+            if (!candidatePos) continue;
             const built = spawnAIStructure(cmd, item.build, candidatePos, availBuilder);
             if (built) {
                 cmd.resources -= item.cost;
@@ -1266,6 +1271,7 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         .addScaledVector(frontDir, 52)
         .addScaledVector(sideDir, spread);
         const clearPos = findAIStructureBuildLocation(cmd, defType, defPos);
+        if (!clearPos) return;
         const builtDef = spawnAIStructure(cmd, defType, clearPos, availBuilder);
         if (builtDef) {
             cmd.resources -= 1000;
