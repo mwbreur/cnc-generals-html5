@@ -60,6 +60,30 @@ function markPathfindGridDirty() {
 }
 window.markPathfindGridDirty = markPathfindGridDirty;
 
+function isTerrainCliffAt(wx, wz, hCenter) {
+    if (typeof getTerrainHeight !== 'function') return false;
+    const h = (hCenter !== undefined) ? hCenter : getTerrainHeight(wx, wz);
+    const mapKey = (typeof currentMapType !== 'undefined') ? currentMapType : '';
+    const offMap = (typeof window !== 'undefined' && window.OFFICIAL_SKIRMISH_MAPS) ? window.OFFICIAL_SKIRMISH_MAPS[mapKey] : null;
+    if (offMap && offMap.grid && offMap.grid.length > 1) {
+        // Scale-independent native grid cliff check so sheer ledges remain impassable at 900, 1500, 2200, and 3000 map sizes
+        const sz = (typeof currentMapSize !== 'undefined' && currentMapSize > 0) ? currentMapSize : 1500;
+        const step = sz / (offMap.grid.length - 1);
+        const hXp = getTerrainHeight(wx + step, wz);
+        const hXm = getTerrainHeight(wx - step, wz);
+        const hZp = getTerrainHeight(wx, wz + step);
+        const hZm = getTerrainHeight(wx, wz - step);
+        return (Math.abs(hXp - h) > 3.8 || Math.abs(hXm - h) > 3.8 || Math.abs(hZp - h) > 3.8 || Math.abs(hZm - h) > 3.8);
+    }
+    const d = 2.5;
+    const hXp = getTerrainHeight(wx + d, wz);
+    const hXm = getTerrainHeight(wx - d, wz);
+    const hZp = getTerrainHeight(wx, wz + d);
+    const hZm = getTerrainHeight(wx, wz - d);
+    return (Math.abs(hXp - h) / d > 0.75 || Math.abs(hXm - h) / d > 0.75 || Math.abs(hZp - h) / d > 0.75 || Math.abs(hZm - h) / d > 0.75);
+}
+window.isTerrainCliffAt = isTerrainCliffAt;
+
 function classifyPathfindPosition(wx, wz, ignoreStruct = null, extraClearance = 0.6) {
     // Bridge cells override water/cliff underneath (AIPathfind.cpp classifyMap)
     if (typeof mapBridges !== 'undefined' && mapBridges && mapBridges.length > 0 && typeof isPointOnBridge === 'function') {
@@ -72,16 +96,9 @@ function classifyPathfindPosition(wx, wz, ignoreStruct = null, extraClearance = 
     const h = (typeof getTerrainHeight === 'function') ? getTerrainHeight(wx, wz) : 0;
     if (h < waterLvl + 0.15) return PATHFIND_CELL_TYPES.WATER;
 
-    // Check slope/cliff passability (symmetric +d / -d on X and Z)
-    if (typeof getTerrainHeight === 'function') {
-        const d = 2.5;
-        const hXp = getTerrainHeight(wx + d, wz);
-        const hXm = getTerrainHeight(wx - d, wz);
-        const hZp = getTerrainHeight(wx, wz + d);
-        const hZm = getTerrainHeight(wx, wz - d);
-        if (Math.abs(hXp - h) / d > 1.35 || Math.abs(hXm - h) / d > 1.35 || Math.abs(hZp - h) / d > 1.35 || Math.abs(hZm - h) / d > 1.35) {
-            return PATHFIND_CELL_TYPES.CLIFF;
-        }
+    // Check scale-independent slope/cliff passability
+    if (isTerrainCliffAt(wx, wz, h)) {
+        return PATHFIND_CELL_TYPES.CLIFF;
     }
 
     // Check player & AI structures
@@ -160,14 +177,8 @@ function rebuildPathfindGrid() {
                     const h = getTerrainHeight(wx, wz);
                     if (h < waterLvl + 0.15) {
                         cellType = PATHFIND_CELL_TYPES.WATER;
-                    } else {
-                        const hXp = getTerrainHeight(wx + d, wz);
-                        const hXm = getTerrainHeight(wx - d, wz);
-                        const hZp = getTerrainHeight(wx, wz + d);
-                        const hZm = getTerrainHeight(wx, wz - d);
-                        if (Math.abs(hXp - h) / d > 1.35 || Math.abs(hXm - h) / d > 1.35 || Math.abs(hZp - h) / d > 1.35 || Math.abs(hZm - h) / d > 1.35) {
-                            cellType = PATHFIND_CELL_TYPES.CLIFF;
-                        }
+                    } else if (isTerrainCliffAt(wx, wz, h)) {
+                        cellType = PATHFIND_CELL_TYPES.CLIFF;
                     }
                 }
                 base[rowOff + gx] = cellType;
