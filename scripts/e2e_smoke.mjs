@@ -134,6 +134,7 @@ try {
         }
         broadcastNetPacket({ type: 'chat', sender: 'Host', text: 'Advancing across valley!' });
         for (let i = 0; i < 8; i++) {
+            if (u0 && u0.mesh && i > 0) u0.mesh.position.x += 1.5; // Advance unit so delta compression emits each snapshot
             _mpLastStateSyncMs = -1000;
             broadcastHostStateSync();
         }
