@@ -1956,6 +1956,29 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             }
             setupMapEnvironment('tournament_desert', 600);
         }
+
+        // 17. Issue #57 regressions: A* budget queue, incremental grid stamp, spatial combat scan & Options Menu
+        {
+            if (typeof stampStructureOnPathfindGrid !== 'function' || typeof enqueueNavigationPath !== 'function' || typeof processPathfindBudgetQueue !== 'function') {
+                throw new Error('Issue #57: Missing incremental pathfind stamping or A* budget queue functions!');
+            }
+            const tUnit = spawnUnit('tank', new THREE.Vector3(0, 0, 0), 'usa');
+            enqueueNavigationPath(tUnit, new THREE.Vector3(40, 0, 40));
+            processPathfindBudgetQueue(6);
+            if (Math.hypot(tUnit.targetPosition.x - 40, tUnit.targetPosition.z - 40) > 120) {
+                throw new Error('Issue #57: processPathfindBudgetQueue did not assign valid targetPosition!');
+            }
+            const spMap = _buildCombatSpatialMap([tUnit]);
+            const found = _queryCombatSpatialMap(spMap, 5, 5, 25);
+            if (found.length !== 1 || found[0] !== tUnit) {
+                throw new Error('Issue #57: Combat spatial grid query failed to find nearby unit!');
+            }
+            applyGameOptions({ graphicsQuality: 'low', shadows: false, masterVolume: 0.5, showFps: true });
+            if (!window._gameOptions || window._gameOptions.graphicsQuality !== 'low' || window._gameOptions.masterVolume !== 0.5) {
+                throw new Error('Issue #57: applyGameOptions failed to persist game options!');
+            }
+            applyGameOptions({ graphicsQuality: 'high', shadows: true, masterVolume: 1.0, showFps: false });
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

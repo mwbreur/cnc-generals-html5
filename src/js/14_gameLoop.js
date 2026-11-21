@@ -132,8 +132,35 @@ const GLOBAL_FLAG_WIND_YAW = 0.45;
 const _flagWaveQ = (typeof THREE !== 'undefined' && typeof THREE.Quaternion === 'function') ? new THREE.Quaternion() : null;
 const _flagWaveAxis = (typeof THREE !== 'undefined' && typeof THREE.Vector3 === 'function') ? new THREE.Vector3(1, 0, 0) : null;
 
+let _frameFrustum = null;
+let _frameProjScreenMatrix = null;
+let _frameFrustumReady = false;
+const _frustumTestSphere = (typeof THREE !== 'undefined' && typeof THREE.Sphere === 'function')
+    ? new THREE.Sphere(new THREE.Vector3(), 12)
+    : null;
+
+function updateFrameFrustum() {
+    _frameFrustumReady = false;
+    if (typeof THREE === 'undefined' || typeof THREE.Frustum !== 'function' || typeof THREE.Matrix4 !== 'function') return;
+    if (typeof camera === 'undefined' || !camera || !camera.projectionMatrix || !camera.matrixWorldInverse) return;
+    if (!_frameFrustum) _frameFrustum = new THREE.Frustum();
+    if (!_frameProjScreenMatrix) _frameProjScreenMatrix = new THREE.Matrix4();
+    if (typeof _frameProjScreenMatrix.multiplyMatrices !== 'function' || typeof _frameFrustum.setFromProjectionMatrix !== 'function') return;
+    _frameProjScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    _frameFrustum.setFromProjectionMatrix(_frameProjScreenMatrix);
+    _frameFrustumReady = true;
+}
+
+function isWorldPosInView(pos, margin = 14) {
+    if (!_frameFrustumReady || !_frustumTestSphere || !pos) return true;
+    _frustumTestSphere.center.set(pos.x, pos.y || 0, pos.z);
+    _frustumTestSphere.radius = margin;
+    return _frameFrustum.intersectsSphere(_frustumTestSphere);
+}
+
 function spinVehicleWheels(unit, stepDist) {
-    if (!unit || !unit.mesh || !stepDist) return;
+    if (!unit || !unit.mesh || unit.mesh.visible === false || !stepDist) return;
+    if (!isWorldPosInView(unit.mesh.position, 14)) return;
     if (unit._wheelNodes === undefined) {
         const wNodes = [];
         if (typeof unit.mesh.traverse === 'function') {
@@ -336,6 +363,24 @@ function animate() {
     combatDeltaScale = Math.max(0.25, Math.min(4.0, dt * 60 * speedMul));
 
     const animTime = nowTime * 0.003;
+    updateFrameFrustum();
+    if (typeof processPathfindBudgetQueue === 'function') processPathfindBudgetQueue();
+
+    // Optional live FPS / Army Performance Counter (toggled in Options Menu)
+    if (typeof window !== 'undefined' && window._gameOptions && window._gameOptions.showFps && typeof document !== 'undefined') {
+        window._fpsAccum = (window._fpsAccum || 0) + 1;
+        if (!window._fpsLastMs) window._fpsLastMs = nowTime;
+        if (nowTime - window._fpsLastMs >= 500) {
+            const fps = Math.round((window._fpsAccum * 1000) / Math.max(1, nowTime - window._fpsLastMs));
+            window._fpsAccum = 0;
+            window._fpsLastMs = nowTime;
+            const badge = document.getElementById('fps-perf-badge');
+            if (badge) {
+                const uTot = (typeof units !== 'undefined' ? units.length : 0) + (typeof enemyUnits !== 'undefined' ? enemyUnits.length : 0);
+                badge.textContent = `${fps} FPS • ${uTot} Units`;
+            }
+        }
+    }
 
     // Keep shadow frustum centered near cameraTarget for crisp shadows & high FPS
     if (window._mainDirLight && typeof cameraTarget !== 'undefined') {
@@ -2534,7 +2579,7 @@ function animate() {
                     unit.mesh.rotation.x = 0;
                     unit.mesh.rotation.z = 0;
                     unit._strideBob = 0;
-                    if (unit.mesh.userData && unit.mesh.userData.animatedMeshes) {
+                    if (unit.mesh.visible !== false && unit.mesh.userData && unit.mesh.userData.animatedMeshes && isWorldPosInView(unit.mesh.position, 10)) {
                         unit._runCycle = ((unit._runCycle || 0) + 0.38) % 8;
                         const c = unit._runCycle;
                         const f0 = Math.floor(c);
@@ -3268,7 +3313,7 @@ function processEnemyMovement() {
                     enemy.mesh.rotation.x = 0;
                     enemy.mesh.rotation.z = 0;
                     enemy._strideBob = 0;
-                    if (enemy.mesh.userData && enemy.mesh.userData.animatedMeshes) {
+                    if (enemy.mesh.visible !== false && enemy.mesh.userData && enemy.mesh.userData.animatedMeshes && isWorldPosInView(enemy.mesh.position, 10)) {
                         enemy._runCycle = ((enemy._runCycle || 0) + 0.38) % 8;
                         const c = enemy._runCycle;
                         const f0 = Math.floor(c);
@@ -3308,8 +3353,9 @@ function processEnemyMovement() {
 }
 
 function updateInfantryStationaryAnim(unit) {
-    if (!unit || !unit.mesh || !unit.mesh.userData || !unit.mesh.userData.animatedMeshes) return;
+    if (!unit || !unit.mesh || unit.mesh.visible === false || !unit.mesh.userData || !unit.mesh.userData.animatedMeshes) return;
     if (unit._atkAnimTicks > 0) unit._atkAnimTicks--;
+    if (!isWorldPosInView(unit.mesh.position, 10)) return;
     const isAttacking = (unit._atkAnimTicks > 0) || !!(unit.combatTarget && unit.combatTarget.health > 0);
     if (isAttacking) {
         unit._atkCycle = ((unit._atkCycle || 0) + 0.24) % 4;

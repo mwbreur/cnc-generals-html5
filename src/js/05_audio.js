@@ -223,7 +223,10 @@ function playAudio(type, options = {}, faction = null) {
     const spatial = worldPos ? computeSpatialAudio(worldPos) : null;
     if (spatial && spatial.cull) return;
     const rawVol = (options && options.volume !== undefined && options.volume !== null) ? Number(options.volume) : 0.90;
-    const baseVol = Number.isFinite(rawVol) ? Math.max(0, Math.min(1, rawVol)) : 0.90;
+    const masterMul = (typeof window !== 'undefined' && window._gameOptions && Number.isFinite(window._gameOptions.masterVolume))
+        ? Math.max(0, Math.min(1, window._gameOptions.masterVolume))
+        : 1.0;
+    const baseVol = (Number.isFinite(rawVol) ? Math.max(0, Math.min(1, rawVol)) : 0.90) * masterMul;
 
     // Trigger authentic retail WAV from 05b_official_audio.js when available
     if (typeof playOfficialSound === 'function') {

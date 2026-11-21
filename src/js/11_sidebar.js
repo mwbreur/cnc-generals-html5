@@ -573,9 +573,103 @@ function toggleControlBar(forceVisible = null) {
     if (restoreButton) restoreButton.hidden = shouldShow;
 }
 
+const _GAME_OPTIONS_STORAGE_KEY = 'cnc_generals_options_v1';
+function loadGameOptions() {
+    const defaults = { graphicsQuality: 'high', shadows: true, masterVolume: 1.0, showFps: false };
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const raw = localStorage.getItem(_GAME_OPTIONS_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') Object.assign(defaults, parsed);
+            }
+        }
+    } catch (_) {}
+    if (typeof window !== 'undefined') window._gameOptions = defaults;
+    return defaults;
+}
+
+function applyGameOptions(opts) {
+    if (!opts) return;
+    if (typeof window !== 'undefined') window._gameOptions = opts;
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(_GAME_OPTIONS_STORAGE_KEY, JSON.stringify(opts));
+        }
+    } catch (_) {}
+
+    const enableShadows = Boolean(opts.shadows) && opts.graphicsQuality !== 'low';
+    if (typeof renderer !== 'undefined' && renderer) {
+        if (renderer.shadowMap) {
+            renderer.shadowMap.enabled = enableShadows;
+            renderer.shadowMap.needsUpdate = true;
+        }
+        if (typeof renderer.setPixelRatio === 'function') {
+            const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+            const maxDpr = opts.graphicsQuality === 'low' ? 1.0 : (opts.graphicsQuality === 'medium' ? 1.25 : 2.0);
+            renderer.setPixelRatio(Math.min(dpr, maxDpr));
+        }
+    }
+    if (typeof window !== 'undefined' && window._mainDirLight) {
+        window._mainDirLight.castShadow = enableShadows;
+    }
+    if (typeof document !== 'undefined') {
+        const badge = document.getElementById('fps-perf-badge');
+        if (badge) badge.style.display = opts.showFps ? 'block' : 'none';
+    }
+}
+
+function openOptionsModal() {
+    if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.6 });
+    const opts = (typeof window !== 'undefined' && window._gameOptions) ? window._gameOptions : loadGameOptions();
+    const modal = document.getElementById('zh-options-modal');
+    if (!modal) return;
+    const qEl = document.getElementById('opt-graphics-quality');
+    const shEl = document.getElementById('opt-shadows');
+    const volEl = document.getElementById('opt-master-volume');
+    const volVal = document.getElementById('opt-master-volume-val');
+    const fpsEl = document.getElementById('opt-show-fps');
+    if (qEl) qEl.value = opts.graphicsQuality || 'high';
+    if (shEl) shEl.checked = opts.shadows !== false;
+    if (volEl) volEl.value = String(Math.round((opts.masterVolume !== undefined ? opts.masterVolume : 1.0) * 100));
+    if (volVal) volVal.textContent = (volEl ? volEl.value : '100') + '%';
+    if (fpsEl) fpsEl.checked = Boolean(opts.showFps);
+    modal.hidden = false;
+}
+
+function closeOptionsModal() {
+    if (typeof playAudio === 'function') playAudio('gui_click', { volume: 0.6 });
+    const modal = document.getElementById('zh-options-modal');
+    if (modal) modal.hidden = true;
+}
+
+function onOptionsFormChange() {
+    const qEl = document.getElementById('opt-graphics-quality');
+    const shEl = document.getElementById('opt-shadows');
+    const volEl = document.getElementById('opt-master-volume');
+    const volVal = document.getElementById('opt-master-volume-val');
+    const fpsEl = document.getElementById('opt-show-fps');
+    const quality = qEl ? qEl.value : 'high';
+    if (quality === 'low' && shEl) shEl.checked = false;
+    const volPct = volEl ? Number(volEl.value) : 100;
+    if (volVal) volVal.textContent = `${volPct}%`;
+    applyGameOptions({
+        graphicsQuality: quality,
+        shadows: shEl ? shEl.checked : true,
+        masterVolume: Math.max(0, Math.min(1, volPct / 100)),
+        showFps: fpsEl ? fpsEl.checked : false
+    });
+}
+if (typeof window !== 'undefined') {
+    window.openOptionsModal = openOptionsModal;
+    window.closeOptionsModal = closeOptionsModal;
+    window.onOptionsFormChange = onOptionsFormChange;
+    window.applyGameOptions = applyGameOptions;
+    loadGameOptions();
+}
+
 function openOptionsMenu() {
-    if (typeof isMatchActive !== 'undefined' && isMatchActive) showInGamePauseModal('options');
-    else showStartSetupCard();
+    openOptionsModal();
 }
 
 function openDiplomacyScreen() {

@@ -145,8 +145,46 @@ function processOverlordGatlingTower(unit) {
     }
 }
 
+const _COMBAT_GRID_CELL = 40;
+function _buildCombatSpatialMap(list) {
+    const map = new Map();
+    for (let i = 0; i < list.length; i++) {
+        const e = list[i];
+        if (!e || e.health <= 0 || !e.mesh) continue;
+        const cx = Math.floor(e.mesh.position.x / _COMBAT_GRID_CELL);
+        const cz = Math.floor(e.mesh.position.z / _COMBAT_GRID_CELL);
+        const key = (cx + 512) * 2048 + (cz + 512);
+        let bucket = map.get(key);
+        if (!bucket) { bucket = []; map.set(key, bucket); }
+        bucket.push(e);
+    }
+    return map;
+}
+
+function _queryCombatSpatialMap(map, x, z, range) {
+    const r = Math.max(10, range + 8);
+    const minX = Math.floor((x - r) / _COMBAT_GRID_CELL);
+    const maxX = Math.floor((x + r) / _COMBAT_GRID_CELL);
+    const minZ = Math.floor((z - r) / _COMBAT_GRID_CELL);
+    const maxZ = Math.floor((z + r) / _COMBAT_GRID_CELL);
+    const out = [];
+    for (let cx = minX; cx <= maxX; cx++) {
+        const base = (cx + 512) * 2048;
+        for (let cz = minZ; cz <= maxZ; cz++) {
+            const bucket = map.get(base + (cz + 512));
+            if (bucket) {
+                for (let i = 0; i < bucket.length; i++) out.push(bucket[i]);
+            }
+        }
+    }
+    return out;
+}
+
 function processCombatScanning() {
     _combatScanTick++;
+    const enemySpatialMap = (typeof enemyUnits !== 'undefined' && enemyUnits.length > 24)
+        ? _buildCombatSpatialMap(enemyUnits)
+        : null;
     if (typeof enemyUnits !== 'undefined' && enemyUnits.length > 0) {
         for (let ei = 0; ei < enemyUnits.length; ei++) {
             const eu = enemyUnits[ei];
@@ -269,11 +307,15 @@ function processCombatScanning() {
                     const minScanR = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
                     const minScanR2 = minScanR * minScanR;
                     let bestUnitDist2 = Infinity;
-                    // 1. Scan for nearest hostile unit in range (respecting siege minRange & VisionRange spotting)
+                    // 1. Scan for nearest hostile unit in range (spatial-grid accelerated for large armies)
                     let bestSightEnemy = null;
                     let bestSightDist2 = Infinity;
-                    for (let ei = 0; ei < enemyUnits.length; ei++) {
-                        const enemy = enemyUnits[ei];
+                    const maxQueryRange = Math.max(unit.scanRange || 0, unit.visionRange || 0) + 6;
+                    const candidateEnemies = enemySpatialMap
+                        ? _queryCombatSpatialMap(enemySpatialMap, uPos.x, uPos.z, maxQueryRange)
+                        : enemyUnits;
+                    for (let ei = 0; ei < candidateEnemies.length; ei++) {
+                        const enemy = candidateEnemies[ei];
                         if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
                             if (!canUnitTarget(unit, enemy)) continue;
                             const ep = enemy.mesh.position;

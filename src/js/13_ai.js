@@ -240,6 +240,85 @@ function rebuildPathfindGrid() {
 }
 window.rebuildPathfindGrid = rebuildPathfindGrid;
 
+// Incremental O(footprint) update when a single structure is placed or destroyed (avoids full grid rebuild)
+function stampStructureOnPathfindGrid(struct, isBlocked = true) {
+    if (!struct || !_pathfindGridState.cells || !_pathfindGridState._baseCells) {
+        _pathfindGridState.dirty = true;
+        return;
+    }
+    const sp = struct.position || (struct.mesh && struct.mesh.position);
+    if (!sp) return;
+    const { cells, _baseCells, gridDim, cellSize, halfExtent } = _pathfindGridState;
+    const r = (struct.radius || 6.0) + 1.5;
+    const minX = Math.max(0, Math.floor((sp.x - r + halfExtent) / cellSize));
+    const maxX = Math.min(gridDim - 1, Math.floor((sp.x + r + halfExtent) / cellSize));
+    const minZ = Math.max(0, Math.floor((sp.z - r + halfExtent) / cellSize));
+    const maxZ = Math.min(gridDim - 1, Math.floor((sp.z + r + halfExtent) / cellSize));
+    const r2 = r * r;
+    for (let gz = minZ; gz <= maxZ; gz++) {
+        const wz = -halfExtent + (gz + 0.5) * cellSize;
+        const dz = wz - sp.z;
+        const rowOff = gz * gridDim;
+        for (let gx = minX; gx <= maxX; gx++) {
+            const wx = -halfExtent + (gx + 0.5) * cellSize;
+            const dx = wx - sp.x;
+            if (dx * dx + dz * dz < r2) {
+                cells[rowOff + gx] = isBlocked ? PATHFIND_CELL_TYPES.OBSTACLE : _baseCells[rowOff + gx];
+            }
+        }
+    }
+    _pathfindGridState.lastStructCount = (typeof structures !== 'undefined' && structures) ? structures.length : 0;
+    _pathfindGridState.lastEnemyStructCount = (typeof enemyStructures !== 'undefined' && enemyStructures) ? enemyStructures.length : 0;
+}
+window.stampStructureOnPathfindGrid = stampStructureOnPathfindGrid;
+
+// Per-frame A* pathfinding budget queue (prevents frame spikes when 40+ units receive group move/attack orders)
+const _pathfindBudgetQueue = [];
+const _pathfindBudgetSet = new Map();
+const MAX_ASTAR_PER_FRAME = 6;
+
+function enqueueNavigationPath(unit, goalPos, options = {}) {
+    if (!unit || !unit.mesh || !goalPos) return;
+    // Start moving toward goal immediately so units feel zero-latency responsive on frame 0
+    unit.waypoints = [];
+    if (unit.targetPosition && typeof unit.targetPosition.copy === 'function') {
+        unit.targetPosition.copy(goalPos);
+    }
+    if (unit.isAir) return;
+    const existing = _pathfindBudgetSet.get(unit);
+    if (existing) {
+        existing.goalPos = goalPos.clone();
+        existing.options = options;
+        return;
+    }
+    const job = { unit, goalPos: goalPos.clone(), options };
+    _pathfindBudgetSet.set(unit, job);
+    _pathfindBudgetQueue.push(job);
+}
+window.enqueueNavigationPath = enqueueNavigationPath;
+
+function processPathfindBudgetQueue(maxSolves = MAX_ASTAR_PER_FRAME) {
+    let solved = 0;
+    while (solved < maxSolves && _pathfindBudgetQueue.length > 0) {
+        const job = _pathfindBudgetQueue.shift();
+        _pathfindBudgetSet.delete(job.unit);
+        const u = job.unit;
+        if (!u || u.health <= 0 || !u.mesh || u.garrisonedIn || u.isAir) continue;
+        const bridges = (typeof findBridgeCrossingsForPath === 'function')
+            ? findBridgeCrossingsForPath(u.mesh.position, job.goalPos, job.options && job.options.ignoreStruct)
+            : null;
+        if (bridges && bridges.length > 0) {
+            u.waypoints = [...bridges.filter(Boolean), job.goalPos];
+            u.targetPosition.copy(u.waypoints.shift());
+        } else {
+            u.waypoints = [];
+            u.targetPosition.copy(job.goalPos);
+        }
+        solved++;
+    }
+}
+window.processPathfindBudgetQueue = processPathfindBudgetQueue;
+
 function isCellPassableOnGround(cellType) {
     return cellType === PATHFIND_CELL_TYPES.CLEAR || cellType === PATHFIND_CELL_TYPES.BRIDGE;
 }
@@ -2416,6 +2495,7 @@ function issueMoveCommand(e) {
             const targetPos = (targetedEnemy.position || targetedEnemy.mesh.position).clone();
             const targetRadius = targetedEnemy.radius || 4;
 
+            let _attackPathCount = 0;
             units.forEach((unit, idx) => {
                     if (unit.selected) {
                         unit.combatTarget = targetedEnemy;
@@ -2440,15 +2520,19 @@ function issueMoveCommand(e) {
                                 const destX = targetPos.x - approachVector.x * desiredRange;
                                 const destZ = targetPos.z - approachVector.z * desiredRange;
                                 const destV = new THREE.Vector3(destX, getTerrainHeight(destX, destZ), destZ);
-                                const bridges = (typeof findBridgeCrossingsForPath === 'function')
-                                    ? findBridgeCrossingsForPath(unit.mesh.position, destV)
-                                    : null;
-                                if (bridges && bridges.length > 0) {
-                                    unit.waypoints = [...bridges.filter(Boolean), destV];
-                                    unit.targetPosition.copy(unit.waypoints.shift());
+                                if (++_attackPathCount > MAX_ASTAR_PER_FRAME && typeof enqueueNavigationPath === 'function') {
+                                    enqueueNavigationPath(unit, destV);
                                 } else {
-                                    unit.waypoints = [];
-                                    unit.targetPosition.copy(destV);
+                                    const bridges = (typeof findBridgeCrossingsForPath === 'function')
+                                        ? findBridgeCrossingsForPath(unit.mesh.position, destV)
+                                        : null;
+                                    if (bridges && bridges.length > 0) {
+                                        unit.waypoints = [...bridges.filter(Boolean), destV];
+                                        unit.targetPosition.copy(unit.waypoints.shift());
+                                    } else {
+                                        unit.waypoints = [];
+                                        unit.targetPosition.copy(destV);
+                                    }
                                 }
                             } else {
                                 unit.waypoints = [];
