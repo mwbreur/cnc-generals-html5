@@ -1158,6 +1158,47 @@ function processEnemyAIEngine() {
             processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnits);
             evaluateEnemyThreatProfile(cmd, hostileUnits);
 
+            // --- 0b. AI Unit Upgrades (China Overlord Towers & USA Vehicle Drones) ---
+            if (cmd.faction === 'china' && typeof attachOverlordUpgrade === 'function' && (cmd.resources || 0) >= 500) {
+                const bareOverlord = myUnits.find(u => u.type === 'overlord' && u.health > 0 && !u.overlordUpgrade);
+                if (bareOverlord) {
+                    const existingSpeaker = myUnits.some(u => u.type === 'overlord' && u.overlordUpgrade === 'speaker');
+                    let upg = 'gatling', cost = 1200;
+                    const roll = simRandom();
+                    if (!existingSpeaker && roll < 0.35) { upg = 'speaker'; cost = 500; }
+                    else if (roll < 0.78) { upg = 'gatling'; cost = 1200; }
+                    else { upg = 'bunker'; cost = 400; }
+                    if ((cmd.resources || 0) >= cost) {
+                        cmd.resources -= cost;
+                        if (typeof window !== 'undefined') window.activeEnemyColorHex = (window.aiColorMap && window.aiColorMap[cmd.ownerId]) || cmd.colorHex || 0xdc2626;
+                        attachOverlordUpgrade(bareOverlord, upg);
+                        if (upg === 'bunker' && typeof spawnEnemyUnit === 'function') {
+                            // Garrison AI Overlord Battle Bunker with Red Guard & Tank Hunters
+                            const garrisonTypes = ['tankhunter', 'tankhunter', 'redguard'];
+                            for (let gi = 0; gi < garrisonTypes.length; gi++) {
+                                const inf = spawnEnemyUnit(garrisonTypes[gi], bareOverlord.mesh.position.clone(), null, 'china');
+                                if (inf) {
+                                    inf.teamId = cmd.teamId;
+                                    inf.ownerId = cmd.ownerId;
+                                    inf.isAI = true;
+                                    inf.garrisonedIn = bareOverlord;
+                                    if (inf.mesh) inf.mesh.visible = false;
+                                    if (!Array.isArray(bareOverlord.garrisoned)) bareOverlord.garrisoned = [];
+                                    bareOverlord.garrisoned.push(inf);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (cmd.faction === 'usa' && typeof attachVehicleDrone === 'function' && (cmd.resources || 0) >= 900) {
+                const bareVeh = myUnits.find(u => ['paladin', 'crusader', 'humvee', 'tomahawk'].includes(u.type) && u.health > 0 && !u.drone);
+                if (bareVeh) {
+                    const droneType = (simRandom() < 0.72) ? 'battle' : 'scout';
+                    cmd.resources -= 300;
+                    attachVehicleDrone(bareVeh, droneType);
+                }
+            }
+
             // --- 1. AI Production Engine with Threat Counter Selection ---
             cmd.productionTimer++;
             const isWealthy = (cmd.resources || 0) >= ZERO_HOUR_AI_DATA.resourcesWealthy;

@@ -164,7 +164,7 @@ function spawnMudClodSpray(pos, backX = 0, backZ = 0, isWater = false) {
 }
 
 function spawnTreadDustPuff(pos, backX = 0, backZ = 0, color = null, size = 0.55) {
-    if (!pos || typeof scene === 'undefined' || activeFX.length > 320) return;
+    if (!pos || typeof scene === 'undefined' || activeFX.length > 520) return;
     const surface = getTerrainSurfaceKind(pos.x, pos.z);
 
     // Green/swamp/riverbank terrain flings mud clods (or water splashes) with much less dust than desert!
@@ -176,33 +176,33 @@ function spawnTreadDustPuff(pos, backX = 0, backZ = 0, color = null, size = 0.55
     }
 
     const dustColor = color !== null ? color : (surface === 'water' ? 0xb8e2f2 : getTerrainDustColor());
-    const surfaceSizeMult = (surface === 'desert') ? 1.42 : (surface === 'snow' ? 1.12 : (surface === 'green' ? 0.58 : (surface === 'city' ? 0.48 : 0.65)));
-    const baseOpacity = (surface === 'desert') ? 0.62 : (surface === 'snow' ? 0.56 : (surface === 'green' ? 0.30 : 0.34));
-    const maxLife = (surface === 'desert') ? 34 : (surface === 'snow' ? 24 : 18);
+    const surfaceSizeMult = (surface === 'desert') ? 1.95 : (surface === 'snow' ? 1.28 : (surface === 'green' ? 0.68 : (surface === 'city' ? 0.55 : 0.78)));
+    const baseOpacity = (surface === 'desert') ? 0.78 : (surface === 'snow' ? 0.62 : (surface === 'green' ? 0.34 : 0.38));
+    const maxLife = (surface === 'desert') ? 46 : (surface === 'snow' ? 28 : 20);
 
     const tex = _getFxSpriteTex('smoke');
     const mat = tex
         ? new THREE.SpriteMaterial({ map: tex, color: dustColor, transparent: true, opacity: baseOpacity, depthWrite: false })
         : new THREE.MeshBasicMaterial({ color: dustColor, transparent: true, opacity: baseOpacity * 0.85 });
     const mesh = tex ? new THREE.Sprite(mat) : new THREE.Mesh(_fxSphere6, mat);
-    const startS = size * surfaceSizeMult * (tex ? 2.4 : 0.85);
+    const startS = size * surfaceSizeMult * (tex ? 2.6 : 0.95);
     mesh.scale.set(startS, startS, startS);
-    mesh.position.set(pos.x + (Math.random() - 0.5) * 0.35, pos.y + 0.12, pos.z + (Math.random() - 0.5) * 0.35);
+    mesh.position.set(pos.x + (Math.random() - 0.5) * 0.55, pos.y + 0.18, pos.z + (Math.random() - 0.5) * 0.55);
     scene.add(mesh);
 
     let life = maxLife;
-    const grow = 0.045 * startS;
+    const grow = 0.055 * startS;
     activeFX.push({
         mesh,
         life,
         update() {
             life--;
             const prog = 1 - life / maxLife;
-            const s = startS + prog * startS * (surface === 'desert' ? 1.45 : 1.05);
+            const s = startS + prog * startS * (surface === 'desert' ? 1.95 : 1.15);
             mesh.scale.set(s, s, s);
-            mesh.position.x += backX * 0.04;
-            mesh.position.z += backZ * 0.04;
-            mesh.position.y += (surface === 'desert' ? 0.022 : 0.014) + grow * 0.1;
+            mesh.position.x += backX * 0.05;
+            mesh.position.z += backZ * 0.05;
+            mesh.position.y += (surface === 'desert' ? 0.032 : 0.016) + grow * 0.12;
             mat.opacity = Math.max(0, (1 - prog) * baseOpacity);
             if (life <= 0) {
                 scene.remove(mesh);
@@ -1185,24 +1185,32 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
         group.add(mClone);
     } else {
         const bodyMat = new THREE.MeshStandardMaterial({
-                color: isToxin ? 0x2ed573 : 0x747d8c,
-                metalness: 0.8,
-                roughness: 0.3
+                color: isToxin ? 0x2ed573 : 0xc0c8d2,
+                metalness: 0.65,
+                roughness: 0.32
         });
-        const rGeo = new THREE.CylinderGeometry(isHeavy ? 0.22 : 0.12, isHeavy ? 0.22 : 0.12, isHeavy ? 1.4 : 0.8, 8);
+        const rLen = isHeavy ? 2.1 : 1.35;
+        const rRad = isHeavy ? 0.30 : 0.19;
+        const rGeo = new THREE.CylinderGeometry(rRad, rRad, rLen, 8);
         rGeo.rotateX(Math.PI / 2);
         const rocketBody = new THREE.Mesh(rGeo, bodyMat);
-        group.add(rocketBody);
+        const noseMat = new THREE.MeshBasicMaterial({ color: isToxin ? 0x55efc4 : 0xff5252 });
+        const noseGeo = new THREE.ConeGeometry(rRad * 1.05, rLen * 0.42, 8);
+        noseGeo.rotateX(Math.PI / 2);
+        const noseCone = new THREE.Mesh(noseGeo, noseMat);
+        noseCone.position.z = rLen * 0.7;
+        group.add(rocketBody, noseCone);
     }
 
     const isHeroic = !!(metadata && metadata.attacker && metadata.attacker.veterancy >= 3);
     const glowColor = isHeroic
         ? (isHeavy ? 0xff5522 : 0xff1e1e)
-        : (isToxin ? 0x7bed9f : 0xff793f);
-    const glowRadius = (isHeavy ? 0.45 : 0.2) * (isHeroic ? 1.45 : 1.0);
-    const glowMat = new THREE.MeshBasicMaterial({ color: glowColor, transparent: true, opacity: 0.9 });
+        : (isToxin ? 0x7bed9f : 0xff9f43);
+    const glowRadius = (isHeavy ? 0.55 : 0.32) * (isHeroic ? 1.45 : 1.0);
+    const glowMat = new THREE.MeshBasicMaterial({ color: glowColor, transparent: true, opacity: 0.95 });
     const motorGlow = new THREE.Mesh(new THREE.SphereGeometry(glowRadius, 6, 6), glowMat);
-    motorGlow.position.z = isHeavy ? -1.4 : -0.45;
+    motorGlow.scale.set(1, 1, 2.2);
+    motorGlow.position.z = isHeavy ? -1.45 : -0.82;
     group.add(motorGlow);
 
     group.lookAt(toPos);
@@ -1224,19 +1232,57 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
         isHeroic: isHeroic,
         metadata: metadata,
         intercepted: false,
+        _tumbling: false,
+        _tumbleVel: null,
+        _tumbleRot: null,
+        _tumbleTicks: 0,
         update() {
             if (this.intercepted) {
-                // Point Defense Laser Interception in Mid-Air!
-                scene.remove(this.group);
-                this.group.traverse(child => {
-                        if (child.userData && child.userData._sharedW3D) return;
-                        if (child.geometry) child.geometry.dispose();
-                        if (child.material) child.material.dispose();
-                });
-                spawnEnhancedExplosion(this.curPos, 0x00ffff, 0.9, false);
-                const mIdx = activeMissiles.indexOf(this);
-                if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
-                return false;
+                // Authentic Zero Hour Paladin Point Defense Laser Interception:
+                // Rocket loses guidance, sparks cyan, tumbles end-over-end trailing dark smoke, and crashes harmlessly!
+                if (!this._tumbling) {
+                    this._tumbling = true;
+                    const mIdx = activeMissiles.indexOf(this);
+                    if (mIdx !== -1) activeMissiles.splice(mIdx, 1);
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(this.group.position, 0x00ffff, 1.0);
+                    motorGlow.visible = false;
+                    const fwd = new THREE.Vector3().subVectors(this.toPos, fromPos);
+                    if (fwd.lengthSq() > 1e-4) fwd.normalize();
+                    else fwd.set(1, 0, 0);
+                    const sideSign = Math.random() < 0.5 ? -1 : 1;
+                    this._tumbleVel = new THREE.Vector3(
+                        fwd.x * 0.45 + (-fwd.z) * sideSign * (0.28 + Math.random() * 0.25),
+                        0.18 + Math.random() * 0.14,
+                        fwd.z * 0.45 + fwd.x * sideSign * (0.28 + Math.random() * 0.25)
+                    );
+                    this._tumbleRot = new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.45 + 0.18,
+                        (Math.random() - 0.5) * 0.45,
+                        (Math.random() - 0.5) * 0.55
+                    );
+                }
+                this._tumbleTicks++;
+                this._tumbleVel.y -= 0.055;
+                this.group.position.add(this._tumbleVel);
+                this.group.rotation.x += this._tumbleRot.x;
+                this.group.rotation.y += this._tumbleRot.y;
+                this.group.rotation.z += this._tumbleRot.z;
+                if (this._tumbleTicks % 2 === 0 && typeof spawnSmokePuff === 'function') {
+                    spawnSmokePuff(this.group.position, 0x4b525c, 0.30);
+                }
+                const gY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(this.group.position.x, this.group.position.z) : 0;
+                if (this.group.position.y <= gY + 0.15 || this._tumbleTicks >= 75) {
+                    if (typeof spawnTreadDustPuff === 'function') spawnTreadDustPuff(this.group.position, 0, 0, null, 0.55);
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(this.group.position, 0xffaa44, 0.55);
+                    scene.remove(this.group);
+                    this.group.traverse(child => {
+                            if (child.userData && child.userData._sharedW3D) return;
+                            if (child.geometry) child.geometry.dispose();
+                            if (child.material) child.material.dispose();
+                    });
+                    return false;
+                }
+                return true;
             }
 
             const isHoming = !!(this.metadata && this.metadata.isGuided && this.metadata.target && this.metadata.target.health > 0 && this.metadata.target.mesh);
@@ -3354,7 +3400,9 @@ function attachVehicleDrone(vehicle, droneType) {
 
     if (typeof playOfficialSound === 'function') playOfficialSound('sfx_drone_create', 0.90);
     else playAudio('radio_chirp');
-    showNotification(`${vehicle.type.toUpperCase()} deployed ${droneType.toUpperCase()} DRONE!`, 'success');
+    if (!vehicle.isEnemy && !vehicle.isAI && typeof showNotification === 'function') {
+        showNotification(`${vehicle.type.toUpperCase()} deployed ${droneType.toUpperCase()} DRONE!`, 'success');
+    }
 }
 
 // =========================================================================

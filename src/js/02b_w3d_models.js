@@ -340,7 +340,38 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
         if (altTurret) altTurret.name = 'turretSystem';
     }
 
-    if (modelKey === 'drone_battle') {
+    if (modelKey === 'paladin') {
+        // Authentic Paladin Tank turret details: twin rear whip antennas + left/right 3-tube smoke grenade canister stacks
+        const pTurret = root.getObjectByName('turretSystem') || root.getObjectByName('TURRET01');
+        if (pTurret) {
+            const antMat = metalMat;
+            const canMat = getCachedW3DMaterial('veh:paladin:smokeCan', () => new THREE.MeshStandardMaterial({ color: 0x3b4438, roughness: 0.55, metalness: 0.45 }));
+            // Twin rear whip antennas on turret bustle
+            [-5.2, 5.2].forEach(ax => {
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.9, 6), antMat);
+                base.position.set(ax, 2.55, -11.4);
+                const whip = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.16, 11.0, 5), antMat);
+                whip.position.set(ax, 8.2, -12.1);
+                whip.rotation.x = -0.11;
+                pTurret.add(base, whip);
+            });
+            // Left & right angled 3-tube smoke grenade discharger stacks on turret cheeks
+            [-1, 1].forEach(side => {
+                const mount = new THREE.Group();
+                mount.position.set(side * 7.85, 0.75, 4.4);
+                const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 2.1), antMat);
+                mount.add(bracket);
+                for (let t = 0; t < 3; t++) {
+                    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.30, 2.1, 6), canMat);
+                    tube.position.set(side * 0.45, 0.35 + t * 0.32, (t - 1) * 0.62);
+                    tube.rotation.x = Math.PI * 0.34;
+                    tube.rotation.z = -side * (0.28 + t * 0.08);
+                    mount.add(tube);
+                }
+                pTurret.add(mount);
+            });
+        }
+    } else if (modelKey === 'drone_battle') {
         const fanMesh = root.getObjectByName('avbattledr.fan');
         if (fanMesh) fanMesh.name = 'ductedFan';
         const dTurret = root.getObjectByName('turretSystem') || root.getObjectByName('TURRET01');

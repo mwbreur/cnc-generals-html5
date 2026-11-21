@@ -2574,15 +2574,16 @@ function animate() {
                 const fwdX = Math.sin(rotY), fwdZ = Math.cos(rotY);
                 const rightX = Math.cos(rotY), rightZ = -Math.sin(rotY);
                 const rLen = (unit.radius || 2.5) * 0.68;
-                if (isTracked && (buildingTick + idx) % 7 === 0) {
+                const dustScale = Math.max(0.55, Math.min(1.15, (unit.radius || 2.8) * 0.22));
+                if (isTracked && (buildingTick + idx) % 4 === 0) {
                     const lat = (unit.radius || 2.5) * 0.45;
-                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen - rightX * lat, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen - rightZ * lat }, -fwdX, -fwdZ, null, 0.52);
-                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen + rightX * lat, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen + rightZ * lat }, -fwdX, -fwdZ, null, 0.52);
-                    if ((buildingTick + idx) % 21 === 0 && typeof spawnSmokePuff === 'function') {
-                        spawnSmokePuff(unit.mesh.position.clone().add(new THREE.Vector3(-fwdX * rLen, 1.35, -fwdZ * rLen)), 0x4b525c, 0.28);
+                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen - rightX * lat, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen - rightZ * lat }, -fwdX, -fwdZ, null, dustScale);
+                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen + rightX * lat, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen + rightZ * lat }, -fwdX, -fwdZ, null, dustScale);
+                    if ((buildingTick + idx) % 16 === 0 && typeof spawnSmokePuff === 'function') {
+                        spawnSmokePuff(unit.mesh.position.clone().add(new THREE.Vector3(-fwdX * rLen, 1.35, -fwdZ * rLen)), 0x4b525c, 0.34);
                     }
-                } else if (!isTracked && (buildingTick + idx) % 6 === 0) {
-                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen }, -fwdX, -fwdZ, null, 0.46);
+                } else if (!isTracked && (buildingTick + idx) % 4 === 0) {
+                    spawnTreadDustPuff({ x: unit.mesh.position.x - fwdX * rLen, y: unit.mesh.position.y, z: unit.mesh.position.z - fwdZ * rLen }, -fwdX, -fwdZ, null, dustScale * 0.9);
                 }
             }
 
@@ -3141,9 +3142,17 @@ function processEnemyMovement() {
                 if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type) && typeof spawnTreadDustPuff === 'function') {
                     const isTrackedEnemy = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(enemy.type);
                     const tickOff = buildingTick + (enemy.netId ? String(enemy.netId).length : 0);
-                    if ((isTrackedEnemy && tickOff % 7 === 0) || (!isTrackedEnemy && tickOff % 6 === 0)) {
+                    if (tickOff % 4 === 0) {
                         const rLen = (enemy.radius || 2.5) * 0.68;
-                        spawnTreadDustPuff({ x: enemy.mesh.position.x - dirX * rLen, y: enemy.mesh.position.y, z: enemy.mesh.position.z - dirZ * rLen }, -dirX, -dirZ, null, isTrackedEnemy ? 0.54 : 0.46);
+                        const dustScale = Math.max(0.55, Math.min(1.15, (enemy.radius || 2.8) * 0.22));
+                        if (isTrackedEnemy) {
+                            const rightX = dirZ, rightZ = -dirX;
+                            const lat = (enemy.radius || 2.5) * 0.45;
+                            spawnTreadDustPuff({ x: enemy.mesh.position.x - dirX * rLen - rightX * lat, y: enemy.mesh.position.y, z: enemy.mesh.position.z - dirZ * rLen - rightZ * lat }, -dirX, -dirZ, null, dustScale);
+                            spawnTreadDustPuff({ x: enemy.mesh.position.x - dirX * rLen + rightX * lat, y: enemy.mesh.position.y, z: enemy.mesh.position.z - dirZ * rLen + rightZ * lat }, -dirX, -dirZ, null, dustScale);
+                        } else {
+                            spawnTreadDustPuff({ x: enemy.mesh.position.x - dirX * rLen, y: enemy.mesh.position.y, z: enemy.mesh.position.z - dirZ * rLen }, -dirX, -dirZ, null, dustScale * 0.9);
+                        }
                     }
                 }
 
