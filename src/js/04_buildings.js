@@ -655,10 +655,10 @@ function createChinaNukeSilo(isEnemy = false) {
     const nukeTipGroup = new THREE.Group();
     nukeTipGroup.name = "nukeTip";
     const nukeTip = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.4, 14), matChinaColor);
-    nukeTip.position.set(0, 1.8, 0); nukeTipGroup.add(nukeTip);
+    nukeTip.position.set(0, 0.2, 0); nukeTipGroup.add(nukeTip);
 
     const warhead = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 10), matNukeGreen);
-    warhead.position.set(0, 2.9, 0); nukeTipGroup.add(warhead);
+    warhead.position.set(0, 1.3, 0); nukeTipGroup.add(warhead);
     g.add(nukeTipGroup);
 
     return g;
@@ -1001,7 +1001,8 @@ function createGLAScudStorm(isEnemy = false) {
         const z = (i < 2 ? -2.2 : 2.2);
 
         const missileGroup = new THREE.Group();
-        missileGroup.name = "scudGantry";
+        missileGroup.name = i === 0 ? "scudGantry" : ("scudGantry_" + i);
+        missileGroup.userData.isScudGantry = true;
         missileGroup.position.set(x, 0.85, z);
         missileGroup.rotation.x = -Math.PI / 5.5; // Elevated ballistic angle
 
@@ -1017,11 +1018,12 @@ function createGLAScudStorm(isEnemy = false) {
         const warhead = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.35, 14), matToxinGreen);
         warhead.position.y = 5.15; missileGroup.add(warhead);
 
-        // Stabilizer tail fins
+        // Stabilizer tail fins (extended outside rocket body radius)
         for (let f = 0; f < 4; f++) {
+            const ang = (f * Math.PI) / 2;
             const fin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.55), matDarkMetal);
-            fin.rotation.y = (f * Math.PI) / 2;
-            fin.position.set(0, 0.45, 0);
+            fin.rotation.y = ang;
+            fin.position.set(Math.sin(ang) * 0.36, 0.45, Math.cos(ang) * 0.36);
             missileGroup.add(fin);
         }
 

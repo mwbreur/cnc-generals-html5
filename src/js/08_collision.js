@@ -537,6 +537,16 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
         } else {
             mesh.scale.set(1.35, 1.35, 1.35);
         }
+        // Ensure procedural enemy vehicles/aircraft never render in friendly faction materials
+        if (typeof matEnemyHull !== 'undefined' && matEnemyHull && typeof mesh.traverse === 'function') {
+            mesh.traverse(c => {
+                if (!c || !c.isMesh || !c.material) return;
+                if (c.material === matUSA || c.material === matChina || c.material === matGLA ||
+                    c.material === matUSAColor || c.material === matChinaColor || c.material === matGLAColor) {
+                    c.material = matEnemyHull;
+                }
+            });
+        }
     }
     if (typeof isInfantryType !== 'function' || !isInfantryType(type)) {
         radius *= 1.35;

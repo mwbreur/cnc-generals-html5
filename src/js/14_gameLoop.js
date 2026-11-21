@@ -110,7 +110,7 @@ function getCachedNode(root, name) {
         if (entry && typeof entry === 'object') {
             let p = entry;
             while (p && p !== root) p = p.parent;
-            if (p === root || !entry.parent) return entry;
+            if (p === root) return entry;
         } else if (typeof entry === 'number' && (_animNodeFrame - entry) < 60) {
             return null;
         }
@@ -395,6 +395,8 @@ function animate() {
                 unit.selectionCircle.rotation.y += 0.02;
                 const d = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z);
                 if (d > 2.5 && unit.health > 0) {
+                    const p1y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z) : 0) + 0.25;
+                    const p2y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(unit.targetPosition.x, unit.targetPosition.z) : 0) + 0.25;
                     if (!unit.trajectoryLine) {
                         const lineMat = new THREE.LineDashedMaterial({
                                 color: 0x00ffcc,
@@ -403,19 +405,23 @@ function animate() {
                                 transparent: true,
                                 opacity: 0.85
                         });
-                        const lineGeo = new THREE.BufferGeometry().setFromPoints([
-                                unit.mesh.position.clone(),
-                                unit.targetPosition.clone()
+                        const posBuf = new Float32Array([
+                                unit.mesh.position.x, p1y, unit.mesh.position.z,
+                                unit.targetPosition.x, p2y, unit.targetPosition.z
                         ]);
+                        const lineGeo = new THREE.BufferGeometry();
+                        lineGeo.setAttribute('position', new THREE.BufferAttribute(posBuf, 3));
                         unit.trajectoryLine = new THREE.Line(lineGeo, lineMat);
+                        if (typeof unit.trajectoryLine.computeLineDistances === 'function') unit.trajectoryLine.computeLineDistances();
                         scene.add(unit.trajectoryLine);
                     } else {
-                        const p1 = unit.mesh.position.clone();
-                        p1.y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(p1.x, p1.z) : 0) + 0.25;
-                        const p2 = unit.targetPosition.clone();
-                        p2.y = (typeof getTerrainHeight === 'function' ? getTerrainHeight(p2.x, p2.z) : 0) + 0.25;
-                        unit.trajectoryLine.geometry.setFromPoints([p1, p2]);
-                        unit.trajectoryLine.computeLineDistances();
+                        const posAttr = unit.trajectoryLine.geometry && unit.trajectoryLine.geometry.attributes && unit.trajectoryLine.geometry.attributes.position;
+                        if (posAttr && posAttr.array && posAttr.array.length >= 6) {
+                            posAttr.array[0] = unit.mesh.position.x; posAttr.array[1] = p1y; posAttr.array[2] = unit.mesh.position.z;
+                            posAttr.array[3] = unit.targetPosition.x; posAttr.array[4] = p2y; posAttr.array[5] = unit.targetPosition.z;
+                            posAttr.needsUpdate = true;
+                            if (typeof unit.trajectoryLine.computeLineDistances === 'function') unit.trajectoryLine.computeLineDistances();
+                        }
                     }
                 } else if (unit.trajectoryLine) {
                     scene.remove(unit.trajectoryLine);
@@ -933,9 +939,11 @@ function animate() {
             }
 
             // 7. Unmanned Vehicle Re-Crewing (Any infantry touching a vehicle whose driver was sniped by Jarmen Kell captures it!)
-            if (typeof isInfantryType === 'function' && isInfantryType(unit.type) && unit.health > 0 && !unit.garrisonedIn) {
-                const allVehicles = [...enemyUnits, ...units].filter(v => v.isUnmanned && v.health > 0 && v.mesh);
-                for (let uv of allVehicles) {
+            if ((buildingTick + idx) % 6 === 0 && typeof isInfantryType === 'function' && isInfantryType(unit.type) && unit.health > 0 && !unit.garrisonedIn) {
+                const allVehicles = getLivingUnits();
+                for (let vi = 0; vi < allVehicles.length; vi++) {
+                    const uv = allVehicles[vi];
+                    if (!uv || !uv.isUnmanned || uv.health <= 0 || !uv.mesh) continue;
                     if (unit.mesh.position.distanceTo(uv.mesh.position) <= (uv.radius || 2.5) + 2.0) {
                         if (enemyUnits.includes(uv) && !unit.isAI) {
                             enemyUnits.splice(enemyUnits.indexOf(uv), 1);

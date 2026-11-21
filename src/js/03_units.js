@@ -1943,6 +1943,7 @@ function createHijackerMesh(isEnemy = false) {
         return createW3DInfantryMesh('hijacker', isEnemy);
     }
     const g = new THREE.Group();
+    g.scale.set(0.52, 0.52, 0.52);
     const dark = new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.6 });
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.25, 8), dark);
     body.position.y = 0.64; g.add(body);
