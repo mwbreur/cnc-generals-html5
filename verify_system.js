@@ -1766,6 +1766,17 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             throw new Error('Issue #46: spawnInfantryDeathAnimation failed to enqueue skeletal death collapse in activeFX!');
         }
         activeFX.pop();
+
+        // 13. Strict Battlefield Size / Player Count map category filtering
+        if (doesMapMatchBattlefieldSize('tournament_desert', 900) !== true ||
+            doesMapMatchBattlefieldSize('twilight_flame', 900) !== false ||
+            doesMapMatchBattlefieldSize('tournament_desert', 1500) !== false ||
+            doesMapMatchBattlefieldSize('twilight_flame', 1500) !== false ||
+            doesMapMatchBattlefieldSize('tournament_desert', 2200) !== false ||
+            doesMapMatchBattlefieldSize('twilight_flame', 2200) !== true ||
+            doesMapMatchBattlefieldSize('desert', 1500) !== true) {
+            throw new Error('Strict Battlefield Size map category filtering failed!');
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");

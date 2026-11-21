@@ -1838,6 +1838,16 @@ function getMapMaxPlayers(mapKey) {
     return 8;
 }
 
+function doesMapMatchBattlefieldSize(mapKey, mapSize) {
+    const requiredSpawns = getRequiredSpawnsForSize(mapSize);
+    // Procedural theaters dynamically scale to exact 4, 6, or 8 spawns for the chosen size category
+    if (['desert', 'jungle', 'snow', 'city', 'random'].includes(mapKey)) {
+        return true;
+    }
+    const maxP = getMapMaxPlayers(mapKey);
+    return maxP === requiredSpawns;
+}
+
 function syncMapOptionsForBattlefieldSize(mode) {
     if (typeof document === 'undefined') return;
     const envEl = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env');
@@ -1845,13 +1855,11 @@ function syncMapOptionsForBattlefieldSize(mode) {
     if (!envEl || !sizeEl) return;
 
     const mapSize = parseInt(sizeEl.value, 10) || 900;
-    const requiredSpawns = getRequiredSpawnsForSize(mapSize);
     const options = Array.from(envEl.options || []);
     let firstCompatibleVal = null;
 
     options.forEach(opt => {
-        const maxP = getMapMaxPlayers(opt.value);
-        const supported = maxP >= requiredSpawns;
+        const supported = doesMapMatchBattlefieldSize(opt.value, mapSize);
         opt.hidden = !supported;
         opt.disabled = !supported;
         if (supported && firstCompatibleVal === null) {
@@ -1859,7 +1867,15 @@ function syncMapOptionsForBattlefieldSize(mode) {
         }
     });
 
-    if (getMapMaxPlayers(envEl.value) < requiredSpawns && firstCompatibleVal !== null) {
+    if (typeof envEl.querySelectorAll === 'function') {
+        envEl.querySelectorAll('optgroup').forEach(og => {
+            const hasVisible = Array.from(og.querySelectorAll('option')).some(o => !o.hidden);
+            og.hidden = !hasVisible;
+            og.disabled = !hasVisible;
+        });
+    }
+
+    if (!doesMapMatchBattlefieldSize(envEl.value, mapSize) && firstCompatibleVal !== null) {
         envEl.value = firstCompatibleVal;
         if (firstCompatibleVal.startsWith('custom_') && typeof savedCustomMaps !== 'undefined' && savedCustomMaps[firstCompatibleVal]) {
             activeCustomMap = savedCustomMaps[firstCompatibleVal];
@@ -1962,7 +1978,7 @@ function renderSkirmishMapPickerGrid() {
                 const m = window.OFFICIAL_SKIRMISH_MAPS[key];
                 if (!m) return;
                 const maxP = (m.spawns && m.spawns.length > 0) ? m.spawns.length : (m.maxPlayers || 4);
-                if (maxP < requiredSpawns) {
+                if (!doesMapMatchBattlefieldSize(key, mapSize)) {
                     hiddenCount++;
                     return;
                 }
@@ -1988,7 +2004,7 @@ function renderSkirmishMapPickerGrid() {
                 const cm = savedCustomMaps[k];
                 if (!cm) return;
                 const maxP = getMapMaxPlayers(k);
-                if (maxP < requiredSpawns) {
+                if (!doesMapMatchBattlefieldSize(k, mapSize)) {
                     hiddenCount++;
                     return;
                 }
@@ -1997,7 +2013,7 @@ function renderSkirmishMapPickerGrid() {
     }
 
     const filterNote = hiddenCount > 0
-        ? `<div style="grid-column: 1 / -1; font-size: 11px; color: #9fb8d8; padding: 4px 8px; background: rgba(16, 30, 54, 0.72); border: 1px solid rgba(110, 168, 254, 0.3); border-radius: 3px;">Showing maps supporting ${requiredSpawns}+ spawns (${mapSize}x${mapSize}). ${hiddenCount} smaller 4-player map${hiddenCount > 1 ? 's' : ''} hidden — select <strong>Small (4 Spawns)</strong> to view all maps.</div>`
+        ? `<div style="grid-column: 1 / -1; font-size: 11px; color: #9fb8d8; padding: 4px 8px; background: rgba(16, 30, 54, 0.72); border: 1px solid rgba(110, 168, 254, 0.3); border-radius: 3px;">Showing ${requiredSpawns}-spawn maps (${mapSize}x${mapSize}). ${hiddenCount} map${hiddenCount > 1 ? 's' : ''} from other size categories hidden.</div>`
         : '';
 
     gridEl.innerHTML = filterNote + items.map(item => {
