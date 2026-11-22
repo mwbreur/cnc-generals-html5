@@ -3624,7 +3624,7 @@ function spawnPropagandaPulseRing(pos, isSubliminal = false) {
             update() {
                 life--;
                 const t = 1 - (life / 36);
-                const s = 1 + t * 14.0;
+                const s = 1 + t * 25.0; // Expands to official 32.4u PropagandaTowerBehavior radius (1.25 * 26 = 32.5u)
                 ringMesh.scale.set(s, s, 1);
                 ringMat.opacity = Math.max(0, 0.75 * (1 - t));
                 if (life <= 0) {

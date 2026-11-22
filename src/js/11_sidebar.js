@@ -4117,16 +4117,17 @@ function processBuildingFunctions() {
                         }
                 });
             }
-            // Standalone China Speaker Tower & Propaganda Center: Heals BOTH friendly infantry & vehicles (+4 HP/s, +6 HP/s with Subliminal Messaging) + grants +25% fire rate Horde buff + visual soundwave ring!
+            // Standalone China Speaker Tower & Propaganda Center (Official INIZH.big: Radius = 150 * 0.216 = 32.4u, 2% maxHP/s or 4% w/ Subliminal Messaging + Horde buff)
             if (['speakerTower', 'propagandaCenter'].includes(structure.type)) {
                 const hasSub = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
-                const healAmt = hasSub ? 6 : 4;
+                const healPct = hasSub ? 0.04 : 0.02;
                 if (typeof spawnPropagandaPulseRing === 'function') {
                     spawnPropagandaPulseRing(structure.position, hasSub);
                 }
                 units.forEach(unit => {
-                        if (unit.health > 0 && unit.mesh && unit.mesh.position.distanceTo(structure.position) < 26) {
+                        if (unit.health > 0 && unit.mesh && unit.mesh.position.distanceTo(structure.position) <= 32.4) {
                             if (unit.health < unit.maxHealth) {
+                                const healAmt = Math.max(2, Math.round((unit.maxHealth || 200) * healPct));
                                 unit.health = Math.min(unit.maxHealth, unit.health + healAmt);
                             }
                             unit.isHordeActive = true;
@@ -4153,17 +4154,7 @@ function processBuildingFunctions() {
             }
     });
 
-    // Overlord Propaganda Tower healing
-    units.forEach(u => {
-            if (u.type === 'overlord' && (u.overlordUpgrade === 'speaker' || u.overlordUpgrade === 'propaganda') && u.health > 0 && u.mesh) {
-                const ovHeal = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal')) ? 4 : 2;
-                units.forEach(nearby => {
-                        if (nearby.health > 0 && nearby.health < nearby.maxHealth && nearby.mesh && nearby.mesh.position.distanceTo(u.mesh.position) < 24) {
-                            nearby.health = Math.min(nearby.maxHealth, nearby.health + ovHeal);
-                        }
-                });
-            }
-    });
+    // Note: Overlord Propaganda/Speaker Tower healing is handled cleanly once per second in 14_gameLoop.js (official INIZH.big: 32.4u radius, 1% / 2% maxHP/s).
 
     landmines.forEach(mine => {
             if (!mine.active) return;

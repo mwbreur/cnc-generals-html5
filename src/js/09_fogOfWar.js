@@ -323,6 +323,10 @@ function updateFogOfWar() {
     const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
     enemyUnits.forEach(enemy => {
             if (!enemy.mesh) return;
+            if (enemy.garrisonedIn) {
+                enemy.mesh.visible = false;
+                return;
+            }
             if (isFriendly({ teamId: playerTeamId }, enemy)) {
                 enemy.mesh.visible = true;
                 return;

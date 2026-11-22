@@ -865,11 +865,11 @@ function animate() {
                     unit.detectsStealth = true;
                 }
 
-                // Overlord Propaganda / Speaker Tower: Heals nearby allies (+4 HP/s, +6 HP/s with Subliminal Messaging) and grants Horde fire-rate buff (+25%)
+                // Overlord Propaganda / Speaker Tower (Official INIZH.big ChinaTankOverlordPropagandaTower: Radius = 150 * 0.216 = 32.4u, 1% maxHP/s or 2% w/ Subliminal Messaging + Horde buff)
                 if ((unit.overlordUpgrade === 'propaganda' || unit.overlordUpgrade === 'speaker') && unit.upgTimer % 60 === 0) {
-                    const maxDistSq = 20.0 * 20.0;
-                    const hasSub = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
-                    const healAmt = hasSub ? 6 : 4;
+                    const maxDistSq = 32.4 * 32.4;
+                    const hasSub = !unit.isAI && (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
+                    const healPct = hasSub ? 0.02 : 0.01;
                     if (typeof spawnPropagandaPulseRing === 'function') {
                         spawnPropagandaPulseRing(unit.mesh.position, hasSub);
                     }
@@ -879,7 +879,10 @@ function animate() {
                                 const dx = ally.mesh.position.x - uX;
                                 const dz = ally.mesh.position.z - uZ;
                                 if ((dx * dx + dz * dz) <= maxDistSq) {
-                                    ally.health = Math.min(ally.maxHealth, ally.health + healAmt);
+                                    if (ally.health < ally.maxHealth) {
+                                        const healAmt = Math.max(1, Math.round((ally.maxHealth || 200) * healPct));
+                                        ally.health = Math.min(ally.maxHealth, ally.health + healAmt);
+                                    }
                                     ally.isHordeActive = true;
                                 }
                             }
@@ -3655,10 +3658,11 @@ function processEnemyCombat() {
             if (enemy.garrisonedIn) {
                 const host = enemy.garrisonedIn;
                 if (!host || host.health <= 0 || !host.mesh) return;
+                enemy.mesh.visible = false;
                 const canFireFromInside = host.type === 'overlord' || host.type === 'humvee' || host.type === 'battlebus' || host.type === 'bunker' || host.type === 'palace' || !!host.isWorldBuilding;
                 if (!canFireFromInside) return;
                 enemy.mesh.position.copy(host.position || host.mesh.position);
-                enemy.mesh.position.y += 4.2;
+                enemy.mesh.position.y += (host.type === 'humvee' || host.type === 'battlebus') ? 1.6 : 4.2;
             }
             if (enemy.attackCooldown > 0) enemy.attackCooldown = Math.max(0, enemy.attackCooldown - combatDeltaScale);
             const effectiveScanRange = enemy.scanRange > 0 ? enemy.scanRange : (enemy.type === 'blacklotus' ? 24 : (enemy.type === 'hijacker' ? 18 : 0));
