@@ -620,6 +620,26 @@ function animate() {
         return cachedLivingUnits;
     };
 
+    // Authentic SAGE Engine Veterancy Passive Regeneration for structures & AI units (1x/sec)
+    if (_simStepsThisFrame > 0 && buildingTick % 60 === 0) {
+        const sLists = [structures, enemyStructures];
+        for (let li = 0; li < 2; li++) {
+            const arr = sLists[li];
+            for (let si = 0; si < arr.length; si++) {
+                const st = arr[si];
+                if (!st || st.isBuilding || st.health <= 0 || st.health >= st.maxHealth || !st.veterancy) continue;
+                const sHeal = st.veterancy >= 3 ? 12 : (st.veterancy === 2 ? 6 : 3);
+                st.health = Math.min(st.maxHealth, st.health + sHeal);
+            }
+        }
+        for (let ei = 0; ei < enemyUnits.length; ei++) {
+            const eu = enemyUnits[ei];
+            if (!eu || eu.health <= 0 || eu.health >= eu.maxHealth || !eu.veterancy) continue;
+            const uHeal = eu.veterancy >= 3 ? 6 : (eu.veterancy === 2 ? 4 : 2);
+            eu.health = Math.min(eu.maxHealth, eu.health + uHeal);
+        }
+    }
+
     units.forEach((unit, idx) => {
             if (unit.health <= 0) return;
 
