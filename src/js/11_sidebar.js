@@ -794,7 +794,7 @@ function purchaseVehicleDrone(droneType, cost) {
         return;
     }
     playerResources -= cost * affordable;
-    for (let i = 0; i < affordable; i++) attachVehicleDrone(eligible[i], droneType);
+    for (let i = 0; i < affordable; i++) attachVehicleDrone(eligible[i], droneType, true);
     playUSASound('radio_chirp');
     showNotification(`${droneType.toUpperCase()} Drone attached to ${affordable} vehicle(s) (-$${cost * affordable})!`, 'success');
     updateSidebar();

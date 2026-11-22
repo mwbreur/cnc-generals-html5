@@ -3863,7 +3863,7 @@ function createDroneMesh(droneType) {
     return group;
 }
 
-function attachVehicleDrone(vehicle, droneType) {
+function attachVehicleDrone(vehicle, droneType, silent = false) {
     if (!vehicle || !vehicle.mesh) return;
     if (!vehicle._baseScanRange) {
         vehicle._baseScanRange = vehicle.scanRange || 25;
@@ -3896,9 +3896,13 @@ function attachVehicleDrone(vehicle, droneType) {
         vehicle.detectsStealth = false;
     }
 
-    if (typeof playOfficialSound === 'function') playOfficialSound('sfx_drone_create', 0.90);
-    else playAudio('radio_chirp');
-    if (!vehicle.isEnemy && !vehicle.isAI && typeof showNotification === 'function') {
+    const _nowDroneSfx = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (_nowDroneSfx - (window._lastDroneDeploySfxMs || 0) >= 150) {
+        window._lastDroneDeploySfxMs = _nowDroneSfx;
+        if (typeof playOfficialSound === 'function') playOfficialSound('sfx_drone_create', 0.90);
+        else playAudio('radio_chirp');
+    }
+    if (!silent && !vehicle.isEnemy && !vehicle.isAI && typeof showNotification === 'function') {
         showNotification(`${vehicle.type.toUpperCase()} deployed ${droneType.toUpperCase()} DRONE!`, 'success');
     }
 }
