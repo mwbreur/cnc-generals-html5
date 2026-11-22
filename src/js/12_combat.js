@@ -569,6 +569,8 @@ if (typeof window !== 'undefined') window.damageHostilesInRadius = damageHostile
 
 function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR_PIERCING') {
     if (!target || target.health <= 0) return;
+    // Garrisoned passengers inside a living transport/bunker/Overlord Bunker are protected by the host's armor
+    if (target.garrisonedIn && target.garrisonedIn.health > 0) return;
 
     const isAttackerPlayer = Boolean(attacker && ((typeof units !== 'undefined' && units.includes(attacker)) || (typeof structures !== 'undefined' && structures.includes(attacker))));
     const isTargetPlayer = Boolean(target && ((typeof units !== 'undefined' && units.includes(target)) || (typeof structures !== 'undefined' && structures.includes(target))));

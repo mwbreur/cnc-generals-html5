@@ -4450,7 +4450,11 @@ function addSelectionCircle(unit) {
 
     unit.mesh.add(group);
     unit.selectionCircle = group;
-    playUSASound('radio_chirp');
+    const _nowChirp = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (_nowChirp - (window._lastSelectChirpMs || 0) >= 80) {
+        window._lastSelectChirpMs = _nowChirp;
+        playUSASound('radio_chirp');
+    }
 }
 
 function removeSelectionCircle(unit) {

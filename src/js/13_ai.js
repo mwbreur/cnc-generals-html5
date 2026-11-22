@@ -3141,6 +3141,10 @@ function evaluateBoxSelection(box) {
         selectedStructure = null;
         selectedSupplyPoint = null;
         activeSidebarTab = 'production';
+        const firstSel = units.find(u => u && u.selected && !u.garrisonedIn);
+        if (firstSel && typeof playUnitVoice === 'function') {
+            playUnitVoice(firstSel.type, 'select', firstSel.faction || (typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa'));
+        }
     }
     updateHUD();
     updateSidebar();
