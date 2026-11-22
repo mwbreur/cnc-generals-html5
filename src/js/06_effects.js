@@ -5142,20 +5142,61 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
         window.activeSupplyPlanes.push(planeTracker);
     }
 
+    // Counterplay: register bomber as a targetable flying unit (500 HP) so enemy AA & interceptors can shoot it down before drop!
+    const isAiBomber = !!(pseudoAttacker && pseudoAttacker.isAI);
+    const bomberUnit = {
+        type: 'c130',
+        mesh: plane,
+        position: plane.position,
+        targetPosition: endPos.clone(),
+        radius: 4.0,
+        speed: 0,
+        health: 500,
+        maxHealth: 500,
+        isAir: true,
+        isOffmapAircraft: true,
+        isAI: isAiBomber,
+        teamId: (pseudoAttacker && pseudoAttacker.teamId !== undefined) ? pseudoAttacker.teamId : (typeof playerTeamId !== 'undefined' ? playerTeamId : 1),
+        ownerId: (pseudoAttacker && pseudoAttacker.ownerId) ? pseudoAttacker.ownerId : 'player',
+        faction: 'usa',
+        netId: 'FAB_' + (typeof netIdSequence !== 'undefined' ? (++netIdSequence) : Math.floor(Math.random() * 1e6)),
+        waypoints: [],
+        garrisoned: []
+    };
+    const bomberList = isAiBomber ? (typeof enemyUnits !== 'undefined' ? enemyUnits : null) : (typeof units !== 'undefined' ? units : null);
+    if (bomberList) bomberList.push(bomberUnit);
+
     let frame = 0;
     let dropped = false;
-    const cleanupFabC130 = () => {
+    const cleanupFabC130 = (shotDown = false) => {
         if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
             const idx = window.activeSupplyPlanes.indexOf(planeTracker);
             if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
         }
+        if (bomberList) {
+            const bIdx = bomberList.indexOf(bomberUnit);
+            if (bIdx !== -1) bomberList.splice(bIdx, 1);
+        }
+        bomberUnit._silentRemove = !shotDown;
+        bomberUnit.health = 0;
         scene.remove(plane);
     };
 
     activeFX.push({
         persistent: true,
-        dispose: cleanupFabC130,
+        dispose: () => cleanupFabC130(false),
         update() {
+            // Abort bomb if enemy AA shot down the bomber before reaching the drop zone!
+            if (bomberUnit.health <= 0) {
+                const crashPos = plane.position.clone();
+                cleanupFabC130(true);
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(crashPos, 0xff6b22, 3.2, true, 'expl_vehicle');
+                else if (typeof spawnExplosion === 'function') spawnExplosion(crashPos, 0xff6b22);
+                if (typeof showNotification === 'function') {
+                    showNotification(dropped ? 'Fuel Air Bomber shot down during egress!' : '⚠️ Fuel Air Bomber shot down before reaching drop zone — strike aborted!', 'warning');
+                }
+                return false;
+            }
             frame++;
             const t = frame / totalFrames;
             plane.position.lerpVectors(startPos, endPos, t);
@@ -5195,7 +5236,49 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
                         chuteMat.dispose();
                         const triggerDaisyDamage = () => {
                             if (typeof playAudio === 'function') playAudio('daisycutter_blast', { volume: 0.98 }, 'usa');
-                            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropCenter, 24.0, 650, 'EXPLOSIVE', pseudoAttacker);
+                            const BLAST_R = 24.0;
+                            if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(dropCenter, BLAST_R, 650, 'EXPLOSIVE', pseudoAttacker);
+
+                            // Special Effect 1: ClearGarrisonedStructures — instantly eliminate infantry inside civilian buildings in blast zone
+                            if (typeof worldBuildings !== 'undefined' && Array.isArray(worldBuildings)) {
+                                for (let wi = 0; wi < worldBuildings.length; wi++) {
+                                    const wb = worldBuildings[wi];
+                                    if (!wb || !wb.position || !Array.isArray(wb.garrisoned) || wb.garrisoned.length === 0) continue;
+                                    if (Math.hypot(wb.position.x - dropCenter.x, wb.position.z - dropCenter.z) <= BLAST_R) {
+                                        for (let gi = wb.garrisoned.length - 1; gi >= 0; gi--) {
+                                            const gUnit = wb.garrisoned[gi];
+                                            if (gUnit) { gUnit.garrisonedIn = null; gUnit.health = 0; }
+                                        }
+                                        wb.garrisoned.length = 0;
+                                        if (typeof updateWorldBuildingGarrisonVisual === 'function') updateWorldBuildingGarrisonVisual(wb);
+                                    }
+                                }
+                            }
+
+                            // Special Effect 2: Destroy all landmines inside the thermobaric overpressure zone
+                            if (typeof landmines !== 'undefined' && Array.isArray(landmines)) {
+                                for (let mi = landmines.length - 1; mi >= 0; mi--) {
+                                    const mine = landmines[mi];
+                                    if (mine && mine.position && Math.hypot(mine.position.x - dropCenter.x, mine.position.z - dropCenter.z) <= BLAST_R) {
+                                        if (mine.mesh) scene.remove(mine.mesh);
+                                        landmines.splice(mi, 1);
+                                    }
+                                }
+                            }
+
+                            // Special Effect 3: Flatten trees & light obstacles inside the blast radius
+                            if (typeof mapObstacles !== 'undefined' && Array.isArray(mapObstacles)) {
+                                for (let oi = mapObstacles.length - 1; oi >= 0; oi--) {
+                                    const obs = mapObstacles[oi];
+                                    if (!obs || !obs.position) continue;
+                                    if ((obs.type === 'tree' || obs.destructible) && Math.hypot(obs.position.x - dropCenter.x, obs.position.z - dropCenter.z) <= 20.0) {
+                                        if (obs.mesh && obs.mesh.parent) obs.mesh.parent.remove(obs.mesh);
+                                        else if (obs.mesh) scene.remove(obs.mesh);
+                                        mapObstacles.splice(oi, 1);
+                                    }
+                                }
+                                if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+                            }
                         };
                         if (typeof spawnFuelAirExplosion === 'function') {
                             spawnFuelAirExplosion(dropCenter, 'none', 1.35, triggerDaisyDamage);
@@ -5209,7 +5292,7 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
             }
 
             if (frame < totalFrames) return true;
-            cleanupFabC130();
+            cleanupFabC130(false);
             return false;
         }
     });

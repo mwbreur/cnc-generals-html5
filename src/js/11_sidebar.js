@@ -4751,7 +4751,7 @@ const GENERALS_POWERS_TREES = {
         { id: 'a10Strike', rank: 3, kind: 'active', cooldownTicks: 5400, cameo: 'a10Strike', label: 'A-10 STRIKE', name: 'A-10 Strike', desc: 'Orders A-10 Thunderbolt II jets to strafe target coordinates with cannons and missiles.' },
         { id: 'emergencyRepair', rank: 3, kind: 'active', cooldownTicks: 3600, cameo: 'emergencyRepair', label: 'REPAIR', name: 'Emergency Repair', desc: 'Rapidly repairs and heals all friendly vehicles and structures in a wide target area.' },
         // Level 5
-        { id: 'fuelAirBomb', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'fuelAirBomb', label: 'DAISY CUTTER', name: 'Fuel Air Bomb', desc: 'Drops a massive thermobaric bomb that incinerates units and flattens structures in a wide radius.' },
+        { id: 'fuelAirBomb', rank: 5, kind: 'active', cooldownTicks: 14400, cameo: 'fuelAirBomb', label: 'DAISY CUTTER', name: 'Fuel Air Bomb', desc: 'Drops a massive thermobaric bomb that clears garrisons, mines & trees and devastates a wide radius (4:00 cooldown).' },
         { id: 'leafletDrop', rank: 5, kind: 'active', cooldownTicks: 7200, cameo: 'leafletDrop', label: 'LEAFLETS', name: 'Leaflet Drop', desc: 'Drops surrender leaflets over enemy forces, temporarily disabling enemy units & defenses for 12s.' },
         { id: 'spectreGunship', rank: 5, kind: 'active', cooldownTicks: 9000, cameo: 'spectreGunship', label: 'SPECTRE', name: 'Spectre Gunship', desc: 'Summons an AC-130 Spectre Gunship that circles and heavily bombards a target zone for 12s.' }
     ],
