@@ -1473,16 +1473,20 @@ function executeWeaponFireInner(attacker, target) {
         if (attacker.type === 'jarmen') playAudio('jarmen_snipe', {}, 'gla');
         else if (typeof playUSASound === 'function') playUSASound('sniper_rifle');
         const tArmor = targetArmor;
-        if (attacker.type === 'jarmen' && (tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh && !target.isUnmanned) {
+        const curTick = (typeof buildingTick !== 'undefined' ? buildingTick : 0);
+        const canSnipeDriver = !attacker.snipeCooldownUntil || curTick >= attacker.snipeCooldownUntil;
+        if (attacker.type === 'jarmen' && canSnipeDriver && (tArmor === 'light_vehicle' || tArmor === 'heavy_vehicle') && !target.isAir && target.mesh && !target.isUnmanned) {
             target.isUnmanned = true;
-            target.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 999999;
+            target.disabledUntil = curTick + 999999;
             target.combatTarget = null;
             attacker.combatTarget = null;
+            attacker.snipeCooldownUntil = curTick + 1800; // Official INIZH.big 30s ClipReloadTime
             if (typeof playAudio === 'function') playAudio('jarmen_snipe_hit', { volume: 0.85 }, 'gla');
             if (typeof spawnSparks === 'function') spawnSparks(targetPos, 0xffffff, 8);
             if (typeof showNotification === 'function') {
-                showNotification(`Jarmen Kell sniped the driver of ${target.type.toUpperCase()}! Vehicle is now unmanned!`, 'success');
+                showNotification(`Jarmen Kell sniped the driver of ${target.type.toUpperCase()}! Vehicle is now unmanned! (30s cooldown)`, 'success');
             }
+            if (typeof updateSidebar === 'function' && attacker.selected) updateSidebar();
         } else {
             applyCalculatedDamage(attacker, target, 120, 'SNIPER');
         }

@@ -857,21 +857,67 @@ function triggerHeroOrUnitAbility(unit, abilityType) {
                 }
             }, 2000);
     } else if (abilityType === 'snipeDriver') {
-        const enemyVehicles = enemyUnits.filter(e => e.health > 0 && !e.isAir && !e.isUnmanned && typeof isInfantryType === 'function' && !isInfantryType(e.type));
-        let nearest = null, bestD = 36;
-        enemyVehicles.forEach(e => {
-                const d = unit.mesh.position.distanceTo(e.mesh.position);
-                if (d < bestD) { bestD = d; nearest = e; }
-        });
-        if (!nearest) {
-            showNotification('No enemy ground vehicle within Jarmen Kell snipe range!', 'error');
+        const curTick = (typeof buildingTick !== 'undefined' ? buildingTick : 0);
+        if (unit.snipeCooldownUntil && curTick < unit.snipeCooldownUntil) {
+            const secsLeft = Math.ceil((unit.snipeCooldownUntil - curTick) / 60);
+            showNotification(`Jarmen Kell Snipe Driver recharging (${secsLeft}s remaining).`, 'warning');
             return;
         }
-        spawnLaserBeam(unit.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)), nearest.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xffffff, 4);
+        // Official INIZH.big GLAJarmenKellVehiclePilotSniperRifle: AttackRange = 225 * 0.216 = 48.6u, ClipReloadTime = 30000ms (1800 ticks)
+        const SNIPE_RANGE = 48.6;
+        const enemyVehicles = enemyUnits.filter(e =>
+            e && e.health > 0 && e.mesh && !e.isAir && !e.isUnmanned &&
+            !isFriendly(unit, e) &&
+            !(e.isStealthed && !(e.revealedUntil && e.revealedUntil > curTick)) &&
+            typeof isInfantryType === 'function' && !isInfantryType(e.type)
+        );
+        let nearest = null;
+        if (unit.combatTarget && enemyVehicles.includes(unit.combatTarget) &&
+            unit.mesh.position.distanceTo(unit.combatTarget.mesh.position) <= SNIPE_RANGE) {
+            nearest = unit.combatTarget;
+        } else {
+            let bestD = SNIPE_RANGE;
+            enemyVehicles.forEach(e => {
+                const d = unit.mesh.position.distanceTo(e.mesh.position);
+                if (d <= bestD) { bestD = d; nearest = e; }
+            });
+        }
+        if (!nearest) {
+            // If an enemy ground vehicle is visible nearby, move Jarmen Kell into snipe range automatically
+            let chaseTarget = null, chaseDist = 90;
+            enemyVehicles.forEach(e => {
+                const d = unit.mesh.position.distanceTo(e.mesh.position);
+                if (d < chaseDist) { chaseDist = d; chaseTarget = e; }
+            });
+            if (chaseTarget) {
+                unit.combatTarget = chaseTarget;
+                unit.targetPosition.copy(chaseTarget.mesh.position);
+                unit.taskState = 'MovingToAttack';
+                showNotification(`Jarmen Kell moving into snipe range of ${chaseTarget.type.toUpperCase()}...`, 'info');
+            } else {
+                showNotification('No enemy ground vehicle within Jarmen Kell snipe range!', 'error');
+            }
+            return;
+        }
+        const fromPos = unit.mesh.position.clone().add(new THREE.Vector3(0, 1.3, 0));
+        const toPos = nearest.mesh.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+        if (typeof spawnSniperVaporTrail === 'function') spawnSniperVaporTrail(fromPos, toPos, 0xffeaa7, unit.veterancy >= 3);
+        else spawnLaserBeam(fromPos, toPos, 0xffeaa7, 4);
+        if (typeof playAudio === 'function') {
+            playAudio('jarmen_snipe', {}, 'gla');
+            playAudio('jarmen_snipe_hit', { volume: 0.85 }, 'gla');
+        }
+        if (typeof spawnSparks === 'function') spawnSparks(toPos, 0xffffff, 8);
         nearest.isUnmanned = true;
-        nearest.disabledUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 999999;
+        nearest.disabledUntil = curTick + 999999;
         nearest.combatTarget = null;
-        showNotification(`Jarmen Kell sniped the driver of ${nearest.type.toUpperCase()}! Send any infantry to capture it!`, 'success');
+        unit.snipeCooldownUntil = curTick + 1800; // Official 30s cooldown
+        if (unit.isStealthed) {
+            unit.isStealthed = false;
+            unit.revealedUntil = curTick + 120; // Official 2.0s StealthDelay
+        }
+        showNotification(`Jarmen Kell sniped the driver of ${nearest.type.toUpperCase()}! Send any infantry to capture it! (30s cooldown)`, 'success');
+        updateSidebar();
     } else if (abilityType === 'lotusHack') {
         const allHostile = [...enemyStructures, ...enemyUnits].filter(e => e.health > 0);
         let nearest = null, bestD = 26;
@@ -1330,8 +1376,11 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                 { name: 'TIMED C4', badge: 'DEMO', action: () => triggerHeroOrUnitAbility(u, 'c4'), desc: 'Plant Timed C4 Charge on nearest enemy structure or vehicle (450 Demo Damage)' }
             );
         } else if (u.type === 'jarmen') {
+            const curTick = (typeof buildingTick !== 'undefined' ? buildingTick : 0);
+            const snipeOnCd = !!(u.snipeCooldownUntil && curTick < u.snipeCooldownUntil);
+            const snipeSecs = snipeOnCd ? Math.ceil((u.snipeCooldownUntil - curTick) / 60) : 0;
             currentGridSlots.push(
-                { name: 'SNIPE DRIVER', badge: 'SNIPE', action: () => triggerHeroOrUnitAbility(u, 'snipeDriver'), desc: 'Eliminate enemy vehicle driver so any friendly infantry can capture it' }
+                { name: 'SNIPE DRIVER', badge: snipeOnCd ? `${snipeSecs}s ⏱` : 'SNIPE', disabled: snipeOnCd, action: () => triggerHeroOrUnitAbility(u, 'snipeDriver'), desc: 'Eliminate enemy vehicle driver so any friendly infantry can capture it (30s cooldown)' }
             );
         } else if (u.type === 'blacklotus') {
             currentGridSlots.push(
@@ -4259,6 +4308,8 @@ function processBuildingFunctions() {
     if (typeof updateSuperweaponTimersHUD === 'function') updateSuperweaponTimersHUD();
     if (typeof renderGeneralPowersBar === 'function') renderGeneralPowersBar();
     if (selectedStructure && ['particleCannon', 'nukeSilo', 'scudStorm'].includes(selectedStructure.type)) {
+        updateSidebar();
+    } else if (buildingTick % 60 === 0 && units.some(u => u.selected && u.type === 'jarmen' && u.snipeCooldownUntil && buildingTick <= u.snipeCooldownUntil + 60)) {
         updateSidebar();
     }
 }
