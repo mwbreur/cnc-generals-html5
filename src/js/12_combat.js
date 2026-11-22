@@ -290,7 +290,7 @@ function processCombatScanning() {
                     : Math.hypot(unit.mesh.position.x - targetPos.x, unit.mesh.position.z - targetPos.z))
                 : Infinity;
                 const inOverlordBunker = !!(unit.garrisonedIn && unit.garrisonedIn.type === 'overlord' && unit.garrisonedIn.overlordUpgrade === 'bunker');
-                const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker' || inOverlordBunker)) ? 1.5 : 1.0;
+                const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker' || inOverlordBunker)) ? 1.33 : 1.0;
                 const garrisonRadiusBonus = inOverlordBunker ? (unit.garrisonedIn.radius || 6.2) : 0;
                 const maxEffectiveRange = unit.scanRange * garrisonRangeMult + garrisonRadiusBonus + targetRadius;
                 const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : (unit.type === 'inferno' ? 10.8 : 0);
@@ -609,6 +609,10 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     // Attacker offensive buffs (USA Strategy Center Bombardment: +20% damage)
     if (typeof battlePlan !== 'undefined' && battlePlan === 'bombard' && isAttackerPlayer) {
         finalDmg = Math.round(finalDmg * 1.20);
+    }
+    // Official INIZH.big GameData.ini: WeaponBonus = GARRISONED DAMAGE 125%
+    if (attacker && attacker.garrisonedIn && (attacker.garrisonedIn.isWorldBuilding || attacker.garrisonedIn.type === 'bunker' || (attacker.garrisonedIn.type === 'overlord' && attacker.garrisonedIn.overlordUpgrade === 'bunker'))) {
+        finalDmg = Math.round(finalDmg * 1.25);
     }
     // China Horde Bonus: 5+ friendly horde units (Red Guard, Battlemaster) within 22m grant +20% damage (+35% with Nationalism)
     if (attacker && (attacker.type === 'redguard' || attacker.type === 'battlemaster' || attacker.type === 'infantry' || attacker.type === 'tank') && (attacker.faction === 'china' || attacker.isChina || (typeof selectedFaction !== 'undefined' && selectedFaction === 'china' && isAttackerPlayer))) {
