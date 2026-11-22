@@ -3914,7 +3914,7 @@ function processBuildingFunctions() {
                         const doorL = getCachedNode(structure.mesh, 'nukeBlastDoorL');
                         const doorR = getCachedNode(structure.mesh, 'nukeBlastDoorR');
                         const tip = getCachedNode(structure.mesh, 'nukeTip');
-                        const openFactor = chargeRatio > 0.45 ? Math.min(1, (chargeRatio - 0.45) / 0.30) : 0;
+                        const openFactor = chargeRatio > 0.85 ? Math.min(1, (chargeRatio - 0.85) / 0.12) : 0;
                         if (roofBase) roofBase.position.x = 17.11 + openFactor * 24.62; // W3D Y: -17.11 -> -41.73
                         if (roofMid) roofMid.position.y = 23.47 - openFactor * 23.21;  // Telescopes into LINE38
                         if (roofTip) roofTip.position.y = 23.50 - openFactor * 23.33;  // Telescopes into LINE37
@@ -3923,23 +3923,27 @@ function processBuildingFunctions() {
                         if (tip) {
                             const isW3D = structure.mesh.userData && structure.mesh.userData.isW3D;
                             if (isW3D) {
-                                const riseFactor = chargeRatio > 0.52 ? Math.min(1, (chargeRatio - 0.52) / 0.42) : 0;
+                                const riseFactor = chargeRatio > 0.88 ? Math.min(1, (chargeRatio - 0.88) / 0.12) : 0;
                                 tip.visible = riseFactor > 0.01;
                                 tip.position.y = -34.0 + riseFactor * 38.0; // Rises cleanly from bay floor to launch posture
                             } else {
-                                tip.position.y = 0.8 + chargeRatio * 1.8;
+                                tip.position.y = 0.8 + openFactor * 1.8;
                             }
                         }
-                        // Official cryogenic steam & exhaust venting from silo bay & STEAM01/STEAM02 vents
-                        if (typeof spawnSmokePuff === 'function') {
-                            const steamInterval = openFactor > 0.2 ? 7 : 22;
+                        // Official cryogenic steam vents & red warning beacon pulses when >90% charged
+                        if (chargeRatio > 0.90 && typeof spawnSmokePuff === 'function') {
+                            const steamInterval = openFactor > 0.5 ? 7 : 14;
                             if (buildingTick % steamInterval === 0) {
                                 const bayCenter = structure.position.clone().add(new THREE.Vector3(-3.5, 4.2, -5.2));
                                 spawnSmokePuff(
                                     bayCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4.5, 0.2, (Math.random() - 0.5) * 4.5)),
-                                    openFactor > 0.5 ? 0xf1f2f6 : 0xdcdde1,
-                                    openFactor > 0.5 ? 1.35 : 0.85
+                                    0xf1f2f6,
+                                    1.25
                                 );
+                                // Subtle pulsing red warning light flare on silo rim
+                                if (buildingTick % 28 === 0 && typeof spawnMuzzleFlash === 'function') {
+                                    spawnMuzzleFlash(bayCenter.clone().add(new THREE.Vector3(4.2, 1.4, 3.8)), 0xff2222, 0.95);
+                                }
                                 if (openFactor > 0.65) {
                                     // Twin pressurized missile-body cryogenic vents (STEAM01 / STEAM02)
                                     spawnSmokePuff(

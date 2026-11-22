@@ -3322,7 +3322,8 @@ function animateNukeStrike(siloPos, targetPos) {
 
     scene.add(missileGroup);
     if (siloPos) {
-        // Official FX_NeutronMissileLaunch: billowing pressurized silo ignition cloud rolling outward from the bay
+        // Official FX_NeutronMissileLaunch: billowing pressurized silo ignition cloud & camera rumble
+        if (typeof triggerScreenShake === 'function') triggerScreenShake(0.85);
         if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(origin.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xffdd59, 4.2);
         for (let s = 0; s < 18; s++) {
             const ang = (s / 18) * Math.PI * 2;
@@ -3337,11 +3338,15 @@ function animateNukeStrike(siloPos, targetPos) {
 
     let phase = 'ascent';
     let frame = 0;
+    let cruiseFrame = 0;
+    const CRUISE_TICKS = 175; // Combined with ~65 ascent ticks = 4.0s total travel delay before steep 80-deg reentry
+    let descentStartX = targetPos.x + 24;
+    let descentStartZ = targetPos.z - 12;
 
     activeFX.push({
             persistent: true,
             group: missileGroup,
-            life: 220,
+            life: 440,
             update() {
                 frame++;
                 const pulse = 0.5 + 0.5 * Math.sin(frame * 0.25);
@@ -3351,25 +3356,40 @@ function animateNukeStrike(siloPos, targetPos) {
                 plume.scale.set(0.85 + Math.random() * 0.35, 0.85 + Math.random() * 0.45, 0.85 + Math.random() * 0.35);
 
                 if (phase === 'ascent') {
-                    // Authentic heavy ICBM liftoff: gradual acceleration with roaring booster smoke column
-                    const climbSpeed = frame < 18 ? (0.45 + frame * 0.09) : 2.15;
+                    // Authentic heavy ICBM liftoff: gradual acceleration straight up along Y-axis with roaring fire-and-smoke trail
+                    const climbSpeed = frame < 18 ? (0.45 + frame * 0.09) : 2.35;
                     missileGroup.position.y += climbSpeed;
-                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.4, -2.5, (Math.random() - 0.5) * 1.4)), frame % 2 === 0 ? 0xff793f : 0xf1f2f6, 1.55);
+                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.4, -2.5, (Math.random() - 0.5) * 1.4)), frame % 2 === 0 ? 0xff793f : 0xf1f2f6, 1.65);
                     if (frame < 26 && frame % 2 === 0 && siloPos) {
                         const a = Math.random() * Math.PI * 2;
                         const rr = 2.5 + Math.random() * 5.5;
                         spawnSmokePuff(origin.clone().add(new THREE.Vector3(Math.cos(a) * rr, 0.8 + Math.random() * 2.2, Math.sin(a) * rr)), 0xdcdde1, 1.9);
                     }
-                    if (missileGroup.position.y > 105) {
+                    if (missileGroup.position.y > 145) {
+                        phase = 'cruise';
+                        cruiseFrame = 0;
+                        missileGroup.visible = false;
+                    }
+                } else if (phase === 'cruise') {
+                    cruiseFrame++;
+                    if (cruiseFrame >= CRUISE_TICKS) {
                         phase = 'descent';
-                        missileGroup.position.set(targetPos.x, 115, targetPos.z);
-                        missileGroup.rotation.x = Math.PI; // point straight down
+                        missileGroup.visible = true;
+                        descentStartX = targetPos.x + 22;
+                        descentStartZ = targetPos.z - 10;
+                        missileGroup.position.set(descentStartX, 135, descentStartZ);
+                        // Steep ~80-degree entry angle aimed directly at targetPos
+                        missileGroup.rotation.set(Math.PI - 0.10, 0, -0.17);
                         if (typeof playAudio === 'function') playAudio('shell_whistle', { volume: 0.85 });
                     }
                 } else if (phase === 'descent') {
-                    missileGroup.position.y -= 3.6;
-                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3(0, 3.0, 0)), frame % 2 === 0 ? 0xff5252 : 0xdcdde1, 1.35);
                     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+                    const dropDist = Math.max(1, 135 - (groundY + 14.0));
+                    missileGroup.position.y -= 3.8;
+                    const frac = Math.min(1, Math.max(0, (135 - missileGroup.position.y) / dropDist));
+                    missileGroup.position.x = descentStartX + (targetPos.x - descentStartX) * frac;
+                    missileGroup.position.z = descentStartZ + (targetPos.z - descentStartZ) * frac;
+                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3(0, 3.0, 0)), frame % 2 === 0 ? 0xff5252 : 0xdcdde1, 1.35);
                     if (missileGroup.position.y <= groundY + 14.0) {
                         scene.remove(missileGroup);
                         missileGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
