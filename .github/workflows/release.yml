@@ -1,0 +1,120 @@
+name: Package and Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release version tag (e.g. v0.9.0-beta)"
+        required: true
+        default: "v0.9.0-beta"
+      notes:
+        description: "Optional extra release notes"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Verify, and Publish Playable Release ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Run full verification suite and build
+        run: npm test
+
+      - name: Determine release metadata
+        id: meta
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="$REF_NAME"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if echo "$TAG" | grep -Eiq '(alpha|beta|rc)'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package playable home-user ZIP
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          PKG="cnc-generals-html5-${TAG}"
+          rm -rf "$PKG" "${PKG}.zip"
+          mkdir -p "$PKG/assets" "$PKG/src" "$PKG/scripts"
+          cp index.html "$PKG/"
+          cp -r assets/data "$PKG/assets/"
+          cp -r src/audio "$PKG/src/"
+          cp -r src/vendor "$PKG/src/"
+          cp scripts/lan_server.mjs "$PKG/scripts/"
+          cp release/Play_Windows.bat "$PKG/"
+          cp release/Play_Mac_Linux.command "$PKG/"
+          cp release/README_PLAY.txt "$PKG/"
+          cp LICENSE "$PKG/"
+          chmod +x "$PKG/Play_Mac_Linux.command"
+          zip -r -q "${PKG}.zip" "$PKG"
+          ls -lh "${PKG}.zip"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          EXTRA_NOTES: ${{ github.event.inputs.notes }}
+        run: |
+          PKG="cnc-generals-html5-${TAG}.zip"
+          cat <<'EOF' > release_notes.md
+          ## Quick Start (No Docker / No Git Required)
+          1. Download **`PKG_PLACEHOLDER`** below and unzip it.
+          2. Double-click **`Play_Windows.bat`** (Windows) or **`Play_Mac_Linux.command`** (Mac/Linux).
+          3. Your browser opens automatically at `http://localhost:8080`.
+             *(Windows 10/11 works with zero installs; install [Node.js](https://nodejs.org) on the host PC to unlock offline LAN Multiplayer.)*
+
+          > **Snapshot Notice:** This release is a frozen snapshot of the game at this tag. Live ongoing updates are always published automatically to GitHub Pages.
+
+          ## What's Included
+          - **3 Factions (USA, China, GLA)** with official W3D 3D models, animations, upgrades, General Powers, and Superweapons.
+          - **17 Official Maps** (2P/4P/6P/8P) + Procedural Skirmish Maps + Map Editor.
+          - **Skirmish AI** (Easy/Medium/Hard), **Live 3D Main Menu Battle**, and **Zero Hour Options Menu**.
+          - **Online P2P (WebRTC)** and **Offline LAN Multiplayer**.
+
+          ## Still In Progress (Road to 1.0)
+          - Continued retail Zero Hour balance & unit-behavior parity passes.
+          - Further large-army (200+ unit) performance & tight-chokepoint pathfinding polish.
+          - Full 2-player multiplayer sync hardening for all General Powers & Superweapons.
+
+          ## Known Issues
+          - Always launch via `Play_Windows.bat` / `Play_Mac_Linux.command` (opening `index.html` directly over `file://` blocks browser audio loading).
+          - First load takes ~2-4 seconds while 3D model and map bundles initialize.
+          - Very large 200+ unit battles may dip FPS on older hardware (adjust quality in the **Options** menu).
+          - Occasional unit clumping in narrow base alleys or around busy Supply Centers.
+          EOF
+          sed -i "s/PKG_PLACEHOLDER/${PKG}/g" release_notes.md
+          if [ -n "$EXTRA_NOTES" ]; then
+            printf "\n## Release Notes\n%s\n" "$EXTRA_NOTES" >> release_notes.md
+          fi
+
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release create "$TAG" "$PKG" --target "${GITHUB_SHA}" --title "C&C Generals HTML5 ${TAG}" --notes-file release_notes.md --prerelease
+          else
+            gh release create "$TAG" "$PKG" --target "${GITHUB_SHA}" --title "C&C Generals HTML5 ${TAG}" --notes-file release_notes.md
+          fi

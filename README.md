@@ -2,9 +2,10 @@
 
 A work-in-progress, browser-based 3D real-time strategy game inspired by **Command & Conquer: Generals / Zero Hour**. The project uses Three.js, HTML, CSS, JavaScript, the Web Audio API and PeerJS/WebRTC.
 
-**Play:** [mwbreur.github.io/cnc-generals-html5](https://mwbreur.github.io/cnc-generals-html5/)
+**Play Online:** [mwbreur.github.io/cnc-generals-html5](https://mwbreur.github.io/cnc-generals-html5/)  
+**Download Offline / LAN Release (No Docker or Git required):** [GitHub Releases](https://github.com/mwbreur/cnc-generals-html5/releases) — download the latest `.zip`, unzip, and double-click `Play_Windows.bat` (Windows) or `Play_Mac_Linux.command` (Mac/Linux).
 
-> **Project status:** Active work in progress. Features and systems are still being developed; expect bugs, balance changes and incomplete functionality.
+> **Project status (`0.9.0-beta`):** Playable beta pre-release. All 3 factions (USA, China, GLA), 17 official maps, Skirmish AI, Map Editor, and P2P/LAN multiplayer are working, while balance parity, large-army (200+ unit) pathing/performance, and multiplayer special-power sync are still being actively polished toward `1.0.0`. See `release/README_PLAY.txt` for current known issues.
 
 ---
 
