@@ -526,6 +526,22 @@ function createW3DVehicleMesh(modelKey, isEnemy = false, fallbackFn = null) {
             const ms = root.getObjectByName(msName);
             if (ms) ms.visible = false;
         });
+    } else if (modelKey === 'marauder') {
+        const up1 = root.getObjectByName('TURRETUP01');
+        const up2 = root.getObjectByName('TURRETUP02');
+        if (up1) up1.visible = false;
+        if (up2) up2.visible = false;
+        // Official UVMarauder.W3D rest-pose quaternions: align house-color barrel muzzle tips forward (+Z) & turret emblems flush
+        const hc2 = root.getObjectByName('HOUSECOLOR02');
+        if (hc2 && hc2.quaternion && typeof hc2.quaternion.set === 'function') hc2.quaternion.set(-0.707107, 0, 0, -0.707107);
+        ['HOUSECOLOR04', 'HOUSECOLOR05', 'HOUSECOLOR06'].forEach(pName => {
+            const hc = root.getObjectByName(pName);
+            if (hc && hc.quaternion && typeof hc.quaternion.set === 'function') hc.quaternion.set(0.5, -0.5, -0.5, 0.5);
+        });
+        ['HOUSECOLOR03', 'HOUSECOLOR07'].forEach(pName => {
+            const hc = root.getObjectByName(pName);
+            if (hc && hc.quaternion && typeof hc.quaternion.set === 'function') hc.quaternion.set(-0.4426, 0.5515, 0.4426, -0.5515);
+        });
     } else if (modelKey === 'scud') {
         const missile = root.getObjectByName('MISSILE');
         if (missile) missile.rotation.x = Math.PI / 2;
