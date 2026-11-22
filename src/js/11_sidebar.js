@@ -3788,7 +3788,10 @@ function updateSuperweaponTimersHUD() {
     ];
 
     if (allSW.length === 0) {
-        if (hud.innerHTML !== '') hud.innerHTML = '';
+        if (hud._lastHtml !== '' || hud.innerHTML !== '') {
+            hud._lastHtml = '';
+            hud.innerHTML = '';
+        }
         return;
     }
 
@@ -3821,6 +3824,8 @@ function updateSuperweaponTimersHUD() {
         `;
     }).join('');
 
+    if (hud._lastHtml === html) return;
+    hud._lastHtml = html;
     hud.innerHTML = html;
 }
 window.updateSuperweaponTimersHUD = updateSuperweaponTimersHUD;

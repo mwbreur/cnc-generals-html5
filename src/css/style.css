@@ -2269,8 +2269,9 @@ body.control-bar-collapsed #generals-command-bar {
     cursor: pointer;
 }
 .sw-timer-row.sw-ready:hover {
-    transform: translateX(-2px);
-    background: linear-gradient(90deg, rgba(28, 42, 30, 0.95) 0%, rgba(40, 58, 38, 0.98) 100%);
+    border-color: #fff2a8;
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.85);
+    background: linear-gradient(90deg, rgba(28, 42, 30, 0.95) 0%, rgba(44, 66, 42, 0.98) 100%);
 }
 
 .sw-timer-top {
