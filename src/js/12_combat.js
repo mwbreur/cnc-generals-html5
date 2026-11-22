@@ -30,14 +30,23 @@ function canUnitTarget(attacker, target) {
 }
 if (typeof window !== 'undefined') window.canUnitTarget = canUnitTarget;
 
-// Checks whether a hostile target at targetPos is revealed by the unit's own ShroudClearingRange or spotted by an allied unit/structure
+// Checks whether a hostile target at targetPos is revealed by the unit's own ShroudClearingRange, Fog of War, or an allied spotter
 function isTargetSpottedForUnit(unit, targetPos, targetRadius = 0) {
     if (!unit || !unit.mesh || !targetPos) return false;
+    // If the target is directly visible in the player's Fog of War (Spy Drone, Satellite Scan, Scout Drone, allied sight, etc.), allow firing!
+    if (!unit.isAI && typeof isPositionVisible === 'function' && isPositionVisible(targetPos.x, targetPos.z)) {
+        return true;
+    }
+    const getSight = (ent) => {
+        let v = (typeof INIZH_SHROUD_RANGE !== 'undefined' && ent.type && INIZH_SHROUD_RANGE[ent.type] !== undefined)
+            ? INIZH_SHROUD_RANGE[ent.type]
+            : (ent.visionRange !== undefined ? ent.visionRange : (ent.scanRange || 24));
+        if (ent.drone && ent.drone.type === 'scout') v = Math.max(v * 1.35, 65);
+        if (typeof battlePlan !== 'undefined' && battlePlan === 'search' && !ent.isAI) v *= 1.2;
+        return Math.max(v || 0, ent.visionRange || 0);
+    };
     const uPos = unit.mesh.position;
-    const baseOwnSight = (typeof getOfficialVisionRange === 'function')
-        ? getOfficialVisionRange(unit)
-        : (unit.visionRange !== undefined ? unit.visionRange : unit.scanRange);
-    const ownVision = Math.max(baseOwnSight || 0, unit.visionRange || 0) + targetRadius;
+    const ownVision = getSight(unit) + targetRadius;
     const dx = uPos.x - targetPos.x, dz = uPos.z - targetPos.z;
     if (dx * dx + dz * dz <= ownVision * ownVision) return true;
 
@@ -47,10 +56,7 @@ function isTargetSpottedForUnit(unit, targetPos, targetRadius = 0) {
         const f = friendUnits[i];
         if (!f || f === unit || f.health <= 0 || !f.mesh) continue;
         if (typeof isFriendly === 'function' && !isFriendly(unit, f)) continue;
-        const baseFSight = (typeof getOfficialVisionRange === 'function')
-            ? getOfficialVisionRange(f)
-            : (f.visionRange !== undefined ? f.visionRange : (f.scanRange || 24));
-        const fVis = Math.max(baseFSight || 0, f.visionRange || 0) + targetRadius;
+        const fVis = getSight(f) + targetRadius;
         const fdx = f.mesh.position.x - targetPos.x, fdz = f.mesh.position.z - targetPos.z;
         if (fdx * fdx + fdz * fdz <= fVis * fVis) return true;
     }
