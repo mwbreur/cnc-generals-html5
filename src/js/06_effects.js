@@ -4868,6 +4868,28 @@ function triggerSupplyDropZoneDelivery(structure) {
     const planeTracker = { mesh: plane, dirX: (endPos.x - startPos.x) / dirLen, dirZ: (endPos.z - startPos.z) / dirLen };
     if (typeof window !== 'undefined') window.activeSupplyPlanes.push(planeTracker);
 
+    // Official INIZH.big AmericaJetCargoPlane (1000 HP): enemy AA & interceptors can shoot down Supply Drop C-130s!
+    const supplyPlaneUnit = {
+        type: 'c130',
+        mesh: plane,
+        position: plane.position,
+        targetPosition: endPos.clone(),
+        radius: 4.0,
+        speed: 0,
+        health: 1000,
+        maxHealth: 1000,
+        isAir: true,
+        isOffmapAircraft: true,
+        isAI: false,
+        teamId: typeof playerTeamId !== 'undefined' ? playerTeamId : 1,
+        ownerId: 'player',
+        faction: 'usa',
+        netId: 'SUPC130_' + (typeof netIdSequence !== 'undefined' ? (++netIdSequence) : Math.floor(Math.random() * 1e6)),
+        waypoints: [],
+        garrisoned: []
+    };
+    if (typeof units !== 'undefined') units.push(supplyPlaneUnit);
+
     if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.7 }, 'usa');
     if (typeof showNotification === 'function') showNotification('✈ C-130 Supply Drop inbound!', 'info');
 
@@ -4994,11 +5016,17 @@ function triggerSupplyDropZoneDelivery(structure) {
         });
     }
 
-    const cleanupSupplyC130 = () => {
+    const cleanupSupplyC130 = (shotDown = false) => {
         if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
             const idx = window.activeSupplyPlanes.indexOf(planeTracker);
             if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
         }
+        if (typeof units !== 'undefined') {
+            const uIdx = units.indexOf(supplyPlaneUnit);
+            if (uIdx !== -1) units.splice(uIdx, 1);
+        }
+        supplyPlaneUnit._silentRemove = !shotDown;
+        supplyPlaneUnit.health = 0;
         scene.remove(plane);
         if (!(plane.userData && plane.userData.isW3D)) {
             const mats = new Set();
@@ -5015,8 +5043,18 @@ function triggerSupplyDropZoneDelivery(structure) {
 
     activeFX.push({
             persistent: true,
-            dispose: cleanupSupplyC130,
+            dispose: () => cleanupSupplyC130(false),
             update() {
+                if (supplyPlaneUnit.health <= 0) {
+                    const crashPos = plane.position.clone();
+                    cleanupSupplyC130(true);
+                    if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(crashPos, 0xff6b22, 3.2, true, 'expl_vehicle');
+                    else if (typeof spawnExplosion === 'function') spawnExplosion(crashPos, 0xff6b22);
+                    if (typeof showNotification === 'function') {
+                        showNotification(crateDropped ? 'C-130 Supply Plane shot down during egress!' : '⚠️ C-130 Supply Plane shot down before drop — delivery aborted!', 'warning');
+                    }
+                    return false;
+                }
                 planeTick++;
                 const t = planeTick / planeDuration;
                 plane.position.lerpVectors(startPos, endPos, t);
@@ -5032,7 +5070,7 @@ function triggerSupplyDropZoneDelivery(structure) {
                     });
                 }
                 if (planeTick >= planeDuration) {
-                    cleanupSupplyC130();
+                    cleanupSupplyC130(false);
                     return false;
                 }
                 return true;
@@ -5065,20 +5103,58 @@ function triggerC130Paradrop(targetPos) {
         window.activeSupplyPlanes.push(planeTracker);
     }
 
+    // Official INIZH.big AmericaJetCargoPlane (1000 HP): enemy AA & interceptors can shoot down Ranger Paradrop C-130s!
+    const paraPlaneUnit = {
+        type: 'c130',
+        mesh: plane,
+        position: plane.position,
+        targetPosition: endPos.clone(),
+        radius: 4.0,
+        speed: 0,
+        health: 1000,
+        maxHealth: 1000,
+        isAir: true,
+        isOffmapAircraft: true,
+        isAI: false,
+        teamId: typeof playerTeamId !== 'undefined' ? playerTeamId : 1,
+        ownerId: 'player',
+        faction: 'usa',
+        netId: 'PARAC130_' + (typeof netIdSequence !== 'undefined' ? (++netIdSequence) : Math.floor(Math.random() * 1e6)),
+        waypoints: [],
+        garrisoned: []
+    };
+    if (typeof units !== 'undefined') units.push(paraPlaneUnit);
+
     let frame = 0;
     let dropped = false;
-    const cleanupParadropC130 = () => {
+    const cleanupParadropC130 = (shotDown = false) => {
         planeTracker.alive = false;
         if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
             const idx = window.activeSupplyPlanes.indexOf(planeTracker);
             if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
         }
+        if (typeof units !== 'undefined') {
+            const uIdx = units.indexOf(paraPlaneUnit);
+            if (uIdx !== -1) units.splice(uIdx, 1);
+        }
+        paraPlaneUnit._silentRemove = !shotDown;
+        paraPlaneUnit.health = 0;
         scene.remove(plane);
     };
     activeFX.push({
         persistent: true,
-        dispose: cleanupParadropC130,
+        dispose: () => cleanupParadropC130(false),
         update() {
+            if (paraPlaneUnit.health <= 0) {
+                const crashPos = plane.position.clone();
+                cleanupParadropC130(true);
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(crashPos, 0xff6b22, 3.2, true, 'expl_vehicle');
+                else if (typeof spawnExplosion === 'function') spawnExplosion(crashPos, 0xff6b22);
+                if (typeof showNotification === 'function') {
+                    showNotification(dropped ? 'C-130 Paradrop plane shot down during egress!' : '⚠️ C-130 Paradrop plane shot down before drop — Rangers lost!', 'warning');
+                }
+                return false;
+            }
             frame++;
             const t = frame / totalFrames;
             plane.position.lerpVectors(startPos, endPos, t);
@@ -5142,7 +5218,7 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
         window.activeSupplyPlanes.push(planeTracker);
     }
 
-    // Counterplay: register bomber as a targetable flying unit (500 HP) so enemy AA & interceptors can shoot it down before drop!
+    // Counterplay: register bomber as official INIZH.big AmericaJetCargoPlane (1000 HP) so enemy AA & interceptors can shoot it down!
     const isAiBomber = !!(pseudoAttacker && pseudoAttacker.isAI);
     const bomberUnit = {
         type: 'c130',
@@ -5151,8 +5227,8 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
         targetPosition: endPos.clone(),
         radius: 4.0,
         speed: 0,
-        health: 500,
-        maxHealth: 500,
+        health: 1000,
+        maxHealth: 1000,
         isAir: true,
         isOffmapAircraft: true,
         isAI: isAiBomber,
