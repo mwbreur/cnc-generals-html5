@@ -1299,6 +1299,10 @@ function animate() {
             }
 
             if (s.dozerRef && s.dozerRef.health > 0) {
+                if (s.dozerRef.targetStructure !== s) {
+                    s.dozerRef = null;
+                    return;
+                }
                 const dPos = s.dozerRef.mesh.position;
                 const dist2D = Math.hypot(dPos.x - s.position.x, dPos.z - s.position.z);
                 const buildThreshold = s.radius + (s.dozerRef.radius || 1.8) + 3.5;
@@ -1550,8 +1554,10 @@ function animate() {
                 break;
             }
             unit.timerState = (unit.timerState || 0) + 1;
-            if (unit.timerState > 80) {
-                const loadCap = (unit.type === 'worker') ? 100 : (unit.type === 'chinook' ? 600 : 200);
+            const hasWorkerShoes = (unit.type === 'worker' && (unit.shoesApplied || (!isAIUnit && typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes'))));
+            const harvestTicks = hasWorkerShoes ? 55 : 80;
+            if (unit.timerState > harvestTicks) {
+                const loadCap = (unit.type === 'worker') ? (hasWorkerShoes ? 130 : 100) : (unit.type === 'chinook' ? 600 : 200);
                 unit.cargoLoaded = Math.min(loadCap, unit.supplyTarget.stock);
                 unit.supplyTarget.stock -= unit.cargoLoaded;
                 if (unit.supplyTarget.crystals && unit.supplyTarget.crystals.length > 0) {
@@ -1631,8 +1637,10 @@ function animate() {
             case 'Depositing':
             if (unit.type === 'chinook') unit.airState = 'hovering';
             unit.timerState = (unit.timerState || 0) + 1;
-            if (unit.timerState > 40) {
-                const baseEarned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? 100 : 200));
+            const hasShoesDeposit = (unit.type === 'worker' && (unit.shoesApplied || (!isAIUnit && typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes'))));
+            const depositTicks = hasShoesDeposit ? 28 : 40;
+            if (unit.timerState > depositTicks) {
+                const baseEarned = unit.cargoLoaded || (unit.type === 'chinook' ? 600 : (unit.type === 'worker' ? (hasShoesDeposit ? 130 : 100) : 200));
                 if (!isAIUnit && unit.teamId === (typeof playerTeamId !== 'undefined' ? playerTeamId : 1)) {
                     // USA Strategy Center "Supply Lines" upgrade: +10% bonus cash on every Supply Center delivery
                     const hasSupplyLines = (typeof researchedTechs !== 'undefined' && researchedTechs.has('supplyLines'));
@@ -1736,7 +1744,9 @@ function animate() {
         const mineDetMesh = getCachedNode(unit.mesh, 'mineDetector');
 
         const isCarrying = !!(unit.cargoLoaded > 0 || unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing');
-        const isBuildingOrRepairing = (unit.taskState === 'Building' || unit.taskState === 'Repairing');
+        const isMoving = !!(unit.waypoints && unit.waypoints.length > 0) ||
+            (unit.targetPosition && Math.hypot(unit.mesh.position.x - unit.targetPosition.x, unit.mesh.position.z - unit.targetPosition.z) > 1.2);
+        const isBuildingOrRepairing = !isMoving && (unit.taskState === 'Building' || unit.taskState === 'Repairing');
 
         let isDetectingMines = !!unit.isClearingMines;
         if (!isDetectingMines && !isCarrying && !isBuildingOrRepairing && typeof landmines !== 'undefined' && landmines.length > 0) {

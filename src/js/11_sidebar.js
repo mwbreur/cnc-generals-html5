@@ -3482,9 +3482,9 @@ function executeStructureUpgradeOrAction(upg, structure) {
         showNotification('Fortified Structures researched: GLA structures reinforced (+25% HP)!', 'success');
     } else if (upg.id === 'workerShoes') {
         units.filter(u => u.type === 'worker').forEach(u => {
-                if (!u.shoesApplied) { u.speed = (u.speed || 0.10) * 1.25; u.shoesApplied = true; }
+                if (!u.shoesApplied) { u.speed = (u.speed || 0.085) * 1.35; u.shoesApplied = true; }
         });
-        showNotification('Worker Shoes acquired: Worker movement speed increased by +25%!', 'success');
+        showNotification('Worker Shoes acquired: Worker speed +35%, carry capacity +30% ($130) & faster harvesting!', 'success');
     } else if (upg.id === 'nuclearTanks') {
         units.filter(u => u.type === 'battlemaster' || u.type === 'overlord').forEach(u => {
                 u.speed = (u.speed || 0.15) * 1.25;
@@ -4250,7 +4250,7 @@ function processBuildingFunctions() {
         }
         if (typeof researchedTechs !== 'undefined' && researchedTechs.has('workerShoes')) {
             units.filter(u => u.type === 'worker' && !u.shoesApplied).forEach(u => {
-                    u.speed = (u.speed || 0.10) * 1.25;
+                    u.speed = (u.speed || 0.085) * 1.35;
                     u.shoesApplied = true;
             });
         }
@@ -4388,7 +4388,7 @@ function spawnUnit(type, position = null, factionOverride = null) {
             speed *= 1.25;
         }
         if (researchedTechs.has('workerShoes') && type === 'worker') {
-            speed *= 1.25;
+            speed *= 1.35;
         }
     }
     const activeGen = (typeof window !== 'undefined' && window.selectedGeneral) ? window.selectedGeneral : spawnFaction;

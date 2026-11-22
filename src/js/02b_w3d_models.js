@@ -1049,6 +1049,18 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
             pitGlow.position.set(0, 10.5, 24.6);
             root.add(pitGlow);
         }
+    } else if (buildingKey === 'civilian_hangar_g') {
+        // Official CBTHanger1_G.W3D rest-pose pivot quaternions (without q, CYLINDER01 stands upright vertically instead of horizontal tunnel)
+        const cyl = root.getObjectByName('CYLINDER01');
+        if (cyl && cyl.quaternion && typeof cyl.quaternion.set === 'function') cyl.quaternion.set(0.5, -0.5, -0.5, 0.5);
+        const hc = root.getObjectByName('HOUSECOLOR');
+        if (hc && hc.quaternion && typeof hc.quaternion.set === 'function') hc.quaternion.set(0.5, -0.5, -0.5, 0.5);
+        ['BWRSM_DK', 'BWRSM_DK01'].forEach(n => {
+            const b = root.getObjectByName(n);
+            if (b) b.rotation.y = Math.PI;
+        });
+        const bLg = root.getObjectByName('BWRLG_DK');
+        if (bLg && bLg.quaternion && typeof bLg.quaternion.set === 'function') bLg.quaternion.set(0, -0.707107, 0, -0.707107);
     } else if (buildingKey === 'usa_commandCenter') {
         // Official EA Radar Lattice Tower + Spinning Parabolic Dish (ABBtCmdHQ_AC.W3D)
         if (window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['usa_commandCenter_radar']) {
