@@ -2280,9 +2280,9 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
     const gY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
     const center = new THREE.Vector3(pos.x, gY, pos.z);
     const isDaisyCutter = blastScale >= 1.15;
-    // Official INIZH.big FX_DaisyCutterExplode -> FX_DaisyCutterIgnite (+0.5s) -> FX_DaisyCutterFinalExplosion (+1.0s)
-    const dispersalTicks = isDaisyCutter ? 66 : 12;
-    const igniteFlashStart = isDaisyCutter ? 40 : 6;
+    // Official INIZH.big FX_DaisyCutterExplode -> FX_DaisyCutterIgnite -> FX_DaisyCutterFinalExplosion (slow, weighty thermobaric sequence)
+    const dispersalTicks = isDaisyCutter ? 115 : 22;
+    const igniteFlashStart = isDaisyCutter ? 74 : 12;
 
     const rootGrp = new THREE.Group();
     rootGrp.position.copy(center);
@@ -2384,11 +2384,11 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
             rootGrp.add(spr);
             fireWall.push({
                 mesh: spr,
-                vx: Math.cos(ang) * (isCore ? 0.14 : (0.36 + Math.random() * 0.24)) * blastScale,
-                vy: (isCore ? 0.22 : (0.10 + Math.random() * 0.14)) * blastScale,
-                vz: Math.sin(ang) * (isCore ? 0.14 : (0.36 + Math.random() * 0.24)) * blastScale,
+                vx: Math.cos(ang) * (isCore ? 0.08 : (0.21 + Math.random() * 0.14)) * blastScale,
+                vy: (isCore ? 0.13 : (0.06 + Math.random() * 0.08)) * blastScale,
+                vz: Math.sin(ang) * (isCore ? 0.08 : (0.21 + Math.random() * 0.14)) * blastScale,
                 baseScale: initS,
-                maxGrow: (isCore ? 12.0 : 9.5) * blastScale
+                maxGrow: (isCore ? 12.5 : 10.0) * blastScale
             });
         }
 
@@ -2441,7 +2441,7 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
                 isCap,
                 tx: Math.cos(ang) * capR,
                 tz: Math.sin(ang) * capR,
-                riseSpeed: (isCap ? 0.16 : 0.10) * blastScale * (0.85 + Math.random() * 0.35),
+                riseSpeed: (isCap ? 0.095 : 0.06) * blastScale * (0.85 + Math.random() * 0.35),
                 baseScale: (isCap ? 7.5 : 4.5) * blastScale * (0.85 + Math.random() * 0.4)
             });
         }
@@ -2452,7 +2452,7 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
         if (typeof spawnExplosionDebris === 'function') spawnExplosionDebris(center, isDaisyCutter ? 14 : 7, 1.5 * blastScale, false);
     };
 
-    const maxPostIgnite = isDaisyCutter ? 185 : 105;
+    const maxPostIgnite = isDaisyCutter ? 300 : 155;
     let totalTick = 0;
 
     const cleanup = () => {
@@ -2499,8 +2499,8 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
 
             igniteTick++;
 
-            // Roaring volumetric flame shockwave wall (0..52 ticks)
-            const wp = Math.min(1, igniteTick / 52);
+            // Roaring volumetric flame shockwave wall (0..96 ticks — slow, heavy thermobaric roll)
+            const wp = Math.min(1, igniteTick / 96);
             for (let i = 0; i < fireWall.length; i++) {
                 const fl = fireWall[i];
                 fl.mesh.position.x += fl.vx * (1 - wp * 0.65);
@@ -2511,9 +2511,9 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
                 fl.mesh.visible = wp < 1;
             }
 
-            // Wilson condensation pressure dome (0..38 ticks)
+            // Wilson condensation pressure dome (0..72 ticks)
             if (wilsonDome) {
-                const cp = Math.min(1, igniteTick / 38);
+                const cp = Math.min(1, igniteTick / 72);
                 const wScale = (5.0 + cp * 24.0) * blastScale;
                 wilsonDome.scale.set(wScale, wScale * 0.58, wScale);
                 wilsonDome.material.opacity = Math.max(0, (1 - cp) * 0.30);
@@ -2522,21 +2522,21 @@ function spawnFuelAirExplosion(pos, soundType = 'aurora_bomb', blastScale = 1.0,
 
             // Ground-hugging flame & supersonic Mach shockwave rings
             if (shockRing1) {
-                const sp1 = Math.min(1, igniteTick / 36);
+                const sp1 = Math.min(1, igniteTick / 66);
                 const s1 = (2.5 + sp1 * 26.0) * blastScale;
                 shockRing1.scale.set(s1, 1, s1);
                 shockRing1.material.opacity = Math.max(0, (1 - sp1) * 0.92);
                 shockRing1.visible = sp1 < 1;
             }
             if (shockRing2) {
-                const sp2 = Math.min(1, igniteTick / 28);
+                const sp2 = Math.min(1, igniteTick / 52);
                 const s2 = (3.0 + sp2 * 31.0) * blastScale;
                 shockRing2.scale.set(s2, 1, s2);
                 shockRing2.material.opacity = Math.max(0, (1 - sp2) * 0.72);
                 shockRing2.visible = sp2 < 1;
             }
             if (dustSkirt) {
-                const dp = Math.min(1, igniteTick / 62);
+                const dp = Math.min(1, igniteTick / 110);
                 const ds = (3.0 + dp * 22.0) * blastScale;
                 dustSkirt.scale.set(ds, 1 + dp * 2.2, ds);
                 dustSkirt.material.opacity = Math.max(0, (1 - dp) * 0.55);
@@ -4980,7 +4980,7 @@ function triggerC130FuelAirBomb(targetPos, pseudoAttacker) {
                     },
                     update() {
                         dropTick++;
-                        const dt = Math.min(1, dropTick / 68);
+                        const dt = Math.min(1, dropTick / 115);
                         canisterGrp.position.y = (flightY - 1.2) * (1 - dt) + (groundY + 0.6) * dt;
                         canisterGrp.rotation.y += 0.03;
                         if (dt < 1) return true;
