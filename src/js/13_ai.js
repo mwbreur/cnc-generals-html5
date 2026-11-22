@@ -3157,14 +3157,14 @@ function updateTurretSystems() {
     }
 }
 function updateTurretFor(unit) {
-    if (!unit.mesh) return;
+    if (!unit || !unit.mesh || unit.mesh.visible === false) return;
     const turret = getCachedNode(unit.mesh, "turretSystem");
     if (!turret) return;
 
     // 1. If actively engaged in combat, lock directly onto combat target!
     if (unit.combatTarget && unit.combatTarget.health > 0) {
         const tPos = unit.combatTarget.position || (unit.combatTarget.mesh ? unit.combatTarget.mesh.position : null);
-        if (tPos) {
+        if (tPos && turret.parent && typeof turret.parent.worldToLocal === 'function') {
             const localTarget = turret.parent.worldToLocal(_turretScratch.copy(tPos));
             const desiredAngle = Math.atan2(localTarget.x, localTarget.z);
             let diff = desiredAngle - turret.rotation.y;
@@ -3175,7 +3175,12 @@ function updateTurretFor(unit) {
         }
     }
 
-    // 2. Out of combat: gentle, slow, randomized observation sweeps
+    // 2. Out of combat: skip idle observation sweeps when far off-screen to save per-frame math in large battles
+    if (typeof camera !== 'undefined' && camera && camera.position) {
+        const dx = unit.mesh.position.x - camera.position.x;
+        const dz = unit.mesh.position.z - camera.position.z;
+        if (dx * dx + dz * dz > 260 * 260) return;
+    }
     if (!unit._idleTurretTimer || unit._idleTurretTimer <= 0) {
         unit._idleTurretTimer = 100 + Math.floor(Math.random() * 180); // Sweeps every 2-5 seconds
         // 65% chance forward (0 rad), 35% chance to sweep left or right
@@ -3238,7 +3243,24 @@ function updateHealthBars() {
             const vetRank = Math.min(3, Math.max(0, asset.veterancy || 0));
             if (!showHealthBar && vetRank === 0) continue;
 
+            // PERF: project & check onScreen BEFORE creating a DOM element for off-screen units
+            const position = _hbScratch.copy((asset.mesh || asset).position);
+            position.y += isStructure ? 7 : 3.5;
+            position.project(camera);
+            const onScreen = position.z >= -1 && position.z <= 1 &&
+                Math.abs(position.x) <= 1.1 && Math.abs(position.y) <= 1.1;
+
             let bar = healthBarElements.get(asset);
+            if (!onScreen) {
+                if (bar) {
+                    bar.seen = _hbFrame;
+                    if (bar.shown !== false) {
+                        bar.container.style.display = 'none';
+                        bar.shown = false;
+                    }
+                }
+                continue;
+            }
             if (!bar) {
                 const container = document.createElement('div');
                 container.className = 'hb-wrap';
@@ -3267,17 +3289,10 @@ function updateHealthBars() {
                 healthBarElements.set(asset, bar);
             }
             bar.seen = _hbFrame;
-
-            const position = _hbScratch.copy((asset.mesh || asset).position);
-            position.y += isStructure ? 7 : 3.5;
-            position.project(camera);
-            const onScreen = position.z >= -1 && position.z <= 1 &&
-            Math.abs(position.x) <= 1.1 && Math.abs(position.y) <= 1.1;
-            if (bar.shown !== onScreen) {
-                bar.container.style.display = onScreen ? 'flex' : 'none';
-                bar.shown = onScreen;
+            if (bar.shown !== true) {
+                bar.container.style.display = 'flex';
+                bar.shown = true;
             }
-            if (!onScreen) continue;
 
             const px = Math.round((position.x * 0.5 + 0.5) * w);
             const py = Math.round((-position.y * 0.5 + 0.5) * h);

@@ -64,7 +64,8 @@ function isTargetSpottedForUnit(unit, targetPos, targetRadius = 0) {
 window.isTargetSpottedForUnit = isTargetSpottedForUnit;
 
 let _combatScanTick = 0;
-function processOverlordGatlingTower(unit) {
+const _NON_COMBAT_SUPPORT_TYPES = new Set(['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker', 'pilot', 'drone_scout']);
+function processOverlordGatlingTower(unit, spatialMap = null, unitIndex = 0) {
     if (!unit || unit.type !== 'overlord' || unit.overlordUpgrade !== 'gatling' || unit.health <= 0 || !unit.mesh) return;
     if (unit.isUnmanned || (unit.disabledUntil && typeof buildingTick !== 'undefined' && buildingTick < unit.disabledUntil)) return;
     if (unit.overlordGatCooldown === undefined) unit.overlordGatCooldown = 0;
@@ -79,20 +80,32 @@ function processOverlordGatlingTower(unit) {
         return Math.hypot(unit.mesh.position.x - hPos.x, unit.mesh.position.z - hPos.z) <= gatRange + (h.radius || 0);
     };
     let bestTarget = isValidGatTarget(unit._overlordGatTarget) ? unit._overlordGatTarget : null;
-    if (!bestTarget) {
-        const hostiles = (unit.isEnemy || unit.isAI)
-            ? [...(typeof units !== 'undefined' ? units : []), ...(typeof structures !== 'undefined' ? structures : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])]
-            : [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+    if (!bestTarget && ((_combatScanTick + unitIndex) % 4 === 0)) {
         let bestScore = -Infinity;
-        for (let hi = 0; hi < hostiles.length; hi++) {
-            const h = hostiles[hi];
-            if (!isValidGatTarget(h)) continue;
-            const hPos = h.position || h.mesh.position;
-            const d = Math.hypot(unit.mesh.position.x - hPos.x, unit.mesh.position.z - hPos.z);
-            let score = 100 - d;
-            if (h.isAir) score += 60;
-            if (getArmorCategory(h) === 'infantry') score += 30;
-            if (score > bestScore) { bestScore = score; bestTarget = h; }
+        const considerList = (list) => {
+            if (!list) return;
+            for (let hi = 0; hi < list.length; hi++) {
+                const h = list[hi];
+                if (!isValidGatTarget(h)) continue;
+                const hPos = h.position || h.mesh.position;
+                const d = Math.hypot(unit.mesh.position.x - hPos.x, unit.mesh.position.z - hPos.z);
+                let score = 100 - d;
+                if (h.isAir) score += 60;
+                if (getArmorCategory(h) === 'infantry') score += 30;
+                if (score > bestScore) { bestScore = score; bestTarget = h; }
+            }
+        };
+        if (unit.isEnemy || unit.isAI) {
+            considerList(typeof units !== 'undefined' ? units : null);
+            considerList(typeof structures !== 'undefined' ? structures : null);
+            considerList(typeof enemyUnits !== 'undefined' ? enemyUnits : null);
+            considerList(typeof enemyStructures !== 'undefined' ? enemyStructures : null);
+        } else {
+            const candUnits = spatialMap
+                ? _queryCombatSpatialMap(spatialMap, unit.mesh.position.x, unit.mesh.position.z, gatRange + 8)
+                : (typeof enemyUnits !== 'undefined' ? enemyUnits : null);
+            considerList(candUnits);
+            considerList(typeof enemyStructures !== 'undefined' ? enemyStructures : null);
         }
         unit._overlordGatTarget = bestTarget;
     }
@@ -182,14 +195,19 @@ function _queryCombatSpatialMap(map, x, z, range) {
 
 function processCombatScanning() {
     _combatScanTick++;
-    const enemySpatialMap = (typeof enemyUnits !== 'undefined' && enemyUnits.length > 24)
+    const enemyCount = (typeof enemyUnits !== 'undefined') ? enemyUnits.length : 0;
+    const totalCombatUnits = units.length + enemyCount;
+    // PERF: dynamic scan staggering scales smoothly for 200+ unit battles (~20-25 scans/frame max)
+    const dynMovingMod = totalCombatUnits > 80 ? Math.min(8, Math.ceil(totalCombatUnits / 25)) : 2;
+    const dynIdleMod = totalCombatUnits > 80 ? Math.min(12, Math.ceil(totalCombatUnits / 18)) : 4;
+    const enemySpatialMap = (enemyCount > 24)
         ? _buildCombatSpatialMap(enemyUnits)
         : null;
-    if (typeof enemyUnits !== 'undefined' && enemyUnits.length > 0) {
+    if (enemyCount > 0) {
         for (let ei = 0; ei < enemyUnits.length; ei++) {
             const eu = enemyUnits[ei];
             if (eu && eu.type === 'overlord' && eu.overlordUpgrade === 'gatling') {
-                processOverlordGatlingTower(eu);
+                processOverlordGatlingTower(eu, null, ei);
             }
         }
     }
@@ -222,17 +240,29 @@ function processCombatScanning() {
                     !canUnitTarget(unit, unit.combatTarget) ||
                     distToHostile(unit.combatTarget) > baseGarrisonRange + (unit.combatTarget.radius || 0)) {
                     unit.combatTarget = null;
-                    const hostiles = [...(typeof enemyUnits !== 'undefined' ? enemyUnits : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
-                    let bestGTarget = null, bestGD = Infinity;
-                    for (let hi = 0; hi < hostiles.length; hi++) {
-                        const h = hostiles[hi];
-                        if (!h || h.health <= 0 || isFriendly(unit, h)) continue;
-                        if (!canUnitTarget(unit, h)) continue;
-                        const d = distToHostile(h);
-                        const maxD = baseGarrisonRange + (h.radius || 0);
-                        if (d <= maxD && d < bestGD) { bestGD = d; bestGTarget = h; }
+                    if ((_combatScanTick + ui) % 3 === 0) {
+                        let bestGTarget = null, bestGD = Infinity;
+                        const candUnits = enemySpatialMap
+                            ? _queryCombatSpatialMap(enemySpatialMap, trPos.x, trPos.z, baseGarrisonRange + 8)
+                            : (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
+                        for (let hi = 0; hi < candUnits.length; hi++) {
+                            const h = candUnits[hi];
+                            if (!h || h.health <= 0 || isFriendly(unit, h) || !canUnitTarget(unit, h)) continue;
+                            const d = distToHostile(h);
+                            const maxD = baseGarrisonRange + (h.radius || 0);
+                            if (d <= maxD && d < bestGD) { bestGD = d; bestGTarget = h; }
+                        }
+                        if (!bestGTarget && typeof enemyStructures !== 'undefined') {
+                            for (let hi = 0; hi < enemyStructures.length; hi++) {
+                                const h = enemyStructures[hi];
+                                if (!h || h.health <= 0 || isFriendly(unit, h) || !canUnitTarget(unit, h)) continue;
+                                const d = distToHostile(h);
+                                const maxD = baseGarrisonRange + (h.radius || 0);
+                                if (d <= maxD && d < bestGD) { bestGD = d; bestGTarget = h; }
+                            }
+                        }
+                        if (bestGTarget) unit.combatTarget = bestGTarget;
                     }
-                    if (bestGTarget) unit.combatTarget = bestGTarget;
                 }
             }
             // Manage weapon assembly cooldown timers
@@ -289,7 +319,7 @@ function processCombatScanning() {
 
             // Autonomous Overlord Roof Gatling Cannon (Anti-Air & Anti-Infantry) — continuous fire until target destroyed/gone
             if (unit.type === 'overlord' && unit.overlordUpgrade === 'gatling' && unit.health > 0) {
-                processOverlordGatlingTower(unit);
+                processOverlordGatlingTower(unit, enemySpatialMap, ui);
             }
 
             // If combat target is friendly ally, clear immediately
@@ -298,9 +328,9 @@ function processCombatScanning() {
             }
 
             // Auto-Scan while Idle or Moving (Fire-on-the-move: engage nearest hostile in range without stopping)
-            // PERF: staggered every 2 frames when moving (4 when idle) using squared horizontal distance
-            const isNonCombatSupport = ['chinook', 'truck', 'worker', 'dozer', 'ambulance', 'radarvan', 'crawler', 'blacklotus', 'hijacker', 'pilot', 'drone_scout'].includes(unit.type);
-            const scanMod = (unit.taskState === 'Moving') ? 2 : 4;
+            // PERF: dynamically staggered by army size using squared horizontal distance + spatial grid
+            const isNonCombatSupport = _NON_COMBAT_SUPPORT_TYPES.has(unit.type);
+            const scanMod = (unit.taskState === 'Moving') ? dynMovingMod : dynIdleMod;
             if (!unit.combatTarget && ((_combatScanTick + ui) % scanMod === 0) && !isNonCombatSupport) {
                 if (!(unit.isAir && unit.taskState === 'Moving')) {
                     const uPos = unit.mesh.position;
