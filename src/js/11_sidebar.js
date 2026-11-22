@@ -2823,8 +2823,17 @@ window.addEventListener('keydown', e => {
             }
         }
 
-        // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all / toggle menu
+        // 1. ESCAPE: Universal cancel blueprint / superweapon / deselect all / toggle in-game menu
         if (e.key === 'Escape' || k === 'escape') {
+            const optModal = document.getElementById('zh-options-modal');
+            if (optModal && !optModal.hidden) {
+                closeOptionsModal();
+                return;
+            }
+            // Never open the in-game pause/options menu or hide the main menu when not in an active match
+            if ((typeof document !== 'undefined' && document.body && document.body.classList.contains('in-main-menu')) || (typeof isMatchActive !== 'undefined' && !isMatchActive)) {
+                return;
+            }
             const menu = document.getElementById('start-menu');
             if (menu && menu.style.display !== 'none') {
                 resumeGame();
