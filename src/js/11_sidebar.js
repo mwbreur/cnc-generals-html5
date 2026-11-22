@@ -4342,7 +4342,8 @@ function spawnUnit(type, position = null, factionOverride = null) {
         speed *= 1.25;
     }
 
-    const myNetId = (isMultiplayerActive ? (isMultiplayerHost ? 'H_' : 'C_') : 'P_') + (++netIdSequence);
+    const mpUnitPrefix = (typeof myMpSlotId === 'number' && myMpSlotId > 2) ? ('P' + myMpSlotId + '_') : (isMultiplayerHost ? 'H_' : 'C_');
+    const myNetId = (isMultiplayerActive ? mpUnitPrefix : 'P_') + (++netIdSequence);
     const isGatherer = (type === 'truck' || type === 'worker' || type === 'chinook');
     const isNaturalStealth = ['pathfinder', 'stealthfighter', 'burton', 'jarmen', 'blacklotus', 'hijacker', 'drone_scout'].includes(type) ||
     (type === 'comanche' && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche'));

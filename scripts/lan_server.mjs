@@ -84,31 +84,39 @@ function sendWsJson(client, obj) {
     }
 }
 
-// Room registry: roomCode -> { host: client, guest: client | null, ... }
+// Room registry: roomCode -> { host: client, guests: Map<peerId, client>, ... }
 const rooms = new Map();
 const activeWsClients = new Set();
 const MAX_WS_CLIENTS = 64;
+const MAX_ROOM_PLAYERS = 8; // Supports up to 4v4 (1 host + 7 guests)
 const WS_IDLE_TIMEOUT_MS = 180000;
 const ROOM_CODE_RE = /^[A-Z0-9-]{1,32}$/;
+let _lanPeerSeq = 0;
 
 function leaveCurrentRoom(client) {
     const roomCode = client.roomCode;
     if (!roomCode) return;
     client.roomCode = null;
     client.role = null;
+    const peerId = client.peerId || null;
+    client.peerId = null;
     const room = rooms.get(roomCode);
     if (!room) return;
     if (room.host === client) {
-        if (room.guest && !room.guest.closed) {
-            sendWsJson(room.guest, { _lan: 'peer_disconnected', reason: 'host_left' });
-            room.guest.roomCode = null;
-            room.guest.role = null;
+        for (const guest of room.guests.values()) {
+            if (guest && !guest.closed) {
+                sendWsJson(guest, { _lan: 'peer_disconnected', reason: 'host_left' });
+                guest.roomCode = null;
+                guest.role = null;
+                guest.peerId = null;
+            }
         }
+        room.guests.clear();
         rooms.delete(roomCode);
-    } else if (room.guest === client) {
-        room.guest = null;
+    } else if (peerId && room.guests.get(peerId) === client) {
+        room.guests.delete(peerId);
         if (room.host && !room.host.closed) {
-            sendWsJson(room.host, { _lan: 'peer_disconnected', reason: 'guest_left' });
+            sendWsJson(room.host, { _lan: 'peer_disconnected', peerId, reason: 'guest_left' });
         }
     }
 }
@@ -150,9 +158,10 @@ function handleWsMessage(client, text) {
         }
         client.roomCode = roomCode;
         client.role = 'host';
+        client.peerId = 'host';
         rooms.set(roomCode, {
             host: client,
-            guest: null,
+            guests: new Map(),
             hostFaction: String(msg.hostFaction || 'usa').slice(0, 16),
             mapName: String(msg.mapName || 'Tournament Desert').slice(0, 48),
             createdAt: Date.now()
@@ -182,24 +191,42 @@ function handleWsMessage(client, text) {
             sendWsJson(client, { _lan: 'error', message: `Room ${roomCode} not found on LAN server.` });
             return;
         }
-        if (room.guest && !room.guest.closed) {
-            sendWsJson(client, { _lan: 'error', message: `Room ${roomCode} is already full.` });
+        // Purge any closed guest sockets before checking 8-player capacity
+        for (const [gid, g] of room.guests.entries()) {
+            if (!g || g.closed) room.guests.delete(gid);
+        }
+        if (room.guests.size >= MAX_ROOM_PLAYERS - 1) {
+            sendWsJson(client, { _lan: 'error', message: `Room ${roomCode} is already full (${MAX_ROOM_PLAYERS}/${MAX_ROOM_PLAYERS}).` });
             return;
         }
+        const peerId = 'lan_' + (++_lanPeerSeq);
         client.roomCode = roomCode;
         client.role = 'guest';
-        room.guest = client;
-        sendWsJson(client, { _lan: 'joined', room: roomCode });
-        sendWsJson(room.host, { _lan: 'peer_connected', room: roomCode });
+        client.peerId = peerId;
+        room.guests.set(peerId, client);
+        sendWsJson(client, { _lan: 'joined', room: roomCode, peerId });
+        sendWsJson(room.host, { _lan: 'peer_connected', room: roomCode, peerId });
         return;
     }
 
     if (msg._lan === 'data') {
         const room = client.roomCode ? rooms.get(client.roomCode) : null;
         if (!room) return;
-        const peer = (room.host === client) ? room.guest : room.host;
-        if (peer && !peer.closed) {
-            sendWsJson(peer, { _lan: 'data', payload: msg.payload });
+        if (room.host === client) {
+            if (msg.toPeerId) {
+                const target = room.guests.get(String(msg.toPeerId));
+                if (target && !target.closed) {
+                    sendWsJson(target, { _lan: 'data', payload: msg.payload });
+                }
+            } else {
+                for (const guest of room.guests.values()) {
+                    if (guest && !guest.closed) {
+                        sendWsJson(guest, { _lan: 'data', payload: msg.payload });
+                    }
+                }
+            }
+        } else if (room.host && !room.host.closed) {
+            sendWsJson(room.host, { _lan: 'data', fromPeerId: client.peerId, payload: msg.payload });
         }
     }
 }
@@ -401,14 +428,18 @@ const server = http.createServer((req, res) => {
         const list = [];
         for (const [code, room] of rooms.entries()) {
             if (!room.host || room.host.closed) continue;
-            const hasGuest = Boolean(room.guest && !room.guest.closed);
+            let activeGuests = 0;
+            for (const g of room.guests.values()) {
+                if (g && !g.closed) activeGuests++;
+            }
+            const totalPlayers = 1 + activeGuests;
             list.push({
                 room: code,
                 hostFaction: room.hostFaction || 'usa',
                 mapName: room.mapName || 'Tournament Desert',
-                players: hasGuest ? 2 : 1,
-                maxPlayers: 2,
-                open: !hasGuest
+                players: totalPlayers,
+                maxPlayers: MAX_ROOM_PLAYERS,
+                open: totalPlayers < MAX_ROOM_PLAYERS
             });
         }
         res.writeHead(200, {

@@ -4,11 +4,15 @@ let isMultiplayerActive = false;
 let isMultiplayerHost = false;
 let netPeer = null;
 let netConn = null;
+const netPeerConns = new Map(); // Host hub-and-spoke registry: peerId -> { conn, slotId, cmdSeq, budget, budgetLastMs, faction }
+let myMpSlotId = 1;
+let myMpPeerId = 'host';
 let currentRoomCode = '';
 let mpOpponentFaction = 'china';
 let netIdSequence = 100;
 
 const MP_PROTOCOL_VERSION = 2;
+const MP_MAX_HUMANS = 8; // Full 4v4 support (1 host + up to 7 remote human peers)
 const MP_ALLOWED_FACTIONS = new Set(['usa', 'china', 'gla', 'random']);
 const MP_COMMAND_PACKET_TYPES = new Set(['move_units', 'attack_target', 'spawn_unit', 'build_structure']);
 let _mpTxSeq = 0;
@@ -25,6 +29,15 @@ const MP_MAX_ENTITY_SAMPLES = 5;
 let _mpStateSyncCount = 0;
 const _mpLastUnitSnapMap = new Map();
 const _mpLastStructSnapMap = new Map();
+
+function hasOpenMpPeers() {
+    if (isMultiplayerHost && netPeerConns.size > 0) {
+        for (const entry of netPeerConns.values()) {
+            if (entry && entry.conn && entry.conn.open) return true;
+        }
+    }
+    return Boolean(netConn && netConn.open);
+}
 
 function generateRoomToken(length = 6) {
     const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Unambiguous uppercase alphanumeric (32 chars)
@@ -53,6 +66,13 @@ function resetMultiplayerTransportState() {
 }
 
 function cleanupPeerSession() {
+    for (const entry of netPeerConns.values()) {
+        if (entry && entry.conn) {
+            try { if (typeof entry.conn.removeAllListeners === 'function') entry.conn.removeAllListeners(); } catch (e) {}
+            try { entry.conn.close(); } catch (e) {}
+        }
+    }
+    netPeerConns.clear();
     if (netConn) {
         try { if (typeof netConn.removeAllListeners === 'function') netConn.removeAllListeners(); } catch (e) {}
         try { netConn.close(); } catch (e) {}
@@ -63,6 +83,16 @@ function cleanupPeerSession() {
         try { netPeer.destroy(); } catch (e) {}
         netPeer = null;
     }
+    if (Array.isArray(mpSlots)) {
+        mpSlots.forEach((s, idx) => {
+            if (s && idx > 0) {
+                delete s.peerId;
+                if (idx > 1) s.isHuman = false;
+            }
+        });
+    }
+    myMpSlotId = 1;
+    myMpPeerId = 'host';
     resetMultiplayerTransportState();
 }
 window.cleanupPeerSession = cleanupPeerSession;
@@ -263,25 +293,29 @@ function detectLanServer() {
     return _lanServerProbePromise;
 }
 
-function createLanRelayConnection(ws) {
+function createLanRelayConnection(ws, toPeerId = null) {
     const handlers = { data: [], close: [], open: [] };
     const conn = {
         open: ws.readyState === 1,
         isLanRelay: true,
+        peer: toPeerId || 'lan_host',
         on(event, fn) {
             if (handlers[event]) handlers[event].push(fn);
         },
         send(payload) {
             if (!conn.open || ws.readyState !== 1) return;
             try {
-                ws.send(JSON.stringify({ _lan: 'data', payload }));
+                const msg = toPeerId ? { _lan: 'data', toPeerId, payload } : { _lan: 'data', payload };
+                ws.send(JSON.stringify(msg));
             } catch (err) {
                 console.warn('LAN relay send error:', err);
             }
         },
         close() {
             conn.open = false;
-            try { ws.close(); } catch (_) {}
+            if (!toPeerId) {
+                try { ws.close(); } catch (_) {}
+            }
         },
         _emit(event, arg) {
             if (event === 'close') conn.open = false;
@@ -291,6 +325,78 @@ function createLanRelayConnection(ws) {
         }
     };
     return conn;
+}
+
+function updateHostLobbyPeerStatus(isLan = false) {
+    const statusEl = document.getElementById('mp-host-status');
+    const launchBtn = document.getElementById('mp-launch-btn');
+    const guestCount = netPeerConns.size;
+    const totalHumans = 1 + guestCount;
+    const prefix = isLan ? '<strong>[LAN]</strong> ' : '';
+    if (statusEl) {
+        if (guestCount > 0) {
+            statusEl.innerHTML = `🟢 ${prefix}<strong>${guestCount === 1 ? 'CHALLENGER' : (guestCount + ' CHALLENGERS')} CONNECTED!</strong> (${totalHumans}/${MP_MAX_HUMANS} players ready). Click "LAUNCH MULTIPLAYER BATTLE" to deploy.`;
+        } else {
+            statusEl.innerHTML = `🟢 ${prefix}Room <strong>${escapeHtml(currentRoomCode)}</strong> created (1/${MP_MAX_HUMANS} players). Share this code with challengers and wait for connection.`;
+        }
+    }
+    if (launchBtn) {
+        launchBtn.disabled = guestCount === 0;
+        launchBtn.style.opacity = guestCount > 0 ? '1' : '0.5';
+        launchBtn.style.cursor = guestCount > 0 ? 'pointer' : 'not-allowed';
+        if (guestCount > 0) {
+            launchBtn.style.borderColor = '#55efc4';
+            launchBtn.style.color = '#55efc4';
+        }
+    }
+    if (typeof renderSlotsUI === 'function' && currentStartMenuMode === 'multiplayer') {
+        renderSlotsUI('multiplayer');
+    }
+}
+
+function registerHostPeerConnection(peerId, conn, isLan = false) {
+    if (!peerId || !conn) return false;
+    if (netPeerConns.size >= MP_MAX_HUMANS - 1) {
+        try { conn.send({ type: 'host_left', message: `Lobby is full (${MP_MAX_HUMANS}/${MP_MAX_HUMANS} players).`, v: MP_PROTOCOL_VERSION }); } catch (_) {}
+        try { conn.close(); } catch (_) {}
+        return false;
+    }
+    let assignedSlot = null;
+    if (Array.isArray(mpSlots)) {
+        // 1. Prefer an open human slot without a bound peer (e.g. default Slot 2 Challenger)
+        assignedSlot = mpSlots.find((s, idx) => idx > 0 && s && s.isHuman && !s.peerId);
+        // 2. Otherwise claim the first inactive slot (slots 3..8 for 2v2 / 3v3 / 4v4)
+        if (!assignedSlot) assignedSlot = mpSlots.find((s, idx) => idx > 0 && s && !s.active && !s.peerId);
+        // 3. Otherwise convert an AI slot to human
+        if (!assignedSlot) assignedSlot = mpSlots.find((s, idx) => idx > 0 && s && !s.isHost && !s.peerId);
+        if (assignedSlot) {
+            assignedSlot.active = true;
+            assignedSlot.isHuman = true;
+            assignedSlot.peerId = peerId;
+            assignedSlot.name = assignedSlot.id === 2 ? 'Challenger' : `Player ${assignedSlot.id}`;
+        }
+    }
+    const slotId = assignedSlot ? assignedSlot.id : (2 + netPeerConns.size);
+    netPeerConns.set(peerId, {
+        conn,
+        slotId,
+        cmdSeq: 0,
+        budget: 12500,
+        budgetLastMs: Date.now(),
+        faction: (assignedSlot && assignedSlot.faction) || 'china',
+        isLan
+    });
+    netConn = conn;
+    setupNetDataConnection(conn, peerId);
+    updateHostLobbyPeerStatus(isLan);
+    if (conn.open) {
+        syncMpLobbyToPeer();
+    } else if (typeof conn.on === 'function') {
+        conn.on('open', () => {
+            syncMpLobbyToPeer();
+        });
+    }
+    return true;
 }
 
 let _lanLobbyPollTimer = null;
@@ -376,7 +482,6 @@ window.refreshLanRooms = refreshLanRooms;
 function initHostPeerLan(lanInfo, statusEl) {
     try {
         const ws = new WebSocket(lanInfo.wsUrl);
-        let activeConn = null;
         netPeer = {
             destroy() {
                 try { ws.close(); } catch (_) {}
@@ -400,29 +505,28 @@ function initHostPeerLan(lanInfo, statusEl) {
             if (!msg || typeof msg !== 'object') return;
             if (msg._lan === 'hosted') {
                 isMultiplayerHost = true;
-                if (statusEl) {
-                    statusEl.innerHTML = `🟢 <strong>[LAN]</strong> Room <strong>${escapeHtml(currentRoomCode)}</strong> created. Share this code with your LAN challenger and wait for connection.`;
-                }
+                myMpSlotId = 1;
+                myMpPeerId = 'host';
+                updateHostLobbyPeerStatus(true);
             } else if (msg._lan === 'peer_connected') {
-                activeConn = createLanRelayConnection(ws);
-                activeConn.open = true;
-                netConn = activeConn;
-                setupNetDataConnection(activeConn);
-                if (statusEl) {
-                    statusEl.innerHTML = `🟢 <strong>[LAN] CHALLENGER CONNECTED!</strong> Opponent ready. Click "LAUNCH MULTIPLAYER BATTLE" to deploy.`;
+                const pid = String(msg.peerId || ('lan_' + (++netIdSequence)));
+                const peerConn = createLanRelayConnection(ws, pid);
+                peerConn.open = true;
+                registerHostPeerConnection(pid, peerConn, true);
+            } else if (msg._lan === 'data') {
+                const fromPid = msg.fromPeerId ? String(msg.fromPeerId) : null;
+                const entry = fromPid ? netPeerConns.get(fromPid) : null;
+                if (entry && entry.conn) {
+                    entry.conn._emit('data', msg.payload);
+                } else if (netConn && typeof netConn._emit === 'function') {
+                    netConn._emit('data', msg.payload);
                 }
-                const launchBtn = document.getElementById('mp-launch-btn');
-                if (launchBtn) {
-                    launchBtn.disabled = false;
-                    launchBtn.style.opacity = '1';
-                    launchBtn.style.cursor = 'pointer';
-                    launchBtn.style.borderColor = '#55efc4';
-                    launchBtn.style.color = '#55efc4';
+            } else if (msg._lan === 'peer_disconnected') {
+                const pid = msg.peerId ? String(msg.peerId) : null;
+                const entry = pid ? netPeerConns.get(pid) : null;
+                if (entry && entry.conn) {
+                    entry.conn._emit('close');
                 }
-            } else if (msg._lan === 'data' && activeConn) {
-                activeConn._emit('data', msg.payload);
-            } else if (msg._lan === 'peer_disconnected' && activeConn) {
-                activeConn._emit('close');
             } else if (msg._lan === 'error') {
                 if (msg.code === 'unavailable-id') {
                     setTimeout(initHostPeer, 500);
@@ -432,7 +536,9 @@ function initHostPeerLan(lanInfo, statusEl) {
             }
         };
         ws.onclose = () => {
-            if (activeConn) activeConn._emit('close');
+            for (const entry of Array.from(netPeerConns.values())) {
+                if (entry && entry.conn) entry.conn._emit('close');
+            }
         };
         ws.onerror = () => {
             if (statusEl) statusEl.innerHTML = '<span style="color:#ff4757;">Failed to connect to local LAN server.</span>';
@@ -460,17 +566,19 @@ function joinConnectToHostLan(lanInfo, statusEl) {
             try { msg = JSON.parse(ev.data); } catch (_) { return; }
             if (!msg || typeof msg !== 'object') return;
             if (msg._lan === 'joined') {
-                activeConn = createLanRelayConnection(ws);
+                myMpPeerId = String(msg.peerId || ('lan_' + (++netIdSequence)));
+                activeConn = createLanRelayConnection(ws, null);
                 activeConn.open = true;
                 netConn = activeConn;
-                setupNetDataConnection(activeConn);
+                setupNetDataConnection(activeConn, 'host');
                 isMultiplayerHost = false;
                 if (statusEl) {
                     statusEl.innerHTML = `🟢 <strong>[LAN] CONNECTED TO HOST!</strong> Waiting for host to launch the battle...`;
                 }
                 broadcastNetPacket({
                     type: 'handshake',
-                    clientFaction: selectedFaction
+                    clientFaction: selectedFaction,
+                    peerId: myMpPeerId
                 });
             } else if (msg._lan === 'data' && activeConn) {
                 activeConn._emit('data', msg.payload);
@@ -522,25 +630,14 @@ function initHostPeer() {
 
             netPeer.on('open', (id) => {
                     isMultiplayerHost = true;
-                    if (statusEl) {
-                        statusEl.innerHTML = `🟢 Room <strong>${currentRoomCode}</strong> created. Share this code with your challenger and wait for connection.`;
-                    }
+                    myMpSlotId = 1;
+                    myMpPeerId = id || 'host';
+                    updateHostLobbyPeerStatus(false);
             });
 
             netPeer.on('connection', (conn) => {
-                    netConn = conn;
-                    setupNetDataConnection(conn);
-                    if (statusEl) {
-                        statusEl.innerHTML = `🟢 <strong>CHALLENGER CONNECTED!</strong> Opponent ready. Click "LAUNCH MULTIPLAYER BATTLE" to deploy.`;
-                    }
-                    const launchBtn = document.getElementById('mp-launch-btn');
-                    if (launchBtn) {
-                        launchBtn.disabled = false;
-                        launchBtn.style.opacity = '1';
-                        launchBtn.style.cursor = 'pointer';
-                        launchBtn.style.borderColor = '#55efc4';
-                        launchBtn.style.color = '#55efc4';
-                    }
+                    const pid = String((conn && conn.peer) || ('p_' + (++netIdSequence)));
+                    registerHostPeerConnection(pid, conn, false);
             });
 
             netPeer.on('error', (err) => {
@@ -593,8 +690,9 @@ function joinConnectToHost() {
             netPeer = new Peer({ debug: 1 });
 
             netPeer.on('open', (myId) => {
+                    myMpPeerId = String(myId || ('p_' + (++netIdSequence)));
                     netConn = netPeer.connect(targetPeerId, { reliable: true });
-                    setupNetDataConnection(netConn);
+                    setupNetDataConnection(netConn, 'host');
 
                     netConn.on('open', () => {
                             isMultiplayerHost = false;
@@ -603,7 +701,8 @@ function joinConnectToHost() {
                             }
                             broadcastNetPacket({
                                     type: 'handshake',
-                                    clientFaction: selectedFaction
+                                    clientFaction: selectedFaction,
+                                    peerId: myMpPeerId
                             });
                     });
             });
@@ -622,18 +721,40 @@ function joinConnectToHost() {
 }
 
 // --- DATA CHANNEL PACKET HANDLERS ---
-function setupNetDataConnection(conn) {
+function setupNetDataConnection(conn, peerId = null) {
     conn.on('data', (packet) => {
-            handleNetworkPacket(packet);
+            handleNetworkPacket(packet, peerId);
     });
 
     conn.on('close', () => {
             if (!isMultiplayerHost && isMultiplayerActive) {
                 onHostDisconnected("The host commander has disconnected and terminated the session.");
-            } else if (isMultiplayerHost && isMultiplayerActive) {
-                showNotification("Challenger disconnected from the match.", "error");
-                const badge = document.getElementById('mp-status-badge');
-                if (badge) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
+            } else if (isMultiplayerHost) {
+                const entry = peerId ? netPeerConns.get(peerId) : null;
+                const wasLan = Boolean(entry && entry.isLan);
+                if (peerId) netPeerConns.delete(peerId);
+                if (netConn === conn) {
+                    const nextEntry = netPeerConns.values().next().value;
+                    netConn = nextEntry ? nextEntry.conn : null;
+                }
+                if (entry && !isMultiplayerActive && Array.isArray(mpSlots)) {
+                    const freed = mpSlots.find(s => s && s.id === entry.slotId);
+                    if (freed) {
+                        delete freed.peerId;
+                        if (freed.id > 2) {
+                            freed.isHuman = false;
+                            freed.active = false;
+                            freed.name = `AI Slot ${freed.id}`;
+                        }
+                    }
+                    updateHostLobbyPeerStatus(wasLan);
+                    syncMpLobbyToPeer();
+                } else if (isMultiplayerActive) {
+                    const label = entry ? `Player ${entry.slotId}` : 'Challenger';
+                    showNotification(`${label} disconnected from the match.`, "error");
+                    const badge = document.getElementById('mp-status-badge');
+                    if (badge && netPeerConns.size === 0) badge.innerHTML = '🔴 ALL CHALLENGERS DISCONNECTED';
+                }
             }
     });
 }
@@ -676,6 +797,7 @@ function sanitizeMpSlots(rawSlots) {
             active: Boolean(s.active),
             isHost: Boolean(s.isHost),
             isHuman: Boolean(s.isHuman),
+            ...(typeof s.peerId === 'string' && s.peerId.length <= 64 ? { peerId: s.peerId } : {}),
             color: (typeof s.color === 'string' && /^[a-z0-9#_-]{1,20}$/i.test(s.color)) ? s.color : (i === 0 ? 'blue' : 'red'),
             difficulty: (typeof s.difficulty === 'string' && ['easy', 'medium', 'hard'].includes(s.difficulty)) ? s.difficulty : 'medium'
         });
@@ -715,15 +837,25 @@ function resolveConcreteMpFaction(rawFaction, seed, slotIndex = 0) {
     return pool[idx];
 }
 
-function consumeMpPeerBudget(cost) {
+function consumeMpPeerBudget(cost, peerEntry = null) {
     const now = Date.now();
+    const safeCost = Math.max(0, Number(cost) || 0);
+    if (peerEntry) {
+        if (peerEntry.budgetLastMs > 0) {
+            const elapsedSec = Math.max(0, Math.min(30, (now - peerEntry.budgetLastMs) / 1000));
+            peerEntry.budget = Math.min(35000, peerEntry.budget + elapsedSec * 280);
+        }
+        peerEntry.budgetLastMs = now;
+        if (peerEntry.budget < safeCost) return false;
+        peerEntry.budget -= safeCost;
+        return true;
+    }
     if (_mpPeerBudgetLastMs > 0) {
         const elapsedSec = Math.max(0, Math.min(30, (now - _mpPeerBudgetLastMs) / 1000));
         // Generous upper bound for peer economy income (harvesters + secondary economy) to prevent false positives while blocking spam/free superweapons
         _mpPeerBudget = Math.min(35000, _mpPeerBudget + elapsedSec * 280);
     }
     _mpPeerBudgetLastMs = now;
-    const safeCost = Math.max(0, Number(cost) || 0);
     if (_mpPeerBudget < safeCost) return false;
     _mpPeerBudget -= safeCost;
     return true;
@@ -765,12 +897,12 @@ function renderClientSlotsList(slots) {
 }
 
 function syncMpLobbyToPeer() {
-    if (!netConn || !netConn.open) return;
+    if (!hasOpenMpPeers()) return;
     const moneyEl = document.getElementById('mp-starting-money');
     const unitsEl = document.getElementById('mp-starting-units');
     const envEl = document.getElementById('mp-map-env');
     const sizeEl = document.getElementById('mp-map-size');
-    broadcastNetPacket({
+    const basePayload = {
             type: 'lobby_sync',
             slots: mpSlots,
             startingMoney: moneyEl ? parseInt(moneyEl.value, 10) : 10000,
@@ -778,33 +910,56 @@ function syncMpLobbyToPeer() {
             mapEnv: envEl ? envEl.value : 'desert',
             mapSize: sizeEl ? parseInt(sizeEl.value, 10) : 1500,
             customMapData: activeCustomMap ? activeCustomMap : null
-    });
-}
-
-function broadcastNetPacket(packet) {
-    if (netConn && netConn.open && packet && typeof packet === 'object') {
-        try {
-            packet.v = MP_PROTOCOL_VERSION;
-            packet.seq = ++_mpTxSeq;
-            if (MP_COMMAND_PACKET_TYPES.has(packet.type)) {
-                packet.cmdSeq = ++_mpCmdTxSeq;
+    };
+    if (isMultiplayerHost && netPeerConns.size > 0) {
+        for (const [pid, entry] of netPeerConns.entries()) {
+            if (entry && entry.conn && entry.conn.open) {
+                broadcastNetPacket(Object.assign({}, basePayload, { assignedSlotId: entry.slotId }), null, pid);
             }
-            packet.ts = Math.round(typeof performance !== 'undefined' ? performance.now() : Date.now());
-            netConn.send(packet);
-        } catch (e) {
-            console.error('Packet broadcast error:', e);
         }
+    } else {
+        broadcastNetPacket(basePayload);
     }
 }
 
-function handleNetworkPacket(packet) {
-    // 1. Per-second token-bucket rate limiter
+function broadcastNetPacket(packet, excludePeerId = null, targetPeerId = null) {
+    if (!packet || typeof packet !== 'object') return;
+    try {
+        packet.v = MP_PROTOCOL_VERSION;
+        packet.seq = ++_mpTxSeq;
+        if (MP_COMMAND_PACKET_TYPES.has(packet.type)) {
+            packet.cmdSeq = ++_mpCmdTxSeq;
+        }
+        packet.ts = Math.round(typeof performance !== 'undefined' ? performance.now() : Date.now());
+        if (isMultiplayerHost && netPeerConns.size > 0) {
+            if (targetPeerId) {
+                const entry = netPeerConns.get(targetPeerId);
+                if (entry && entry.conn && entry.conn.open) entry.conn.send(packet);
+                return;
+            }
+            for (const [pid, entry] of netPeerConns.entries()) {
+                if (excludePeerId && pid === excludePeerId) continue;
+                if (entry && entry.conn && entry.conn.open) {
+                    entry.conn.send(packet);
+                }
+            }
+        } else if (netConn && netConn.open) {
+            netConn.send(packet);
+        }
+    } catch (e) {
+        console.error('Packet broadcast error:', e);
+    }
+}
+
+function handleNetworkPacket(packet, fromPeerId = null) {
+    // 1. Per-second token-bucket rate limiter (scaled on host for up to 7 concurrent human guests)
     const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (nowMs - _mpRateWindowStart > 1000) {
         _mpRateWindowStart = nowMs;
         _mpRateWindowCount = 0;
     }
-    if (++_mpRateWindowCount > MP_RATE_LIMIT_PER_SEC) {
+    const maxRate = isMultiplayerHost ? (MP_RATE_LIMIT_PER_SEC * Math.max(1, netPeerConns.size)) : MP_RATE_LIMIT_PER_SEC;
+    if (++_mpRateWindowCount > maxRate) {
         console.warn('Multiplayer rate limit exceeded; dropping excess packet');
         return false;
     }
@@ -816,7 +971,9 @@ function handleNetworkPacket(packet) {
         return false;
     }
 
-    // 3. Sequence ordering: drop stale out-of-order state_sync snapshots & player commands
+    const senderPeer = (isMultiplayerHost && fromPeerId) ? netPeerConns.get(fromPeerId) : null;
+
+    // 3. Sequence ordering: drop stale out-of-order state_sync snapshots & per-peer player commands
     if (typeof packet.seq === 'number') {
         if (packet.type === 'state_sync') {
             if (packet.seq <= _mpLastRxStateSeq) return false;
@@ -825,25 +982,60 @@ function handleNetworkPacket(packet) {
         if (packet.seq > _mpLastRxSeq) _mpLastRxSeq = packet.seq;
     }
     if (MP_COMMAND_PACKET_TYPES.has(packet.type) && typeof packet.cmdSeq === 'number') {
-        if (packet.cmdSeq <= _mpLastRxCmdSeq) {
-            console.warn('Dropping stale out-of-order player command:', packet.type, packet.cmdSeq);
-            return false;
+        if (senderPeer) {
+            if (packet.cmdSeq <= senderPeer.cmdSeq) {
+                console.warn('Dropping stale out-of-order player command from', fromPeerId, packet.type, packet.cmdSeq);
+                return false;
+            }
+            senderPeer.cmdSeq = packet.cmdSeq;
+        } else if (!packet.relayed) {
+            if (packet.cmdSeq <= _mpLastRxCmdSeq) {
+                console.warn('Dropping stale out-of-order player command:', packet.type, packet.cmdSeq);
+                return false;
+            }
+            _mpLastRxCmdSeq = packet.cmdSeq;
         }
-        _mpLastRxCmdSeq = packet.cmdSeq;
     }
+
+    const resolveSenderSlot = () => {
+        if (senderPeer && Array.isArray(mpSlots)) {
+            const byId = mpSlots.find(s => s && s.id === senderPeer.slotId);
+            if (byId) return byId;
+        }
+        if (Number.isInteger(packet.fromSlotId) && Array.isArray(mpSlots)) {
+            const byFrom = mpSlots.find(s => s && s.id === packet.fromSlotId);
+            if (byFrom) return byFrom;
+        }
+        return getAuthenticatedPeerSlot();
+    };
+    const relayToOtherGuests = (pkt, slotObj) => {
+        if (isMultiplayerHost && fromPeerId && netPeerConns.size > 1) {
+            broadcastNetPacket(Object.assign({}, pkt, {
+                fromSlotId: slotObj ? slotObj.id : undefined,
+                relayed: true
+            }), fromPeerId);
+        }
+    };
 
     try {
     if (packet.type === 'handshake') {
-        mpOpponentFaction = packet.clientFaction || 'china';
-        if (mpSlots[1]) mpSlots[1].faction = mpOpponentFaction;
-        const statusEl = document.getElementById('mp-host-status');
-        if (statusEl) {
-            statusEl.innerHTML = `🟢 <strong>CHALLENGER CONNECTED!</strong> (Opponent: ${escapeHtml(String(mpOpponentFaction).toUpperCase())}). Ready to launch.`;
+        const peerFac = packet.clientFaction || 'china';
+        const peerSlot = resolveSenderSlot();
+        if (peerSlot) {
+            peerSlot.faction = peerFac;
+            if (senderPeer) senderPeer.faction = peerFac;
+        } else if (mpSlots[1]) {
+            mpSlots[1].faction = peerFac;
         }
+        mpOpponentFaction = peerFac;
+        updateHostLobbyPeerStatus(Boolean(senderPeer && senderPeer.isLan));
         syncMpLobbyToPeer();
     }
     else if (packet.type === 'lobby_sync') {
         // Client receives live room configuration from Host
+        if (Number.isInteger(packet.assignedSlotId)) {
+            myMpSlotId = packet.assignedSlotId;
+        }
         const cleanSlots = sanitizeMpSlots(packet.slots);
         if (cleanSlots) {
             mpSlots = cleanSlots;
@@ -880,10 +1072,12 @@ function handleNetworkPacket(packet) {
         // Remote peer ordered movement (restricted to remote human peer's own units; bounds clamped; stale waypoints cleared)
         const ids = new Set(packet.unitNetIds || []);
         const targetPos = clampMpWorldPos(packet.targetPos);
-        const peerSlot = getAuthenticatedPeerSlot();
+        const peerSlot = resolveSenderSlot();
         const peerTeamId = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
+        const peerOwnerId = peerSlot ? ('human_' + peerSlot.id) : null;
         enemyUnits.forEach(enemy => {
-                if (ids.has(enemy.netId) && !enemy.isAI && enemy.teamId === peerTeamId) {
+                const ownerOk = !peerOwnerId || !enemy.ownerId || enemy.ownerId === peerOwnerId || enemy.ownerId === 'challenger' || enemy.ownerId === 'ally';
+                if (ids.has(enemy.netId) && !enemy.isAI && enemy.teamId === peerTeamId && ownerOk) {
                     enemy.targetPosition.copy(targetPos);
                     enemy.waypoints = [];
                     enemy.combatTarget = null;
@@ -894,22 +1088,26 @@ function handleNetworkPacket(packet) {
                     }
                 }
         });
+        relayToOtherGuests(packet, peerSlot);
     }
     else if (packet.type === 'attack_target') {
         const ids = new Set(packet.unitNetIds || []);
-        const peerSlot = getAuthenticatedPeerSlot();
+        const peerSlot = resolveSenderSlot();
         const peerTeamId = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
+        const peerOwnerId = peerSlot ? ('human_' + peerSlot.id) : null;
         const localTarget = units.find(u => u.netId === packet.targetNetId) ||
         structures.find(s => s.netId === packet.targetNetId) ||
         enemyUnits.find(eu => eu.netId === packet.targetNetId) ||
         enemyStructures.find(es => es.netId === packet.targetNetId);
         if (localTarget) {
             enemyUnits.forEach(enemy => {
-                    if (ids.has(enemy.netId) && !enemy.isAI && enemy.teamId === peerTeamId) {
+                    const ownerOk = !peerOwnerId || !enemy.ownerId || enemy.ownerId === peerOwnerId || enemy.ownerId === 'challenger' || enemy.ownerId === 'ally';
+                    if (ids.has(enemy.netId) && !enemy.isAI && enemy.teamId === peerTeamId && ownerOk) {
                         enemy.combatTarget = localTarget;
                     }
             });
         }
+        relayToOtherGuests(packet, peerSlot);
     }
     else if (packet.type === 'host_left') {
         if (!isMultiplayerHost && isMultiplayerActive) {
@@ -919,19 +1117,20 @@ function handleNetworkPacket(packet) {
     else if (packet.type === 'client_left') {
         showNotification(packet.message || "Challenger has left the match.", "error");
         const badge = document.getElementById('mp-status-badge');
-        if (badge) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
+        if (badge && netPeerConns.size === 0) badge.innerHTML = '🔴 CHALLENGER DISCONNECTED';
     }
     else if (packet.type === 'spawn_unit') {
         if (!MP_ALLOWED_UNIT_TYPES.has(packet.unitType)) return false;
         if (enemyUnits.some(u => u && u.netId === packet.netId) || units.some(u => u && u.netId === packet.netId)) return false;
-        if (enemyUnits.length >= 250) return false;
+        if (enemyUnits.length >= 400) return false;
         const pos = clampMpWorldPos(packet.position);
-        const peerSlot = getAuthenticatedPeerSlot();
+        const peerSlot = resolveSenderSlot();
         const spawnTeam = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
+        const slotIndex = peerSlot ? Math.max(0, (peerSlot.id || 1) - 1) : 1;
         const peerFaction = resolveConcreteMpFaction(
             (peerSlot && peerSlot.faction) || (isMultiplayerHost ? mpOpponentFaction : 'usa'),
             typeof randomMapSeed !== 'undefined' ? randomMapSeed : 424242,
-            1
+            slotIndex
         );
         const factionAllowedUnits = MP_FACTION_UNITS[peerFaction];
         if (factionAllowedUnits && !factionAllowedUnits.has(packet.unitType)) {
@@ -939,31 +1138,36 @@ function handleNetworkPacket(packet) {
             return false;
         }
         const unitCost = (typeof unitCosts !== 'undefined' && Number.isFinite(unitCosts[packet.unitType])) ? unitCosts[packet.unitType] : 500;
-        if (!consumeMpPeerBudget(unitCost)) {
+        if (!consumeMpPeerBudget(unitCost, senderPeer)) {
             console.warn('Rejected unaffordable peer spawn_unit:', packet.unitType);
             return false;
+        }
+        if (peerSlot && peerSlot.color && typeof getPlayerColorHex === 'function' && typeof window !== 'undefined') {
+            window.activeEnemyColorHex = getPlayerColorHex(peerSlot.color);
         }
         const isAlly = (spawnTeam === playerTeamId);
         const unit = spawnEnemyUnit(packet.unitType, pos, packet.netId, peerFaction);
         if (unit) {
             unit.teamId = spawnTeam;
-            unit.ownerId = isAlly ? 'ally' : 'challenger';
+            unit.ownerId = peerSlot ? ('human_' + peerSlot.id) : (isAlly ? 'ally' : 'challenger');
             unit.isAI = false;
             unit.faction = peerFaction;
         }
+        relayToOtherGuests(packet, peerSlot);
     }
     else if (packet.type === 'build_structure') {
         if (!MP_ALLOWED_STRUCT_TYPES.has(packet.structType)) return false;
         if (enemyStructures.some(s => s && s.netId === packet.netId) || structures.some(s => s && s.netId === packet.netId)) return false;
-        if (enemyStructures.length >= 120) return false;
+        if (enemyStructures.length >= 200) return false;
         const pos = clampMpWorldPos(packet.position);
-        const peerSlot = getAuthenticatedPeerSlot();
+        const peerSlot = resolveSenderSlot();
         const structTeam = peerSlot ? peerSlot.team : (isMultiplayerHost ? 2 : 1);
+        const slotIndex = peerSlot ? Math.max(0, (peerSlot.id || 1) - 1) : 1;
         const isAlly = (structTeam === playerTeamId);
         const foeFaction = resolveConcreteMpFaction(
             (peerSlot && peerSlot.faction) || (isMultiplayerHost ? mpOpponentFaction : 'usa'),
             typeof randomMapSeed !== 'undefined' ? randomMapSeed : 424242,
-            1
+            slotIndex
         );
         const factionAllowedStructs = MP_FACTION_STRUCTS[foeFaction];
         if (factionAllowedStructs && !factionAllowedStructs.has(packet.structType)) {
@@ -971,9 +1175,12 @@ function handleNetworkPacket(packet) {
             return false;
         }
         const structCost = (typeof getStructureCost === 'function' ? getStructureCost(packet.structType) : 0) || 500;
-        if (!consumeMpPeerBudget(structCost)) {
+        if (!consumeMpPeerBudget(structCost, senderPeer)) {
             console.warn('Rejected unaffordable peer build_structure:', packet.structType);
             return false;
+        }
+        if (peerSlot && peerSlot.color && typeof getPlayerColorHex === 'function' && typeof window !== 'undefined') {
+            window.activeEnemyColorHex = getPlayerColorHex(peerSlot.color);
         }
         const structMaxHp = (typeof getStructureMaxHealth === 'function') ? getStructureMaxHealth(packet.structType) : 1200;
         const group = (typeof createStructureMeshForFaction === 'function')
@@ -997,9 +1204,10 @@ function handleNetworkPacket(packet) {
                 isBuilding: false,
                 netId: packet.netId,
                 teamId: structTeam,
-                ownerId: isAlly ? 'ally' : 'challenger',
+                ownerId: peerSlot ? ('human_' + peerSlot.id) : (isAlly ? 'ally' : 'challenger'),
                 isAI: false
         });
+        relayToOtherGuests(packet, peerSlot);
     }
     else if (packet.type === 'unit_damage') {
         const target = units.find(u => u.netId === packet.targetNetId) ||
@@ -1106,6 +1314,7 @@ function handleNetworkPacket(packet) {
     }
     else if (packet.type === 'chat') {
         addMpChatMessage(packet.sender, packet.text);
+        relayToOtherGuests(packet, resolveSenderSlot());
     }
     } catch (err) {
         console.warn('Error handling multiplayer packet:', err);
@@ -1120,7 +1329,7 @@ function hostLaunchBattle() {
     const startMoney = parseInt(document.getElementById('mp-starting-money').value, 10);
     const startUnits = document.getElementById('mp-starting-units').value;
 
-    const packet = {
+    const basePacket = {
         type: 'start_battle',
         mapType: mapEnv,
         mapSize: mapSize,
@@ -1131,8 +1340,16 @@ function hostLaunchBattle() {
         seed: Math.floor(Math.random() * 1000000)
     };
 
-    broadcastNetPacket(packet);
-    startMultiplayerMatch(true, packet);
+    if (netPeerConns.size > 0) {
+        for (const [pid, entry] of netPeerConns.entries()) {
+            if (entry && entry.conn && entry.conn.open) {
+                broadcastNetPacket(Object.assign({}, basePacket, { assignedSlotId: entry.slotId }), null, pid);
+            }
+        }
+    } else {
+        broadcastNetPacket(basePacket);
+    }
+    startMultiplayerMatch(true, basePacket);
 }
 
 // --- COMMON MULTIPLAYER START LOGIC ---
@@ -1144,6 +1361,18 @@ function startMultiplayerMatch(isHost, config) {
     _mpLastRxCmdSeq = 0;
     _mpLastUnitSnapMap.clear();
     _mpLastStructSnapMap.clear();
+    if (!isHost && Number.isInteger(config.assignedSlotId)) {
+        myMpSlotId = config.assignedSlotId;
+    } else if (isHost) {
+        myMpSlotId = 1;
+    }
+    for (const entry of netPeerConns.values()) {
+        if (entry) {
+            entry.cmdSeq = 0;
+            entry.budget = Math.max(2000, (Number(config.money) || 10000) + 2500);
+            entry.budgetLastMs = Date.now();
+        }
+    }
 
     // Seed deterministic simulation PRNG from host match seed so both peers share identical RNG stream
     const matchSeed = (Number(config.seed) >>> 0) || 424242;
@@ -1179,11 +1408,15 @@ function startMultiplayerMatch(isHost, config) {
     }));
     mpSlots = activeSlots.slice();
     if (typeof window !== 'undefined') window.mpSlots = mpSlots;
-    const mySlot = isHost ? activeSlots.find(s => s.isHost) : activeSlots.find(s => !s.isHost && s.isHuman);
+    const mySlot = isHost
+        ? activeSlots.find(s => s.isHost)
+        : (activeSlots.find(s => s.id === myMpSlotId) || activeSlots.find(s => s.peerId && s.peerId === myMpPeerId) || activeSlots.find(s => !s.isHost && s.isHuman));
     const playerSlot = mySlot || activeSlots[0];
     if (!playerSlot) return;
+    myMpSlotId = playerSlot.id;
     playerTeamId = playerSlot.team;
     selectedFaction = playerSlot.faction;
+    const humanCount = activeSlots.filter(s => s.isHuman).length;
     const remoteHumanSlot = activeSlots.find(s => s.isHuman && s !== playerSlot);
     if (remoteHumanSlot) mpOpponentFaction = remoteHumanSlot.faction;
     if (typeof preloadSkirmishAudio === 'function') preloadSkirmishAudio(selectedFaction);
@@ -1220,7 +1453,7 @@ function startMultiplayerMatch(isHost, config) {
 
             spawnSupplyCacheNearBase(spawnPos);
 
-            const isMe = (isHost && slot.isHost) || (!isHost && !slot.isHost && slot.isHuman);
+            const isMe = (slot === playerSlot);
 
             if (isMe) {
                 // Deploy Local Player Base
@@ -1232,7 +1465,7 @@ function startMultiplayerMatch(isHost, config) {
                 camera.position.set(spawnPos.x, 65, spawnPos.z + 65);
                 camera.lookAt(spawnPos.x, 0, spawnPos.z);
             } else if (slot.isHuman) {
-                // Remote Human Peer Base
+                // Remote Human Peer Base (supports up to 8 human players / 4v4)
                 if (typeof getPlayerColorHex === 'function') {
                     window.activeEnemyColorHex = getPlayerColorHex(slot.color || 'red');
                 }
@@ -1242,11 +1475,12 @@ function startMultiplayerMatch(isHost, config) {
                 foeCCGroup.rotation.y = faceCenterYaw;
                 scene.add(foeCCGroup);
                 const ccMaxHp = (typeof getStructureMaxHealth === 'function') ? getStructureMaxHealth('commandCenter') : 5000;
+                const ccNetId = (humanCount <= 2) ? ((isHost ? 'CS_' : 'HS_') + 'CC') : ('P' + slot.id + '_CC');
                 enemyStructures.push({
                         type: 'commandCenter', faction: slot.faction, position: spawnPos.clone(), rotationY: faceCenterYaw,
                         mesh: foeCCGroup, health: ccMaxHp, maxHealth: ccMaxHp, radius: 10,
-                        buildProgress: 100, isBuilding: false, netId: (isHost ? 'CS_' : 'HS_') + 'CC',
-                        teamId: slot.team, ownerId: 'challenger', isAI: false
+                        buildProgress: 100, isBuilding: false, netId: ccNetId,
+                        teamId: slot.team, ownerId: 'human_' + slot.id, isAI: false
                 });
             } else {
                 // AI Base

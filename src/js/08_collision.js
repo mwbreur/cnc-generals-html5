@@ -396,9 +396,11 @@ function buildStructureMesh(type, pos, instant = false, rotationY = 0) {
 
     const structMaxHp = getStructureMaxHealth(type);
     const isInitialMpCC = Boolean(isMultiplayerActive && instant && (type === 'center' || type === 'commandCenter') && !structures.some(s => (s.type === 'center' || s.type === 'commandCenter') && s.health > 0));
+    const mpHumanTotal = (isMultiplayerActive && typeof mpSlots !== 'undefined' && Array.isArray(mpSlots)) ? mpSlots.filter(s => s && s.active && s.isHuman).length : 2;
+    const mpStructPrefix = (typeof myMpSlotId === 'number' && myMpSlotId > 2) ? ('P' + myMpSlotId + 'S_') : (isMultiplayerHost ? 'HS_' : 'CS_');
     const structNetId = isInitialMpCC
-        ? ((isMultiplayerHost ? 'HS_' : 'CS_') + 'CC')
-        : ((isMultiplayerActive ? (isMultiplayerHost ? 'HS_' : 'CS_') : 'PS_') + (++netIdSequence));
+        ? (mpHumanTotal > 2 && typeof myMpSlotId === 'number' ? ('P' + myMpSlotId + '_CC') : ((isMultiplayerHost ? 'HS_' : 'CS_') + 'CC'))
+        : ((isMultiplayerActive ? mpStructPrefix : 'PS_') + (++netIdSequence));
     const structObj = {
         type: type, mesh: group, position: pos.clone(),
         rotationY: rotationY || 0,
