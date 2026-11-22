@@ -1236,7 +1236,16 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         data._cachedMinBldY = minBldY;
     }
     const minBldY = data._cachedMinBldY;
-    if (minBldY < 1e8 && minBldY < 0) {
+    // Retail W3D buildings with intentional underground drill cables/foundations (or rotated cylinders) are already authored at Y=0 ground level
+    const skipAutoLift = (
+        buildingKey === 'tech_oilDerrick' ||
+        buildingKey === 'civilian_hangar_g' ||
+        buildingKey === 'gla_scudStorm' ||
+        buildingKey === 'china_speakerTower' ||
+        buildingKey === 'civilian_bunker' ||
+        buildingKey === 'civilian_bunker_g'
+    );
+    if (!skipAutoLift && minBldY < 1e8 && minBldY < 0) {
         const shiftY = -minBldY + 0.35;
         root.children.forEach(child => {
             child.position.y += shiftY;
