@@ -2984,38 +2984,43 @@ function animateNukeStrike(siloPos, targetPos) {
     warnGroup.add(warnCore);
     scene.add(warnGroup);
 
-    // 1. Ascending Chinese ICBM from Silo with booster fins & exhaust flame
+    // 1. Ascending Official EA NBNRocket.W3D ICBM from Silo with booster ignition plume & billowing launch smoke
     const missileGroup = new THREE.Group();
-    const origin = (siloPos ? siloPos.clone() : targetPos.clone());
+    const origin = (siloPos ? siloPos.clone().add(new THREE.Vector3(-3.5, 1.5, -5.2)) : targetPos.clone());
     missileGroup.position.copy(origin);
-    const mGeo = new THREE.CylinderGeometry(0.45, 0.52, 4.8, 12);
-    const mMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, metalness: 0.8, roughness: 0.2 });
-    const missileBody = new THREE.Mesh(mGeo, mMat);
-    missileGroup.add(missileBody);
 
-    const stripeGeo = new THREE.CylinderGeometry(0.47, 0.49, 1.1, 12);
-    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xc0392b });
-    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-    stripe.position.y = 0.8;
-    missileGroup.add(stripe);
+    if (typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_nukeRocket']) {
+        const w3dRocket = createW3DBuildingMesh('china_nukeRocket', false);
+        missileGroup.add(w3dRocket);
+    } else {
+        const mGeo = new THREE.CylinderGeometry(0.45, 0.52, 4.8, 12);
+        const mMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1, metalness: 0.8, roughness: 0.2 });
+        missileGroup.add(new THREE.Mesh(mGeo, mMat));
+        const noseGeo = new THREE.ConeGeometry(0.45, 1.5, 12);
+        const nose = new THREE.Mesh(noseGeo, new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.3 }));
+        nose.position.y = 3.15;
+        missileGroup.add(nose);
+    }
 
-    const noseGeo = new THREE.ConeGeometry(0.45, 1.5, 12);
-    const noseMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.3 });
-    const nose = new THREE.Mesh(noseGeo, noseMat);
-    nose.position.y = 3.15;
-    missileGroup.add(nose);
-
-    const plumeGeo = new THREE.ConeGeometry(0.55, 2.6, 10);
+    const plumeGeo = new THREE.ConeGeometry(1.15, 5.4, 12);
     plumeGeo.rotateX(Math.PI);
-    const plumeMat = new THREE.MeshBasicMaterial({ color: 0xffa502, transparent: true, opacity: 0.95 });
+    const plumeMat = new THREE.MeshBasicMaterial({ color: 0xffb142, transparent: true, opacity: 0.95 });
     const plume = new THREE.Mesh(plumeGeo, plumeMat);
-    plume.position.y = -3.4;
+    plume.position.y = -2.7;
     missileGroup.add(plume);
 
     scene.add(missileGroup);
     if (siloPos) {
-        for (let s = 0; s < 6; s++) {
-            spawnSmokePuff(siloPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4, 1.2, (Math.random() - 0.5) * 4)), 0xdcdde1, 1.2);
+        // Official FX_NeutronMissileLaunch: billowing pressurized silo ignition cloud rolling outward from the bay
+        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(origin.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xffdd59, 4.2);
+        for (let s = 0; s < 18; s++) {
+            const ang = (s / 18) * Math.PI * 2;
+            const rad = 2.0 + Math.random() * 6.5;
+            spawnSmokePuff(
+                origin.clone().add(new THREE.Vector3(Math.cos(ang) * rad, 0.8 + Math.random() * 3.0, Math.sin(ang) * rad)),
+                s % 3 === 0 ? 0xff9f43 : (s % 2 === 0 ? 0xf1f2f6 : 0xb2bec3),
+                2.0 + Math.random() * 1.4
+            );
         }
     }
 
@@ -3035,19 +3040,26 @@ function animateNukeStrike(siloPos, targetPos) {
                 plume.scale.set(0.85 + Math.random() * 0.35, 0.85 + Math.random() * 0.45, 0.85 + Math.random() * 0.35);
 
                 if (phase === 'ascent') {
-                    missileGroup.position.y += 1.9;
-                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3(0, -2.5, 0)), 0xff793f, 0.95);
-                    if (missileGroup.position.y > 95) {
+                    // Authentic heavy ICBM liftoff: gradual acceleration with roaring booster smoke column
+                    const climbSpeed = frame < 18 ? (0.45 + frame * 0.09) : 2.15;
+                    missileGroup.position.y += climbSpeed;
+                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.4, -2.5, (Math.random() - 0.5) * 1.4)), frame % 2 === 0 ? 0xff793f : 0xf1f2f6, 1.55);
+                    if (frame < 26 && frame % 2 === 0 && siloPos) {
+                        const a = Math.random() * Math.PI * 2;
+                        const rr = 2.5 + Math.random() * 5.5;
+                        spawnSmokePuff(origin.clone().add(new THREE.Vector3(Math.cos(a) * rr, 0.8 + Math.random() * 2.2, Math.sin(a) * rr)), 0xdcdde1, 1.9);
+                    }
+                    if (missileGroup.position.y > 105) {
                         phase = 'descent';
-                        missileGroup.position.set(targetPos.x, 105, targetPos.z);
+                        missileGroup.position.set(targetPos.x, 115, targetPos.z);
                         missileGroup.rotation.x = Math.PI; // point straight down
                         if (typeof playAudio === 'function') playAudio('shell_whistle', { volume: 0.85 });
                     }
                 } else if (phase === 'descent') {
-                    missileGroup.position.y -= 3.4;
-                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3(0, 2.5, 0)), 0xff5252, 1.0);
+                    missileGroup.position.y -= 3.6;
+                    spawnSmokePuff(missileGroup.position.clone().add(new THREE.Vector3(0, 3.0, 0)), frame % 2 === 0 ? 0xff5252 : 0xdcdde1, 1.35);
                     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
-                    if (missileGroup.position.y <= groundY + 1.2) {
+                    if (missileGroup.position.y <= groundY + 14.0) {
                         scene.remove(missileGroup);
                         missileGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
                         scene.remove(warnGroup);

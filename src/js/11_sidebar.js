@@ -3857,22 +3857,48 @@ function processBuildingFunctions() {
                 // Animate 3D superweapon buildup state based on chargeRatio (0.0 -> 1.0)
                 if (structure.mesh) {
                     if (structure.type === 'nukeSilo') {
-                        const roof = getCachedNode(structure.mesh, 'LINE38');
+                        // Official NBNMissle_A2.W3D 3-panel telescoping sliding roof hatch (slides horizontally back onto rear deck, NEVER rotates into building!)
+                        const roofBase = getCachedNode(structure.mesh, 'LINE38');
+                        const roofMid = getCachedNode(structure.mesh, 'LINE37');
+                        const roofTip = getCachedNode(structure.mesh, 'LINE13');
                         const doorL = getCachedNode(structure.mesh, 'nukeBlastDoorL');
                         const doorR = getCachedNode(structure.mesh, 'nukeBlastDoorR');
                         const tip = getCachedNode(structure.mesh, 'nukeTip');
-                        const openFactor = chargeRatio > 0.45 ? Math.min(1, (chargeRatio - 0.45) / 0.35) : 0;
-                        if (roof) roof.rotation.z = (Math.PI / 2) * (1 - openFactor);
+                        const openFactor = chargeRatio > 0.45 ? Math.min(1, (chargeRatio - 0.45) / 0.30) : 0;
+                        if (roofBase) roofBase.position.x = 17.11 + openFactor * 24.62; // W3D Y: -17.11 -> -41.73
+                        if (roofMid) roofMid.position.y = 23.47 - openFactor * 23.21;  // Telescopes into LINE38
+                        if (roofTip) roofTip.position.y = 23.50 - openFactor * 23.33;  // Telescopes into LINE37
                         if (doorL) doorL.position.x = -2.2 - openFactor * 1.1;
                         if (doorR) doorR.position.x = 2.2 + openFactor * 1.1;
                         if (tip) {
                             const isW3D = structure.mesh.userData && structure.mesh.userData.isW3D;
-                            tip.position.y = isW3D
-                            ? (2 + Math.max(0, (chargeRatio - 0.5) * 2.0) * 22)
-                            : (0.8 + chargeRatio * 1.8);
+                            if (isW3D) {
+                                const riseFactor = chargeRatio > 0.52 ? Math.min(1, (chargeRatio - 0.52) / 0.42) : 0;
+                                tip.visible = riseFactor > 0.01;
+                                tip.position.y = -34.0 + riseFactor * 38.0; // Rises cleanly from bay floor to launch posture
+                            } else {
+                                tip.position.y = 0.8 + chargeRatio * 1.8;
+                            }
                         }
-                        if (chargeRatio < 1.0 && buildingTick % 20 === 0 && typeof spawnSmokePuff === 'function') {
-                            spawnSmokePuff(structure.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4, 2.5, (Math.random() - 0.5) * 4 - 4)), 0xdcdde1, 0.7);
+                        // Official cryogenic steam & exhaust venting from silo bay & STEAM01/STEAM02 vents
+                        if (typeof spawnSmokePuff === 'function') {
+                            const steamInterval = openFactor > 0.2 ? 7 : 22;
+                            if (buildingTick % steamInterval === 0) {
+                                const bayCenter = structure.position.clone().add(new THREE.Vector3(-3.5, 4.2, -5.2));
+                                spawnSmokePuff(
+                                    bayCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4.5, 0.2, (Math.random() - 0.5) * 4.5)),
+                                    openFactor > 0.5 ? 0xf1f2f6 : 0xdcdde1,
+                                    openFactor > 0.5 ? 1.35 : 0.85
+                                );
+                                if (openFactor > 0.65) {
+                                    // Twin pressurized missile-body cryogenic vents (STEAM01 / STEAM02)
+                                    spawnSmokePuff(
+                                        bayCenter.clone().add(new THREE.Vector3((Math.random() < 0.5 ? -1.8 : 1.8), 4.5 + Math.random() * 2.5, (Math.random() - 0.5) * 1.4)),
+                                        0xffffff,
+                                        0.95
+                                    );
+                                }
+                            }
                         }
                     } else if (structure.type === 'scudStorm') {
                         // Elevate all 9 retail W3D SCUD Storm launcher arms & pistons (UBScudStrm_A1.W3D) + procedural fallback gantries
