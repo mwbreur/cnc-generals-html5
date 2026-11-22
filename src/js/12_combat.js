@@ -293,7 +293,7 @@ function processCombatScanning() {
                 const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker' || inOverlordBunker)) ? 1.5 : 1.0;
                 const garrisonRadiusBonus = inOverlordBunker ? (unit.garrisonedIn.radius || 6.2) : 0;
                 const maxEffectiveRange = unit.scanRange * garrisonRangeMult + garrisonRadiusBonus + targetRadius;
-                const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
+                const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : (unit.type === 'inferno' ? 10.8 : 0);
 
                 if (!canUnitTarget(unit, unit.combatTarget) || unit.combatTarget.health <= 0) {
                     unit.combatTarget = null; // Target invalid, untargetable, or destroyed
@@ -346,7 +346,7 @@ function processCombatScanning() {
             if (!unit.combatTarget && ((_combatScanTick + ui) % scanMod === 0) && !isNonCombatSupport) {
                 if (!(unit.isAir && unit.taskState === 'Moving')) {
                     const uPos = unit.mesh.position;
-                    const minScanR = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : 0;
+                    const minScanR = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : (unit.type === 'inferno' ? 10.8 : 0);
                     const minScanR2 = minScanR * minScanR;
                     let bestUnitDist2 = Infinity;
                     // 1. Scan for nearest hostile unit in range (spatial-grid accelerated for large armies)
@@ -1153,36 +1153,40 @@ function executeWeaponFireInner(attacker, target) {
         if (attacker.type === 'tomahawk') playUSASound('tomahawk_launch');
         if (attacker.type === 'scud') playAudio('scud_launch', {}, 'gla');
     } else if (attacker.type === 'inferno') {
-        // Inferno Cannon Long-Range Incendiary Napalm Artillery
+        // Official INIZH.big InfernoCannonGun / InfernoCannonGunUpgraded (Black Napalm + 3-hit Firestorm Synergy)
+        const hasBlackNapalm = (!attacker.isAI && typeof researchedTechs !== 'undefined' && researchedTechs.has('blackNapalm')) || !!attacker.hasBlackNapalm;
+        const shellCol = hasBlackNapalm ? 0x1e90ff : 0xff6b22;
+        const coreCol = hasBlackNapalm ? 0xa8e6ff : 0xffe699;
+        const smokeCol = hasBlackNapalm ? 0x1b2a4a : 0xff8833;
         if (typeof spawnCannonMuzzleBlast === 'function') {
-            spawnCannonMuzzleBlast(muzzlePos, targetPos, { scale: 1.35 * heroicScale, color: 0xff5252, smokeColor: 0x6b4b3e, isHeroic, isArtillery: true });
+            spawnCannonMuzzleBlast(muzzlePos, targetPos, { scale: 1.35 * heroicScale, color: shellCol, smokeColor: hasBlackNapalm ? 0x1e272e : 0x6b4b3e, isHeroic, isArtillery: true });
         } else {
-            spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : 0xff5252, 1.2 * heroicScale);
+            spawnMuzzleFlash(muzzlePos, isHeroic ? heroicFlashColor : shellCol, 1.2 * heroicScale);
         }
         if (typeof triggerUnitRecoil === 'function') triggerUnitRecoil(attacker, targetPos, 1.4);
         playAudio('inferno_cannon', {}, 'china');
         const impactPos = targetPos.clone();
         const detonateInferno = (hitPos) => {
             const p = hitPos || impactPos;
-            if (typeof spawnExplosion === 'function') spawnExplosion(p, 0xff5500, 1.45, 'expl_fire');
-            if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(p);
+            if (typeof spawnExplosion === 'function') spawnExplosion(p, hasBlackNapalm ? 0x1e90ff : 0xff5500, 1.45, 'expl_fire');
+            if (typeof spawnNapalmScorchPool === 'function') spawnNapalmScorchPool(p, hasBlackNapalm, true);
             const allHostile = [...((attacker.isAI ? units : enemyUnits) || []), ...((attacker.isAI ? structures : enemyStructures) || [])];
             allHostile.forEach(h => {
                     if (!h || h.health <= 0 || isFriendly(attacker, h)) return;
                     const hp = h.position || (h.mesh && h.mesh.position);
-                    if (hp && hp.distanceTo(p) <= 8.5) {
-                        applyCalculatedDamage(attacker, h, h === target ? 75 : 40, 'FLAME');
+                    if (hp && hp.distanceTo(p) <= 6.5) {
+                        applyCalculatedDamage(attacker, h, h === target ? 65 : 35, 'FLAME');
                     }
             });
         };
         if (typeof spawnCannonShellProjectile === 'function') {
             spawnCannonShellProjectile(muzzlePos, impactPos, {
-                color: 0xff6b22, coreColor: 0xffe699, smokeColor: 0xff8833,
-                thickness: 1.45 * heroicScale, speed: 2.2, arcHeight: 10.5, trailRate: 0.9, trailSize: 0.34, isHeroic,
+                color: shellCol, coreColor: coreCol, smokeColor: smokeCol,
+                thickness: 1.45 * heroicScale, speed: 2.2, arcHeight: 12.5, trailRate: 0.9, trailSize: 0.36, isHeroic,
                 onImpact: detonateInferno
             });
         } else {
-            spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : 0xff793f, 5.5 * heroicScale);
+            spawnBulletTracer(muzzlePos, targetPos, isHeroic ? heroicTracerColor : shellCol, 5.5 * heroicScale);
             setTimeout(() => detonateInferno(impactPos), 280);
         }
     } else if (attacker.type === 'nukecannon' || attacker.type === 'nuketank') {

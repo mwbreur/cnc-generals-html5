@@ -1953,70 +1953,274 @@ function spawnHeavyExplosion(pos, isToxin = false) {
     }
 }
 
-// Lingering Napalm Scorch Pool (deals continuous burn damage)
-function spawnNapalmScorchPool(pos) {
-    const groundY = getTerrainHeight(pos.x, pos.z);
-    const poolGeo = new THREE.CircleGeometry(3.5, 16);
-    poolGeo.rotateX(-Math.PI / 2);
-    const poolMat = new THREE.MeshBasicMaterial({ color: 0xff4757, transparent: true, opacity: 0.8, depthWrite: false });
-    const pool = new THREE.Mesh(poolGeo, poolMat);
-    pool.position.set(pos.x, groundY + 0.04, pos.z);
-    scene.add(pool);
+// Track active Inferno Cannon burn patches for official 3-hit Firestorm synergy (HistoricBonusRadius)
+const _activeInfernoPools = [];
 
+function spawnInfernoFirestorm(center, hasBlackNapalm = false) {
+    if (!center || typeof scene === 'undefined') return;
+    const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(center.x, center.z) : (center.y || 0);
+    const fireTex = _getFxSpriteTex('fireball');
+    const smokeTex = _getFxSpriteTex('smoke');
+    const group = new THREE.Group();
+    group.position.set(center.x, groundY, center.z);
+
+    const addBlend = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
+    const radius = 8.5;
+    const durationTicks = 660; // 11 seconds
+
+    // Blazing ground magma / napalm pool
+    const baseGeo = new THREE.CircleGeometry(radius, 28);
+    baseGeo.rotateX(-Math.PI / 2);
+    const baseMat = new THREE.MeshBasicMaterial({
+        ...(smokeTex ? { map: smokeTex } : {}),
+        color: hasBlackNapalm ? 0x1e60ff : 0xff5500,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        ...addBlend
+    });
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    baseMesh.position.y = 0.16;
+    group.add(baseMesh);
+
+    // Towering swirling Firestorm flame pillars (orange/gold/black or Black Napalm blue/black-blue)
+    const pillars = [];
+    const flameColors = hasBlackNapalm
+        ? [0x2980ff, 0x70c8ff, 0x0d2b6b, 0x1e40af]
+        : [0xff7718, 0xffcc33, 0xe84118, 0xff4500];
+    if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+        const pillarCount = 14;
+        for (let i = 0; i < pillarCount; i++) {
+            const isSmoke = (i >= 10);
+            const mat = new THREE.SpriteMaterial({
+                map: isSmoke ? smokeTex : (fireTex || smokeTex),
+                color: isSmoke ? (hasBlackNapalm ? 0x0f172a : 0x1f1916) : flameColors[i % flameColors.length],
+                transparent: true,
+                opacity: isSmoke ? 0.55 : 0.92,
+                depthWrite: false,
+                ...(isSmoke ? {} : addBlend)
+            });
+            const spr = new THREE.Sprite(mat);
+            const ang = (i / pillarCount) * Math.PI * 2;
+            const orbitR = isSmoke ? (2.0 + Math.random() * 4.5) : (0.8 + (i % 4) * 1.6);
+            const baseY = isSmoke ? (6.5 + Math.random() * 5.0) : (1.8 + (i % 5) * 1.8);
+            const scale = isSmoke ? (7.5 + Math.random() * 4.0) : (5.2 + Math.random() * 3.8);
+            spr.position.set(Math.cos(ang) * orbitR, baseY, Math.sin(ang) * orbitR);
+            spr.scale.set(scale, scale * (isSmoke ? 1.1 : 1.45), 1);
+            group.add(spr);
+            pillars.push({
+                spr, mat, ang, orbitR, baseY, scale, isSmoke,
+                spinSpeed: (isSmoke ? 0.035 : 0.085) * (i % 2 === 0 ? 1 : -1),
+                phase: Math.random() * Math.PI * 2,
+                baseOp: mat.opacity
+            });
+        }
+    }
+    scene.add(group);
+
+    if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
+    if (typeof playAudio === 'function') playAudio('expl_fire', { volume: 0.9 });
+    if (typeof spawnCraterDecal === 'function') spawnCraterDecal(center, 7.5, 1200, 'flame');
+
+    const disposeStorm = () => {
+        scene.remove(group);
+        baseGeo.dispose();
+        baseMat.dispose();
+        for (let i = 0; i < pillars.length; i++) pillars[i].mat.dispose();
+    };
+
+    let life = durationTicks;
+    let tick = 0;
     activeFX.push({
-            mesh: pool,
+        persistent: true,
+        group,
+        life: durationTicks,
+        dispose: disposeStorm,
+        update() {
+            life--;
+            tick++;
+            const env = Math.min(1, tick / 18) * Math.min(1, life / 80);
+            baseMat.opacity = env * (0.72 + Math.sin(tick * 0.25) * 0.16);
+            for (let i = 0; i < pillars.length; i++) {
+                const p = pillars[i];
+                p.ang += p.spinSpeed;
+                const rise = Math.sin(tick * 0.08 + p.phase) * 1.6;
+                p.spr.position.set(Math.cos(p.ang) * p.orbitR, p.baseY + rise, Math.sin(p.ang) * p.orbitR);
+                const pulse = 0.88 + Math.sin(tick * 0.22 + p.phase) * 0.22;
+                p.spr.scale.set(p.scale * pulse, p.scale * (p.isSmoke ? 1.15 : 1.5) * pulse, 1);
+                p.mat.opacity = env * p.baseOp;
+            }
+            // Spiraling embers & smoke
+            if (tick % 10 === 0 && activeFX.length < 480 && typeof spawnSmokePuff === 'function') {
+                const ea = Math.random() * Math.PI * 2;
+                const er = Math.random() * radius * 0.7;
+                spawnSmokePuff(new THREE.Vector3(center.x + Math.cos(ea) * er, groundY + 3.5, center.z + Math.sin(ea) * er), hasBlackNapalm ? 0x1e3a8a : 0x261f1b, 1.35);
+            }
+            // Official Firestorm DoT: 3.5x-4x normal burn every 0.5s (melts tanks, incinerates infantry, burns structures)
+            if (tick % 30 === 0) {
+                const stormDmg = hasBlackNapalm ? 48 : 38;
+                const allUnits = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
+                for (let i = 0; i < allUnits.length; i++) {
+                    const u = allUnits[i];
+                    if (u && u.health > 0 && u.mesh && !u.isAir && Math.hypot(u.mesh.position.x - center.x, u.mesh.position.z - center.z) <= radius) {
+                        if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, stormDmg, 'FLAME');
+                        else u.health -= stormDmg;
+                    }
+                }
+                const allStructs = [...(typeof structures !== 'undefined' ? structures : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+                for (let i = 0; i < allStructs.length; i++) {
+                    const st = allStructs[i];
+                    const sp = st && (st.position || (st.mesh && st.mesh.position));
+                    if (st && st.health > 0 && sp && Math.hypot(sp.x - center.x, sp.z - center.z) <= radius + 2.5) {
+                        if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, Math.round(stormDmg * 1.15), 'FLAME');
+                        else st.health -= stormDmg;
+                    }
+                }
+            }
+            if (life <= 0) {
+                disposeStorm();
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
+// Lingering Napalm Scorch Pool (supports Black Napalm blue/black flames & 3-hit Inferno Firestorm synergy)
+function spawnNapalmScorchPool(pos, hasBlackNapalm = false, isInfernoShell = false) {
+    if (!pos || typeof scene === 'undefined') return;
+    // Official Firestorm Synergy: if 2+ active Inferno pools already exist within 7.0u, consume them and ignite a massive Firestorm Vortex!
+    if (isInfernoShell) {
+        const nearby = [];
+        for (let i = _activeInfernoPools.length - 1; i >= 0; i--) {
+            const p = _activeInfernoPools[i];
+            if (!p || p.life <= 0) { _activeInfernoPools.splice(i, 1); continue; }
+            if (Math.hypot(p.pos.x - pos.x, p.pos.z - pos.z) <= 7.0) nearby.push(p);
+        }
+        if (nearby.length >= 2) {
+            const avgX = (pos.x + nearby.reduce((s, p) => s + p.pos.x, 0)) / (nearby.length + 1);
+            const avgZ = (pos.z + nearby.reduce((s, p) => s + p.pos.z, 0)) / (nearby.length + 1);
+            const anyBlack = hasBlackNapalm || nearby.some(p => p.hasBlackNapalm);
+            nearby.forEach(p => { p.life = 1; }); // Consume small patches on next tick
+            spawnInfernoFirestorm(new THREE.Vector3(avgX, pos.y || 0, avgZ), anyBlack);
+            return;
+        }
+    }
+
+    const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+    const fireTex = _getFxSpriteTex('fireball');
+    const smokeTex = _getFxSpriteTex('smoke');
+    const addBlend = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
+    const poolGrp = new THREE.Group();
+    poolGrp.position.set(pos.x, groundY, pos.z);
+
+    const poolGeo = new THREE.CircleGeometry(3.8, 18);
+    poolGeo.rotateX(-Math.PI / 2);
+    const poolMat = new THREE.MeshBasicMaterial({
+        ...(smokeTex ? { map: smokeTex } : {}),
+        color: hasBlackNapalm ? 0x1e60ff : 0xff4500,
+        transparent: true,
+        opacity: 0.78,
+        depthWrite: false,
+        ...addBlend
+    });
+    const poolMesh = new THREE.Mesh(poolGeo, poolMat);
+    poolMesh.position.y = 0.08;
+    poolGrp.add(poolMesh);
+
+    const flameSprites = [];
+    if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+        const fCols = hasBlackNapalm ? [0x2980ff, 0x6ec6ff, 0x142c66] : [0xff7718, 0xffcc33, 0xe84118];
+        for (let fi = 0; fi < 4; fi++) {
+            const fm = new THREE.SpriteMaterial({
+                map: fireTex || smokeTex,
+                color: fCols[fi % fCols.length],
+                transparent: true,
+                opacity: 0.82,
+                depthWrite: false,
+                ...addBlend
+            });
+            const fs = new THREE.Sprite(fm);
+            const fa = (fi / 4) * Math.PI * 2 + Math.random() * 0.5;
+            const fr = fi === 0 ? 0 : (1.1 + Math.random() * 1.4);
+            fs.position.set(Math.cos(fa) * fr, 1.0 + Math.random() * 0.8, Math.sin(fa) * fr);
+            const sc = 2.6 + Math.random() * 1.4;
+            fs.scale.set(sc, sc * 1.25, 1);
+            poolGrp.add(fs);
+            flameSprites.push({ spr: fs, mat: fm, sc, phase: Math.random() * Math.PI * 2 });
+        }
+    }
+    scene.add(poolGrp);
+
+    const disposePool = () => {
+        scene.remove(poolGrp);
+        poolGeo.dispose();
+        poolMat.dispose();
+        for (let i = 0; i < flameSprites.length; i++) flameSprites[i].mat.dispose();
+    };
+
+    const duration = isInfernoShell ? 540 : 300; // 9s for Inferno Cannon, 5s for incidental napalm
+    const fxEntry = {
+            group: poolGrp,
             pos: pos.clone(),
-            life: 260, // ~4.5 seconds
-            maxLife: 260,
-            radius: 4.2,
+            life: duration,
+            maxLife: duration,
+            radius: 4.0,
+            hasBlackNapalm: !!hasBlackNapalm,
             tickTimer: 0,
+            dispose: disposePool,
             update() {
                 this.life--;
                 this.tickTimer++;
+                const fadeOut = Math.min(1, this.life / 60);
+                poolMat.opacity = fadeOut * (0.55 + Math.sin(this.life * 0.25) * 0.22);
+                for (let fi = 0; fi < flameSprites.length; fi++) {
+                    const f = flameSprites[fi];
+                    const flick = 0.85 + Math.sin(this.tickTimer * 0.3 + f.phase) * 0.22;
+                    f.spr.scale.set(f.sc * flick, f.sc * 1.3 * flick, 1);
+                    f.mat.opacity = fadeOut * 0.82;
+                }
 
-                // Flickering flame intensity
-                this.mesh.material.opacity = 0.55 + Math.sin(this.life * 0.3) * 0.25;
-
-                // Periodic flame tongue & smoke particles
-                if (this.tickTimer % 8 === 0) {
+                // Periodic dark smoke puff
+                if (this.tickTimer % 14 === 0 && activeFX.length < 480) {
                     const sparkPos = this.pos.clone();
                     sparkPos.x += (Math.random() - 0.5) * 3.0;
                     sparkPos.z += (Math.random() - 0.5) * 3.0;
-                    sparkPos.y = groundY + 0.2;
-                    spawnSmokePuff(sparkPos, 0x1e272e, 0.4);
+                    sparkPos.y = groundY + 0.6;
+                    spawnSmokePuff(sparkPos, hasBlackNapalm ? 0x111827 : 0x1e272e, 0.55);
                 }
 
-                // Lingering damage tick: burn enemy units trapped in napalm pool!
-                if (this.tickTimer % 20 === 0) {
-                    enemyUnits.forEach(enemy => {
-                            if (enemy.health > 0 && enemy.mesh && !enemy.isAir) {
-                                if (enemy.mesh.position.distanceTo(this.pos) <= this.radius) {
-                                    enemy.health -= 8;
-                                }
-                            }
-                    });
-                    units.forEach(unit => {
-                            if (unit.health > 0 && unit.mesh && !unit.isAir) {
-                                if (unit.mesh.position.distanceTo(this.pos) <= this.radius) {
-                                    if (typeof applyCalculatedDamage === 'function') {
-                                        applyCalculatedDamage(null, unit, 5, 'FLAME');
-                                    } else {
-                                        unit.health -= 5;
-                                    }
-                                }
-                            }
-                    });
+                // Lingering FLAME DoT every 0.5s (30 ticks) to ground units & structures inside the burn patch
+                if (this.tickTimer % 30 === 0) {
+                    const burnDmg = hasBlackNapalm ? 13 : 10;
+                    const allGround = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
+                    for (let i = 0; i < allGround.length; i++) {
+                        const u = allGround[i];
+                        if (u && u.health > 0 && u.mesh && !u.isAir && Math.hypot(u.mesh.position.x - this.pos.x, u.mesh.position.z - this.pos.z) <= this.radius) {
+                            if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, burnDmg, 'FLAME');
+                            else u.health -= burnDmg;
+                        }
+                    }
+                    const allStructs = [...(typeof structures !== 'undefined' ? structures : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+                    for (let i = 0; i < allStructs.length; i++) {
+                        const st = allStructs[i];
+                        const sp = st && (st.position || (st.mesh && st.mesh.position));
+                        if (st && st.health > 0 && sp && Math.hypot(sp.x - this.pos.x, sp.z - this.pos.z) <= this.radius + 1.5) {
+                            if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, Math.round(burnDmg * 0.7), 'FLAME');
+                            else st.health -= Math.round(burnDmg * 0.7);
+                        }
+                    }
                 }
 
                 if (this.life <= 0) {
-                    scene.remove(this.mesh);
-                    this.mesh.geometry.dispose();
-                    this.mesh.material.dispose();
+                    disposePool();
                     return false;
                 }
                 return true;
             }
-    });
+    };
+    activeFX.push(fxEntry);
+    if (isInfernoShell) _activeInfernoPools.push(fxEntry);
 }
 
 // Lingering Toxic Gas Cloud (Anthrax / GLA Toxin / SCUD Storm OCL_PoisonField* with official INIZH.big poison DoT)

@@ -500,7 +500,7 @@ function spawnEnemyUnit(type = 'tank', position = new THREE.Vector3(25, 0, -25),
     else if (type === 'gatling') { mesh = createGatlingTankMesh(true); radius = 3.2; speed = 0.16; health = 300; scanRange = 24; }
     else if (type === 'dragon') { mesh = createDragonTankMesh(true); radius = 3.2; speed = 0.15; health = 280; scanRange = 12; }
     else if (type === 'crawler') { mesh = createTroopCrawlerMesh(true); radius = 3.6; speed = 0.15; health = 240; scanRange = 28; }
-    else if (type === 'inferno') { mesh = createInfernoCannonMesh(true); radius = 3.2; speed = 0.10; health = 120; scanRange = 48; }
+    else if (type === 'inferno') { mesh = createInfernoCannonMesh(true); radius = 3.2; speed = 0.10; health = 120; scanRange = 64.8; }
     else if (type === 'nukecannon' || type === 'nuketank') { mesh = createNukeCannonMesh(true); radius = 2.6; speed = 0.08; health = 240; scanRange = 56; }
     else if (type === 'redguard') { mesh = createRedGuardMesh(); radius = 0.8; speed = 0.085; health = 120; scanRange = 22; }
     else if (type === 'tankhunter') { mesh = createTankHunterMesh(); radius = 0.8; speed = 0.08; health = 100; scanRange = 38; }
