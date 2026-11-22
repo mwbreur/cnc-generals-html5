@@ -1462,8 +1462,15 @@ function startMultiplayerMatch(isHost, config) {
                     applyPlayerColorToMaterials(getPlayerColorHex(window.selectedPlayerColor));
                 }
                 deployBase(spawnPos, slot.faction, slot.team);
-                camera.position.set(spawnPos.x, 65, spawnPos.z + 65);
-                camera.lookAt(spawnPos.x, 0, spawnPos.z);
+                cameraTarget.copy(spawnPos);
+                if (typeof cameraAlpha !== 'undefined' && Math.hypot(spawnPos.x, spawnPos.z) > 1) {
+                    cameraAlpha = Math.atan2(spawnPos.x, spawnPos.z);
+                }
+                if (typeof updateCameraPosition === 'function') updateCameraPosition();
+                else {
+                    camera.position.set(spawnPos.x, 65, spawnPos.z + 65);
+                    camera.lookAt(spawnPos.x, 0, spawnPos.z);
+                }
             } else if (slot.isHuman) {
                 // Remote Human Peer Base (supports up to 8 human players / 4v4)
                 if (typeof getPlayerColorHex === 'function') {

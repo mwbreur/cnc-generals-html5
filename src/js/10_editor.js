@@ -970,10 +970,13 @@ function setupGameDeployment() {
             spawnSupplyCacheNearBase(spawnPos);
 
             if (slot.isPlayer) {
-                // Deploy Player base
+                // Deploy Player base & orient camera behind spawn looking straight toward the center of the map
                 deployBase(spawnPos, resolvedPlayerFaction, effectiveTeam);
                 cameraRadius = selectedSize >= 2200 ? 280 : selectedSize >= 1400 ? 220 : 160;
                 cameraTarget.copy(spawnPos);
+                if (typeof cameraAlpha !== 'undefined' && Math.hypot(spawnPos.x, spawnPos.z) > 1) {
+                    cameraAlpha = Math.atan2(spawnPos.x, spawnPos.z);
+                }
                 updateCameraPosition();
             } else {
                 // Deploy AI Opponent / Ally base

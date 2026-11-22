@@ -1279,6 +1279,72 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 600) {
     terrainMesh.receiveShadow = true;
     scene.add(terrainMesh);
 
+    // 2b. Seamless Outer Terrain Horizon Apron (extends 520u beyond all 4 playable edges so terrain blends into horizon fog instead of cutting off)
+    if (typeof THREE.BufferGeometry === 'function' && typeof THREE.Float32BufferAttribute === 'function') {
+        const halfM = mapSize * 0.5;
+        const apronW = 520;
+        const outerM = halfM + apronW;
+        const segs = 36;
+        const apronPositions = [];
+        const apronIndices = [];
+        const addStrip = (innerPts, outerPts) => {
+            const baseIdx = apronPositions.length / 3;
+            for (let i = 0; i <= segs; i++) {
+                const ip = innerPts[i];
+                const op = outerPts[i];
+                apronPositions.push(ip[0], ip[1], ip[2]);
+                apronPositions.push(op[0], op[1], op[2]);
+                if (i < segs) {
+                    const a = baseIdx + i * 2;
+                    const b = a + 1;
+                    const c = a + 2;
+                    const d = a + 3;
+                    apronIndices.push(a, c, b, b, c, d);
+                }
+            }
+        };
+        // North (-Z), South (+Z), West (-X), East (+X) stitched cleanly to edge heights
+        const makeEdge = (axis, sign) => {
+            const inner = [], outer = [];
+            for (let i = 0; i <= segs; i++) {
+                const u = (i / segs) * 2 - 1; // -1 .. +1
+                const ix = axis === 'z' ? u * halfM : sign * halfM;
+                const iz = axis === 'z' ? sign * halfM : u * halfM;
+                const ox = axis === 'z' ? u * outerM : sign * outerM;
+                const oz = axis === 'z' ? sign * outerM : u * outerM;
+                const hIn = (typeof getRawTerrainHeight === 'function') ? getRawTerrainHeight(ix, iz) : 0;
+                const hOut = hIn * 0.35 - 1.5;
+                inner.push([ix, hIn - 0.08, iz]);
+                outer.push([ox, hOut, oz]);
+            }
+            if ((axis === 'z' && sign < 0) || (axis === 'x' && sign > 0)) addStrip(inner, outer);
+            else addStrip(outer, inner);
+        };
+        makeEdge('z', -1);
+        makeEdge('z', 1);
+        makeEdge('x', -1);
+        makeEdge('x', 1);
+
+        const apronGeo = new THREE.BufferGeometry();
+        apronGeo.setAttribute('position', new THREE.Float32BufferAttribute(apronPositions, 3));
+        apronGeo.setIndex(apronIndices);
+        apronGeo.computeVertexNormals();
+        const apronColor = effectiveTheme === 'snow' ? 0xcad6e0
+            : (effectiveTheme === 'city' ? 0x62686e
+            : (effectiveTheme === 'jungle' ? 0x4c613d
+            : (effectiveTheme === 'grassland' ? 0x637847 : 0xb89f76)));
+        const apronMat = new THREE.MeshStandardMaterial({
+            color: apronColor,
+            roughness: 0.96,
+            metalness: 0.02,
+            side: THREE.DoubleSide
+        });
+        const apronMesh = new THREE.Mesh(apronGeo, apronMat);
+        apronMesh.name = 'terrainHorizonApron';
+        apronMesh.receiveShadow = false;
+        mapPropsGroup.add(apronMesh);
+    }
+
     // 3. Water Body (per-map waterLevel on official maps so river/lake maps render water while dry canyons stay passable)
     mapBridges.length = 0; // Clear previous bridges
     let waterLevel = (officialMap && officialMap.waterLevel !== undefined)
