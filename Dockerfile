@@ -1,4 +1,5 @@
-FROM node:22-alpine
+# Pin patch-level Node.js 24 LTS release containing the CVE-2026-111497 (Brotli) fix
+FROM node:24.22.1-alpine
 
 WORKDIR /app
 
@@ -9,7 +10,9 @@ COPY tools/lint_js.js ./tools/lint_js.js
 COPY scripts/lan_server.mjs ./scripts/lan_server.mjs
 
 # Pre-build index.html and assets/data/ into the image for instant startup
-RUN node build.js
+RUN node build.js && chown -R node:node /app
+
+USER node
 
 EXPOSE 8080
 
