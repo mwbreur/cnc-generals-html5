@@ -841,6 +841,7 @@ function resetEntireBattlefieldState(mapSize = 1500) {
             if (fx.group) disposeSceneNodeSafe(fx.group);
         });
         activeFX.length = 0;
+    if (typeof clearVehicleTrackMarks === 'function') clearVehicleTrackMarks();
     }
     if (typeof activeMissiles !== 'undefined' && Array.isArray(activeMissiles)) {
         activeMissiles.forEach(m => { if (m && m.mesh) disposeSceneNodeSafe(m.mesh); });

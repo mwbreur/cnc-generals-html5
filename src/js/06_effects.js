@@ -1670,6 +1670,142 @@ function spawnCraterDecal(pos, radius = 2.2, duration = 380, style = 'explosive'
     });
 }
 
+// =========================================================================
+// AUTHENTIC C&C GENERALS VEHICLE TANK TREAD & TIRE TRACK DECAL SYSTEM
+// (Pooled ring buffer — zero per-frame geometry allocation, never evicts combat FX!)
+// =========================================================================
+const _trackTexCache = { tracked: null, wheeled: null };
+let _sharedTrackGeo = null;
+const _activeTrackMarks = [];
+const MAX_VEHICLE_TRACK_MARKS = 260;
+
+function _getVehicleTrackTexture(isTracked) {
+    const key = isTracked ? 'tracked' : 'wheeled';
+    if (_trackTexCache[key]) return _trackTexCache[key];
+    if (typeof document === 'undefined' || !document.createElement) return null;
+    const can = document.createElement('canvas');
+    can.width = 64;
+    can.height = 64;
+    const ctx = can.getContext('2d');
+    if (!ctx) return null;
+    ctx.clearRect(0, 0, 64, 64);
+
+    if (isTracked) {
+        // Twin wide ribbed caterpillar tank treads
+        const drawBelt = (x0, w) => {
+            ctx.fillStyle = 'rgba(28, 22, 16, 0.32)';
+            ctx.fillRect(x0, 2, w, 60);
+            ctx.fillStyle = 'rgba(18, 13, 9, 0.72)';
+            for (let y = 4; y < 60; y += 7) {
+                ctx.fillRect(x0 + 1, y, w - 2, 3.5);
+            }
+        };
+        drawBelt(6, 15);
+        drawBelt(43, 15);
+    } else {
+        // Twin narrow rubber tire ruts with chevron tread
+        const drawTire = (x0, w) => {
+            ctx.fillStyle = 'rgba(26, 22, 18, 0.42)';
+            ctx.fillRect(x0, 2, w, 60);
+            ctx.fillStyle = 'rgba(16, 12, 9, 0.65)';
+            for (let y = 4; y < 60; y += 6) {
+                ctx.fillRect(x0 + 1, y, w - 2, 2.5);
+            }
+        };
+        drawTire(10, 9);
+        drawTire(45, 9);
+    }
+    const tex = new THREE.CanvasTexture(can);
+    _trackTexCache[key] = tex;
+    return tex;
+}
+
+function spawnVehicleTrackMark(unit, rotY, isTracked = true) {
+    if (!unit || !unit.mesh || typeof scene === 'undefined') return;
+    if (unit.mesh.visible === false) return;
+    const px = unit.mesh.position.x;
+    const pz = unit.mesh.position.z;
+    // Only stamp a new track segment every ~2.4 world units of travel
+    if (unit._lastTrackX !== undefined) {
+        const d2 = (px - unit._lastTrackX) * (px - unit._lastTrackX) + (pz - unit._lastTrackZ) * (pz - unit._lastTrackZ);
+        if (d2 < 5.76) return;
+    }
+    unit._lastTrackX = px;
+    unit._lastTrackZ = pz;
+
+    const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(px, pz) : (unit.mesh.position.y || 0);
+    // Skip underwater or bridge deck
+    if (typeof currentWaterLevel === 'number' && groundY < currentWaterLevel + 0.1) return;
+    if (typeof getBridgeDeckHeightAt === 'function' && getBridgeDeckHeightAt(px, pz) !== null) return;
+
+    if (!_sharedTrackGeo) {
+        _sharedTrackGeo = new THREE.PlaneGeometry(1, 1);
+        _sharedTrackGeo.rotateX(-Math.PI / 2);
+    }
+    const tex = _getVehicleTrackTexture(isTracked);
+    if (!tex) return;
+
+    const width = Math.max(1.8, (unit.radius || 2.5) * (isTracked ? 1.08 : 0.88));
+    const length = 2.75;
+    let entry;
+    if (_activeTrackMarks.length >= MAX_VEHICLE_TRACK_MARKS) {
+        entry = _activeTrackMarks.shift();
+        entry.mesh.material.map = tex;
+        entry.mesh.material.needsUpdate = true;
+    } else {
+        const mat = new THREE.MeshBasicMaterial({
+            map: tex,
+            color: 0xffffff,
+            transparent: true,
+            opacity: isTracked ? 0.58 : 0.48,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
+        });
+        const mesh = new THREE.Mesh(_sharedTrackGeo, mat);
+        mesh.renderOrder = 1;
+        scene.add(mesh);
+        entry = { mesh, life: 0, maxLife: 1080, baseOpacity: 0.55 };
+    }
+    entry.baseOpacity = isTracked ? 0.58 : 0.48;
+    entry.maxLife = 1080; // ~18 seconds before fading away
+    entry.life = entry.maxLife;
+    entry.mesh.visible = true;
+    entry.mesh.position.set(px, groundY + 0.08, pz);
+    entry.mesh.rotation.set(0, rotY || 0, 0);
+    entry.mesh.scale.set(width, 1, length);
+    entry.mesh.material.opacity = entry.baseOpacity;
+    _activeTrackMarks.push(entry);
+}
+window.spawnVehicleTrackMark = spawnVehicleTrackMark;
+
+function updateVehicleTrackMarks() {
+    for (let i = _activeTrackMarks.length - 1; i >= 0; i--) {
+        const tm = _activeTrackMarks[i];
+        tm.life--;
+        if (tm.life < 180) {
+            tm.mesh.material.opacity = Math.max(0, (tm.life / 180) * tm.baseOpacity);
+        }
+        if (tm.life <= 0) {
+            scene.remove(tm.mesh);
+            if (tm.mesh.material) tm.mesh.material.dispose();
+            _activeTrackMarks.splice(i, 1);
+        }
+    }
+}
+
+function clearVehicleTrackMarks() {
+    while (_activeTrackMarks.length > 0) {
+        const tm = _activeTrackMarks.pop();
+        if (tm && tm.mesh) {
+            if (typeof scene !== 'undefined') scene.remove(tm.mesh);
+            if (tm.mesh.material) tm.mesh.material.dispose();
+        }
+    }
+}
+window.clearVehicleTrackMarks = clearVehicleTrackMarks;
+
 // Lingering smoke plume for wrecked buildings and vehicles
 function spawnLingeringSmokeColumn(pos, duration = 240, color = 0x2d3436) {
     let timer = 0;
@@ -2548,6 +2684,7 @@ function updateFXEngine() {
             activeScrapCrates.splice(i, 1);
         }
     }
+    updateVehicleTrackMarks();
 }
 
 // Muzzle position helper for realistic weapon firing origins

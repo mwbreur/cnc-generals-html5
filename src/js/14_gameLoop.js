@@ -2674,6 +2674,7 @@ function animate() {
             if (!unit.isAir && !INFANTRY_TYPE_SET.has(unit.type) && unit.taskState === 'Moving' && typeof spawnTreadDustPuff === 'function') {
                 const isTracked = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(unit.type);
                 const rotY = unit.mesh.rotation.y || 0;
+                if (typeof spawnVehicleTrackMark === 'function') spawnVehicleTrackMark(unit, rotY, isTracked);
                 const fwdX = Math.sin(rotY), fwdZ = Math.cos(rotY);
                 const rightX = Math.cos(rotY), rightZ = -Math.sin(rotY);
                 const rLen = (unit.radius || 2.5) * 0.68;
@@ -3286,6 +3287,9 @@ function processEnemyMovement() {
                 if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type)) spinVehicleWheels(enemy, step);
                 if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type) && typeof spawnTreadDustPuff === 'function') {
                     const isTrackedEnemy = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(enemy.type);
+                    if (!cliffBlocked && typeof spawnVehicleTrackMark === 'function') {
+                        spawnVehicleTrackMark(enemy, Math.atan2(dirX, dirZ), isTrackedEnemy);
+                    }
                     const tickOff = buildingTick + (enemy.netId ? String(enemy.netId).length : 0);
                     if (tickOff % 4 === 0) {
                         const rLen = (enemy.radius || 2.5) * 0.68;
