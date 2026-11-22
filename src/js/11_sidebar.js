@@ -4038,6 +4038,15 @@ function processBuildingFunctions() {
                             structure._sharedTarget = null;
                         }
                     }
+                    if (structure.type === 'stingerSite' && Array.isArray(structure.stingerCrew)) {
+                        for (let ci = 0; ci < 3; ci++) {
+                            if (structure.stingerCrew[ci] <= 0 && buildingTick >= (structure.stingerRespawnAt[ci] || 0)) {
+                                structure.stingerCrew[ci] = 100;
+                                const cm = structure.mesh && structure.mesh.getObjectByName ? structure.mesh.getObjectByName('stingerCrew_' + ci) : null;
+                                if (cm) cm.visible = true;
+                            }
+                        }
+                    }
                     if (!target) {
                         // Retail INIZH.big * 0.216: Ground 225 (48.6u), Patriot Air 350 (75.6u), Stinger Site Air 400 (86.4u)
                         const groundRange = 48.6;
@@ -4094,18 +4103,42 @@ function processBuildingFunctions() {
                             structure._gatlingSpinVel = 0.55;
                             target.health -= 28;
                         } else if (structure.type === 'stingerSite') {
-                            const mPos = structure.position.clone().add(new THREE.Vector3(0, 1.4, 0));
-                            const isToxinStinger = typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin';
-                            spawnMuzzleFlash(mPos, isToxinStinger ? 0x2ed573 : 0xff9f43, 0.5);
-                            spawnRocketProjectile(mPos, targetPos, false, isToxinStinger, {
-                                    attacker: structure,
-                                    target: target,
-                                    isGuided: true,
-                                    damage: 42,
-                                    damageType: 'EXPLOSIVE',
-                                    splashRadius: 1.5
-                            });
-                            if (typeof playAudio === 'function') playAudio('stinger_fire', {}, 'gla');
+                            // Official INIZH.big GLAStingerSite: 3 Stinger Soldiers (100 HP each, 30s auto-respawn) firing a 3-rocket ripple salvo
+                            if (!Array.isArray(structure.stingerCrew)) {
+                                structure.stingerCrew = [100, 100, 100];
+                                structure.stingerRespawnAt = [0, 0, 0];
+                            }
+                            let livingSoldiers = [];
+                            for (let ci = 0; ci < 3; ci++) {
+                                if (structure.stingerCrew[ci] <= 0 && buildingTick >= (structure.stingerRespawnAt[ci] || 0)) {
+                                    structure.stingerCrew[ci] = 100;
+                                    const cm = structure.mesh && structure.mesh.getObjectByName ? structure.mesh.getObjectByName('stingerCrew_' + ci) : null;
+                                    if (cm) cm.visible = true;
+                                }
+                                if (structure.stingerCrew[ci] > 0) livingSoldiers.push(ci);
+                            }
+                            if (livingSoldiers.length > 0) {
+                                const isToxinStinger = typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin';
+                                const shotOffsets = [[-1.1, 1.5, 0.9], [1.1, 1.5, 0.9], [0, 1.5, -1.1]];
+                                livingSoldiers.forEach((ci, k) => {
+                                    setTimeout(() => {
+                                        if (structure.health <= 0 || !target || target.health <= 0) return;
+                                        const [ox, oy, oz] = shotOffsets[ci];
+                                        const mPos = structure.position.clone().add(new THREE.Vector3(ox, oy, oz));
+                                        const tPosNow = (target.mesh ? target.mesh.position : target.position).clone().add(new THREE.Vector3(0, target.isAir ? 0.3 : 0.5, 0));
+                                        spawnMuzzleFlash(mPos, isToxinStinger ? 0x2ed573 : 0xff9f43, 0.5);
+                                        spawnRocketProjectile(mPos, tPosNow, false, isToxinStinger, {
+                                                attacker: structure,
+                                                target: target,
+                                                isGuided: true,
+                                                damage: 32,
+                                                damageType: 'EXPLOSIVE',
+                                                splashRadius: 1.5
+                                        });
+                                        if (k === 0 && typeof playAudio === 'function') playAudio('stinger_fire', {}, 'gla');
+                                    }, k * 115);
+                                });
+                            }
                         }
                     }
                 }

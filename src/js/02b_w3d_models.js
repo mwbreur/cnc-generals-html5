@@ -840,6 +840,26 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
             siloRocket.add(rMesh);
         });
         root.add(siloRocket);
+    } else if (buildingKey === 'gla_stingerSite') {
+        // Official INIZH.big GLAStingerSite: 3 visible Stinger Soldiers standing inside the sandbag pit (SpawnNumber = 3)
+        const crewOffsets = [[-5.2, 2.2, 4.8], [5.2, 2.2, 4.8], [0, 2.2, -5.6]];
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x5c4a38, roughness: 0.85 });
+        crewOffsets.forEach(([cx, cy, cz], idx) => {
+            const soldier = new THREE.Group();
+            soldier.name = 'stingerCrew_' + idx;
+            soldier.position.set(cx, cy, cz);
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 4.6, 6), bodyMat);
+            torso.position.y = 2.3;
+            soldier.add(torso);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(1.05, 6, 6), accentMat);
+            head.position.y = 5.3;
+            soldier.add(head);
+            const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 5.2, 6), gunMat);
+            tube.rotation.x = Math.PI * 0.38;
+            tube.position.set(1.1, 4.4, 0.8);
+            soldier.add(tube);
+            root.add(soldier);
+        });
     }
 
     if (buildingKey === 'usa_power') {

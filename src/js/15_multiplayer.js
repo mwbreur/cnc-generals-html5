@@ -1691,6 +1691,15 @@ function processBaseDefenseCombat() {
 
         // Acquire closest target within official INIZH.big defense range (AttackRange = 225.0 => 48.6 units) strictly filtering !isFriendly
         if (def.attackCooldown === 0) {
+            if (def.type === 'stingerSite' && Array.isArray(def.stingerCrew)) {
+                for (let ci = 0; ci < 3; ci++) {
+                    if (def.stingerCrew[ci] <= 0 && curTick >= (def.stingerRespawnAt[ci] || 0)) {
+                        def.stingerCrew[ci] = 100;
+                        const cm = def.mesh && def.mesh.getObjectByName ? def.mesh.getObjectByName('stingerCrew_' + ci) : null;
+                        if (cm) cm.visible = true;
+                    }
+                }
+            }
             if (def._defIdleScanCd > 0) {
                 def._defIdleScanCd--;
                 return;
@@ -1761,13 +1770,34 @@ function processBaseDefenseCombat() {
                     if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(def, closestEnemy, 65, 'EXPLOSIVE');
                     else closestEnemy.health -= 65;
                 } else if (def.type === 'stingerSite') {
-                    def.attackCooldown = 150; // 2.5s reload
-                    const isToxinStinger = isPlayerDef && typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin';
-                    spawnMuzzleFlash(defPos, 0xff9f43, 0.5);
-                    spawnRocketProjectile(defPos, targetPos, false, isToxinStinger);
-                    if ((!def.mesh || def.mesh.visible) && typeof playAudio === 'function') playAudio('stinger_fire', {}, 'gla');
-                    if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(def, closestEnemy, 50, 'EXPLOSIVE');
-                    else closestEnemy.health -= 50;
+                    // Official INIZH.big GLAStingerSite: 3 Stinger Soldiers (100 HP each, 30s auto-respawn) firing a ripple volley
+                    if (!Array.isArray(def.stingerCrew)) {
+                        def.stingerCrew = [100, 100, 100];
+                        def.stingerRespawnAt = [0, 0, 0];
+                    }
+                    let livingSoldiers = 0;
+                    for (let ci = 0; ci < 3; ci++) {
+                        if (def.stingerCrew[ci] <= 0 && curTick >= (def.stingerRespawnAt[ci] || 0)) {
+                            def.stingerCrew[ci] = 100;
+                            const cm = def.mesh && def.mesh.getObjectByName ? def.mesh.getObjectByName('stingerCrew_' + ci) : null;
+                            if (cm) cm.visible = true;
+                        }
+                        if (def.stingerCrew[ci] > 0) livingSoldiers++;
+                    }
+                    if (livingSoldiers > 0) {
+                        def.attackCooldown = 150; // 2.5s reload
+                        const isToxinStinger = isPlayerDef && typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin';
+                        for (let s = 0; s < livingSoldiers; s++) {
+                            const offX = (s - 1) * 1.0;
+                            const mPos = defPos.clone().add(new THREE.Vector3(offX, -1.6, 0));
+                            spawnMuzzleFlash(mPos, isToxinStinger ? 0x2ed573 : 0xff9f43, 0.45);
+                            spawnRocketProjectile(mPos, targetPos, false, isToxinStinger);
+                        }
+                        if ((!def.mesh || def.mesh.visible) && typeof playAudio === 'function') playAudio('stinger_fire', {}, 'gla');
+                        const totalVolleyDmg = 32 * livingSoldiers;
+                        if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(def, closestEnemy, totalVolleyDmg, 'EXPLOSIVE');
+                        else closestEnemy.health -= totalVolleyDmg;
+                    }
                 }
 
                 // Sync heavy defense damage in multiplayer (host-authoritative)

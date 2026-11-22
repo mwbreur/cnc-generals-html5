@@ -717,6 +717,39 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
     target._lastAttackedTime = Date.now();
     target._lastAttacker = attacker || null;
 
+    // Official INIZH.big GLAStingerSite: 3 individual Stinger Soldiers (100 HP each, 30s respawn) can be killed by snipers/flame/toxin/flashbang/anti-infantry!
+    if (target.type === 'stingerSite' && target.health > 0 && !target.isBuilding) {
+        if (!Array.isArray(target.stingerCrew)) {
+            target.stingerCrew = [100, 100, 100];
+            target.stingerRespawnAt = [0, 0, 0];
+        }
+        const isCrewKiller = damageType === 'SNIPER' || damageType === 'FLAME' || damageType === 'TOXIN' || damageType === 'POISON' || damageType === 'RADIATION' || damageType === 'FLASHBANG';
+        const crewDmg = isCrewKiller ? Math.max(baseDamage, damageType === 'SNIPER' ? 120 : 55) : (damageType === 'GATLING' || damageType === 'SMALL_ARMS' ? Math.round(baseDamage * 0.85) : Math.round(baseDamage * 0.35));
+        if (crewDmg > 0) {
+            const curT = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+            const hitsAll = damageType === 'FLAME' || damageType === 'TOXIN' || damageType === 'POISON' || damageType === 'RADIATION' || damageType === 'FLASHBANG';
+            for (let ci = 0; ci < 3; ci++) {
+                if (target.stingerCrew[ci] > 0) {
+                    target.stingerCrew[ci] -= crewDmg;
+                    if (target.stingerCrew[ci] <= 0) {
+                        target.stingerCrew[ci] = 0;
+                        target.stingerRespawnAt[ci] = curT + 1800; // Official SpawnReplaceDelay = 30000ms (30s)
+                        if (target.mesh) {
+                            const cm = target.mesh.getObjectByName('stingerCrew_' + ci);
+                            if (cm) cm.visible = false;
+                        }
+                        if (typeof spawnSmokePuff === 'function' && target.position) {
+                            spawnSmokePuff(target.position.clone().add(new THREE.Vector3((ci - 1) * 1.2, 1.5, 0)), 0xd63031, 0.55);
+                        }
+                    }
+                    if (!hitsAll) break;
+                }
+            }
+            // Sniper shots kill the Stinger Soldier without damaging the sandbag pit itself (matches retail Sniper 0% vs building!)
+            if (damageType === 'SNIPER') return;
+        }
+    }
+
     // Authentic Generals Garrison Clearing (Flamethrowers, Toxin Tractors, Flashbangs clear buildings directly!)
     if (target.isWorldBuilding && Array.isArray(target.garrisoned) && target.garrisoned.length > 0 &&
         (damageType === 'FLAME' || damageType === 'TOXIN' || damageType === 'FLASHBANG')) {
