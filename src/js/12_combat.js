@@ -1018,9 +1018,14 @@ function executeWeaponFireInner(attacker, target) {
 
     // Firing uncloaks stealth units for their retail StealthDelay (INIZH.big StealthUpdate; 60 ticks = 1 s).
     // Pathfinder keeps stealth while attacking (only MOVING breaks it); Burton's silent knife kill stays hidden.
-    if (attacker.isStealthed && attacker.type !== 'pathfinder') {
+    const isBurtonSilentKnife = (
+        attacker.type === 'burton' &&
+        typeof getArmorCategory === 'function' && getArmorCategory(target) === 'infantry' &&
+        attacker.mesh && attacker.mesh.position.distanceTo(targetPos) <= 5.5
+    );
+    if (attacker.isStealthed && attacker.type !== 'pathfinder' && !isBurtonSilentKnife) {
         const curT = (typeof buildingTick !== 'undefined' ? buildingTick : 0);
-        const STEALTH_DELAY_TICKS = { stealthfighter: 90, burton: 120, blacklotus: 150, jarmen: 120, hijacker: 30, comanche: 90 };
+        const STEALTH_DELAY_TICKS = { stealthfighter: 90, burton: 120, blacklotus: 150, jarmen: 120, hijacker: 30, comanche: 90, rebel: 150 };
         attacker.isStealthed = false;
         attacker.revealedUntil = curT + (STEALTH_DELAY_TICKS[attacker.type] || 90);
     }

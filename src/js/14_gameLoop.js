@@ -3516,8 +3516,11 @@ function spawnInfantryDeathAnimation(unit) {
     return true;
 }
 
-const STATIONARY_STEALTH_UNITS = new Set(['pathfinder', 'jarmen', 'burton', 'blacklotus', 'hijacker']);
-const ALWAYS_STEALTH_UNITS = new Set(['stealthfighter', 'drone_scout']);
+// Official INIZH.big StealthUpdate:
+// - Stationary-only stealth (MOVING breaks cloak): Pathfinder (stays cloaked while firing), Hijacker, Camouflage Rebels
+// - Moving stealth (only FIRING/ATTACKING/ABILITY breaks cloak): Stealth Fighter, Scout Drone, Colonel Burton, Black Lotus, Jarmen Kell, Stealth Comanche
+const STATIONARY_STEALTH_UNITS = new Set(['pathfinder', 'hijacker']);
+const ALWAYS_STEALTH_UNITS = new Set(['stealthfighter', 'drone_scout', 'burton', 'blacklotus', 'jarmen']);
 
 // Retail StealthUpdate: FriendlyOpacityMin = 50% .. FriendlyOpacityMax = 100% (owner/allies always see their stealthed units,
 // shimmering between those values). Enemies see nothing until the unit is revealed (firing / detector).
@@ -3579,8 +3582,9 @@ function updateStealthAndDetection() {
         const u = allUnits[i];
         if (!u || u.health <= 0) continue;
         const hasComancheStealth = u.type === 'comanche' && !u.isAI && typeof researchedTechs !== 'undefined' && researchedTechs.has('stealthComanche');
-        const isStationaryStealth = STATIONARY_STEALTH_UNITS.has(u.type) || hasComancheStealth;
-        const isAlwaysStealth = ALWAYS_STEALTH_UNITS.has(u.type);
+        const hasRebelCamo = u.type === 'rebel' && ((!u.isAI && typeof researchedTechs !== 'undefined' && researchedTechs.has('camouflage')) || !!u.hasCamouflage);
+        const isStationaryStealth = STATIONARY_STEALTH_UNITS.has(u.type) || hasRebelCamo;
+        const isAlwaysStealth = ALWAYS_STEALTH_UNITS.has(u.type) || hasComancheStealth;
         const hasGpsCloak = !!(u.gpsCloakUntil && u.gpsCloakUntil > nowStealthMs);
         if (u.gpsCloakUntil && u.gpsCloakUntil <= nowStealthMs) {
             u.gpsCloakUntil = 0;
