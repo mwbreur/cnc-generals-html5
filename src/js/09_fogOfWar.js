@@ -1297,12 +1297,12 @@ window.mpSlots = mpSlots;
 function isFriendly(assetA, assetB) {
     if (!assetA || !assetB) return false;
     const getTeam = (a) => {
-        if (a.teamId !== undefined) return a.teamId;
-        if (a.team !== undefined) return a.team;
-        if (typeof units !== 'undefined' && units.includes(a)) return (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
-        if (typeof structures !== 'undefined' && structures.includes(a)) return (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+        if (a.teamId !== undefined) return Number(a.teamId);
+        if (a.team !== undefined) return Number(a.team);
+        if (typeof units !== 'undefined' && units.includes(a)) return Number(typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+        if (typeof structures !== 'undefined' && structures.includes(a)) return Number(typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
         if (a.isAI) return 2;
-        return (typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
+        return Number(typeof playerTeamId !== 'undefined' ? playerTeamId : 1);
     };
     return getTeam(assetA) === getTeam(assetB);
 }
@@ -1794,11 +1794,14 @@ function updateSlot(mode, slotIdx, field, value, skipRerender = false) {
     if (!targetSlot) return;
 
     if (field === 'spawnId') {
-        const existing = slots.find((s, idx) => idx !== slotIdx && s.active && s.spawnId === value);
+        const parsedVal = parseInt(value, 10) || 1;
+        const existing = slots.find((s, idx) => idx !== slotIdx && s.active && Number(s.spawnId) === parsedVal);
         if (existing) {
             existing.spawnId = targetSlot.spawnId;
         }
-        targetSlot.spawnId = value;
+        targetSlot.spawnId = parsedVal;
+    } else if (field === 'team') {
+        targetSlot.team = parseInt(value, 10) || 0;
     } else {
         targetSlot[field] = value;
     }

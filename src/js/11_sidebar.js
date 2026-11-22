@@ -4032,7 +4032,7 @@ function processBuildingFunctions() {
                     // Patriot Network Linking: share target lock & extended assist range (97.2u = 450*0.216, matching official PatriotMissileAssistWeapon) with nearby Patriots (<=55u)
                     let target = null;
                     if (structure.type === 'patriot' && structure._sharedTarget) {
-                        if (structure._sharedTarget.health > 0 && structure._sharedTarget.mesh && structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 97.2) {
+                        if (structure._sharedTarget.health > 0 && !structure._sharedTarget.garrisonedIn && structure._sharedTarget.mesh && !isFriendly(structure, structure._sharedTarget) && structure._sharedTarget.mesh.position.distanceTo(structure.position) <= 97.2) {
                             target = structure._sharedTarget;
                         } else {
                             structure._sharedTarget = null;
@@ -4042,8 +4042,8 @@ function processBuildingFunctions() {
                         // Retail INIZH.big * 0.216: Ground 225 (48.6u), Patriot Air 350 (75.6u), Stinger Site Air 400 (86.4u)
                         const groundRange = 48.6;
                         const airRange = (structure.type === 'patriot') ? 75.6 : (structure.type === 'stingerSite' ? 86.4 : 48.6);
-                        // Patriots prioritize aircraft & vehicles; less effective against small infantry
-                        const inRange = enemyUnits.filter(enemy => enemy.health > 0 && enemy.mesh && !(enemy.isStealthed && !(enemy.revealedUntil && enemy.revealedUntil > buildingTick)) && enemy.mesh.position.distanceTo(structure.position) < (enemy.isAir ? airRange : groundRange));
+                        // Patriots prioritize aircraft & vehicles; strictly filter !isFriendly so defenses NEVER attack teammates/allied AI!
+                        const inRange = enemyUnits.filter(enemy => enemy.health > 0 && !enemy.garrisonedIn && enemy.mesh && !isFriendly(structure, enemy) && !(enemy.isStealthed && !(enemy.revealedUntil && enemy.revealedUntil > buildingTick)) && enemy.mesh.position.distanceTo(structure.position) < (enemy.isAir ? airRange : groundRange));
                         target = inRange.find(e => e.isAir) ||
                         inRange.find(e => typeof getArmorCategory !== 'function' || getArmorCategory(e) !== 'infantry') ||
                         inRange[0] || null;
@@ -4095,8 +4095,9 @@ function processBuildingFunctions() {
                             target.health -= 28;
                         } else if (structure.type === 'stingerSite') {
                             const mPos = structure.position.clone().add(new THREE.Vector3(0, 1.4, 0));
-                            spawnMuzzleFlash(mPos, 0x2ed573, 0.5);
-                            spawnRocketProjectile(mPos, targetPos, false, true, {
+                            const isToxinStinger = typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin';
+                            spawnMuzzleFlash(mPos, isToxinStinger ? 0x2ed573 : 0xff9f43, 0.5);
+                            spawnRocketProjectile(mPos, targetPos, false, isToxinStinger, {
                                     attacker: structure,
                                     target: target,
                                     isGuided: true,
@@ -4145,9 +4146,9 @@ function processBuildingFunctions() {
                 });
             }
             if (structure.type === 'demoTrap') {
-                const target = enemyUnits.find(enemy => enemy && enemy.health > 0 && enemy.mesh && enemy.mesh.position && enemy.mesh.position.distanceTo(structure.position) < 7);
+                const target = enemyUnits.find(enemy => enemy && enemy.health > 0 && !enemy.garrisonedIn && !isFriendly(structure, enemy) && enemy.mesh && enemy.mesh.position && enemy.mesh.position.distanceTo(structure.position) < 7);
                 if (target) {
-                    enemyUnits.forEach(enemy => { if (enemy && enemy.mesh && enemy.mesh.position && enemy.mesh.position.distanceTo(structure.position) < 16) enemy.health -= 300; });
+                    enemyUnits.forEach(enemy => { if (enemy && !isFriendly(structure, enemy) && enemy.mesh && enemy.mesh.position && enemy.mesh.position.distanceTo(structure.position) < 16) enemy.health -= 300; });
                     structure.health = 0;
                     createImpactExplosion(structure.position);
                 }
@@ -4159,7 +4160,8 @@ function processBuildingFunctions() {
     landmines.forEach(mine => {
             if (!mine.active) return;
             const triggerDist = mine.radius || 3.5;
-            const trigger = enemyUnits.some(enemy => enemy.health > 0 && !enemy.isAir && enemy.mesh && enemy.mesh.position.distanceTo(mine.position) < triggerDist);
+            const mineTeamRef = { teamId: mine.teamId !== undefined ? mine.teamId : (typeof playerTeamId !== 'undefined' ? playerTeamId : 1) };
+            const trigger = enemyUnits.some(enemy => enemy.health > 0 && !enemy.isAir && !enemy.garrisonedIn && !isFriendly(mineTeamRef, enemy) && enemy.mesh && enemy.mesh.position.distanceTo(mine.position) < triggerDist);
             if (trigger) {
                 mine.active = false;
                 if (mine.mesh && typeof scene !== 'undefined') scene.remove(mine.mesh);
