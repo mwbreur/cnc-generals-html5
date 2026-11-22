@@ -1302,8 +1302,10 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
 function processEnemyAIEngine() {
     if (isMultiplayerActive) return;
     aiDecisionTimer++;
-    // Scaled AI decision tick rate by chosen difficulty
-    const tickRate = aiDifficultyLevel === 'hard' ? 30 : aiDifficultyLevel === 'easy' ? 90 : 60;
+    // Scaled AI decision tick rate by difficulty + dynamic scaling for large AI armies (Issue #64)
+    const baseTickRate = aiDifficultyLevel === 'hard' ? 30 : aiDifficultyLevel === 'easy' ? 90 : 60;
+    const aiUnitCount = (typeof enemyUnits !== 'undefined' && enemyUnits.length) ? enemyUnits.length : 0;
+    const tickRate = Math.max(baseTickRate, Math.min(120, Math.ceil(aiUnitCount / 2.5)));
     if (aiDecisionTimer < tickRate) return;
     aiDecisionTimer = 0;
 
@@ -3173,7 +3175,11 @@ function evaluateBoxSelection(box) {
 // Advanced Turret System: Locks onto active combat targets or sweeps in natural idle radar scans
 // PERF: iterates the four lists directly (no per-frame array spread) and reuses one scratch vector
 const _turretScratch = new THREE.Vector3();
+let _turretThrottleFrame = 0;
 function updateTurretSystems() {
+    // Throttle turret tracking to every 2 frames (Issue #63); lerp factors compensated below for identical speed
+    _turretThrottleFrame++;
+    if ((_turretThrottleFrame & 1) !== 0) return;
     const lists = [units, enemyUnits, structures, enemyStructures];
     for (let li = 0; li < lists.length; li++) {
         const list = lists[li];
@@ -3194,7 +3200,7 @@ function updateTurretFor(unit) {
             let diff = desiredAngle - turret.rotation.y;
             while (diff < -Math.PI) diff += Math.PI * 2;
             while (diff > Math.PI) diff -= Math.PI * 2;
-            turret.rotation.y += diff * 0.16; // Smooth swift tracking
+            turret.rotation.y += diff * 0.28; // Smooth swift tracking (2-frame compensated)
             return;
         }
     }
@@ -3206,7 +3212,7 @@ function updateTurretFor(unit) {
         if (dx * dx + dz * dz > 260 * 260) return;
     }
     if (!unit._idleTurretTimer || unit._idleTurretTimer <= 0) {
-        unit._idleTurretTimer = 100 + Math.floor(Math.random() * 180); // Sweeps every 2-5 seconds
+        unit._idleTurretTimer = 50 + Math.floor(Math.random() * 90); // Sweeps every 2-5 seconds (2-frame compensated)
         // 65% chance forward (0 rad), 35% chance to sweep left or right
         unit._idleTurretAngle = Math.random() < 0.65 ? 0 : (Math.random() - 0.5) * 1.3;
     }
@@ -3214,7 +3220,7 @@ function updateTurretFor(unit) {
     let diff = (unit._idleTurretAngle || 0) - turret.rotation.y;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
-    turret.rotation.y += diff * 0.035; // Gentle, authentic military traverse
+    turret.rotation.y += diff * 0.068; // Gentle, authentic military traverse (2-frame compensated)
 }
 
 // PERF: health bars no longer rebuild 4 arrays + a Set per frame, no O(S) includes() per asset,
@@ -3232,6 +3238,9 @@ const _VET_ICONS = [
 ];
 function updateHealthBars() {
     _hbFrame++;
+    // Issue #60: throttle health bar projection/DOM loop to 30 Hz when total battlefield assets exceed 160
+    const totalAssets = units.length + enemyUnits.length + structures.length + enemyStructures.length;
+    if (totalAssets > 160 && (_hbFrame & 1) !== 0) return;
     if (!_hbContainer) _hbContainer = document.getElementById('health-bars');
     _hbGroupMap.clear();
     const cg = (typeof controlGroups !== 'undefined') ? controlGroups : (typeof window !== 'undefined' ? window.controlGroups : null);
