@@ -6,6 +6,23 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
+
+function getBuildVersionLabel() {
+    let commit = (process.env.GITHUB_SHA || '').trim().slice(0, 7);
+    if (!commit) {
+        try {
+            commit = execSync('git rev-parse --short HEAD', { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8').trim();
+        } catch (_) {
+            commit = 'local';
+        }
+    }
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())} ${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}Z`;
+    return `${commit} · ${stamp}`;
+}
+const buildVersionLabel = getBuildVersionLabel();
 
 const srcDir = path.join(__dirname, 'src');
 const pagesOutput = path.join(__dirname, 'index.html');
@@ -21,7 +38,8 @@ for (const marker of ['/* {{CSS_CONTENT}} */', '<!-- {{BODY_CONTENT}} -->', '// 
     }
 }
 const css = fs.readFileSync(path.join(srcDir, 'css', 'style.css'), 'utf8');
-const body = fs.readFileSync(path.join(srcDir, 'html', 'body.html'), 'utf8');
+const body = fs.readFileSync(path.join(srcDir, 'html', 'body.html'), 'utf8')
+    .replace(/\{\{BUILD_VERSION\}\}/g, () => buildVersionLabel);
 
 // 2. Read and stitch JS modules in sorted numerical order (externalizing heavy data blobs for browser caching)
 const jsDir = path.join(srcDir, 'js');
