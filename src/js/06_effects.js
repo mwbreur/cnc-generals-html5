@@ -1372,21 +1372,30 @@ function spawnRocketProjectile(fromPos, toPos, isHeavy = false, isToxin = false,
                         }
                     }
                     if (splashRadius && splashRadius > 0) {
-                        const allEnemies = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined')
-                        ? [...units, ...enemyUnits] : [];
-                        allEnemies.forEach(other => {
-                                if (other !== target && other.health > 0 && other.mesh) {
-                                    const d = other.mesh.position.distanceTo(this.toPos);
-                                    if (d <= splashRadius && (typeof isFriendly === 'function' ? !isFriendly(attacker, other) : true)) {
-                                        const splashDmg = Math.floor(damage * (1 - (d / splashRadius) * 0.5));
-                                        if (typeof applyCalculatedDamage === 'function') {
-                                            applyCalculatedDamage(attacker, other, splashDmg, damageType || 'EXPLOSIVE');
-                                        } else {
-                                            other.health -= splashDmg;
-                                        }
+                        const splashSq = splashRadius * splashRadius;
+                        const px = this.toPos.x, pz = this.toPos.z;
+                        const uLists = [];
+                        if (typeof units !== 'undefined') uLists.push(units);
+                        if (typeof enemyUnits !== 'undefined') uLists.push(enemyUnits);
+                        for (let li = 0; li < uLists.length; li++) {
+                            const list = uLists[li];
+                            for (let ui = 0; ui < list.length; ui++) {
+                                const other = list[ui];
+                                if (!other || other === target || other.health <= 0 || !other.mesh) continue;
+                                const dx = other.mesh.position.x - px;
+                                const dz = other.mesh.position.z - pz;
+                                const dSq = dx * dx + dz * dz;
+                                if (dSq <= splashSq && (typeof isFriendly === 'function' ? !isFriendly(attacker, other) : true)) {
+                                    const d = Math.sqrt(dSq);
+                                    const splashDmg = Math.floor(damage * (1 - (d / splashRadius) * 0.5));
+                                    if (typeof applyCalculatedDamage === 'function') {
+                                        applyCalculatedDamage(attacker, other, splashDmg, damageType || 'EXPLOSIVE');
+                                    } else {
+                                        other.health -= splashDmg;
                                     }
                                 }
-                        });
+                            }
+                        }
                     }
                 }
 
@@ -3052,15 +3061,26 @@ function spawnParticleFirePatch(pos) {
                     spawnSmokePuff(patch.position, (fireLife % 28 === 0) ? 0xff6b1a : 0x2b2d32, 0.52);
                 }
                 if (fireLife % 20 === 0 && typeof applyCalculatedDamage === 'function') {
-                    const allU = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
-                    allU.forEach(u => {
-                            if (u.health > 0 && u.mesh && !u.isAir && u.mesh.position.distanceTo(patch.position) <= 5.5) {
+                    const pX = patch.position.x, pZ = patch.position.z;
+                    const patchRSq = 5.5 * 5.5;
+                    const uLists = [];
+                    if (typeof units !== 'undefined') uLists.push(units);
+                    if (typeof enemyUnits !== 'undefined') uLists.push(enemyUnits);
+                    for (let li = 0; li < uLists.length; li++) {
+                        const list = uLists[li];
+                        for (let ui = 0; ui < list.length; ui++) {
+                            const u = list[ui];
+                            if (!u || u.health <= 0 || !u.mesh || u.isAir) continue;
+                            const dx = u.mesh.position.x - pX;
+                            const dz = u.mesh.position.z - pZ;
+                            if (dx * dx + dz * dz <= patchRSq) {
                                 const cat = typeof getArmorCategory === 'function' ? getArmorCategory(u) : '';
                                 if (cat === 'infantry' || cat === 'light_vehicle') {
                                     applyCalculatedDamage(null, u, 10, 'FLAME');
                                 }
                             }
-                    });
+                        }
+                    }
                 }
                 if (fireLife <= 0) {
                     scene.remove(patch);
@@ -3419,27 +3439,41 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                         lastScorchPos.copy(group.position);
                     }
                 }
-                // Continuous high-frequency thermal damage tick (every 0.1s = 6 ticks; melts heavy tanks & structures in 1.5-2s)
+                // Continuous high-frequency thermal damage tick (every 0.1s = 6 ticks; zero-alloc + squared-distance — Issue #65)
                 if (life % 6 === 0) {
-                    const beamPos = group.position;
-                    [...units, ...enemyUnits].forEach(u => {
-                            if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(beamPos) <= 8.5) {
-                                if (typeof applyCalculatedDamage === 'function') {
-                                    applyCalculatedDamage(null, u, 55, 'LASER');
-                                } else {
-                                    u.health -= 55;
-                                }
+                    const bx = group.position.x, bz = group.position.z;
+                    const unitRSq = 8.5 * 8.5;
+                    const structRSq = 11.5 * 11.5;
+                    const uLists = [units, enemyUnits];
+                    for (let li = 0; li < 2; li++) {
+                        const list = uLists[li];
+                        if (!list) continue;
+                        for (let ui = 0; ui < list.length; ui++) {
+                            const u = list[ui];
+                            if (!u || u.health <= 0 || !u.mesh) continue;
+                            const dx = u.mesh.position.x - bx;
+                            const dz = u.mesh.position.z - bz;
+                            if (dx * dx + dz * dz <= unitRSq) {
+                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, 55, 'LASER');
+                                else u.health -= 55;
                             }
-                    });
-                    [...structures, ...enemyStructures].forEach(struct => {
-                            if (struct.health > 0 && struct.position && struct.position.distanceTo(beamPos) <= 11.5) {
-                                if (typeof applyCalculatedDamage === 'function') {
-                                    applyCalculatedDamage(null, struct, 85, 'LASER');
-                                } else {
-                                    struct.health -= 85;
-                                }
+                        }
+                    }
+                    const sLists = [structures, enemyStructures];
+                    for (let li = 0; li < 2; li++) {
+                        const list = sLists[li];
+                        if (!list) continue;
+                        for (let si = 0; si < list.length; si++) {
+                            const struct = list[si];
+                            if (!struct || struct.health <= 0 || !struct.position) continue;
+                            const dx = struct.position.x - bx;
+                            const dz = struct.position.z - bz;
+                            if (dx * dx + dz * dz <= structRSq) {
+                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, struct, 85, 'LASER');
+                                else struct.health -= 85;
                             }
-                    });
+                        }
+                    }
                 }
                 if (life % 12 === 0) {
                     spawnParticleFirePatch(group.position);
@@ -3652,34 +3686,44 @@ function animateNukeStrike(siloPos, targetPos) {
                                         const t = Math.min(1, (dist - NUKE_INNER_RADIUS) / (NUKE_OUTER_RADIUS - NUKE_INNER_RADIUS));
                                         return Math.round(3500 - t * (3500 - 300));
                                     };
-                                    const allUnits = [
-                                        ...(typeof units !== 'undefined' ? units : []),
-                                        ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])
-                                    ];
-                                    for (let i = 0; i < allUnits.length; i++) {
-                                        const u = allUnits[i];
-                                        if (!u || u.health <= 0 || !u.mesh) continue;
-                                        const dist = Math.hypot(u.mesh.position.x - blastCenter.x, u.mesh.position.z - blastCenter.z);
-                                        if (dist <= NUKE_OUTER_RADIUS) {
-                                            const dmg = computeNukeDamage(dist);
-                                            if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, dmg, 'EXPLOSIVE');
-                                            else u.health -= dmg;
+                                    const outerRSq = NUKE_OUTER_RADIUS * NUKE_OUTER_RADIUS;
+                                    const bcx = blastCenter.x, bcz = blastCenter.z;
+                                    const uLists = [];
+                                    if (typeof units !== 'undefined') uLists.push(units);
+                                    if (typeof enemyUnits !== 'undefined') uLists.push(enemyUnits);
+                                    for (let li = 0; li < uLists.length; li++) {
+                                        const list = uLists[li];
+                                        for (let i = 0; i < list.length; i++) {
+                                            const u = list[i];
+                                            if (!u || u.health <= 0 || !u.mesh) continue;
+                                            const dx = u.mesh.position.x - bcx;
+                                            const dz = u.mesh.position.z - bcz;
+                                            const dSq = dx * dx + dz * dz;
+                                            if (dSq <= outerRSq) {
+                                                const dmg = computeNukeDamage(Math.sqrt(dSq));
+                                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, dmg, 'EXPLOSIVE');
+                                                else u.health -= dmg;
+                                            }
                                         }
                                     }
-                                    const allStructs = [
-                                        ...(typeof structures !== 'undefined' ? structures : []),
-                                        ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])
-                                    ];
-                                    for (let i = 0; i < allStructs.length; i++) {
-                                        const st = allStructs[i];
-                                        if (!st || st.health <= 0) continue;
-                                        const pos = st.position || (st.mesh && st.mesh.position);
-                                        if (!pos) continue;
-                                        const dist = Math.hypot(pos.x - blastCenter.x, pos.z - blastCenter.z);
-                                        if (dist <= NUKE_OUTER_RADIUS) {
-                                            const dmg = computeNukeDamage(dist);
-                                            if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, dmg, 'EXPLOSIVE');
-                                            else st.health -= dmg;
+                                    const sLists = [];
+                                    if (typeof structures !== 'undefined') sLists.push(structures);
+                                    if (typeof enemyStructures !== 'undefined') sLists.push(enemyStructures);
+                                    for (let li = 0; li < sLists.length; li++) {
+                                        const list = sLists[li];
+                                        for (let i = 0; i < list.length; i++) {
+                                            const st = list[i];
+                                            if (!st || st.health <= 0) continue;
+                                            const pos = st.position || (st.mesh && st.mesh.position);
+                                            if (!pos) continue;
+                                            const dx = pos.x - bcx;
+                                            const dz = pos.z - bcz;
+                                            const dSq = dx * dx + dz * dz;
+                                            if (dSq <= outerRSq) {
+                                                const dmg = computeNukeDamage(Math.sqrt(dSq));
+                                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, dmg, 'EXPLOSIVE');
+                                                else st.health -= dmg;
+                                            }
                                         }
                                     }
                                 }
@@ -4181,28 +4225,45 @@ function animateScudStormStrike(stormPos, targetPos) {
                             }
                         });
 
-                        // Official ScudStormDamageWeapon damages ALL units & structures in blast radius with distance falloff
-                        const allU = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
-                        for (let ui = 0; ui < allU.length; ui++) {
-                            const u = allU[ui];
-                            if (!u || u.health <= 0 || !u.mesh) continue;
-                            const dist = Math.hypot(u.mesh.position.x - impactPos.x, u.mesh.position.z - impactPos.z);
-                            if (dist <= 13.5) {
-                                const dmg = Math.round(185 * Math.max(0.28, 1 - dist / 14.5));
-                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, dmg, 'EXPLOSIVE');
-                                else u.health -= dmg;
+                        // Official ScudStormDamageWeapon damages ALL units & structures in blast radius (zero-alloc + squared-distance)
+                        const impX = impactPos.x, impZ = impactPos.z;
+                        const uRadSq = 13.5 * 13.5;
+                        const sRadSq = 15.0 * 15.0;
+                        const uLists = [];
+                        if (typeof units !== 'undefined') uLists.push(units);
+                        if (typeof enemyUnits !== 'undefined') uLists.push(enemyUnits);
+                        for (let li = 0; li < uLists.length; li++) {
+                            const list = uLists[li];
+                            for (let ui = 0; ui < list.length; ui++) {
+                                const u = list[ui];
+                                if (!u || u.health <= 0 || !u.mesh) continue;
+                                const dx = u.mesh.position.x - impX;
+                                const dz = u.mesh.position.z - impZ;
+                                const dSq = dx * dx + dz * dz;
+                                if (dSq <= uRadSq) {
+                                    const dmg = Math.round(185 * Math.max(0.28, 1 - Math.sqrt(dSq) / 14.5));
+                                    if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, dmg, 'EXPLOSIVE');
+                                    else u.health -= dmg;
+                                }
                             }
                         }
-                        const allS = [...(typeof structures !== 'undefined' ? structures : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
-                        for (let si = 0; si < allS.length; si++) {
-                            const st = allS[si];
-                            const sp = st && (st.position || (st.mesh && st.mesh.position));
-                            if (!st || st.health <= 0 || !sp) continue;
-                            const dist = Math.hypot(sp.x - impactPos.x, sp.z - impactPos.z);
-                            if (dist <= 15.0) {
-                                const dmg = Math.round(220 * Math.max(0.30, 1 - dist / 16.0));
-                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, dmg, 'EXPLOSIVE');
-                                else st.health -= dmg;
+                        const sLists = [];
+                        if (typeof structures !== 'undefined') sLists.push(structures);
+                        if (typeof enemyStructures !== 'undefined') sLists.push(enemyStructures);
+                        for (let li = 0; li < sLists.length; li++) {
+                            const list = sLists[li];
+                            for (let si = 0; si < list.length; si++) {
+                                const st = list[si];
+                                const sp = st && (st.position || (st.mesh && st.mesh.position));
+                                if (!st || st.health <= 0 || !sp) continue;
+                                const dx = sp.x - impX;
+                                const dz = sp.z - impZ;
+                                const dSq = dx * dx + dz * dz;
+                                if (dSq <= sRadSq) {
+                                    const dmg = Math.round(220 * Math.max(0.30, 1 - Math.sqrt(dSq) / 16.0));
+                                    if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, dmg, 'EXPLOSIVE');
+                                    else st.health -= dmg;
+                                }
                             }
                         }
 
