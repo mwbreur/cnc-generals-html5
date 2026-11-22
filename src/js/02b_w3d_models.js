@@ -1216,6 +1216,12 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         const _vb = new THREE.Vector3();
         root.traverse(c => {
             if (c.isMesh && c.geometry && c.geometry.attributes && c.geometry.attributes.position) {
+                // Ignore hidden/stowed underground subtrees (e.g. stowed nuke rocket or particle dish)
+                let visCheck = c;
+                while (visCheck && visCheck !== root) {
+                    if (visCheck.visible === false) return;
+                    visCheck = visCheck.parent;
+                }
                 const pos = c.geometry.attributes.position;
                 for (let i = 0; i < pos.count; i++) {
                     _vb.set(pos.getX(i), pos.getY(i), pos.getZ(i));
@@ -1241,6 +1247,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         buildingKey === 'tech_oilDerrick' ||
         buildingKey === 'civilian_hangar_g' ||
         buildingKey === 'gla_scudStorm' ||
+        buildingKey === 'china_nukeSilo' ||
         buildingKey === 'china_speakerTower' ||
         buildingKey === 'civilian_bunker' ||
         buildingKey === 'civilian_bunker_g'
