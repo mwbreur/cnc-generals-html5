@@ -1691,6 +1691,9 @@ function executeWeaponFireInner(attacker, target) {
                 spawnBulletTracer(mPosR, targetPos, isHeroic ? heroicTracerColor : 0xffb142, 3.5 * heroicScale);
             }
         } else if (isScorpion && (attacker.salvageLevel >= 1 || (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('scorpionRocket')))) {
+            if (attacker.salvageLevel >= 1) {
+                tkDmg = Math.round(tkDmg * (attacker.salvageLevel >= 2 ? 1.6 : 1.35));
+            }
             // Secondary Scorpion Rocket (from turret rocket rack; apRockets applied in applyCalculatedDamage)
             const rackNode = getCachedNode(attacker.mesh, 'WEAPONA01') || getCachedNode(attacker.mesh, 'MISSLERACK01');
             const rocketPos = rackNode ? rackNode.getWorldPosition(new THREE.Vector3()) : muzzlePos;

@@ -3889,7 +3889,7 @@ function processScrapCrateCollection() {
         const crate = activeScrapCrates[cIdx];
         if (!crate || !crate.mesh) continue;
 
-        const weaponSalvagers = ['technical', 'scorpion', 'marauder', 'quad', 'buggy', 'toxintractor'];
+        const weaponSalvagers = ['technical', 'scorpion', 'marauder', 'quad', 'buggy', 'toxintractor', 'battlebus'];
         const glaSalvagers = [...weaponSalvagers, 'scud', 'bombtruck', 'radarvan'];
         for (let u of allLivingUnits) {
             if (u.health > 0 && u.mesh && glaSalvagers.includes(u.type)) {
@@ -3908,8 +3908,12 @@ function processScrapCrateCollection() {
                     if (weaponSalvagers.includes(u.type) && (u.salvageLevel || 0) < 2) {
                         u.salvageLevel = (u.salvageLevel || 0) + 1;
                         if (u.salvageLevel === 1) {
+                            if (u.type === 'battlebus') {
+                                u.maxHealth = Math.floor(u.maxHealth * 1.15);
+                                u.health = Math.min(u.maxHealth, u.health + Math.floor(u.maxHealth * 0.2));
+                            }
                             if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(u)) {
-                                showNotification(`★ ${u.type.toUpperCase()} salvaged scrap: WEAPONS UPGRADED!`, 'success');
+                                showNotification(`★ ${u.type.toUpperCase()} salvaged scrap: ${u.type === 'battlebus' ? 'ARMOR PLATING' : 'WEAPONS'} UPGRADED!`, 'success');
                             }
                         } else if (u.salvageLevel === 2) {
                             u.maxHealth = Math.floor(u.maxHealth * 1.3);
