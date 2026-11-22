@@ -30,21 +30,27 @@ function canUnitTarget(attacker, target) {
 }
 if (typeof window !== 'undefined') window.canUnitTarget = canUnitTarget;
 
-// Checks whether a hostile target at targetPos is within the unit's own VisionRange or spotted by an allied unit/structure
+// Checks whether a hostile target at targetPos is revealed by the unit's own ShroudClearingRange or spotted by an allied unit/structure
 function isTargetSpottedForUnit(unit, targetPos, targetRadius = 0) {
     if (!unit || !unit.mesh || !targetPos) return false;
     const uPos = unit.mesh.position;
-    const ownVision = (unit.visionRange !== undefined ? unit.visionRange : unit.scanRange) + targetRadius;
+    const baseOwnSight = (typeof getOfficialVisionRange === 'function')
+        ? getOfficialVisionRange(unit)
+        : (unit.visionRange !== undefined ? unit.visionRange : unit.scanRange);
+    const ownVision = Math.max(baseOwnSight || 0, unit.visionRange || 0) + targetRadius;
     const dx = uPos.x - targetPos.x, dz = uPos.z - targetPos.z;
     if (dx * dx + dz * dz <= ownVision * ownVision) return true;
 
-    // Beyond own VisionRange (e.g. Tomahawk/NukeCannon/SCUD/Inferno artillery): requires friendly spotter
+    // Beyond own ShroudClearingRange (e.g. Tomahawk 43u -> 75.6u, SCUD 65u -> 75.6u): requires friendly spotter
     const friendUnits = unit.isAI ? (typeof enemyUnits !== 'undefined' ? enemyUnits : []) : (typeof units !== 'undefined' ? units : []);
     for (let i = 0; i < friendUnits.length; i++) {
         const f = friendUnits[i];
         if (!f || f === unit || f.health <= 0 || !f.mesh) continue;
         if (typeof isFriendly === 'function' && !isFriendly(unit, f)) continue;
-        const fVis = (f.visionRange !== undefined ? f.visionRange : (f.scanRange || 24)) + targetRadius;
+        const baseFSight = (typeof getOfficialVisionRange === 'function')
+            ? getOfficialVisionRange(f)
+            : (f.visionRange !== undefined ? f.visionRange : (f.scanRange || 24));
+        const fVis = Math.max(baseFSight || 0, f.visionRange || 0) + targetRadius;
         const fdx = f.mesh.position.x - targetPos.x, fdz = f.mesh.position.z - targetPos.z;
         if (fdx * fdx + fdz * fdz <= fVis * fVis) return true;
     }

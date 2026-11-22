@@ -120,7 +120,7 @@ const INIZH_SHROUD_RANGE = {
     comanche: 130, chinook: 130, aurora: 130, raptor: 86, mig: 65, stealthfighter: 65,
     // Battle Tanks & Artillery
     tank: 65, crusader: 65, paladin: 65, battlemaster: 65, scorpion: 65, marauder: 65,
-    quad: 65, buggy: 65, inferno: 65, scud: 65, nukecannon: 65, nuketank: 65, truck: 65,
+    quad: 65, buggy: 65, inferno: 65, scud: 65, nukecannon: 76, nuketank: 76, truck: 65,
     overlord: 43, dragon: 43, toxintractor: 43, tomahawk: 43, dozer: 43, technical: 54, bombtruck: 43, battlebus: 43,
     // Base Defenses
     stingerSite: 86, patriot: 78, gatlingCannon: 78, bunker: 54, tunnel: 54,
