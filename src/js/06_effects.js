@@ -1907,6 +1907,7 @@ function spawnLingeringToxinCloud(pos, radius = 4.2, durationTicks = 600, custom
     scene.add(cloud);
 
     activeFX.push({
+            persistent: radius > 7,
             mesh: cloud,
             pos: pos.clone(),
             life: durationTicks,
@@ -2789,16 +2790,55 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
 
     // Optional Uplink Beam shooting straight up from the Particle Cannon structure into orbit
     let uplinkGroup = null;
+    const uplinkRings = [];
     if (uplinkPos) {
         uplinkGroup = new THREE.Group();
         uplinkGroup.position.copy(uplinkPos);
-        const upGeo = new THREE.CylinderGeometry(0.45, 0.45, 110, 12);
-        const upMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.85 });
-        const upMesh = new THREE.Mesh(upGeo, upMat);
-        upMesh.position.y = 57;
-        uplinkGroup.add(upMesh);
+        const upCore = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.32, 0.42, 120, 12),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.96, depthWrite: false, ...addBlend })
+        );
+        upCore.position.y = 62;
+        uplinkGroup.add(upCore);
+        const upSheath = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.05, 1.35, 120, 14, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0x00d8ff, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, ...addBlend })
+        );
+        upSheath.position.y = 62;
+        uplinkGroup.add(upSheath);
+        for (let ur = 0; ur < 4; ur++) {
+            const urGeo = new THREE.RingGeometry(1.1, 1.7, 20);
+            urGeo.rotateX(-Math.PI / 2);
+            const urMesh = new THREE.Mesh(urGeo, new THREE.MeshBasicMaterial({ color: 0x74f0ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, ...addBlend }));
+            urMesh.position.y = 4 + ur * 26;
+            uplinkGroup.add(urMesh);
+            uplinkRings.push(urMesh);
+        }
         scene.add(uplinkGroup);
     }
+
+    // Outer wide atmospheric electric-blue bloom sheath around the main orbital beam
+    const outerBloomGeo = new THREE.CylinderGeometry(2.6, 4.4, 115, 20, 1, true);
+    const outerBloomMat = new THREE.MeshBasicMaterial({ color: 0x0077ff, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false, ...addBlend });
+    const outerBloom = new THREE.Mesh(outerBloomGeo, outerBloomMat);
+    outerBloom.position.y = 57;
+    outerBloom.renderOrder = 4;
+    group.add(outerBloom);
+
+    const disposeParticleBeam = () => {
+        window.activeParticleCannonTarget = null;
+        window.activeParticleCannonPlayerOwned = false;
+        window.activeParticleCannonControl = false;
+        if (isPlayerOwned) setParticleBeamCursor(false);
+        scene.remove(group);
+        if (glowTex && typeof glowTex.dispose === 'function') glowTex.dispose();
+        group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        if (uplinkGroup) {
+            scene.remove(uplinkGroup);
+            uplinkGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+            uplinkGroup = null;
+        }
+    };
 
     let life = duration;
     const originCenter = targetPos.clone();
@@ -2807,24 +2847,21 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
             persistent: true,
             group: group,
             life: duration,
+            dispose: disposeParticleBeam,
             update() {
                 life--;
                 // Low-Power shutoff: if owner's base enters Low Power while firing, shut off beam immediately
                 if (isPlayerOwned && typeof window !== 'undefined' && window.isPlayerLowPower) {
-                    window.activeParticleCannonTarget = null;
-                    window.activeParticleCannonPlayerOwned = false;
-                    window.activeParticleCannonControl = false;
-                    setParticleBeamCursor(false);
-                    scene.remove(group);
-                    group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
-                    if (uplinkGroup) {
-                        scene.remove(uplinkGroup);
-                        uplinkGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
-                    }
+                    disposeParticleBeam();
                     if (typeof showNotification === 'function') {
                         showNotification('⚡ PARTICLE CANNON OFFLINE: Low Power — beam shut off!', 'error');
                     }
                     return false;
+                }
+                // Animate ascending orbital uplink energy rings
+                for (let ui = 0; ui < uplinkRings.length; ui++) {
+                    uplinkRings[ui].position.y += 2.6;
+                    if (uplinkRings[ui].position.y > 112) uplinkRings[ui].position.y = 4;
                 }
                 // Sit steadily on target when uncontrolled, or sweep in a straight line toward player's steered target
                 if (window.activeParticleCannonTarget) {
@@ -2845,38 +2882,42 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                 const pulse = 0.92 + Math.sin(life * 0.6) * 0.16;
                 coreBeam.scale.set(pulse, 1, pulse);
                 beam.scale.set(1.0 + Math.cos(life * 0.4) * 0.18, 1, 1.0 + Math.cos(life * 0.4) * 0.18);
+                outerBloom.scale.set(1.0 + Math.sin(life * 0.35) * 0.22, 1, 1.0 + Math.sin(life * 0.35) * 0.22);
                 flareDisc.scale.setScalar(0.92 + Math.sin(life * 0.5) * 0.22);
                 plasmaDome.scale.set(1.3 + Math.sin(life * 0.45) * 0.18, 1.8 + Math.cos(life * 0.55) * 0.25, 1.3 + Math.sin(life * 0.45) * 0.18);
                 impactCore.scale.setScalar(0.85 + Math.cos(life * 0.7) * 0.2);
 
                 rings.forEach((r, idx) => {
                         r.rotation.z += 0.16 * (idx % 2 === 0 ? 1 : -1);
-                        r.scale.setScalar(1 + Math.sin(Date.now() * 0.02 + idx) * 0.22);
+                        r.position.y -= 1.15;
+                        if (r.position.y < 1.0) r.position.y = 75;
+                        r.scale.setScalar(1 + Math.sin(Date.now() * 0.02 + idx) * 0.24);
                 });
 
                 // Ground electrical sizzle, molten scorch, shockwave rings & sparks
-                if (Math.random() < 0.9) {
-                    spawnSparks(group.position, 0x00f2fe, 10);
-                    if (Math.random() < 0.5) spawnSparks(group.position, 0xffffff, 5);
-                    spawnSmokePuff(group.position, 0x222f3e, 0.75);
+                if (Math.random() < 0.92) {
+                    spawnSparks(group.position, 0x00f2fe, 12);
+                    if (Math.random() < 0.6) spawnSparks(group.position, 0xffffff, 6);
+                    spawnSmokePuff(group.position, 0x222f3e, 0.95);
                 }
-                if (life % 16 === 0) {
+                if (life % 14 === 0) {
                     if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(group.position, 24, 90);
-                    const swGeo = new THREE.RingGeometry(1.6, 3.0, 24);
+                    const swGeo = new THREE.RingGeometry(1.6, 3.2, 28);
                     swGeo.rotateX(-Math.PI / 2);
                     const swMat = new THREE.MeshBasicMaterial({ color: 0x48dbfb, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false, depthTest: false, ...addBlend });
                     const sw = new THREE.Mesh(swGeo, swMat);
                     sw.position.set(group.position.x, group.position.y + 0.75, group.position.z);
                     sw.renderOrder = 10;
                     scene.add(sw);
-                    let swLife = 22;
+                    let swLife = 24;
                     activeFX.push({
+                            mesh: sw,
                             life: swLife,
                             update() {
                                 swLife--;
-                                const prog = 1 - swLife / 22;
-                                sw.scale.setScalar(1 + prog * 3.8);
-                                swMat.opacity = 0.9 * (1 - prog);
+                                const prog = 1 - swLife / 24;
+                                sw.scale.setScalar(1 + prog * 4.4);
+                                swMat.opacity = 0.92 * (1 - prog);
                                 if (swLife <= 0) {
                                     scene.remove(sw);
                                     swGeo.dispose();
@@ -2912,29 +2953,19 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                                 }
                             }
                     });
-                    if (Math.random() < 0.35) {
-                        spawnCraterDecal(beamPos, 2.6, 360, 'ion');
-                    }
+                    // Continuous molten scorch trail along the beam's path (iconic Zero Hour Particle Cannon burn scar)
+                    spawnCraterDecal(beamPos, 3.4, 720, 'ion');
                 }
-                if (life % 14 === 0) {
+                if (life % 12 === 0) {
                     spawnParticleFirePatch(group.position);
                     if (life % 70 === 0 && typeof playAudio === 'function') playAudio('particle_annihilate', { volume: 0.72 });
                 }
 
                 if (life <= 0) {
-                    window.activeParticleCannonTarget = null;
-                    window.activeParticleCannonPlayerOwned = false;
-                    window.activeParticleCannonControl = false;
-                    if (isPlayerOwned) setParticleBeamCursor(false);
-                    scene.remove(group);
-                    if (glowTex && typeof glowTex.dispose === 'function') glowTex.dispose();
-                    group.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
-                    if (uplinkGroup) {
-                        scene.remove(uplinkGroup);
-                        uplinkGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
-                    }
-                    spawnEnhancedExplosion(group.position, 0x00d2d3, 3.0, true, 'particle_annihilate');
-                    spawnCraterDecal(group.position, 4.2, 480);
+                    const finalPos = group.position.clone();
+                    disposeParticleBeam();
+                    spawnEnhancedExplosion(finalPos, 0x00d2d3, 3.4, true, 'particle_annihilate');
+                    spawnCraterDecal(finalPos, 5.2, 900, 'ion');
                     return false;
                 }
                 return true;
@@ -3142,38 +3173,75 @@ function animateNukeStrike(siloPos, targetPos) {
                                 if (!radSpawned && detTick >= 105) {
                                     radSpawned = true;
                                     const radGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(blastCenter.x, blastCenter.z) : 0;
+                                    const radGroup = new THREE.Group();
+                                    radGroup.position.set(blastCenter.x, radGroundY + 0.22, blastCenter.z);
                                     const radTex = _getFxSpriteTex('smoke');
-                                    const radGeo = new THREE.PlaneGeometry(NUKE_RAD_RADIUS * 2, NUKE_RAD_RADIUS * 2);
-                                    radGeo.rotateX(-Math.PI / 2);
-                                    const radPool = new THREE.Mesh(
-                                        radGeo,
-                                        new THREE.MeshBasicMaterial({
-                                            ...(radTex ? { map: radTex } : {}),
-                                            color: 0x9be824,
-                                            transparent: true,
-                                            opacity: 0.42,
-                                            depthWrite: false,
-                                            blending: THREE.AdditiveBlending,
-                                            polygonOffset: true,
-                                            polygonOffsetFactor: -2,
-                                            polygonOffsetUnits: -2
-                                        })
-                                    );
-                                    radPool.position.set(blastCenter.x, radGroundY + 0.22, blastCenter.z);
-                                    scene.add(radPool);
+                                    const flashTex = _getFxSpriteTex('flash');
+                                    const addB = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
+
+                                    const outerGeo = new THREE.PlaneGeometry(NUKE_RAD_RADIUS * 2.05, NUKE_RAD_RADIUS * 2.05);
+                                    outerGeo.rotateX(-Math.PI / 2);
+                                    const outerMat = new THREE.MeshBasicMaterial({
+                                        ...(radTex ? { map: radTex } : {}),
+                                        color: 0x76e018,
+                                        transparent: true,
+                                        opacity: 0.42,
+                                        depthWrite: false,
+                                        polygonOffset: true,
+                                        polygonOffsetFactor: -2,
+                                        polygonOffsetUnits: -2,
+                                        ...addB
+                                    });
+                                    const outerDisc = new THREE.Mesh(outerGeo, outerMat);
+                                    radGroup.add(outerDisc);
+
+                                    const innerGeo = new THREE.PlaneGeometry(NUKE_RAD_RADIUS * 1.15, NUKE_RAD_RADIUS * 1.15);
+                                    innerGeo.rotateX(-Math.PI / 2);
+                                    const innerMat = new THREE.MeshBasicMaterial({
+                                        ...(flashTex ? { map: flashTex } : {}),
+                                        color: 0xc2ff38,
+                                        transparent: true,
+                                        opacity: 0.36,
+                                        depthWrite: false,
+                                        polygonOffset: true,
+                                        polygonOffsetFactor: -3,
+                                        polygonOffsetUnits: -3,
+                                        ...addB
+                                    });
+                                    const innerDisc = new THREE.Mesh(innerGeo, innerMat);
+                                    innerDisc.position.y = 0.06;
+                                    radGroup.add(innerDisc);
+                                    scene.add(radGroup);
+
+                                    const disposeRad = () => {
+                                        scene.remove(radGroup);
+                                        radGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+                                    };
 
                                     let radTicks = 0;
                                     const radDuration = 1800; // Official INIZH.big LifetimeUpdate = 30000ms (30s)
                                     activeFX.push({
+                                        persistent: true,
+                                        group: radGroup,
                                         life: radDuration,
+                                        dispose: disposeRad,
                                         update() {
                                             radTicks++;
-                                            const fadeOut = Math.min(1, (radDuration - radTicks) / 210);
-                                            radPool.material.opacity = fadeOut * (0.30 + 0.10 * Math.sin(radTicks * 0.10));
-                                            if (radTicks % 10 === 0 && typeof spawnSmokePuff === 'function' && activeFX.length < 480) {
+                                            const fadeIn = Math.min(1, radTicks / 45);
+                                            const fadeOut = Math.min(1, (radDuration - radTicks) / 240);
+                                            const env = fadeIn * fadeOut;
+                                            outerMat.opacity = env * (0.30 + 0.10 * Math.sin(radTicks * 0.09));
+                                            innerMat.opacity = env * (0.28 + 0.12 * Math.cos(radTicks * 0.13));
+                                            outerDisc.rotation.y += 0.0025;
+                                            innerDisc.rotation.y -= 0.004;
+                                            if (radTicks % 8 === 0 && typeof spawnSmokePuff === 'function' && activeFX.length < 440) {
                                                 const ang = Math.random() * Math.PI * 2;
                                                 const rr = Math.sqrt(Math.random()) * (NUKE_RAD_RADIUS * 0.88);
-                                                spawnSmokePuff(new THREE.Vector3(blastCenter.x + Math.cos(ang) * rr, radGroundY + 0.5, blastCenter.z + Math.sin(ang) * rr), 0xa8f030, 1.05);
+                                                spawnSmokePuff(
+                                                    new THREE.Vector3(blastCenter.x + Math.cos(ang) * rr, radGroundY + 0.55, blastCenter.z + Math.sin(ang) * rr),
+                                                    (radTicks % 16 === 0) ? 0xc2ff38 : 0x76e018,
+                                                    1.35 + Math.random() * 0.65
+                                                );
                                             }
                                             if (radTicks % 45 === 0) {
                                                 const allGround = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
@@ -3186,9 +3254,7 @@ function animateNukeStrike(siloPos, targetPos) {
                                                 }
                                             }
                                             if (radTicks >= radDuration) {
-                                                scene.remove(radPool);
-                                                radPool.geometry.dispose();
-                                                radPool.material.dispose();
+                                                disposeRad();
                                                 return false;
                                             }
                                             return true;
@@ -3208,110 +3274,204 @@ function animateNukeStrike(siloPos, targetPos) {
 }
 
 function spawnMushroomCloud(pos, scaleMult = 1.0, shockwaveTargetRadius = null) {
+    if (!pos || typeof scene === 'undefined') return;
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : 0;
+    const fireTex = _getFxSpriteTex('fireball');
+    const smokeTex = _getFxSpriteTex('smoke');
+    const flashTex = _getFxSpriteTex('flash');
+    const addBlend = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
 
-    // 0. Blinding initial white-gold thermal flash dome
-    const flashGeo = new THREE.SphereGeometry(5.5 * scaleMult, 20, 20);
-    const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 });
-    const flashDome = new THREE.Mesh(flashGeo, flashMat);
-    flashDome.position.set(pos.x, groundY + 1.5, pos.z);
-    scene.add(flashDome);
+    // Brief iconic Zero Hour blinding white-gold thermal screen flash (full-scale nukes only)
+    if (shockwaveTargetRadius && typeof document !== 'undefined' && document.body && document.createElement) {
+        try {
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;background:radial-gradient(circle, rgba(255,255,240,0.85) 0%, rgba(255,210,120,0.45) 55%, rgba(255,140,40,0) 100%);opacity:0.95;transition:opacity 0.55s ease-out;';
+            document.body.appendChild(ov);
+            requestAnimationFrame(() => { ov.style.opacity = '0'; });
+            setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 650);
+        } catch (_) {}
+    }
 
-    // 1. Colossal expanding mushroom cap + rolling torus rim
-    const capGeo = new THREE.SphereGeometry(3.8 * scaleMult, 20, 20);
-    const capMat = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.96 });
-    const cap = new THREE.Mesh(capGeo, capMat);
-    cap.position.set(pos.x, groundY + 4 * scaleMult, pos.z);
-    scene.add(cap);
+    const cloudGroup = new THREE.Group();
+    cloudGroup.position.set(pos.x, groundY, pos.z);
+    scene.add(cloudGroup);
 
-    const torusGeo = new THREE.TorusGeometry(3.2 * scaleMult, 1.35 * scaleMult, 12, 24);
-    torusGeo.rotateX(Math.PI / 2);
-    const torusMat = new THREE.MeshBasicMaterial({ color: 0xff9f43, transparent: true, opacity: 0.9 });
-    const torusRing = new THREE.Mesh(torusGeo, torusMat);
-    torusRing.position.set(pos.x, groundY + 3.5 * scaleMult, pos.z);
-    scene.add(torusRing);
+    // 0. Blinding thermal flash billboard + expanding ground glare
+    const flashMat = new THREE.SpriteMaterial({
+        ...(flashTex ? { map: flashTex } : {}),
+        color: 0xfffbe6,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        ...addBlend
+    });
+    const flashSprite = new THREE.Sprite(flashMat);
+    flashSprite.position.set(0, 6.0 * scaleMult, 0);
+    flashSprite.scale.set(16 * scaleMult, 16 * scaleMult, 1);
+    cloudGroup.add(flashSprite);
 
-    // 2. Vertical rising fireball & dust stem
-    const stemGeo = new THREE.CylinderGeometry(1.4 * scaleMult, 2.6 * scaleMult, 14 * scaleMult, 14);
-    const stemMat = new THREE.MeshBasicMaterial({ color: 0xd35400, transparent: true, opacity: 0.88 });
-    const stem = new THREE.Mesh(stemGeo, stemMat);
-    stem.position.set(pos.x, groundY + 7 * scaleMult, pos.z);
-    scene.add(stem);
+    // 1. Volumetric Mushroom Cloud built from layered soft fireball/smoke sprites (NO cartoon solid spheres/cylinders!)
+    const capPuffs = [];
+    const stemPuffs = [];
+    const skirtPuffs = [];
+    const makePuff = (tex, colorHex, additive, baseSize) => {
+        const mat = new THREE.SpriteMaterial({
+            ...(tex ? { map: tex } : {}),
+            color: colorHex,
+            transparent: true,
+            opacity: 0.92,
+            depthWrite: false,
+            ...(additive ? addBlend : {})
+        });
+        const sp = new THREE.Sprite(mat);
+        sp.scale.set(baseSize, baseSize, 1);
+        cloudGroup.add(sp);
+        return sp;
+    };
 
-    // 3. Dual supersonic shockwave rings (ground & atmospheric Mach condensation ring)
+    // 1a. Rolling Toroidal Mushroom Cap (16 layered billowing fireball + soot sprites)
+    for (let i = 0; i < 16; i++) {
+        const isRing = i < 11;
+        const ang = isRing ? ((i / 11) * Math.PI * 2) : (((i - 11) / 5) * Math.PI * 2 + 0.4);
+        const radFrac = isRing ? (0.85 + (i % 2) * 0.22) : 0.35;
+        const yOff = isRing ? ((i % 2) * 1.4 - 0.8) : (2.6 + (i % 3) * 0.8);
+        const baseSz = (isRing ? 8.5 : 10.5) * scaleMult;
+        const isInnerGlow = (i % 3 === 0);
+        const sp = makePuff(isInnerGlow ? fireTex : smokeTex, isInnerGlow ? 0xffb142 : 0xff6b35, isInnerGlow, baseSz);
+        capPuffs.push({ sp, ang, radFrac, yOff, baseSz, isInnerGlow, phase: i * 0.7 });
+    }
+
+    // 1b. Churning Vertical Fireball & Dust Stem (10 stacked billowing sprites)
+    for (let i = 0; i < 10; i++) {
+        const frac = i / 9;
+        const baseSz = (6.8 - frac * 1.8) * scaleMult;
+        const isHot = i % 2 === 0;
+        const sp = makePuff(isHot ? fireTex : smokeTex, isHot ? 0xff793f : 0x8b4513, false, baseSz);
+        stemPuffs.push({ sp, frac, baseSz, ang: i * 1.3, wobble: (0.4 + (i % 3) * 0.35) * scaleMult });
+    }
+
+    // 1c. Ground-Hugging Base Surge / Dust Skirt (10 outward-rolling shock-dust clouds)
+    for (let i = 0; i < 10; i++) {
+        const ang = (i / 10) * Math.PI * 2 + (i % 2) * 0.15;
+        const baseSz = (7.2 + (i % 3) * 1.2) * scaleMult;
+        const sp = makePuff(smokeTex, i % 2 === 0 ? 0xd2b48c : 0x7f6a52, false, baseSz);
+        skirtPuffs.push({ sp, ang, baseSz });
+    }
+
+    // 2. Dual Supersonic Shockwave Rings (ground blast front + atmospheric Wilson condensation ring)
     const baseShockOuter = 4.8 * scaleMult;
-    const ringGeo = new THREE.RingGeometry(1.8 * scaleMult, baseShockOuter, 48);
+    const ringGeo = new THREE.RingGeometry(2.6 * scaleMult, baseShockOuter, 56);
     ringGeo.rotateX(-Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffa502, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffeaa7, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false, ...addBlend });
     const shockwave = new THREE.Mesh(ringGeo, ringMat);
-    shockwave.position.set(pos.x, groundY + 0.35, pos.z);
-    scene.add(shockwave);
+    shockwave.position.set(0, 0.45, 0);
+    cloudGroup.add(shockwave);
 
-    const machGeo = new THREE.RingGeometry(2.2 * scaleMult, 3.0 * scaleMult, 36);
+    const machGeo = new THREE.RingGeometry(4.2 * scaleMult, 6.0 * scaleMult, 48);
     machGeo.rotateX(-Math.PI / 2);
-    const machMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+    const machMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false });
     const machRing = new THREE.Mesh(machGeo, machMat);
-    machRing.position.set(pos.x, groundY + 9 * scaleMult, pos.z);
-    scene.add(machRing);
+    machRing.position.set(0, 12 * scaleMult, 0);
+    cloudGroup.add(machRing);
 
-    // 4. Persistent nuclear scorched crater (skipped when caller spawns a calibrated full-scale nuke crater)
+    // 3. Persistent nuclear scorched crater (skipped when caller spawns a calibrated full-scale nuke crater)
     if (!shockwaveTargetRadius) {
         spawnCraterDecal(pos, 8.0 * scaleMult, 1200, 'nuke');
     }
 
-    const maxLife = Math.round(95 * Math.max(0.6, scaleMult));
+    const disposeCloud = () => {
+        scene.remove(cloudGroup);
+        cloudGroup.traverse(c => {
+            if (c.geometry) c.geometry.dispose();
+            if (c.material) c.material.dispose();
+        });
+    };
+
+    const maxLife = Math.round(240 * Math.max(0.65, Math.min(1.6, scaleMult))); // ~6.4s dramatic billowing cloud for full nuke
     let life = maxLife;
     const maxShockScale = shockwaveTargetRadius ? (shockwaveTargetRadius / baseShockOuter) : 8.2;
+    const cHot = new THREE.Color(0xffb142);
+    const cOrange = new THREE.Color(0xd35400);
+    const cSoot = new THREE.Color(0x3a3836);
+
     activeFX.push({
+            persistent: true,
+            group: cloudGroup,
             life: maxLife,
+            dispose: disposeCloud,
             update() {
                 life--;
                 const progress = 1 - (life / maxLife);
+                const easeOut = 1 - Math.pow(1 - progress, 2.2);
+                const fadeTail = progress > 0.62 ? Math.max(0, 1 - (progress - 0.62) / 0.38) : 1.0;
 
-                // Thermal flash rapidly expands and fades in first 25% of lifetime
-                if (progress < 0.28) {
-                    const fp = progress / 0.28;
-                    flashDome.scale.setScalar(1 + fp * 3.8);
-                    flashDome.material.opacity = Math.max(0, 1.0 - fp);
+                // Thermal flash expands explosively and fades in first 16%
+                if (progress < 0.18) {
+                    const fp = progress / 0.18;
+                    const fs = (16 + fp * 48) * scaleMult;
+                    flashSprite.scale.set(fs, fs, 1);
+                    flashMat.opacity = Math.max(0, 1.0 - fp * fp);
                 } else {
-                    flashDome.visible = false;
+                    flashSprite.visible = false;
                 }
 
-                // Cap & Torus expand and billow upward
-                const riseY = groundY + (4 + progress * 22) * scaleMult;
-                cap.position.y = riseY;
-                cap.scale.set(1 + progress * 4.0, 1 + progress * 2.5, 1 + progress * 4.0);
-                cap.material.opacity = Math.max(0, 0.96 - progress * 0.88);
-                if (progress > 0.45) cap.material.color.setHex(0x57606f);
+                // Cap rises from Y=5 -> Y=30*scaleMult, expands radially into a rolling mushroom dome, cools orange -> soot grey
+                const capHeight = (5.0 + easeOut * 24.0) * scaleMult;
+                const capRadius = (2.8 + easeOut * 11.5) * scaleMult;
+                for (let i = 0; i < capPuffs.length; i++) {
+                    const cp = capPuffs[i];
+                    const r = capRadius * cp.radFrac;
+                    const swirl = cp.ang + progress * 0.45;
+                    cp.sp.position.set(Math.cos(swirl) * r, capHeight + cp.yOff * (0.6 + easeOut * 1.1) * scaleMult, Math.sin(swirl) * r);
+                    const sz = cp.baseSz * (0.7 + easeOut * 1.45);
+                    cp.sp.scale.set(sz, sz * 0.82, 1);
+                    if (cp.isInnerGlow) {
+                        cp.sp.material.opacity = Math.max(0, (1 - Math.min(1, progress / 0.58)) * 0.9);
+                    } else {
+                        const coolT = Math.min(1, Math.max(0, (progress - 0.18) / 0.45));
+                        cp.sp.material.color.copy(cOrange).lerp(cSoot, coolT);
+                        cp.sp.material.opacity = fadeTail * 0.86;
+                    }
+                }
 
-                torusRing.position.y = riseY - 1.2 * scaleMult;
-                torusRing.scale.set(1 + progress * 3.8, 1 + progress * 3.8, 1 + progress * 2.2);
-                torusRing.material.opacity = Math.max(0, 0.9 - progress * 0.85);
+                // Stem stretches upward smoothly beneath the cap
+                for (let i = 0; i < stemPuffs.length; i++) {
+                    const st = stemPuffs[i];
+                    const y = (1.5 + st.frac * (capHeight - 2.5 * scaleMult));
+                    const w = st.wobble * (0.4 + progress * 0.9);
+                    st.sp.position.set(Math.cos(st.ang + progress) * w, y, Math.sin(st.ang + progress) * w);
+                    const sz = st.baseSz * (0.65 + easeOut * 1.15);
+                    st.sp.scale.set(sz, sz * 1.15, 1);
+                    const coolT = Math.min(1, Math.max(0, (progress - 0.12) / 0.42));
+                    st.sp.material.color.copy(cHot).lerp(cSoot, coolT);
+                    st.sp.material.opacity = fadeTail * 0.78;
+                }
 
-                // Stem stretches
-                stem.position.y = groundY + ((4 + progress * 22) * scaleMult) / 2;
-                stem.scale.set(1 + progress * 1.6, 1 + progress * 2.2, 1 + progress * 1.6);
-                stem.material.opacity = Math.max(0, 0.88 - progress * 0.82);
+                // Base surge dust skirt rolls outward along the ground
+                const skirtR = (3.5 + easeOut * 16.0) * scaleMult;
+                for (let i = 0; i < skirtPuffs.length; i++) {
+                    const sk = skirtPuffs[i];
+                    sk.sp.position.set(Math.cos(sk.ang) * skirtR, (1.8 + easeOut * 2.4) * scaleMult, Math.sin(sk.ang) * skirtR);
+                    const sz = sk.baseSz * (0.75 + easeOut * 1.35);
+                    sk.sp.scale.set(sz, sz * 0.65, 1);
+                    sk.sp.material.opacity = Math.max(0, (1 - progress / 0.72) * 0.68);
+                }
 
-                // Shockwave sweeps to full Blast6OuterRadius (45.4u) over the first ~1.2s (progress ~0.42) then dissipates
-                const shockProg = shockwaveTargetRadius ? Math.min(1, progress / 0.45) : progress;
+                // Supersonic ground shockwave sweeps to full Blast6OuterRadius (45.4u) over ~1.2s then dissipates
+                const shockProg = shockwaveTargetRadius ? Math.min(1, progress / 0.22) : Math.min(1, progress / 0.55);
                 const rScale = 1 + shockProg * (maxShockScale - 1);
                 shockwave.scale.set(rScale, rScale, 1);
-                shockwave.material.opacity = shockwaveTargetRadius
-                    ? Math.max(0, 0.95 * (1 - Math.max(0, (progress - 0.35) / 0.35)))
-                    : Math.max(0, 0.95 - progress * 1.0);
+                ringMat.opacity = Math.max(0, 0.92 * (1 - shockProg));
 
-                const mScale = 1 + progress * 5.0;
-                machRing.position.y = groundY + (8 + progress * 10) * scaleMult;
+                // Wilson atmospheric condensation ring rises around mid-stem
+                const machProg = Math.min(1, progress / 0.55);
+                const mScale = 1 + machProg * 2.8;
+                machRing.position.y = (10 + machProg * 14) * scaleMult;
                 machRing.scale.set(mScale, mScale, 1);
-                machRing.material.opacity = Math.max(0, 0.85 - progress * 1.05);
+                machMat.opacity = Math.max(0, 0.68 * Math.sin(machProg * Math.PI));
 
                 if (life <= 0) {
-                    [flashDome, cap, torusRing, stem, shockwave, machRing].forEach(m => {
-                            scene.remove(m);
-                            if (m.geometry) m.geometry.dispose();
-                            if (m.material) m.material.dispose();
-                    });
+                    disposeCloud();
                     return false;
                 }
                 return true;
@@ -3326,54 +3486,118 @@ function animateScudStormStrike(stormPos, targetPos) {
     playAudio('superweapon_siren');
     playAudio('scud_storm_volley');
 
-    // 9-missile ballistic ripple salvo from the 9 launcher tubes
+    // Biohazard Target Zone Reticle (pulsing toxic green outer barrage ring during salvo)
+    const warnGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
+    const warnGeo = new THREE.RingGeometry(23.5, 25.2, 44);
+    warnGeo.rotateX(-Math.PI / 2);
+    const warnMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71, side: THREE.DoubleSide, transparent: true, opacity: 0.65, depthWrite: false, depthTest: false });
+    const warnRing = new THREE.Mesh(warnGeo, warnMat);
+    warnRing.position.set(targetPos.x, warnGroundY + 0.5, targetPos.z);
+    warnRing.renderOrder = 10;
+    scene.add(warnRing);
+    let warnLife = 210;
+    activeFX.push({
+        persistent: true,
+        mesh: warnRing,
+        life: warnLife,
+        update() {
+            warnLife--;
+            warnMat.opacity = Math.min(1, warnLife / 45) * (0.30 + 0.30 * Math.sin(warnLife * 0.25));
+            if (warnLife <= 0) {
+                scene.remove(warnRing);
+                warnGeo.dispose();
+                warnMat.dispose();
+                return false;
+            }
+            return true;
+        }
+    });
+
+    // 9-missile ballistic ripple salvo from the 9 launcher tubes (Official INIZH.big ScudStorm)
     for (let i = 0; i < 9; i++) {
         setTimeout(() => {
                 const angle = (i / 9) * Math.PI * 2;
-                const dist = (i === 0) ? 0 : (6.5 + (i % 2) * 5.5);
+                const dist = (i === 0) ? 0 : (9.5 + (i % 2) * 8.5);
                 const offset = new THREE.Vector3(
-                    Math.cos(angle) * dist + (Math.random() - 0.5) * 3.0,
+                    Math.cos(angle) * dist + (Math.random() - 0.5) * 4.5,
                     0,
-                    Math.sin(angle) * dist + (Math.random() - 0.5) * 3.0
+                    Math.sin(angle) * dist + (Math.random() - 0.5) * 4.5
                 );
                 const subTarget = targetPos.clone().add(offset);
-                const tubeOffset = new THREE.Vector3(((i % 3) - 1) * 1.4, 2.4, (Math.floor(i / 3) - 1) * 1.4);
+                const tubeOffset = new THREE.Vector3(((i % 3) - 1) * 1.6, 2.8, (Math.floor(i / 3) - 1) * 1.6);
                 const launchOrigin = (stormPos ? stormPos.clone() : targetPos.clone().add(new THREE.Vector3(-45, 0, -45))).add(tubeOffset);
 
-                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(launchOrigin, 0xffa502, 1.2);
-                if (typeof spawnSmokePuff === 'function') spawnSmokePuff(launchOrigin, 0xdcdde1, 1.1);
+                // Heavy billowing launch ignition at SCUD Storm palace
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(launchOrigin, 0xffa502, 1.8);
+                if (typeof spawnSmokePuff === 'function') {
+                    spawnSmokePuff(launchOrigin, 0xdcdde1, 1.6);
+                    spawnSmokePuff(launchOrigin.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 0.8, (Math.random() - 0.5) * 3)), 0x95a5a6, 1.4);
+                }
                 if (i % 2 === 0 && typeof playAudio === 'function') playAudio('scud_launch', { volume: 0.72 }, 'gla');
+
                 spawnRocketProjectile(launchOrigin, subTarget, true, true, {
                     onImpact: (impactPos) => {
                         playAudio('scud_detonation');
                         setTimeout(() => { if (typeof playAudio === 'function') playAudio('anthrax_hiss', { volume: 0.65 }, 'gla'); }, 220);
-                        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(impactPos, 22, 300);
-                        if (typeof triggerScreenShake === 'function') triggerScreenShake(0.95);
-                        if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPos, 0x2ecc71, 3.2, true, 'none');
-                        enemyUnits.forEach(enemy => {
-                            if (enemy.health > 0 && enemy.mesh && enemy.mesh.position.distanceTo(impactPos) <= 11.5) {
-                                if (typeof applyCalculatedDamage === 'function') {
-                                    applyCalculatedDamage(null, enemy, 165, 'EXPLOSIVE');
-                                } else {
-                                    enemy.health -= 165;
+                        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(impactPos, 26, 360);
+                        if (typeof triggerScreenShake === 'function') triggerScreenShake(1.05);
+
+                        // Dual fiery explosion + emerald-green Anthrax shockwave ring & rising toxic plume
+                        if (typeof spawnEnhancedExplosion === 'function') {
+                            spawnEnhancedExplosion(impactPos, 0xff793f, 2.8, true, 'none');
+                            spawnEnhancedExplosion(impactPos, 0x2ecc71, 3.8, true, 'none');
+                        }
+                        const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(impactPos.x, impactPos.z) : 0;
+                        const bioGeo = new THREE.RingGeometry(1.5, 3.4, 36);
+                        bioGeo.rotateX(-Math.PI / 2);
+                        const bioMat = new THREE.MeshBasicMaterial({ color: 0x55efc4, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
+                        const bioRing = new THREE.Mesh(bioGeo, bioMat);
+                        bioRing.position.set(impactPos.x, gY + 0.4, impactPos.z);
+                        scene.add(bioRing);
+                        let bLife = 28;
+                        activeFX.push({
+                            mesh: bioRing,
+                            life: bLife,
+                            update() {
+                                bLife--;
+                                const p = 1 - bLife / 28;
+                                bioRing.scale.setScalar(1 + p * 4.2);
+                                bioMat.opacity = 0.9 * (1 - p);
+                                if (bLife <= 0) {
+                                    scene.remove(bioRing);
+                                    bioGeo.dispose();
+                                    bioMat.dispose();
+                                    return false;
                                 }
+                                return true;
                             }
                         });
-                        enemyStructures.forEach(struct => {
-                            if (struct.health > 0 && struct.position && struct.position.distanceTo(impactPos) <= 13.5) {
-                                if (typeof applyCalculatedDamage === 'function') {
-                                    applyCalculatedDamage(null, struct, 195, 'EXPLOSIVE');
-                                } else {
-                                    struct.health -= 195;
-                                }
+
+                        // Official ScudStormDamageWeapon damages ALL units & structures in blast radius
+                        const allU = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
+                        for (let ui = 0; ui < allU.length; ui++) {
+                            const u = allU[ui];
+                            if (u && u.health > 0 && u.mesh && Math.hypot(u.mesh.position.x - impactPos.x, u.mesh.position.z - impactPos.z) <= 13.5) {
+                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, 185, 'EXPLOSIVE');
+                                else u.health -= 185;
                             }
-                        });
-                        spawnCraterDecal(impactPos, 3.6, 720, 'toxin');
-                        // Official INIZH.big ScudStormDamageWeapon FireOCL = OCL_PoisonFieldLarge (~18s bubbling anthrax field)
-                        spawnLingeringToxinCloud(impactPos, 8.5, 1080);
+                        }
+                        const allS = [...(typeof structures !== 'undefined' ? structures : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
+                        for (let si = 0; si < allS.length; si++) {
+                            const st = allS[si];
+                            const sp = st && (st.position || (st.mesh && st.mesh.position));
+                            if (st && st.health > 0 && sp && Math.hypot(sp.x - impactPos.x, sp.z - impactPos.z) <= 15.0) {
+                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, 220, 'EXPLOSIVE');
+                                else st.health -= 220;
+                            }
+                        }
+
+                        spawnCraterDecal(impactPos, 5.2, 1200, 'toxin');
+                        // Official INIZH.big ScudStormDamageWeapon FireOCL = OCL_PoisonFieldLarge (overlapping bubbling anthrax pools for 35s)
+                        spawnLingeringToxinCloud(impactPos, 12.5, 2100);
                     }
                 });
-            }, i * 155);
+            }, i * 210);
     }
 }
 
