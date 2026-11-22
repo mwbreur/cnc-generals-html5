@@ -3214,24 +3214,24 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                         lastScorchPos.copy(group.position);
                     }
                 }
-                // Continuous damage tick to all units & structures in beam path (supports AI superweapons & friendly fire)
-                if (life % 10 === 0) {
+                // Continuous high-frequency thermal damage tick (every 0.1s = 6 ticks; melts heavy tanks & structures in 1.5-2s)
+                if (life % 6 === 0) {
                     const beamPos = group.position;
                     [...units, ...enemyUnits].forEach(u => {
-                            if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(beamPos) <= 9.5) {
+                            if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(beamPos) <= 8.5) {
                                 if (typeof applyCalculatedDamage === 'function') {
-                                    applyCalculatedDamage(null, u, 45, 'LASER');
+                                    applyCalculatedDamage(null, u, 55, 'LASER');
                                 } else {
-                                    u.health -= 45;
+                                    u.health -= 55;
                                 }
                             }
                     });
                     [...structures, ...enemyStructures].forEach(struct => {
-                            if (struct.health > 0 && struct.position && struct.position.distanceTo(beamPos) <= 12.5) {
+                            if (struct.health > 0 && struct.position && struct.position.distanceTo(beamPos) <= 11.5) {
                                 if (typeof applyCalculatedDamage === 'function') {
-                                    applyCalculatedDamage(null, struct, 65, 'LASER');
+                                    applyCalculatedDamage(null, struct, 85, 'LASER');
                                 } else {
-                                    struct.health -= 65;
+                                    struct.health -= 85;
                                 }
                             }
                     });
@@ -3245,7 +3245,18 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                     const finalPos = group.position.clone();
                     disposeParticleBeam();
                     spawnEnhancedExplosion(finalPos, 0x00d2d3, 3.4, true, 'particle_annihilate');
-                    spawnCraterDecal(finalPos, 5.2, 900, 'ion');
+                    spawnCraterDecal(finalPos, 5.2, 1800, 'ion');
+                    // Vent cooling steam from the Particle Cannon structure upon beam shutdown
+                    if (uplinkPos && typeof spawnSmokePuff === 'function') {
+                        for (let sv = 0; sv < 8; sv++) {
+                            const sa = (sv / 8) * Math.PI * 2;
+                            spawnSmokePuff(
+                                uplinkPos.clone().add(new THREE.Vector3(Math.cos(sa) * 2.4, 0.8 + Math.random() * 1.6, Math.sin(sa) * 2.4)),
+                                sv % 2 === 0 ? 0xf1f2f6 : 0xbceeff,
+                                1.35
+                            );
+                        }
+                    }
                     return false;
                 }
                 return true;
