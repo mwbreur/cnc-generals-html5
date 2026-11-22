@@ -54,12 +54,14 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Package playable home-user ZIP
+      - name: Package playable home-user ZIPs (Cross-platform + Self-contained Windows Portable)
         env:
           TAG: ${{ steps.meta.outputs.tag }}
+          NODE_WIN_VER: "24.22.1"
         run: |
           PKG="cnc-generals-html5-${TAG}"
-          rm -rf "$PKG" "${PKG}.zip"
+          WIN_PKG="cnc-generals-html5-${TAG}-windows-portable"
+          rm -rf "$PKG" "${PKG}.zip" "$WIN_PKG" "${WIN_PKG}.zip" _node_dl
           mkdir -p "$PKG/assets" "$PKG/src" "$PKG/scripts"
           cp index.html "$PKG/"
           cp -r assets/data "$PKG/assets/"
@@ -72,7 +74,23 @@ jobs:
           cp LICENSE "$PKG/"
           chmod +x "$PKG/Play_Mac_Linux.command"
           zip -r -q "${PKG}.zip" "$PKG"
-          ls -lh "${PKG}.zip"
+
+          # Build self-contained Windows Portable ZIP with official patched Node.js runtime bundled
+          mkdir -p _node_dl
+          NODE_ZIP="node-v${NODE_WIN_VER}-win-x64.zip"
+          curl -fsSL "https://nodejs.org/dist/v${NODE_WIN_VER}/${NODE_ZIP}" -o "_node_dl/${NODE_ZIP}"
+          curl -fsSL "https://nodejs.org/dist/v${NODE_WIN_VER}/SHASUMS256.txt" -o "_node_dl/SHASUMS256.txt"
+          (cd _node_dl && grep " ${NODE_ZIP}\$" SHASUMS256.txt | sha256sum -c -)
+          unzip -q "_node_dl/${NODE_ZIP}" "node-v${NODE_WIN_VER}-win-x64/node.exe" "node-v${NODE_WIN_VER}-win-x64/LICENSE" -d _node_dl
+
+          cp -r "$PKG" "$WIN_PKG"
+          rm -f "$WIN_PKG/Play_Mac_Linux.command"
+          mkdir -p "$WIN_PKG/runtime"
+          cp "_node_dl/node-v${NODE_WIN_VER}-win-x64/node.exe" "$WIN_PKG/runtime/node.exe"
+          cp "_node_dl/node-v${NODE_WIN_VER}-win-x64/LICENSE" "$WIN_PKG/runtime/NODEJS_LICENSE.txt"
+          zip -r -q "${WIN_PKG}.zip" "$WIN_PKG"
+          rm -rf _node_dl
+          ls -lh "${PKG}.zip" "${WIN_PKG}.zip"
 
       - name: Create GitHub Release
         env:
@@ -82,12 +100,12 @@ jobs:
           EXTRA_NOTES: ${{ github.event.inputs.notes }}
         run: |
           PKG="cnc-generals-html5-${TAG}.zip"
+          WIN_PKG="cnc-generals-html5-${TAG}-windows-portable.zip"
           cat <<'EOF' > release_notes.md
-          ## Quick Start (No Docker / No Git Required)
-          1. Download **`PKG_PLACEHOLDER`** below and unzip it.
-          2. Double-click **`Play_Windows.bat`** (Windows) or **`Play_Mac_Linux.command`** (Mac/Linux).
-          3. Your browser opens automatically at `http://localhost:8080`.
-             *(Windows 10/11 works with zero installs; install [Node.js](https://nodejs.org) on the host PC to unlock offline LAN Multiplayer.)*
+          ## Quick Start (Zero Installs — No Docker, No Git, No Node.js Needed)
+          - **Windows (Recommended):** Download **`WIN_PKG_PLACEHOLDER`**, unzip it, and double-click **`Play_Windows.bat`**.
+            *(Includes portable Node.js 24.22.1 inside `runtime/node.exe` — full Offline Skirmish **and** LAN Multiplayer work out of the box!)*
+          - **Mac / Linux (or Slim ZIP):** Download **`PKG_PLACEHOLDER`**, unzip it, and double-click **`Play_Mac_Linux.command`** (or `Play_Windows.bat`).
 
           > **Snapshot Notice:** This release is a frozen snapshot of the game at this tag. Live ongoing updates are always published automatically to GitHub Pages.
 
@@ -108,13 +126,13 @@ jobs:
           - Very large 200+ unit battles may dip FPS on older hardware (adjust quality in the **Options** menu).
           - Occasional unit clumping in narrow base alleys or around busy Supply Centers.
           EOF
-          sed -i "s/PKG_PLACEHOLDER/${PKG}/g" release_notes.md
+          sed -i "s/PKG_PLACEHOLDER/${PKG}/g; s/WIN_PKG_PLACEHOLDER/${WIN_PKG}/g" release_notes.md
           if [ -n "$EXTRA_NOTES" ]; then
             printf "\n## Release Notes\n%s\n" "$EXTRA_NOTES" >> release_notes.md
           fi
 
           if [ "$PRERELEASE" = "true" ]; then
-            gh release create "$TAG" "$PKG" --target "${GITHUB_SHA}" --title "C&C Generals HTML5 ${TAG}" --notes-file release_notes.md --prerelease
+            gh release create "$TAG" "$WIN_PKG" "$PKG" --target "${GITHUB_SHA}" --title "C&C Generals HTML5 ${TAG}" --notes-file release_notes.md --prerelease
           else
-            gh release create "$TAG" "$PKG" --target "${GITHUB_SHA}" --title "C&C Generals HTML5 ${TAG}" --notes-file release_notes.md
+            gh release create "$TAG" "$WIN_PKG" "$PKG" --target "${GITHUB_SHA}" --title "C&C Generals HTML5 ${TAG}" --notes-file release_notes.md
           fi

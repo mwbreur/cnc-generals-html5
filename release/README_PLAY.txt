@@ -23,7 +23,9 @@ directly. Modern browsers block audio files when opened via file:// URLs.
 OFFLINE LAN MULTIPLAYER (OPTIONAL)
 ------------------------------------------------------------------------
 To host a 2-player match on your home Wi-Fi / LAN without internet:
-1. Make sure the HOST PC has Node.js installed (https://nodejs.org).
+1. If you downloaded the "windows-portable.zip", Node.js is ALREADY
+   bundled inside (zero installs needed!). On Mac/Linux or the slim ZIP,
+   install Node.js (https://nodejs.org) on the HOST PC.
 2. Run Play_Windows.bat or Play_Mac_Linux.command on the host PC.
 3. The launcher prints your local LAN address (e.g. http://192.168.1.42:8080).
 4. Have the second player open that URL in their browser (no install needed

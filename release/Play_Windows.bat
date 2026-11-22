@@ -11,6 +11,16 @@ echo   Command ^& Conquer: Generals HTML5 Edition — Local Launcher
 echo ====================================================================
 echo.
 
+if exist "%~dp0runtime\node.exe" (
+    echo [OK] Using bundled portable Node.js! Starting full Offline + LAN Multiplayer server...
+    echo      Opening %URL% in your browser...
+    echo      (Keep this window open while playing. Press Ctrl+C to stop.)
+    echo.
+    start "" "%URL%"
+    "%~dp0runtime\node.exe" scripts\lan_server.mjs --no-build --port=%PORT%
+    goto :end
+)
+
 where node >nul 2>&1
 if %ERRORLEVEL%==0 (
     echo [OK] Node.js detected! Starting full Offline + LAN Multiplayer server...
