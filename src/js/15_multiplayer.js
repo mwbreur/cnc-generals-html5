@@ -1785,6 +1785,8 @@ function processBaseDefenseCombat() {
                         if (def.stingerCrew[ci] > 0) livingSoldiers++;
                     }
                     if (livingSoldiers > 0) {
+                        // Retail Generals: firing briefly breaks Camo Netting stealth for ~2.5s before re-cloaking
+                        if (def.hasCamoNetting) def.revealedUntil = curTick + 150;
                         def.attackCooldown = 150; // 2.5s reload
                         const isToxinStinger = isPlayerDef && typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin';
                         for (let s = 0; s < livingSoldiers; s++) {

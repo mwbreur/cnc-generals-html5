@@ -723,10 +723,10 @@ function initAICommanders() {
             const actualColorHex = (typeof window !== 'undefined' && window.aiColorMap && window.aiColorMap[ownerId])
             ? window.aiColorMap[ownerId]
             : ((typeof getPlayerColorHex === 'function' && slot.color) ? getPlayerColorHex(slot.color) : 0xdc2626);
-            createCommanderState(ownerId, slot.team, actualFaction, myBasePos, slot.difficulty || 'medium', slot.spawnId, actualColorHex);
+            createCommanderState(ownerId, slot.team, actualFaction, myBasePos, slot.difficulty || 'medium', slot.spawnId, actualColorHex, slot.general || null);
     });
 
-    function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0, colorHex = 0xdc2626) {
+    function createCommanderState(ownerId, teamId, faction, basePos, difficulty = 'medium', spawnId = 0, colorHex = 0xdc2626, generalId = null) {
         const candidateWaypoints = [];
         allSpawns.forEach(sp => {
                 if (sp.id !== spawnId) {
@@ -761,6 +761,7 @@ function initAICommanders() {
             ownerId: ownerId,
             teamId: teamId,
             faction: faction,
+            generalId: generalId,
             colorHex: colorHex,
             difficulty: difficulty,
             basePos: basePos.clone(),
@@ -1275,6 +1276,25 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
         const builtDef = spawnAIStructure(cmd, defType, clearPos, availBuilder);
         if (builtDef) {
             cmd.resources -= 1000;
+        }
+    }
+
+    // GLA AI Camo Netting on completed Stinger Sites & Tunnel Networks (free/instant for GLA Stealth General; $400 purchase for standard GLA)
+    if (f === 'gla') {
+        const isStealthGen = cmd.generalId === 'gla_stealth';
+        for (let i = 0; i < myStructures.length; i++) {
+            const s = myStructures[i];
+            if (!s || s.health <= 0 || s.isBuilding || s.hasCamoNetting) continue;
+            if (s.type !== 'stingerSite' && s.type !== 'tunnel') continue;
+            if (isStealthGen || cmd.resources >= 1000) {
+                s.hasCamoNetting = true;
+                s.isStealthed = true;
+                if (typeof attachCamoNettingVisual === 'function') attachCamoNettingVisual(s);
+                if (!isStealthGen) {
+                    cmd.resources -= 400;
+                    break; // Purchase at most 1 camo net per AI decision tick
+                }
+            }
         }
     }
 }

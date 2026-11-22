@@ -680,7 +680,7 @@ function animate() {
                                 if (es.health > 0 && es.position && !isFriendly(unit, es)) {
                                     const dx = es.position.x - uX, dz = es.position.z - uZ;
                                     if (dx * dx + dz * dz <= detectR2) {
-                                        es.isStealthed = false;
+                                        if (!es.hasCamoNetting) es.isStealthed = false;
                                         es.revealedUntil = buildingTick + 120;
                                     }
                                 }
@@ -3633,7 +3633,10 @@ function updateStealthAndDetection() {
     }
     for (let i = 0; i < allStructs.length; i++) {
         const s = allStructs[i];
-        if (!s || s.health <= 0 || !s.position || !s.isStealthed) continue;
+        if (!s || s.health <= 0 || !s.position) continue;
+        // Re-cloak Camo Netted structures automatically once any reveal timer expires
+        if (s.hasCamoNetting && !s.isBuilding) s.isStealthed = true;
+        if (!s.isStealthed) continue;
         for (let j = 0; j < detectors.length; j++) {
             const det = detectors[j];
             if (isFriendly(s, det.obj)) continue;

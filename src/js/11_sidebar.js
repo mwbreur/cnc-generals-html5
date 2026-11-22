@@ -4118,6 +4118,8 @@ function processBuildingFunctions() {
                                 if (structure.stingerCrew[ci] > 0) livingSoldiers.push(ci);
                             }
                             if (livingSoldiers.length > 0) {
+                                // Retail Generals: firing briefly breaks Camo Netting stealth for ~2.5s before re-cloaking
+                                if (structure.hasCamoNetting) structure.revealedUntil = buildingTick + 150;
                                 const isToxinStinger = typeof activePlayerGeneral !== 'undefined' && activePlayerGeneral === 'gla_toxin';
                                 const shotOffsets = [[-1.1, 1.5, 0.9], [1.1, 1.5, 0.9], [0, 1.5, -1.1]];
                                 livingSoldiers.forEach((ci, k) => {
