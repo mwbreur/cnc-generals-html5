@@ -3951,15 +3951,15 @@ function processBuildingFunctions() {
                             }
                         }
                     } else if (structure.type === 'scudStorm') {
-                        // Elevate all 9 retail W3D SCUD Storm launcher arms & pistons (UBScudStrm_A1.W3D) + procedural fallback gantries
+                        // Elevate all 9 retail W3D SCUD Storm launcher arms & pistons (UBScudStrm_A1.W3D) from 0 deg horizontal/stowed -> 90 deg vertical over 5:00 charge
                         if (typeof applyScudStormElevation === 'function' && structure.mesh && structure.mesh.userData && structure.mesh.userData.isW3D) {
-                            applyScudStormElevation(structure.mesh, 0.55 + 0.45 * chargeRatio);
+                            applyScudStormElevation(structure.mesh, chargeRatio);
                         }
                         const gantryNames = ['scudGantry', 'scudGantry_1', 'scudGantry_2', 'scudGantry_3'];
                         for (let gi = 0; gi < gantryNames.length; gi++) {
                             const gantry = getCachedNode(structure.mesh, gantryNames[gi]);
                             if (gantry) {
-                                gantry.rotation.x = -0.15 - chargeRatio * 0.75;
+                                gantry.rotation.x = -chargeRatio * (Math.PI / 2);
                                 if (!gantry.userData) gantry.userData = {};
                                 gantry.userData._chargeControlled = true;
                             }

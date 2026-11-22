@@ -2793,6 +2793,14 @@ function animate() {
         });
     }
 
+    const pendingGLAHoles = [];
+    const shouldLeaveGLAHole = (s, isEnemyList) => {
+        if (!s || s.isBuilding || s._wasSold) return false;
+        if (s.type === 'glaHole' || s.type === 'demoTrap' || String(s.type || '').startsWith('fake')) return false;
+        const fac = s.faction || (!isEnemyList && typeof selectedFaction !== 'undefined' ? selectedFaction : null);
+        return fac === 'gla';
+    };
+
     if (structures.some(s => s.health <= 0)) {
         structures = structures.filter(structure => {
                 if (structure.health > 0) return true;
@@ -2807,8 +2815,14 @@ function animate() {
                 const sPos = structure.position || (structure.mesh && structure.mesh.position);
                 if (typeof spawnBuildingDestructionFX === 'function' && sPos) spawnBuildingDestructionFX(sPos, structure.radius || 5.5, 0xff793f);
                 else createImpactExplosion(sPos);
+                if (structure.type === 'glaHole' && structure.holeWorker && structure.holeWorker.health > 0) {
+                    structure.holeWorker.health = 0;
+                }
+                if (shouldLeaveGLAHole(structure, false) && sPos) {
+                    pendingGLAHoles.push({ src: structure, pos: sPos.clone(), isEnemy: false });
+                }
                 if (typeof playEvaAlert === 'function') playEvaAlert('building_lost');
-                showNotification(`Friendly ${structure.type} destroyed!`, 'error');
+                showNotification(structure.type === 'glaHole' ? 'GLA Foundation Hole destroyed!' : `Friendly ${structure.type} destroyed!`, 'error');
                 if (structure.dozerRef) {
                     structure.dozerRef.taskState = 'Idle';
                     structure.dozerRef.targetStructure = null;
@@ -2841,13 +2855,89 @@ function animate() {
                 const expPos = structure.position || (structure.mesh && structure.mesh.position);
                 if (typeof spawnBuildingDestructionFX === 'function' && expPos) spawnBuildingDestructionFX(expPos, structure.radius || 5.5, 0xff4757);
                 else createImpactExplosion(expPos);
-                showNotification(`Hostile ${structure.type} eradicated!`, 'success');
+                if (structure.type === 'glaHole' && structure.holeWorker && structure.holeWorker.health > 0) {
+                    structure.holeWorker.health = 0;
+                }
+                if (shouldLeaveGLAHole(structure, true) && expPos) {
+                    pendingGLAHoles.push({ src: structure, pos: expPos.clone(), isEnemy: true });
+                }
+                showNotification(structure.type === 'glaHole' ? 'Hostile GLA Hole destroyed!' : `Hostile ${structure.type} eradicated!`, 'success');
                 evacuateGarrisonedUnits(structure);
                 units.forEach((unit, idx) => {
                         if (unit.combatTarget === structure) unit.combatTarget = null;
                 });
                 return false;
         });
+    }
+
+    // Official GLA Hole spawning: destroyed GLA structures leave a sunken bunker hole + free rebuild worker
+    for (let hi = 0; hi < pendingGLAHoles.length; hi++) {
+        const { src, pos, isEnemy } = pendingGLAHoles[hi];
+        if (typeof createGLAHoleMesh !== 'function') continue;
+        const holeMesh = createGLAHoleMesh(isEnemy);
+        const gY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+        const holePos = new THREE.Vector3(pos.x, gY + 0.05, pos.z);
+        holeMesh.position.copy(holePos);
+        holeMesh.rotation.y = src.rotationY || 0;
+        scene.add(holeMesh);
+
+        const isSmallHole = (src.type === 'stingerSite' || src.type === 'tunnel');
+        let holeMaxHp = isSmallHole ? 180 : 250;
+        if (!isEnemy && typeof researchedTechs !== 'undefined' && researchedTechs.has('fortifiedStructures')) {
+            holeMaxHp = Math.floor(holeMaxHp * 1.25);
+        }
+        const holeObj = {
+            type: 'glaHole',
+            originalType: src.type,
+            originalMaxHealth: src.maxHealth || 1200,
+            originalRadius: src.radius || 6.0,
+            mesh: holeMesh,
+            position: holePos.clone(),
+            rotationY: src.rotationY || 0,
+            radius: Math.min(src.radius || 5.0, 5.2),
+            health: holeMaxHp,
+            maxHealth: holeMaxHp,
+            netId: (isEnemy ? 'AIH_' : 'PH_') + (++netIdSequence),
+            teamId: src.teamId !== undefined ? src.teamId : (isEnemy ? 2 : playerTeamId),
+            ownerId: src.ownerId || (isEnemy ? 'ai_1' : 'player'),
+            faction: 'gla',
+            isAI: isEnemy,
+            isBuilding: false,
+            rebuildTimer: 18 * 60, // 18s official free reconstruction
+            workerRespawnCd: 0,
+            holeWorker: null
+        };
+        if (isEnemy) enemyStructures.push(holeObj);
+        else structures.push(holeObj);
+
+        // Spawn free GLA Worker from the hole to rebuild the structure
+        const wPos = holePos.clone().add(new THREE.Vector3(3.2, 0, 2.2));
+        if (!isEnemy && typeof spawnUnit === 'function') {
+            const w = spawnUnit('worker', wPos);
+            if (w) {
+                w.isHoleWorker = true;
+                w.taskState = 'Building';
+                w.targetStructure = holeObj;
+                w.targetPosition.copy(wPos);
+                w.waypoints = [];
+                holeObj.holeWorker = w;
+            }
+        } else if (isEnemy && typeof spawnEnemyUnit === 'function') {
+            const w = spawnEnemyUnit('worker', wPos, 'gla');
+            if (w) {
+                w.isHoleWorker = true;
+                w.ownerId = holeObj.ownerId;
+                w.teamId = holeObj.teamId;
+                w.taskState = 'Building';
+                w.targetStructure = holeObj;
+                w.targetPosition.copy(wPos);
+                w.waypoints = [];
+                holeObj.holeWorker = w;
+            }
+        }
+        if (typeof showNotification === 'function') {
+            showNotification(isEnemy ? `Hostile GLA Hole remaining — destroy it before it rebuilds ${src.type}!` : `GLA Hole intact — worker rebuilding ${src.type} for free!`, 'warning');
+        }
     }
 
     if (typeof worldBuildings !== 'undefined' && worldBuildings.some(wb => wb.health <= 0)) {
@@ -2990,22 +3080,90 @@ function animate() {
             }
         }
 
-        // 3. GLA Foundation Holes Rebuilding Timer (PERF: iterate in-place without per-frame spread/filter)
+        // 3. GLA Foundation Holes Rebuilding Timer (official free worker reconstruction unless hole is destroyed)
         const structLists = [structures, enemyStructures];
         for (let li = 0; li < 2; li++) {
             const sList = structLists[li];
+            const isEnemyHole = (li === 1);
             for (let si = 0; si < sList.length; si++) {
                 const hole = sList[si];
                 if (hole.type !== 'glaHole' || hole.health <= 0) continue;
-                if (hole.rebuildTimer === undefined) hole.rebuildTimer = 18 * 60; // 18 seconds
+                // If the rebuild worker was killed while the hole survives, pause 5s then spawn a replacement worker
+                const wAlive = !!(hole.holeWorker && hole.holeWorker.health > 0);
+                if (!wAlive) {
+                    if (!hole.workerRespawnCd) hole.workerRespawnCd = 300;
+                    hole.workerRespawnCd--;
+                    if (hole.workerRespawnCd <= 0) {
+                        const wPos = hole.position.clone().add(new THREE.Vector3(3.2, 0, 2.2));
+                        const nw = (!isEnemyHole && typeof spawnUnit === 'function')
+                            ? spawnUnit('worker', wPos)
+                            : (isEnemyHole && typeof spawnEnemyUnit === 'function' ? spawnEnemyUnit('worker', wPos, 'gla') : null);
+                        if (nw) {
+                            nw.isHoleWorker = true;
+                            nw.ownerId = hole.ownerId;
+                            nw.teamId = hole.teamId;
+                            nw.taskState = 'Building';
+                            nw.targetStructure = hole;
+                            nw.targetPosition.copy(wPos);
+                            nw.waypoints = [];
+                            hole.holeWorker = nw;
+                        }
+                    }
+                    continue;
+                }
+                // Keep hole worker visibly hammering at the hole
+                if (hole.holeWorker.taskState !== 'Building') hole.holeWorker.taskState = 'Building';
+                if (hole.rebuildTimer === undefined) hole.rebuildTimer = 18 * 60;
                 hole.rebuildTimer--;
                 if (hole.rebuildTimer <= 0) {
-                    // Reconstruct structure for free!
-                    hole.health = 0;
-                    if (hole.mesh) scene.remove(hole.mesh);
+                    // Reconstruct original GLA structure for free!
                     const origType = hole.originalType || 'barracks';
-                    if (typeof deployBaseStructureAt === 'function') {
-                        deployBaseStructureAt(origType, hole.position, hole.ownerId, hole.teamId, 'gla');
+                    const rebuildPos = hole.position.clone();
+                    const rebuildRotY = hole.rotationY || 0;
+                    const maxHp = hole.originalMaxHealth || 1200;
+                    const rad = hole.originalRadius || 6.0;
+                    if (hole.holeWorker && hole.holeWorker.health > 0) {
+                        hole.holeWorker._silentRemove = true;
+                        hole.holeWorker.health = 0;
+                    }
+                    hole.health = 0;
+                    if (hole.mesh) {
+                        if (typeof disposeSceneNodeSafe === 'function') disposeSceneNodeSafe(hole.mesh);
+                        else scene.remove(hole.mesh);
+                        hole.mesh = null;
+                    }
+                    if (typeof createStructureMeshForFaction === 'function') {
+                        const newMesh = createStructureMeshForFaction(origType, 'gla', isEnemyHole);
+                        if (!newMesh.userData || !newMesh.userData.isW3D) newMesh.scale.set(1.35, 1.35, 1.35);
+                        newMesh.position.copy(rebuildPos);
+                        newMesh.rotation.y = rebuildRotY;
+                        scene.add(newMesh);
+                        const rebuilt = {
+                            type: origType,
+                            mesh: newMesh,
+                            position: rebuildPos.clone(),
+                            rotationY: rebuildRotY,
+                            radius: rad,
+                            health: maxHp,
+                            maxHealth: maxHp,
+                            netId: (isEnemyHole ? 'AIS_' : 'PS_') + (++netIdSequence),
+                            teamId: hole.teamId,
+                            ownerId: hole.ownerId,
+                            faction: 'gla',
+                            isAI: isEnemyHole,
+                            isBuilding: false,
+                            buildProgress: 100
+                        };
+                        if (origType === 'scudStorm') {
+                            rebuilt.swMaxCooldown = 18000;
+                            rebuilt.cooldownUntil = buildingTick + 18000;
+                            rebuilt._readyAnnounced = false;
+                        }
+                        sList.push(rebuilt);
+                        if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+                        if (typeof showNotification === 'function') {
+                            showNotification(isEnemyHole ? `Hostile GLA Hole rebuilt ${origType}!` : `GLA ${origType} rebuilt from hole for free!`, isEnemyHole ? 'warning' : 'success');
+                        }
                     }
                 }
             }

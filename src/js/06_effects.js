@@ -2025,46 +2025,98 @@ function spawnLingeringToxinCloud(pos, radius = 4.2, durationTicks = 600, custom
     if (!pos || typeof scene === 'undefined') return;
     const groundY = (typeof getTerrainHeight === 'function') ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
     const smokeTex = _getFxSpriteTex('smoke');
-    const cloudGeo = new THREE.PlaneGeometry(radius * 2.4, radius * 2.4);
+    const cloudGroup = new THREE.Group();
+    cloudGroup.position.set(pos.x, groundY, pos.z);
+
+    // Soft ground-hugging toxic haze layer
+    const cloudGeo = new THREE.PlaneGeometry(radius * 2.5, radius * 2.5);
     cloudGeo.rotateX(-Math.PI / 2);
     const cloudMat = new THREE.MeshBasicMaterial({
         ...(smokeTex ? { map: smokeTex } : {}),
-        color: 0x2ecc40,
+        color: 0x38d948,
         transparent: true,
-        opacity: 0.68,
+        opacity: 0.62,
         depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -2,
         polygonOffsetUnits: -2
     });
-    const cloud = new THREE.Mesh(cloudGeo, cloudMat);
-    cloud.position.set(pos.x, groundY + 0.14, pos.z);
-    cloud.rotation.y = Math.random() * Math.PI * 2;
-    scene.add(cloud);
+    const groundPool = new THREE.Mesh(cloudGeo, cloudMat);
+    groundPool.position.y = 0.16;
+    groundPool.rotation.y = Math.random() * Math.PI * 2;
+    cloudGroup.add(groundPool);
+
+    // Official Generals volumetric swirling green / yellow-green anthrax mist bank (soft overlapping camera-facing sprites, not dots)
+    const mistSprites = [];
+    if (smokeTex && typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+        const mistCount = radius > 7 ? 7 : 3;
+        const mistPalette = [0x4cd137, 0xb8e934, 0x26de81, 0xa3cb38, 0x20bf6b];
+        for (let mi = 0; mi < mistCount; mi++) {
+            const ang = (mi / mistCount) * Math.PI * 2 + Math.random() * 0.6;
+            const dist = (mi === 0) ? 0 : radius * (0.28 + Math.random() * 0.52);
+            const baseScale = radius * (radius > 7 ? (0.95 + Math.random() * 0.55) : (1.15 + Math.random() * 0.45));
+            const sMat = new THREE.SpriteMaterial({
+                map: smokeTex,
+                color: mistPalette[mi % mistPalette.length],
+                transparent: true,
+                opacity: radius > 7 ? 0.42 : 0.34,
+                depthWrite: false
+            });
+            const spr = new THREE.Sprite(sMat);
+            const baseX = Math.cos(ang) * dist;
+            const baseZ = Math.sin(ang) * dist;
+            const baseY = 1.2 + Math.random() * (radius > 7 ? 3.8 : 1.4);
+            spr.position.set(baseX, baseY, baseZ);
+            spr.scale.set(baseScale, baseScale * 0.72, 1);
+            cloudGroup.add(spr);
+            mistSprites.push({
+                spr, mat: sMat, baseX, baseZ, baseY, baseScale,
+                phase: Math.random() * Math.PI * 2,
+                speed: 0.015 + Math.random() * 0.015,
+                orbitR: 0.6 + Math.random() * (radius * 0.14),
+                baseOpacity: sMat.opacity
+            });
+        }
+    }
+    scene.add(cloudGroup);
+
+    const disposeCloud = () => {
+        scene.remove(cloudGroup);
+        cloudGeo.dispose();
+        cloudMat.dispose();
+        for (let i = 0; i < mistSprites.length; i++) mistSprites[i].mat.dispose();
+    };
 
     activeFX.push({
             persistent: radius > 7,
-            mesh: cloud,
+            group: cloudGroup,
             pos: pos.clone(),
             life: durationTicks,
             maxLife: durationTicks,
             radius: radius,
             customDmgPerTick: customDmgPerTick,
             tickTimer: 0,
+            dispose: disposeCloud,
             update() {
                 this.life--;
                 this.tickTimer++;
-                const fadeOut = Math.min(1, this.life / 90);
+                const fadeIn = Math.min(1, this.tickTimer / 22);
+                const fadeOut = Math.min(1, this.life / 100);
+                const alphaEnv = fadeIn * fadeOut;
 
-                // Soft pulsing green anthrax contamination pool
-                this.mesh.material.opacity = fadeOut * (0.48 + Math.sin(this.life * 0.14) * 0.16);
+                // Soft pulsing green anthrax contamination haze
+                cloudMat.opacity = alphaEnv * (0.44 + Math.sin(this.life * 0.08) * 0.12);
 
-                // Rising green anthrax gas fumes
-                if (this.tickTimer % 8 === 0 && activeFX.length < 480) {
-                    const ang = Math.random() * Math.PI * 2;
-                    const rr = Math.random() * this.radius * 0.78;
-                    const mistPos = new THREE.Vector3(this.pos.x + Math.cos(ang) * rr, groundY + 0.35, this.pos.z + Math.sin(ang) * rr);
-                    spawnSmokePuff(mistPos, (this.tickTimer % 16 === 0) ? 0x55efc4 : 0x2ed573, 0.55 + (this.radius > 7 ? 0.25 : 0));
+                // Gently swirl & breathe the 3D volumetric anthrax mist clouds
+                for (let mi = 0; mi < mistSprites.length; mi++) {
+                    const m = mistSprites[mi];
+                    const t = this.tickTimer * m.speed + m.phase;
+                    m.spr.position.x = m.baseX + Math.cos(t) * m.orbitR;
+                    m.spr.position.z = m.baseZ + Math.sin(t * 0.85) * m.orbitR;
+                    m.spr.position.y = m.baseY + Math.sin(t * 1.2) * 0.7;
+                    const swell = 1.0 + Math.sin(t * 0.7) * 0.14;
+                    m.spr.scale.set(m.baseScale * swell, m.baseScale * 0.72 * swell, 1);
+                    m.mat.opacity = alphaEnv * m.baseOpacity * (0.85 + Math.sin(t) * 0.15);
                 }
 
                 // Official INIZH.big poison field tick (500ms = 30 ticks): damages all ground units inside
@@ -2086,9 +2138,7 @@ function spawnLingeringToxinCloud(pos, radius = 4.2, durationTicks = 600, custom
                 }
 
                 if (this.life <= 0) {
-                    scene.remove(this.mesh);
-                    this.mesh.geometry.dispose();
-                    this.mesh.material.dispose();
+                    disposeCloud();
                     return false;
                 }
                 return true;
@@ -3716,23 +3766,23 @@ function animateScudStormStrike(stormPos, targetPos) {
     playAudio('superweapon_siren');
     playAudio('scud_storm_volley');
 
-    // Biohazard Target Zone Reticle (pulsing toxic green outer barrage ring during salvo)
+    // Biohazard Target Zone Reticle (wide circular saturation zone matching official SCUD Storm scatter)
     const warnGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(targetPos.x, targetPos.z) : 0;
-    const warnGeo = new THREE.RingGeometry(23.5, 25.2, 44);
+    const warnGeo = new THREE.RingGeometry(27.0, 29.0, 48);
     warnGeo.rotateX(-Math.PI / 2);
-    const warnMat = new THREE.MeshBasicMaterial({ color: 0x2ecc71, side: THREE.DoubleSide, transparent: true, opacity: 0.65, depthWrite: false, depthTest: false });
+    const warnMat = new THREE.MeshBasicMaterial({ color: 0x4cd137, side: THREE.DoubleSide, transparent: true, opacity: 0.65, depthWrite: false, depthTest: false });
     const warnRing = new THREE.Mesh(warnGeo, warnMat);
     warnRing.position.set(targetPos.x, warnGroundY + 0.5, targetPos.z);
     warnRing.renderOrder = 10;
     scene.add(warnRing);
-    let warnLife = 210;
+    let warnLife = 360;
     activeFX.push({
         persistent: true,
         mesh: warnRing,
         life: warnLife,
         update() {
             warnLife--;
-            warnMat.opacity = Math.min(1, warnLife / 45) * (0.30 + 0.30 * Math.sin(warnLife * 0.25));
+            warnMat.opacity = Math.min(1, warnLife / 55) * (0.30 + 0.30 * Math.sin(warnLife * 0.22));
             if (warnLife <= 0) {
                 scene.remove(warnRing);
                 warnGeo.dispose();
@@ -3743,44 +3793,127 @@ function animateScudStormStrike(stormPos, targetPos) {
         }
     });
 
-    // 9-missile ballistic ripple salvo from the 9 launcher tubes (Official INIZH.big ScudStorm)
+    // Official SCUD Storm: 9 missiles fire in staggered 0.35-0.45s succession, climb steeply off-screen, then rain down in wide inaccurate scatter
+    const launchMissileStage = (launchOrigin, subTarget, onImpact) => {
+        const mGroup = new THREE.Group();
+        const body = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.42, 0.52, 4.6, 8),
+            new THREE.MeshStandardMaterial({ color: 0x5c6654, roughness: 0.65, metalness: 0.25 })
+        );
+        const nose = new THREE.Mesh(
+            new THREE.ConeGeometry(0.42, 1.4, 8),
+            new THREE.MeshStandardMaterial({ color: 0x2ecc40, roughness: 0.5 })
+        );
+        nose.position.y = 3.0;
+        const flame = new THREE.Mesh(
+            new THREE.ConeGeometry(0.68, 3.2, 8),
+            new THREE.MeshBasicMaterial({ color: 0xffa502, transparent: true, opacity: 0.92 })
+        );
+        flame.rotation.x = Math.PI;
+        flame.position.y = -3.6;
+        mGroup.add(body, nose, flame);
+        mGroup.position.copy(launchOrigin);
+        scene.add(mGroup);
+
+        let phase = 'ascend';
+        let t = 0;
+        const ascendTicks = 68;
+        const descendTicks = 56;
+        const targetGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(subTarget.x, subTarget.z) : 0;
+        const impactPoint = new THREE.Vector3(subTarget.x, targetGroundY, subTarget.z);
+        const dirXZ = new THREE.Vector3(subTarget.x - launchOrigin.x, 0, subTarget.z - launchOrigin.z);
+        if (dirXZ.lengthSq() > 0.01) dirXZ.normalize();
+        const apexY = 185;
+
+        const disposeM = () => {
+            scene.remove(mGroup);
+            mGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        };
+
+        activeFX.push({
+            persistent: true,
+            group: mGroup,
+            life: ascendTicks + descendTicks + 20,
+            dispose: disposeM,
+            update() {
+                t++;
+                if (phase === 'ascend') {
+                    const p = Math.min(1, t / ascendTicks);
+                    const ease = p * p; // accelerating rocket boost
+                    mGroup.position.set(
+                        launchOrigin.x + dirXZ.x * (p * 18),
+                        launchOrigin.y + ease * apexY,
+                        launchOrigin.z + dirXZ.z * (p * 18)
+                    );
+                    flame.scale.setScalar(0.9 + Math.sin(t * 0.9) * 0.25);
+                    if (t % 2 === 0 && mGroup.position.y < 145 && typeof spawnSmokePuff === 'function') {
+                        spawnSmokePuff(mGroup.position.clone().add(new THREE.Vector3(0, -2.5, 0)), (t % 4 === 0) ? 0xe5e7eb : 0x9ca3af, 1.55);
+                    }
+                    if (t >= ascendTicks) {
+                        phase = 'descend';
+                        t = 0;
+                        mGroup.position.set(impactPoint.x - dirXZ.x * 22, impactPoint.y + apexY, impactPoint.z - dirXZ.z * 22);
+                        mGroup.rotation.x = Math.PI; // Nose down!
+                    }
+                    return true;
+                } else {
+                    const p = Math.min(1, t / descendTicks);
+                    mGroup.position.set(
+                        impactPoint.x - dirXZ.x * (22 * (1 - p)),
+                        impactPoint.y + apexY * (1 - p),
+                        impactPoint.z - dirXZ.z * (22 * (1 - p))
+                    );
+                    if (t % 3 === 0 && mGroup.position.y < 130 && typeof spawnSmokePuff === 'function') {
+                        spawnSmokePuff(mGroup.position.clone().add(new THREE.Vector3(0, 2.5, 0)), 0xd1d5db, 1.15);
+                    }
+                    if (t >= descendTicks) {
+                        disposeM();
+                        if (typeof onImpact === 'function') onImpact(impactPoint);
+                        return false;
+                    }
+                    return true;
+                }
+            }
+        });
+    };
+
     for (let i = 0; i < 9; i++) {
         setTimeout(() => {
-                const angle = (i / 9) * Math.PI * 2;
-                const dist = (i === 0) ? 0 : (9.5 + (i % 2) * 8.5);
+                // Wide, inaccurate circular saturation scatter (radius up to ~28u)
+                const randAngle = Math.random() * Math.PI * 2;
+                const randDist = (i === 0) ? (Math.random() * 6.0) : (6.0 + Math.sqrt(Math.random()) * 22.0);
                 const offset = new THREE.Vector3(
-                    Math.cos(angle) * dist + (Math.random() - 0.5) * 4.5,
+                    Math.cos(randAngle) * randDist,
                     0,
-                    Math.sin(angle) * dist + (Math.random() - 0.5) * 4.5
+                    Math.sin(randAngle) * randDist
                 );
                 const subTarget = targetPos.clone().add(offset);
                 const tubeOffset = new THREE.Vector3(((i % 3) - 1) * 1.6, 2.8, (Math.floor(i / 3) - 1) * 1.6);
                 const launchOrigin = (stormPos ? stormPos.clone() : targetPos.clone().add(new THREE.Vector3(-45, 0, -45))).add(tubeOffset);
 
-                // Heavy billowing launch ignition at SCUD Storm palace
-                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(launchOrigin, 0xffa502, 1.8);
+                // Heavy billowing gray-white launch smoke & exhaust ignition at SCUD Storm launcher
+                if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(launchOrigin, 0xff9f43, 2.1);
                 if (typeof spawnSmokePuff === 'function') {
-                    spawnSmokePuff(launchOrigin, 0xdcdde1, 1.6);
-                    spawnSmokePuff(launchOrigin.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3, 0.8, (Math.random() - 0.5) * 3)), 0x95a5a6, 1.4);
+                    spawnSmokePuff(launchOrigin, 0xe5e7eb, 1.9);
+                    spawnSmokePuff(launchOrigin.clone().add(new THREE.Vector3((Math.random() - 0.5) * 3.5, 1.0, (Math.random() - 0.5) * 3.5)), 0x9ca3af, 1.7);
                 }
-                if (i % 2 === 0 && typeof playAudio === 'function') playAudio('scud_launch', { volume: 0.72 }, 'gla');
+                if (typeof playAudio === 'function') playAudio('scud_launch', { volume: i % 2 === 0 ? 0.72 : 0.48 }, 'gla');
 
-                spawnRocketProjectile(launchOrigin, subTarget, true, true, {
-                    onImpact: (impactPos) => {
+                launchMissileStage(launchOrigin, subTarget, (impactPos) => {
                         playAudio('scud_detonation');
                         setTimeout(() => { if (typeof playAudio === 'function') playAudio('anthrax_hiss', { volume: 0.65 }, 'gla'); }, 220);
-                        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(impactPos, 26, 360);
+                        if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(impactPos, 28, 360);
                         if (typeof triggerScreenShake === 'function') triggerScreenShake(1.05);
 
-                        // Dual fiery explosion + emerald-green Anthrax shockwave ring & rising toxic plume
+                        // Dual fiery HE explosion + emerald/yellow-green Anthrax shockwave ring
                         if (typeof spawnEnhancedExplosion === 'function') {
-                            spawnEnhancedExplosion(impactPos, 0xff793f, 2.8, true, 'none');
-                            spawnEnhancedExplosion(impactPos, 0x2ecc71, 3.8, true, 'none');
+                            spawnEnhancedExplosion(impactPos, 0xff793f, 2.9, true, 'none');
+                            spawnEnhancedExplosion(impactPos, 0x4cd137, 3.8, true, 'none');
                         }
                         const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(impactPos.x, impactPos.z) : 0;
-                        const bioGeo = new THREE.RingGeometry(1.5, 3.4, 36);
+                        const bioGeo = new THREE.RingGeometry(1.5, 3.6, 36);
                         bioGeo.rotateX(-Math.PI / 2);
-                        const bioMat = new THREE.MeshBasicMaterial({ color: 0x55efc4, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
+                        const bioMat = new THREE.MeshBasicMaterial({ color: 0xb8e934, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
                         const bioRing = new THREE.Mesh(bioGeo, bioMat);
                         bioRing.position.set(impactPos.x, gY + 0.4, impactPos.z);
                         scene.add(bioRing);
@@ -3791,8 +3924,8 @@ function animateScudStormStrike(stormPos, targetPos) {
                             update() {
                                 bLife--;
                                 const p = 1 - bLife / 28;
-                                bioRing.scale.setScalar(1 + p * 4.2);
-                                bioMat.opacity = 0.9 * (1 - p);
+                                bioRing.scale.setScalar(1 + p * 4.4);
+                                bioMat.opacity = 0.85 * (1 - p);
                                 if (bLife <= 0) {
                                     scene.remove(bioRing);
                                     bioGeo.dispose();
@@ -3823,11 +3956,10 @@ function animateScudStormStrike(stormPos, targetPos) {
                         }
 
                         spawnCraterDecal(impactPos, 5.2, 1200, 'toxin');
-                        // Official INIZH.big ScudStormDamageWeapon FireOCL = OCL_PoisonFieldLarge (overlapping bubbling anthrax pools for 35s)
+                        // Official INIZH.big ScudStormDamageWeapon FireOCL = OCL_PoisonFieldLarge (35s volumetric green/yellow anthrax mist)
                         spawnLingeringToxinCloud(impactPos, 12.5, 2100);
-                    }
                 });
-            }, i * 210);
+            }, i * 380);
     }
 }
 
