@@ -2824,11 +2824,22 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
         playSuperweaponEvaAlert('particleCannon', 'launched', typeof selectedFaction !== 'undefined' ? selectedFaction : 'usa');
     }
     if (typeof playOfficialSound === 'function') playOfficialSound('sfx_particle_charge', 0.85);
-    playAudio('orbital_beam');
-    if (typeof triggerScreenShake === 'function') triggerScreenShake(1.1);
+    if (typeof triggerScreenShake === 'function') triggerScreenShake(0.7);
 
+    // Bright electric-blue flash overlay (official Generals Particle Cannon ignition & orbital impact flash)
+    const triggerBlueParticleFlash = (peakOpacity = 0.65, fadeMs = 620) => {
+        if (typeof document === 'undefined' || !document.body) return;
+        const fl = document.createElement('div');
+        fl.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:9998;background:radial-gradient(circle, rgba(220,250,255,${peakOpacity}) 0%, rgba(0,185,255,${(peakOpacity * 0.78).toFixed(2)}) 55%, rgba(0,95,255,${(peakOpacity * 0.42).toFixed(2)}) 100%);transition:opacity ${fadeMs}ms ease-out;opacity:1;`;
+        document.body.appendChild(fl);
+        requestAnimationFrame(() => { fl.style.opacity = '0'; });
+        setTimeout(() => { if (fl.parentNode) fl.parentNode.removeChild(fl); }, fadeMs + 60);
+    };
+
+    const UPLINK_DELAY = uplinkPos ? 72 : 0; // 1.2s upward beam travel to orbital satellite before reflection strike
     const group = new THREE.Group();
     group.position.copy(targetPos);
+    group.visible = (UPLINK_DELAY === 0);
     window.activeParticleCannonTarget = targetPos.clone();
     window.activeParticleCannonPlayerOwned = !!isPlayerOwned;
     window.activeParticleCannonControl = !!isPlayerOwned;
@@ -2925,33 +2936,54 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
 
     scene.add(group);
 
-    // Optional Uplink Beam shooting straight up from the Particle Cannon structure into orbit
+    // Uplink Beam shooting straight up from the Particle Cannon's risen dish into orbit (reflects off orbital satellite)
     let uplinkGroup = null;
+    let upCore = null;
+    let upSheath = null;
+    let upBloom = null;
+    let upDishFlash = null;
     const uplinkRings = [];
     if (uplinkPos) {
         uplinkGroup = new THREE.Group();
         uplinkGroup.position.copy(uplinkPos);
-        const upCore = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.32, 0.42, 120, 12),
-            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.96, depthWrite: false, ...addBlend })
+        upCore = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.42, 0.55, 220, 14),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, depthWrite: false, ...addBlend })
         );
-        upCore.position.y = 62;
+        upCore.position.y = 110;
+        upCore.scale.set(1, 0.02, 1);
         uplinkGroup.add(upCore);
-        const upSheath = new THREE.Mesh(
-            new THREE.CylinderGeometry(1.05, 1.35, 120, 14, 1, true),
-            new THREE.MeshBasicMaterial({ color: 0x00d8ff, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, ...addBlend })
+        upSheath = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.35, 1.85, 220, 16, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, ...addBlend })
         );
-        upSheath.position.y = 62;
+        upSheath.position.y = 110;
+        upSheath.scale.set(1, 0.02, 1);
         uplinkGroup.add(upSheath);
-        for (let ur = 0; ur < 4; ur++) {
-            const urGeo = new THREE.RingGeometry(1.1, 1.7, 20);
+        upBloom = new THREE.Mesh(
+            new THREE.CylinderGeometry(2.6, 3.6, 220, 16, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false, ...addBlend })
+        );
+        upBloom.position.y = 110;
+        upBloom.scale.set(1, 0.02, 1);
+        uplinkGroup.add(upBloom);
+        // Bright blue ignition flash sphere at the risen dish
+        upDishFlash = new THREE.Mesh(
+            new THREE.SphereGeometry(5.5, 16, 12),
+            new THREE.MeshBasicMaterial({ color: 0x80f0ff, transparent: true, opacity: 0.95, depthWrite: false, ...addBlend })
+        );
+        upDishFlash.position.y = 1.5;
+        uplinkGroup.add(upDishFlash);
+        for (let ur = 0; ur < 5; ur++) {
+            const urGeo = new THREE.RingGeometry(1.4, 2.2, 20);
             urGeo.rotateX(-Math.PI / 2);
-            const urMesh = new THREE.Mesh(urGeo, new THREE.MeshBasicMaterial({ color: 0x74f0ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, ...addBlend }));
-            urMesh.position.y = 4 + ur * 26;
+            const urMesh = new THREE.Mesh(urGeo, new THREE.MeshBasicMaterial({ color: 0x74f0ff, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false, ...addBlend }));
+            urMesh.position.y = 4 + ur * 36;
             uplinkGroup.add(urMesh);
             uplinkRings.push(urMesh);
         }
         scene.add(uplinkGroup);
+        triggerBlueParticleFlash(0.42, 480);
     }
 
     // Outer wide atmospheric electric-blue bloom sheath around the main orbital beam
@@ -2977,16 +3009,28 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
         }
     };
 
-    let life = duration;
+    const totalDuration = duration + UPLINK_DELAY;
+    let life = totalDuration;
+    let elapsed = 0;
+    let strikeStarted = (UPLINK_DELAY === 0);
+    let impactFlashSphere = null;
+    let impactFlashLife = 0;
     const originCenter = targetPos.clone();
+    const lastScorchPos = new THREE.Vector3(1e9, 0, 1e9);
+
+    if (strikeStarted) {
+        playAudio('orbital_beam');
+        triggerBlueParticleFlash(0.68, 650);
+    }
 
     activeFX.push({
             persistent: true,
             group: group,
-            life: duration,
+            life: totalDuration,
             dispose: disposeParticleBeam,
             update() {
                 life--;
+                elapsed++;
                 // Low-Power shutoff: if owner's base enters Low Power while firing, shut off beam immediately
                 if (isPlayerOwned && typeof window !== 'undefined' && window.isPlayerLowPower) {
                     disposeParticleBeam();
@@ -2995,10 +3039,52 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                     }
                     return false;
                 }
-                // Animate ascending orbital uplink energy rings
-                for (let ui = 0; ui < uplinkRings.length; ui++) {
-                    uplinkRings[ui].position.y += 2.6;
-                    if (uplinkRings[ui].position.y > 112) uplinkRings[ui].position.y = 4;
+                // Animate upward orbital uplink beam shooting straight up from the risen dish to the satellite
+                if (uplinkGroup) {
+                    const shootFrac = Math.min(1, elapsed / Math.max(1, UPLINK_DELAY * 0.55));
+                    const beamYScale = Math.max(0.02, shootFrac);
+                    const upPulse = 0.92 + Math.sin(elapsed * 0.55) * 0.14;
+                    if (upCore) { upCore.scale.set(upPulse, beamYScale, upPulse); upCore.position.y = 110 * beamYScale; }
+                    if (upSheath) { upSheath.scale.set(upPulse, beamYScale, upPulse); upSheath.position.y = 110 * beamYScale; }
+                    if (upBloom) { upBloom.scale.set(upPulse, beamYScale, upPulse); upBloom.position.y = 110 * beamYScale; }
+                    if (upDishFlash) {
+                        const fProg = Math.min(1, elapsed / 26);
+                        upDishFlash.scale.setScalar(1.0 + fProg * 3.2);
+                        upDishFlash.material.opacity = Math.max(0, 0.95 * (1 - fProg));
+                    }
+                    for (let ui = 0; ui < uplinkRings.length; ui++) {
+                        uplinkRings[ui].position.y += 4.2;
+                        if (uplinkRings[ui].position.y > 195 * beamYScale) uplinkRings[ui].position.y = 4;
+                    }
+                }
+
+                // Stage 1 -> Stage 2 transition: orbital satellite reflects beam down onto target with bright blue flash!
+                if (!strikeStarted) {
+                    if (elapsed < UPLINK_DELAY) return true;
+                    strikeStarted = true;
+                    group.visible = true;
+                    playAudio('orbital_beam');
+                    if (typeof triggerScreenShake === 'function') triggerScreenShake(1.4);
+                    triggerBlueParticleFlash(0.72, 680);
+                    const tY = typeof getTerrainHeight === 'function' ? getTerrainHeight(originCenter.x, originCenter.z) : 0;
+                    group.position.set(originCenter.x, tY, originCenter.z);
+                    impactFlashSphere = new THREE.Mesh(
+                        new THREE.SphereGeometry(4.5, 16, 12),
+                        new THREE.MeshBasicMaterial({ color: 0xa8f4ff, transparent: true, opacity: 0.98, depthWrite: false, ...addBlend })
+                    );
+                    impactFlashSphere.position.y = 2.0;
+                    impactFlashSphere.renderOrder = 12;
+                    group.add(impactFlashSphere);
+                    impactFlashLife = 28;
+                    spawnCraterDecal(group.position, 4.8, 1800, 'ion');
+                    lastScorchPos.copy(group.position);
+                }
+                if (impactFlashSphere && impactFlashLife > 0) {
+                    impactFlashLife--;
+                    const fp = 1 - impactFlashLife / 28;
+                    impactFlashSphere.scale.setScalar(1 + fp * 5.2);
+                    impactFlashSphere.material.opacity = 0.98 * (1 - fp);
+                    if (impactFlashLife <= 0) impactFlashSphere.visible = false;
                 }
                 // Sit steadily on target when uncontrolled, or sweep in a straight line toward player's steered target
                 if (window.activeParticleCannonTarget) {
@@ -3069,6 +3155,15 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                     triggerScreenShake(0.35);
                 }
 
+                // Continuous molten scorch trail carved along the beam's dragged path (iconic Zero Hour Particle Cannon burn scar)
+                if (life % 4 === 0) {
+                    const dxS = group.position.x - lastScorchPos.x;
+                    const dzS = group.position.z - lastScorchPos.z;
+                    if (dxS * dxS + dzS * dzS >= 2.25 || life % 24 === 0) {
+                        spawnCraterDecal(group.position, 4.2, 1800, 'ion');
+                        lastScorchPos.copy(group.position);
+                    }
+                }
                 // Continuous damage tick to all units & structures in beam path (supports AI superweapons & friendly fire)
                 if (life % 10 === 0) {
                     const beamPos = group.position;
@@ -3090,8 +3185,6 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                                 }
                             }
                     });
-                    // Continuous molten scorch trail along the beam's path (iconic Zero Hour Particle Cannon burn scar)
-                    spawnCraterDecal(beamPos, 3.4, 720, 'ion');
                 }
                 if (life % 12 === 0) {
                     spawnParticleFirePatch(group.position);

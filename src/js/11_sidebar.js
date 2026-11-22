@@ -3772,10 +3772,11 @@ function strikeWithSuperweapon(structure, targetPosition) {
     if (sType === 'particleCannon') {
         let uplinkPos = structure.position;
         if (structure.mesh && structure.mesh.userData && structure.mesh.userData.isW3D) {
-            const pitOffset = new THREE.Vector3(0, 6.2 * 0.27, 24.6 * 0.27);
+            const pitOffset = new THREE.Vector3(0, 14.5 * 0.27, 24.6 * 0.27);
             pitOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), structure.rotationY || 0);
             uplinkPos = structure.position.clone().add(pitOffset);
         }
+        structure._particleFiringUntil = buildingTick + 675;
         animateParticleCannonStrike(targetPosition, 600, uplinkPos, !structure.isAI);
     } else if (sType === 'nukeSilo') {
         animateNukeStrike(structure.position, targetPosition);
@@ -3915,13 +3916,39 @@ function processBuildingFunctions() {
                             }
                         }
                     } else if (structure.type === 'particleCannon') {
+                        const isFiringNow = !!(structure._particleFiringUntil && buildingTick < structure._particleFiringUntil);
+                        // Official ABSDILink_A1: Doors stay closed while charging, open near ready / while firing, and dish rises out of the pit
+                        const targetOpen = (isFiringNow || rem === 0) ? 1 : (chargeRatio > 0.90 ? Math.min(1, (chargeRatio - 0.90) / 0.10) : 0);
+                        if (structure._particleDoorOpen === undefined) structure._particleDoorOpen = targetOpen;
+                        structure._particleDoorOpen += (targetOpen - structure._particleDoorOpen) * 0.14;
+                        const dOpen = structure._particleDoorOpen;
+                        for (let di = 0; di < 3; di++) {
+                            const doorLeaf = getCachedNode(structure.mesh, 'particleDoor' + di);
+                            if (doorLeaf) {
+                                doorLeaf.position.z = dOpen * 7.8;
+                                doorLeaf.position.y = dOpen * 1.4;
+                                doorLeaf.rotation.x = -dOpen * 0.52;
+                            }
+                        }
+                        const dish = getCachedNode(structure.mesh, 'particleDish');
+                        if (dish) {
+                            const riseT = dOpen > 0.25 ? Math.min(1, (dOpen - 0.25) / 0.75) : 0;
+                            dish.visible = riseT > 0.02;
+                            dish.position.y = -13.0 + riseT * 17.5; // Stowed at -13 -> rises to +4.5 above pit rim
+                            if (isFiringNow) dish.rotation.y += 0.08;
+                            const dishCore = getCachedNode(structure.mesh, 'particleDishCore');
+                            if (dishCore && dishCore.material) {
+                                dishCore.material.emissiveIntensity = isFiringNow ? 3.2 : (1.1 + riseT * 1.2);
+                            }
+                        }
                         const glowLight = getCachedNode(structure.mesh, 'particleCannonGlowLight');
                         if (glowLight) {
-            if (glowLight.material) glowLight.material.opacity = 0.18 + chargeRatio * 0.6;
-            else glowLight.intensity = 0.6 + chargeRatio * 2.2;
-        }
+                            const glowLevel = isFiringNow ? 0.95 : (0.12 + dOpen * 0.55 + chargeRatio * 0.15);
+                            if (glowLight.material) glowLight.material.opacity = glowLevel;
+                            else glowLight.intensity = 0.6 + glowLevel * 2.4;
+                        }
                         const ring = getCachedNode(structure.mesh, 'particleAcceleratorRing');
-                        if (ring && ring.material) ring.material.emissiveIntensity = 0.4 + chargeRatio * 1.4;
+                        if (ring && ring.material) ring.material.emissiveIntensity = isFiringNow ? 2.6 : (0.4 + chargeRatio * 1.4);
                         const fan1 = getCachedNode(structure.mesh, 'FAN01');
                         const fan4 = getCachedNode(structure.mesh, 'FAN04');
                         if (fan1) fan1.rotation.y += 0.15 + chargeRatio * 0.45;

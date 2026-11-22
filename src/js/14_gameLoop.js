@@ -1812,7 +1812,7 @@ function animate() {
                 const el = getCachedNode(unit.mesh, elName);
                 if (el) el.rotation.x += (airPitch - el.rotation.x) * 0.14;
             });
-            const qDish = getCachedNode(unit.mesh, 'RADARDISH01');
+            const qDish = getCachedNode(unit.mesh, 'radarDish') || getCachedNode(unit.mesh, 'RADARDISH01');
             if (qDish) qDish.rotation.y += 0.04;
         } else if (unit.type === 'marauder') {
             const lvl = unit.salvageLevel || 0;
