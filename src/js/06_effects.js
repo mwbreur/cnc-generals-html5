@@ -4275,33 +4275,49 @@ function animateScudStormStrike(stormPos, targetPos) {
     }
 }
 
-// Expanding Propaganda Aura Soundwave Ring (for Overlord Speaker Tower & Standalone Speaker Tower)
-function spawnPropagandaPulseRing(pos, isSubliminal = false) {
+// Official C&C Generals Propaganda Tower / Overlord Speaker Tower Broadcast Wave (exact 32.4u radius)
+function spawnPropagandaPulseRing(pos, isSubliminal = false, hornHeight = 5.2) {
     if (!pos || typeof scene === 'undefined' || !scene) return;
-    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : pos.y;
-    const ringColor = isSubliminal ? 0xff4757 : 0xf1c40f;
-    const ringGeo = new THREE.RingGeometry(0.8, 1.25, 28);
-    ringGeo.rotateX(-Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({
-            color: ringColor,
+    const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(pos.x, pos.z) : (pos.y || 0);
+    const addBlend = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
+    const primaryColor = isSubliminal ? 0xff3b30 : 0xffc312;
+    const secondaryColor = isSubliminal ? 0xffd32a : 0xffeaa7;
+
+    // 2 staggered concentric ground broadcast rings expanding cleanly in XZ to 32.4u + 1 elevated loudspeaker horn acoustic wave
+    const waves = [
+        { delay: 0, yOff: 0.45, color: primaryColor, maxScale: 26.0, duration: 54, baseOp: 0.85, thick: 0.45 },
+        { delay: 10, yOff: 0.45, color: secondaryColor, maxScale: 26.0, duration: 54, baseOp: 0.58, thick: 0.30 },
+        { delay: 0, yOff: hornHeight, color: primaryColor, maxScale: 10.5, duration: 36, baseOp: 0.90, thick: 0.35 }
+    ];
+
+    waves.forEach(w => {
+        const ringGeo = new THREE.RingGeometry(1.25 - w.thick, 1.25, 44);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: w.color,
             side: THREE.DoubleSide,
             transparent: true,
-            opacity: 0.75
-    });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.position.set(pos.x, groundY + 0.35, pos.z);
-    scene.add(ringMesh);
+            opacity: 0,
+            depthWrite: false,
+            ...addBlend
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.set(pos.x, groundY + w.yOff, pos.z);
+        ringMesh.renderOrder = 6;
+        scene.add(ringMesh);
 
-    let life = 36;
-    activeFX.push({
-            life: 36,
+        let tick = -w.delay;
+        activeFX.push({
+            life: w.duration + w.delay,
             update() {
-                life--;
-                const t = 1 - (life / 36);
-                const s = 1 + t * 25.0; // Expands to official 32.4u PropagandaTowerBehavior radius (1.25 * 26 = 32.5u)
-                ringMesh.scale.set(s, s, 1);
-                ringMat.opacity = Math.max(0, 0.75 * (1 - t));
-                if (life <= 0) {
+                tick++;
+                if (tick < 0) return true;
+                const t = Math.min(1, tick / w.duration);
+                const ease = 1 - Math.pow(1 - t, 1.8);
+                const s = 1 + ease * (w.maxScale - 1);
+                ringMesh.scale.set(s, 1, s); // Horizontal XZ expansion (exact 32.4u circle!)
+                ringMat.opacity = Math.max(0, w.baseOp * Math.sin(Math.min(1, t * 4) * Math.PI * 0.5) * (1 - t));
+                if (tick >= w.duration) {
                     scene.remove(ringMesh);
                     ringGeo.dispose();
                     ringMat.dispose();
@@ -4309,6 +4325,7 @@ function spawnPropagandaPulseRing(pos, isSubliminal = false) {
                 }
                 return true;
             }
+        });
     });
 }
 window.spawnPropagandaPulseRing = spawnPropagandaPulseRing;

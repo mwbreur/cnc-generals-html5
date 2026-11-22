@@ -4244,22 +4244,28 @@ function processBuildingFunctions() {
                         }
                 });
             }
-            // Standalone China Speaker Tower & Propaganda Center (Official INIZH.big: Radius = 150 * 0.216 = 32.4u, 2% maxHP/s or 4% w/ Subliminal Messaging + Horde buff)
+            // Standalone China Speaker Tower & Propaganda Center (Official INIZH.big: Radius = 150 * 0.216 = 32.4u, 2% maxHP/s or 4% w/ Subliminal Messaging + Enthusiastic/Subliminal ROF)
             if (['speakerTower', 'propagandaCenter'].includes(structure.type)) {
                 const hasSub = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
                 const healPct = hasSub ? 0.04 : 0.02;
                 if (typeof spawnPropagandaPulseRing === 'function') {
-                    spawnPropagandaPulseRing(structure.position, hasSub);
+                    spawnPropagandaPulseRing(structure.position, hasSub, structure.type === 'speakerTower' ? 5.8 : 7.0);
                 }
-                units.forEach(unit => {
-                        if (unit.health > 0 && unit.mesh && unit.mesh.position.distanceTo(structure.position) <= 32.4) {
-                            if (unit.health < unit.maxHealth) {
-                                const healAmt = Math.max(2, Math.round((unit.maxHealth || 200) * healPct));
-                                unit.health = Math.min(unit.maxHealth, unit.health + healAmt);
-                            }
-                            unit.isHordeActive = true;
+                const rSq = 32.4 * 32.4;
+                const sx = structure.position.x, sz = structure.position.z;
+                for (let ui = 0; ui < units.length; ui++) {
+                    const unit = units[ui];
+                    if (!unit || unit.health <= 0 || !unit.mesh) continue;
+                    const dx = unit.mesh.position.x - sx, dz = unit.mesh.position.z - sz;
+                    if (dx * dx + dz * dz <= rSq) {
+                        if (unit.health < unit.maxHealth) {
+                            const healAmt = Math.max(2, Math.round((unit.maxHealth || 200) * healPct));
+                            unit.health = Math.min(unit.maxHealth, unit.health + healAmt);
                         }
-                });
+                        unit._propagandaUntil = buildingTick + 90;
+                        unit._subliminalActive = hasSub;
+                    }
+                }
             }
             if (['factory', 'airfield'].includes(structure.type)) {
                 units.forEach(unit => {

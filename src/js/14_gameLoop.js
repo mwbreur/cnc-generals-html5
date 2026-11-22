@@ -891,22 +891,23 @@ function animate() {
                     const hasSub = !unit.isAI && (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
                     const healPct = hasSub ? 0.02 : 0.01;
                     if (typeof spawnPropagandaPulseRing === 'function') {
-                        spawnPropagandaPulseRing(unit.mesh.position, hasSub);
+                        spawnPropagandaPulseRing(unit.mesh.position, hasSub, 5.2);
                     }
                     const myTeamList = unit.isAI ? enemyUnits : units;
-                    myTeamList.forEach(ally => {
-                            if (ally.health > 0 && ally.mesh) {
-                                const dx = ally.mesh.position.x - uX;
-                                const dz = ally.mesh.position.z - uZ;
-                                if ((dx * dx + dz * dz) <= maxDistSq) {
-                                    if (ally.health < ally.maxHealth) {
-                                        const healAmt = Math.max(1, Math.round((ally.maxHealth || 200) * healPct));
-                                        ally.health = Math.min(ally.maxHealth, ally.health + healAmt);
-                                    }
-                                    ally.isHordeActive = true;
-                                }
+                    for (let ai = 0; ai < myTeamList.length; ai++) {
+                        const ally = myTeamList[ai];
+                        if (!ally || ally.health <= 0 || !ally.mesh) continue;
+                        const dx = ally.mesh.position.x - uX;
+                        const dz = ally.mesh.position.z - uZ;
+                        if ((dx * dx + dz * dz) <= maxDistSq) {
+                            if (ally.health < ally.maxHealth) {
+                                const healAmt = Math.max(1, Math.round((ally.maxHealth || 200) * healPct));
+                                ally.health = Math.min(ally.maxHealth, ally.health + healAmt);
                             }
-                    });
+                            ally._propagandaUntil = buildingTick + 90;
+                            ally._subliminalActive = hasSub;
+                        }
+                    }
                 }
             }
 

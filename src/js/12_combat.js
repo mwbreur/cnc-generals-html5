@@ -967,9 +967,16 @@ function executeWeaponFireInner(attacker, target) {
 
     attacker.attackCooldown = baseCooldown;
 
+    const curTProp = (typeof buildingTick !== 'undefined' ? buildingTick : 0);
+    const inPropagandaAura = !!(attacker._propagandaUntil && curTProp <= attacker._propagandaUntil);
+    if (inPropagandaAura) {
+        // Official INIZH.big GameData.ini: ENTHUSIASTIC RATE_OF_FIRE 125% (*0.80), stacks with SUBLIMINAL RATE_OF_FIRE 125% (*0.64)
+        const propRofMult = attacker._subliminalActive ? 0.64 : 0.80;
+        attacker.attackCooldown = Math.max(5, Math.floor(attacker.attackCooldown * propRofMult));
+    }
     if (attacker.isHordeActive) {
-        const hordeFactor = (typeof researchedTechs !== 'undefined' && researchedTechs.has('nationalism')) ? 0.60 : 0.75;
-        attacker.attackCooldown = Math.max(6, Math.floor(attacker.attackCooldown * hordeFactor)); // China Horde: +25% fire-rate (+40% with Nationalism)
+        const hordeFactor = (typeof researchedTechs !== 'undefined' && researchedTechs.has('nationalism')) ? 0.65 : 0.80;
+        attacker.attackCooldown = Math.max(5, Math.floor(attacker.attackCooldown * hordeFactor)); // China Horde: +25% ROF (+50% w/ Nationalism)
     }
     // China Autoloader Tech: Battlemaster tanks fire +25% faster
     if (typeof units !== 'undefined' && units.includes(attacker) && typeof researchedTechs !== 'undefined' && researchedTechs.has('autoloader') && attacker.type === 'battlemaster') {
