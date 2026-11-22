@@ -973,66 +973,6 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         ringWrapper.add(accelRing);
         root.add(ringWrapper);
 
-        // Official ABSDILink_A1.W3D: 3-petal armored silo blast doors (closed while charging, open when ready/firing)
-        const doorMat = new THREE.MeshStandardMaterial({ color: 0x6b7685, roughness: 0.55, metalness: 0.45 });
-        const doorTrimMat = new THREE.MeshStandardMaterial({ color: 0x384250, roughness: 0.5, metalness: 0.6 });
-        const pitAnchor = new THREE.Group();
-        pitAnchor.name = 'particlePitAnchor';
-        pitAnchor.position.set(0, 6.5, 24.6);
-        for (let di = 0; di < 3; di++) {
-            const ang = (di * Math.PI * 2) / 3;
-            const doorHinge = new THREE.Group();
-            doorHinge.rotation.y = ang;
-            const doorLeaf = new THREE.Group();
-            doorLeaf.name = 'particleDoor' + di;
-            const leafGeo = new THREE.CylinderGeometry(9.4, 9.4, 1.1, 8, 1, false, -Math.PI / 3, (Math.PI * 2) / 3);
-            const leafMesh = new THREE.Mesh(leafGeo, doorMat);
-            leafMesh.castShadow = true;
-            leafMesh.receiveShadow = true;
-            doorLeaf.add(leafMesh);
-            const rib = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, 8.8), doorTrimMat);
-            rib.position.set(0, 0.15, 4.4);
-            doorLeaf.add(rib);
-            doorHinge.add(doorLeaf);
-            pitAnchor.add(doorHinge);
-        }
-
-        // Official ABSDILink_A1.W3D: Rising parabolic Beam Emitter Dish (stowed inside pit while charging, rises when ready/firing)
-        const dishGroup = new THREE.Group();
-        dishGroup.name = 'particleDish';
-        dishGroup.position.set(0, -13.0, 0);
-        dishGroup.visible = false;
-        const dishColMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.45, metalness: 0.65 });
-        const dishMirrorMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, emissive: 0x004466, emissiveIntensity: 0.35, roughness: 0.2, metalness: 0.85, side: THREE.DoubleSide });
-        const dishCoreMat = new THREE.MeshStandardMaterial({ color: 0x74f0ff, emissive: 0x00d2ff, emissiveIntensity: 1.6, roughness: 0.15, metalness: 0.3 });
-        const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, 12.0, 12), dishColMat);
-        pedestal.position.y = -4.5;
-        dishGroup.add(pedestal);
-        const bowl = new THREE.Mesh(new THREE.CylinderGeometry(8.2, 2.8, 3.6, 16, 1, true), dishMirrorMat);
-        bowl.position.y = 2.6;
-        dishGroup.add(bowl);
-        const bowlRim = new THREE.Mesh(new THREE.TorusGeometry(8.2, 0.45, 8, 24), dishColMat);
-        bowlRim.rotation.x = Math.PI / 2;
-        bowlRim.position.y = 4.4;
-        dishGroup.add(bowlRim);
-        const emitterLens = new THREE.Mesh(new THREE.SphereGeometry(2.3, 14, 10), dishCoreMat);
-        emitterLens.name = 'particleDishCore';
-        emitterLens.position.y = 2.4;
-        dishGroup.add(emitterLens);
-        for (let si = 0; si < 3; si++) {
-            const sa = (si * Math.PI * 2) / 3;
-            const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 7.6, 6), dishColMat);
-            strut.position.set(Math.sin(sa) * 4.2, 5.2, Math.cos(sa) * 4.2);
-            strut.rotation.z = Math.sin(sa) * 0.62;
-            strut.rotation.x = -Math.cos(sa) * 0.62;
-            dishGroup.add(strut);
-        }
-        const focusTip = new THREE.Mesh(new THREE.SphereGeometry(1.15, 8, 6), dishCoreMat);
-        focusTip.position.y = 7.6;
-        dishGroup.add(focusTip);
-        pitAnchor.add(dishGroup);
-        root.add(pitAnchor);
-
         // Glow is a light-free soft circular radial mist sprite (no square edges, no PointLight shader recompiles in r128)
         if (typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
             if (!window._particlePitGlowTex && typeof document !== 'undefined' && document.createElement && typeof THREE.CanvasTexture === 'function') {
@@ -1310,6 +1250,65 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         plinth.position.set(0, -4.95, 0);
         plinth.receiveShadow = true;
         root.add(plinth);
+    } else if (buildingKey === 'usa_particleCannon') {
+        // Add 3-petal silo doors + stowed underground emitter dish AFTER grounding so the stowed pedestal never lifts the building!
+        const groundShiftY = (minBldY < 1e8 && minBldY < 0) ? (-minBldY + 0.35) : 0;
+        const doorMat = new THREE.MeshStandardMaterial({ color: 0x6b7685, roughness: 0.55, metalness: 0.45 });
+        const doorTrimMat = new THREE.MeshStandardMaterial({ color: 0x384250, roughness: 0.5, metalness: 0.6 });
+        const pitAnchor = new THREE.Group();
+        pitAnchor.name = 'particlePitAnchor';
+        pitAnchor.position.set(0, 6.5 + groundShiftY, 24.6);
+        for (let di = 0; di < 3; di++) {
+            const ang = (di * Math.PI * 2) / 3;
+            const doorHinge = new THREE.Group();
+            doorHinge.rotation.y = ang;
+            const doorLeaf = new THREE.Group();
+            doorLeaf.name = 'particleDoor' + di;
+            const leafGeo = new THREE.CylinderGeometry(9.4, 9.4, 1.1, 8, 1, false, -Math.PI / 3, (Math.PI * 2) / 3);
+            const leafMesh = new THREE.Mesh(leafGeo, doorMat);
+            leafMesh.castShadow = true;
+            leafMesh.receiveShadow = true;
+            doorLeaf.add(leafMesh);
+            const rib = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, 8.8), doorTrimMat);
+            rib.position.set(0, 0.15, 4.4);
+            doorLeaf.add(rib);
+            doorHinge.add(doorLeaf);
+            pitAnchor.add(doorHinge);
+        }
+        const dishGroup = new THREE.Group();
+        dishGroup.name = 'particleDish';
+        dishGroup.position.set(0, -13.0, 0);
+        dishGroup.visible = false;
+        const dishColMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.45, metalness: 0.65 });
+        const dishMirrorMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, emissive: 0x004466, emissiveIntensity: 0.35, roughness: 0.2, metalness: 0.85, side: THREE.DoubleSide });
+        const dishCoreMat = new THREE.MeshStandardMaterial({ color: 0x74f0ff, emissive: 0x00d2ff, emissiveIntensity: 1.6, roughness: 0.15, metalness: 0.3 });
+        const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, 12.0, 12), dishColMat);
+        pedestal.position.y = -4.5;
+        dishGroup.add(pedestal);
+        const bowl = new THREE.Mesh(new THREE.CylinderGeometry(8.2, 2.8, 3.6, 16, 1, true), dishMirrorMat);
+        bowl.position.y = 2.6;
+        dishGroup.add(bowl);
+        const bowlRim = new THREE.Mesh(new THREE.TorusGeometry(8.2, 0.45, 8, 24), dishColMat);
+        bowlRim.rotation.x = Math.PI / 2;
+        bowlRim.position.y = 4.4;
+        dishGroup.add(bowlRim);
+        const emitterLens = new THREE.Mesh(new THREE.SphereGeometry(2.3, 14, 10), dishCoreMat);
+        emitterLens.name = 'particleDishCore';
+        emitterLens.position.y = 2.4;
+        dishGroup.add(emitterLens);
+        for (let si = 0; si < 3; si++) {
+            const sa = (si * Math.PI * 2) / 3;
+            const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 7.6, 6), dishColMat);
+            strut.position.set(Math.sin(sa) * 4.2, 5.2, Math.cos(sa) * 4.2);
+            strut.rotation.z = Math.sin(sa) * 0.62;
+            strut.rotation.x = -Math.cos(sa) * 0.62;
+            dishGroup.add(strut);
+        }
+        const focusTip = new THREE.Mesh(new THREE.SphereGeometry(1.15, 8, 6), dishCoreMat);
+        focusTip.position.y = 7.6;
+        dishGroup.add(focusTip);
+        pitAnchor.add(dishGroup);
+        root.add(pitAnchor);
     }
 
     root.userData.isW3D = true;
