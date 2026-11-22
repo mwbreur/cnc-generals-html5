@@ -1195,3 +1195,370 @@ function selectUnitsByType(category) {
 window.selectUnitsByType = selectUnitsByType;
 
 // =========================================================================
+// BROWSER EA SAGE .MAP IMPORTER (Uncompressed CkMp & EAR RefPack .map files)
+// =========================================================================
+const IMPORTED_SAGE_MAPS_KEY = 'cnc_imported_sage_maps_v1';
+
+function _decompressSageRefPack(bytes, startOffset) {
+    let pos = startOffset;
+    const magic = (bytes[pos] << 8) | bytes[pos + 1];
+    pos += 2;
+    let decompSize = 0;
+    if (magic & 0x8000) {
+        if (magic & 0x0100) pos += 4;
+        decompSize = ((bytes[pos] << 24) | (bytes[pos + 1] << 16) | (bytes[pos + 2] << 8) | bytes[pos + 3]) >>> 0;
+        pos += 4;
+    } else {
+        if (magic & 0x0100) pos += 3;
+        decompSize = (bytes[pos] << 16) | (bytes[pos + 1] << 8) | bytes[pos + 2];
+        pos += 3;
+    }
+    if (decompSize <= 0 || decompSize > 64 * 1024 * 1024) {
+        throw new Error('Unsupported .map decompressed size: ' + decompSize);
+    }
+    const out = new Uint8Array(decompSize);
+    let outPos = 0;
+    while (pos < bytes.length && outPos < decompSize) {
+        const b0 = bytes[pos++];
+        if (b0 >= 0xFC) {
+            const litCount = b0 & 0x03;
+            for (let i = 0; i < litCount && pos < bytes.length && outPos < decompSize; i++) out[outPos++] = bytes[pos++];
+            if (b0 === 0xFC) break;
+        } else if (b0 >= 0xE0) {
+            const litCount = (b0 - 0xDF) << 2;
+            for (let i = 0; i < litCount && pos < bytes.length && outPos < decompSize; i++) out[outPos++] = bytes[pos++];
+        } else if (b0 >= 0xC0) {
+            const b1 = bytes[pos++], b2 = bytes[pos++], b3 = bytes[pos++];
+            const litCount = b0 & 0x03;
+            for (let i = 0; i < litCount && pos < bytes.length && outPos < decompSize; i++) out[outPos++] = bytes[pos++];
+            const copyCount = ((b0 & 0x0C) << 6) + b3 + 5;
+            const copyOffset = ((b0 & 0x10) << 12) + (b1 << 8) + b2 + 1;
+            let src = outPos - copyOffset;
+            for (let i = 0; i < copyCount && outPos < decompSize; i++) out[outPos++] = out[src++];
+        } else if (b0 >= 0x80) {
+            const b1 = bytes[pos++], b2 = bytes[pos++];
+            const litCount = (b1 >> 6) & 0x03;
+            for (let i = 0; i < litCount && pos < bytes.length && outPos < decompSize; i++) out[outPos++] = bytes[pos++];
+            const copyCount = (b0 & 0x3F) + 4;
+            const copyOffset = ((b1 & 0x3F) << 8) + b2 + 1;
+            let src = outPos - copyOffset;
+            for (let i = 0; i < copyCount && outPos < decompSize; i++) out[outPos++] = out[src++];
+        } else {
+            const b1 = bytes[pos++];
+            const litCount = b0 & 0x03;
+            for (let i = 0; i < litCount && pos < bytes.length && outPos < decompSize; i++) out[outPos++] = bytes[pos++];
+            const copyCount = ((b0 >> 2) & 0x07) + 3;
+            const copyOffset = ((b0 & 0x60) << 3) + b1 + 1;
+            let src = outPos - copyOffset;
+            for (let i = 0; i < copyCount && outPos < decompSize; i++) out[outPos++] = out[src++];
+        }
+    }
+    return out;
+}
+
+function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
+    const raw = new Uint8Array(arrayBuffer);
+    const readAscii = (u8, off, len) => {
+        let s = '';
+        for (let i = 0; i < len && off + i < u8.length; i++) s += String.fromCharCode(u8[off + i]);
+        return s;
+    };
+    const isEar = raw.length >= 12 && readAscii(raw, 0, 4) === 'EAR\0';
+    const decomp = isEar ? _decompressSageRefPack(raw, 8) : raw;
+    if (decomp.length < 16 || readAscii(decomp, 0, 4) !== 'CkMp') {
+        throw new Error('Not a valid C&C Generals / Zero Hour .map file (missing CkMp header).');
+    }
+    const dv = new DataView(decomp.buffer, decomp.byteOffset, decomp.byteLength);
+    const numStrings = dv.getUint32(4, true);
+    let pos = 8;
+    const dict = {};
+    let snowHits = 0, greenHits = 0, desertHits = 0;
+    for (let i = 0; i < numStrings && pos < decomp.length; i++) {
+        const len = decomp[pos++];
+        const str = readAscii(decomp, pos, len);
+        pos += len;
+        const id = dv.getUint32(pos, true);
+        pos += 4;
+        dict[id] = str;
+        if (/snow|ice|arctic|alpine|glacier/i.test(str)) snowHits++;
+        else if (/grass|forest|pasture|pine|temperate/i.test(str)) greenHits++;
+        else if (/sand|desert|dune|arid/i.test(str)) desertHits++;
+    }
+
+    let hmChunkPos = -1, objListPos = -1, objListEnd = -1;
+    let scanPos = pos;
+    while (scanPos + 10 <= decomp.length) {
+        const cid = dv.getUint32(scanPos, true);
+        const csz = dv.getUint32(scanPos + 6, true);
+        const cname = dict[cid] || '';
+        const dataStart = scanPos + 10;
+        if (cname === 'HeightMapData') hmChunkPos = dataStart;
+        else if (cname === 'ObjectsList') { objListPos = dataStart; objListEnd = dataStart + csz; }
+        if (csz <= 0 || dataStart + csz > decomp.length) break;
+        scanPos = dataStart + csz;
+    }
+    if (hmChunkPos < 0) throw new Error('Map is missing HeightMapData chunk.');
+
+    const W = dv.getInt32(hmChunkPos, true);
+    const H = dv.getInt32(hmChunkPos + 4, true);
+    const border = dv.getInt32(hmChunkPos + 8, true);
+    const numBoundaries = dv.getInt32(hmChunkPos + 12, true);
+    const hmDataStart = hmChunkPos + 20 + numBoundaries * 8;
+    const playW = Math.max(1, W - 2 * border);
+    const playH = Math.max(1, H - 2 * border);
+
+    const sampleVals = [];
+    for (let y = border; y < H - border; y += 4) {
+        for (let x = border; x < W - border; x += 4) {
+            sampleVals.push(decomp[hmDataStart + y * W + x]);
+        }
+    }
+    sampleVals.sort((a, b) => a - b);
+    const baseByte = sampleVals[Math.floor(sampleVals.length * 0.25)] || 64;
+
+    // Preserve exact original elevation tiers (scale-independent height levels!)
+    const GRID = 97;
+    const grid = [];
+    for (let r = 0; r < GRID; r++) {
+        const row = [];
+        const srcY = Math.min(H - 1, Math.max(0, Math.floor(border + (1 - r / (GRID - 1)) * (playH - 1))));
+        for (let c = 0; c < GRID; c++) {
+            const srcX = Math.min(W - 1, Math.max(0, Math.floor(border + (c / (GRID - 1)) * (playW - 1))));
+            const val = decomp[hmDataStart + srcY * W + srcX];
+            const hVal = Math.max(-5.5, Math.min(22.0, (val - baseByte) * 0.155));
+            row.push(Math.round(hVal * 100) / 100);
+        }
+        grid.push(row);
+    }
+
+    const hAtNorm = (nxVal, nzVal) => {
+        const col = Math.max(0, Math.min(GRID - 1, Math.round((nxVal + 0.5) * (GRID - 1))));
+        const row = Math.max(0, Math.min(GRID - 1, Math.round((nzVal + 0.5) * (GRID - 1))));
+        return grid[row][col];
+    };
+
+    const rawSpawns = [], rawSupplies = [], rawDerricks = [], rawHospitals = [], rawRefineries = [];
+    const rawBridges = [], rawBuildings = [], rawRoads = [], rawProps = [];
+    let pendingRoadPt1 = null, pendingBridgePt1 = null;
+    let p = objListPos;
+    while (p > 0 && p + 10 <= objListEnd) {
+        const cid = dv.getUint32(p, true);
+        const csz = dv.getUint32(p + 6, true);
+        const dStart = p + 10;
+        if (dict[cid] === 'Object' && dStart + csz <= objListEnd) {
+            let op = dStart;
+            const x = dv.getFloat32(op, true);
+            const y = dv.getFloat32(op + 4, true);
+            op += 12;
+            const angle = dv.getFloat32(op, true);
+            const flags = dv.getInt32(op + 4, true);
+            const tLen = dv.getUint16(op + 8, true);
+            op += 10;
+            const templateName = readAscii(decomp, op, tLen);
+            op += tLen;
+            let waypointName = '';
+            if (op + 2 <= dStart + csz) {
+                const numProps = dv.getUint16(op, true);
+                op += 2;
+                for (let k = 0; k < numProps && op + 4 <= dStart + csz; k++) {
+                    const keyAndType = dv.getUint32(op, true);
+                    const pType = keyAndType & 0xff;
+                    const pKey = dict[keyAndType >>> 8] || '';
+                    op += 4;
+                    if (pType === 0) op += 1;
+                    else if (pType === 1 || pType === 2) op += 4;
+                    else if (pType === 3) {
+                        if (op + 2 > dStart + csz) break;
+                        const sLen = dv.getUint16(op, true); op += 2;
+                        const sVal = readAscii(decomp, op, sLen); op += sLen;
+                        if (pKey === 'waypointName') waypointName = sVal;
+                    } else if (pType === 4) {
+                        if (op + 2 > dStart + csz) break;
+                        const uLen = dv.getUint16(op, true); op += 2 + uLen * 2;
+                    } else break;
+                }
+            }
+            const rawNx = (x / (playW * 10)) - 0.5;
+            const rawNz = 0.5 - (y / (playH * 10));
+            const nx = Math.max(-0.42, Math.min(0.42, rawNx));
+            const nz = Math.max(-0.42, Math.min(0.42, rawNz));
+            if (flags & 0x02) {
+                pendingRoadPt1 = { nx: rawNx, nz: rawNz };
+            } else if ((flags & 0x04) && pendingRoadPt1) {
+                if (rawRoads.length < 220) {
+                    rawRoads.push([
+                        Math.round(pendingRoadPt1.nx * 1000) / 1000,
+                        Math.round(pendingRoadPt1.nz * 1000) / 1000,
+                        Math.round(rawNx * 1000) / 1000,
+                        Math.round(rawNz * 1000) / 1000
+                    ]);
+                }
+                pendingRoadPt1 = null;
+            }
+            const mStart = /^Player_(\d)_Start$/i.exec(waypointName);
+            if (mStart) {
+                rawSpawns.push({ id: parseInt(mStart[1], 10), nx: Math.round(nx * 1000) / 1000, nz: Math.round(nz * 1000) / 1000 });
+            } else if (/SupplyDock|SupplyWarehouse|SupplyPile/i.test(templateName)) {
+                if (!rawSupplies.some(s => Math.hypot(s.nx - nx, s.nz - nz) < 0.04)) {
+                    rawSupplies.push({ nx: Math.round(nx * 1000) / 1000, nz: Math.round(nz * 1000) / 1000, amount: 30000 });
+                }
+            } else if (/TechOilDerrick/i.test(templateName)) {
+                rawDerricks.push({ nx: Math.round(nx * 1000) / 1000, nz: Math.round(nz * 1000) / 1000 });
+            } else if (/TechHospital/i.test(templateName)) {
+                rawHospitals.push({ nx: Math.round(nx * 1000) / 1000, nz: Math.round(nz * 1000) / 1000 });
+            } else if (/TechOilRefinery/i.test(templateName)) {
+                rawRefineries.push({ nx: Math.round(nx * 1000) / 1000, nz: Math.round(nz * 1000) / 1000 });
+            } else if (/CivilianBunker/i.test(templateName)) {
+                rawBuildings.push([Math.round(nx * 1000) / 1000, Math.round(nz * 1000) / 1000, Math.round(angle * 100) / 100, 'bunker']);
+            } else if (/Bridge/i.test(templateName)) {
+                if ((flags & 0x30) === 0x10) {
+                    pendingBridgePt1 = { nx: rawNx, nz: rawNz, tName: templateName };
+                } else if ((flags & 0x30) === 0x20 && pendingBridgePt1) {
+                    const midNx = (pendingBridgePt1.nx + rawNx) * 0.5;
+                    const midNz = (pendingBridgePt1.nz + rawNz) * 0.5;
+                    const dNx = rawNx - pendingBridgePt1.nx, dNz = rawNz - pendingBridgePt1.nz;
+                    const deckH = Math.max(hAtNorm(pendingBridgePt1.nx, pendingBridgePt1.nz), hAtNorm(rawNx, rawNz));
+                    if (!rawBridges.some(b => Math.hypot(b.nx - midNx, b.nz - midNz) < 0.03)) {
+                        rawBridges.push({
+                            nx: Math.round(midNx * 10000) / 10000,
+                            nz: Math.round(midNz * 10000) / 10000,
+                            angle: Math.round(Math.atan2(dNx, dNz) * 1000) / 1000,
+                            span: Math.round((Math.hypot(dNx, dNz) + 0.022) * 10000) / 10000,
+                            deckH: Math.round(deckH * 100) / 100,
+                            width: /wide/i.test(pendingBridgePt1.tName || templateName) ? 24 : 20
+                        });
+                    }
+                    pendingBridgePt1 = null;
+                }
+            } else if (rawProps.length < 180 && /Tree|Palm|Bush|Rock|Boulder/i.test(templateName)) {
+                const pKind = /Palm/i.test(templateName) ? 'palm' : (/Rock|Boulder/i.test(templateName) ? 'rock' : (/Bush/i.test(templateName) ? 'bush' : 'tree'));
+                rawProps.push([Math.round(nx * 1000) / 1000, Math.round(nz * 1000) / 1000, pKind]);
+            }
+        }
+        if (csz <= 0 || dStart + csz > objListEnd) break;
+        p = dStart + csz;
+    }
+
+    rawSpawns.sort((a, b) => a.id - b.id);
+    if (rawSpawns.length < 2) {
+        rawSpawns.push({ id: 1, nx: -0.34, nz: -0.34 }, { id: 2, nx: 0.34, nz: 0.34 });
+    }
+    const cleanName = String(fileName || 'Imported Map').replace(/\.map$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 42) || 'Imported Map';
+    const mapKey = 'imported_' + cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 28);
+    const biome = (snowHits > greenHits && snowHits > desertHits) ? 'snow' : (greenHits > desertHits ? 'temperate' : 'desert');
+    const players = Math.max(2, Math.min(8, rawSpawns.length));
+    const recSize = players <= 2 ? 600 : (players <= 4 ? 900 : (players <= 6 ? 1200 : 1600));
+
+    return {
+        key: mapKey,
+        name: cleanName,
+        players,
+        biome,
+        gridSize: GRID,
+        recommendedSize: recSize,
+        heightGrid: grid,
+        spawns: rawSpawns,
+        supplies: rawSupplies,
+        derricks: rawDerricks,
+        hospitals: rawHospitals,
+        refineries: rawRefineries,
+        bridges: rawBridges,
+        buildings: rawBuildings,
+        roads: rawRoads,
+        props: rawProps,
+        isImportedSageMap: true
+    };
+}
+window.parseSageMapBuffer = parseSageMapBuffer;
+
+function registerImportedSageMap(mapObj, persist = true) {
+    if (!mapObj || !mapObj.key || !Array.isArray(mapObj.heightGrid)) return;
+    if (typeof window !== 'undefined') {
+        window.OFFICIAL_SKIRMISH_MAPS = window.OFFICIAL_SKIRMISH_MAPS || {};
+        window.OFFICIAL_SKIRMISH_MAPS[mapObj.key] = mapObj;
+    }
+    const label = `${mapObj.name} (${mapObj.players}P • Imported .map)`;
+    const addOpt = (selId, grpId) => {
+        const sel = typeof document !== 'undefined' ? document.getElementById(selId) : null;
+        if (!sel) return;
+        let opt = sel.querySelector(`option[value="${mapObj.key}"]`);
+        if (!opt) {
+            opt = document.createElement('option');
+            opt.value = mapObj.key;
+            const grp = grpId ? document.getElementById(grpId) : null;
+            if (grp) {
+                grp.style.display = '';
+                grp.appendChild(opt);
+            } else {
+                sel.appendChild(opt);
+            }
+        }
+        opt.textContent = label;
+    };
+    addOpt('map-environment', 'sp-imported-maps-optgroup');
+    addOpt('mp-map-env', null);
+
+    if (persist && typeof localStorage !== 'undefined') {
+        try {
+            const store = JSON.parse(localStorage.getItem(IMPORTED_SAGE_MAPS_KEY) || '{}');
+            store[mapObj.key] = mapObj;
+            localStorage.setItem(IMPORTED_SAGE_MAPS_KEY, JSON.stringify(store));
+        } catch (err) {
+            console.warn('Could not persist imported .map to localStorage (quota):', err);
+        }
+    }
+}
+window.registerImportedSageMap = registerImportedSageMap;
+
+function loadPersistedImportedSageMaps() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+        const store = JSON.parse(localStorage.getItem(IMPORTED_SAGE_MAPS_KEY) || '{}');
+        Object.values(store).forEach(m => {
+            if (m && m.key && Array.isArray(m.heightGrid)) registerImportedSageMap(m, false);
+        });
+    } catch (_) {}
+}
+window.loadPersistedImportedSageMaps = loadPersistedImportedSageMaps;
+
+function importOfficialSageMapFile() {
+    if (typeof document === 'undefined') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.map';
+    input.onchange = (ev) => {
+        const file = ev.target && ev.target.files && ev.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const parsed = parseSageMapBuffer(reader.result, file.name);
+                registerImportedSageMap(parsed, true);
+                const spSel = document.getElementById('map-environment');
+                const sizeSel = document.getElementById('map-size');
+                if (sizeSel && parsed.recommendedSize) sizeSel.value = String(parsed.recommendedSize);
+                if (spSel) {
+                    spSel.value = parsed.key;
+                    if (typeof onMapSelectionChange === 'function') onMapSelectionChange('single');
+                }
+                if (typeof showNotification === 'function') {
+                    showNotification(`Imported "${parsed.name}" (${parsed.players}P, ${parsed.supplies.length} supplies, ${parsed.bridges.length} bridges)!`, 'success');
+                }
+            } catch (err) {
+                console.error('Failed to import .map file:', err);
+                if (typeof showNotification === 'function') {
+                    showNotification('Could not parse .map file: ' + (err && err.message ? err.message : 'Invalid format'), 'error');
+                }
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+    input.click();
+}
+window.importOfficialSageMapFile = importOfficialSageMapFile;
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('DOMContentLoaded', () => { loadPersistedImportedSageMaps(); });
+}
+
+// =========================================================================

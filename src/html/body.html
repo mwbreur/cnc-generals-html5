@@ -256,7 +256,9 @@
                                         <option value="city">Small City Grid (Urban Warfare)</option>
                                         <option value="random">Procedural Warzone - Random Hills &amp; River</option>
                                     </optgroup>
+                                    <optgroup id="sp-imported-maps-optgroup" label="Imported Community .map Files" style="display:none;"></optgroup>
                                 </select>
+                                <button type="button" class="rts-btn" style="margin-top:6px; width:100%; padding:5px 8px; font-size:11px; border-color:#55efc4; color:#55efc4;" onclick="importOfficialSageMapFile()">📥 IMPORT C&amp;C .MAP FILE</button>
                             </div>
                             <div class="zh-opt-group">
                                 <label for="map-size">Battlefield Size</label>
@@ -480,7 +482,8 @@
                         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
                             <button type="button" class="rts-btn" style="flex:1; padding: 7px; font-size:11px;" onclick="saveCustomMap()">💾 SAVE MAP</button>
                             <button type="button" class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#f1c40f; color:#f1c40f;" onclick="exportCustomMapJSON()">📁 EXPORT</button>
-                            <button type="button" class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#3498db; color:#3498db;" onclick="importCustomMapJSON()">📥 IMPORT</button>
+                            <button type="button" class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#3498db; color:#3498db;" onclick="importCustomMapJSON()">📥 IMPORT JSON</button>
+                            <button type="button" class="rts-btn" style="flex:1; padding: 7px; font-size:11px; border-color:#55efc4; color:#55efc4;" onclick="importOfficialSageMapFile()">🗺️ IMPORT .MAP</button>
                         </div>
                         <div style="display:flex; gap:6px; margin-bottom:12px;">
                             <button type="button" class="rts-btn" style="flex:1; padding:7px; font-size:11px; border-color:#55efc4; color:#55efc4;" onclick="saveMapAndOpenMode('single')">SAVE &amp; OPEN SKIRMISH</button>

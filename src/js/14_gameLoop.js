@@ -3255,8 +3255,34 @@ function processEnemyMovement() {
                     }
                 }
                 const step = Math.min(dist2D, effectiveSpeed * combatDeltaScale);
-                enemy.mesh.position.x += dirX * step;
-                enemy.mesh.position.z += dirZ * step;
+                const nextX = enemy.mesh.position.x + dirX * step;
+                const nextZ = enemy.mesh.position.z + dirZ * step;
+                // Enforce the exact same cliff passability rules on AI ground units as player units (no riding up sheer cliffs!)
+                let cliffBlocked = false;
+                if (!enemy.isAir && typeof isTerrainCliffAt === 'function') {
+                    const onBridgeNext = (typeof getBridgeDeckHeightAt === 'function' && getBridgeDeckHeightAt(nextX, nextZ) !== null);
+                    if (!onBridgeNext && isTerrainCliffAt(nextX, nextZ) && !isTerrainCliffAt(enemy.mesh.position.x, enemy.mesh.position.z)) {
+                        cliffBlocked = true;
+                        const nowTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
+                        if (!enemy._cliffRerouteTick || nowTick - enemy._cliffRerouteTick >= 30) {
+                            enemy._cliffRerouteTick = nowTick;
+                            const finalGoal = (enemy.waypoints && enemy.waypoints.length > 0)
+                                ? enemy.waypoints[enemy.waypoints.length - 1]
+                                : enemy.targetPosition;
+                            const reroute = (typeof findNavigationPath === 'function' && finalGoal)
+                                ? findNavigationPath(enemy.mesh.position, finalGoal, { ignoreStruct: enemy.targetStructure || enemy.combatTarget || null })
+                                : null;
+                            if (reroute && reroute.length > 1) {
+                                enemy.waypoints = reroute.slice(1);
+                                enemy.targetPosition.copy(reroute[0]);
+                            }
+                        }
+                    }
+                }
+                if (!cliffBlocked) {
+                    enemy.mesh.position.x = nextX;
+                    enemy.mesh.position.z = nextZ;
+                }
                 if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type)) spinVehicleWheels(enemy, step);
                 if (!enemy.isAir && !INFANTRY_TYPE_SET.has(enemy.type) && typeof spawnTreadDustPuff === 'function') {
                     const isTrackedEnemy = ['tank', 'crusader', 'paladin', 'battlemaster', 'overlord', 'gatling', 'gatlingTank', 'dragon', 'inferno', 'nukecannon', 'nuketank', 'scorpion', 'marauder', 'scud', 'dozer', 'crawler'].includes(enemy.type);
