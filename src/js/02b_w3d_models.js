@@ -1114,7 +1114,7 @@ function createW3DBuildingMesh(buildingKey, isEnemy = false, fallbackFn = null, 
         if (b2 && b2.quaternion && typeof b2.quaternion.set === 'function') {
             b2.quaternion.set(0, 0, 0, 1);
         }
-    } else if (buildingKey === 'china_nukeSilo') {
+    } else if (buildingKey === 'china_nukeSilo' && !(window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['china_nukeRocket'])) {
         const nukeTipGroup = new THREE.Group();
         nukeTipGroup.name = 'nukeTip';
         nukeTipGroup.position.set(0, 2, -20.5);

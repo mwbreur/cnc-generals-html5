@@ -3939,28 +3939,25 @@ function processBuildingFunctions() {
                                 tip.position.y = 0.8 + openFactor * 1.8;
                             }
                         }
-                        // Official cryogenic steam vents & red warning beacon pulses when >90% charged
-                        if (chargeRatio > 0.90 && typeof spawnSmokePuff === 'function') {
-                            const steamInterval = openFactor > 0.5 ? 7 : 14;
-                            if (buildingTick % steamInterval === 0) {
-                                const bayCenter = structure.position.clone().add(new THREE.Vector3(-3.5, 4.2, -5.2));
+                        // Official cryogenic steam vents & red warning beacon pulses when >85% charged (updateBuildingLoops runs 1x/sec)
+                        if (chargeRatio > 0.85 && typeof spawnSmokePuff === 'function') {
+                            const bayCenter = structure.position.clone().add(new THREE.Vector3(-3.5, 4.2, -5.2));
+                            const puffCount = (rem === 0 || openFactor > 0.65) ? 3 : 2;
+                            for (let sp = 0; sp < puffCount; sp++) {
                                 spawnSmokePuff(
-                                    bayCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 4.5, 0.2, (Math.random() - 0.5) * 4.5)),
-                                    0xf1f2f6,
-                                    1.25
+                                    bayCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 5.0, 0.5 + Math.random() * 2.5, (Math.random() - 0.5) * 5.0)),
+                                    sp % 2 === 0 ? 0xf1f2f6 : 0xdcdde1,
+                                    1.45
                                 );
-                                // Subtle pulsing red warning light flare on silo rim
-                                if (buildingTick % 28 === 0 && typeof spawnMuzzleFlash === 'function') {
-                                    spawnMuzzleFlash(bayCenter.clone().add(new THREE.Vector3(4.2, 1.4, 3.8)), 0xff2222, 0.95);
-                                }
-                                if (openFactor > 0.65) {
-                                    // Twin pressurized missile-body cryogenic vents (STEAM01 / STEAM02)
-                                    spawnSmokePuff(
-                                        bayCenter.clone().add(new THREE.Vector3((Math.random() < 0.5 ? -1.8 : 1.8), 4.5 + Math.random() * 2.5, (Math.random() - 0.5) * 1.4)),
-                                        0xffffff,
-                                        0.95
-                                    );
-                                }
+                            }
+                            if (openFactor > 0.55) {
+                                // Twin pressurized missile-body cryogenic vents (STEAM01 / STEAM02)
+                                spawnSmokePuff(bayCenter.clone().add(new THREE.Vector3(-1.8, 5.2, 0)), 0xffffff, 1.15);
+                                spawnSmokePuff(bayCenter.clone().add(new THREE.Vector3(1.8, 5.2, 0)), 0xffffff, 1.15);
+                            }
+                            // Pulsing red warning light flare on silo rim when >90% charged
+                            if (chargeRatio > 0.90 && typeof spawnMuzzleFlash === 'function') {
+                                spawnMuzzleFlash(bayCenter.clone().add(new THREE.Vector3(4.2, 1.4, 3.8)), 0xff2222, 1.05);
                             }
                         }
                     } else if (structure.type === 'scudStorm') {
@@ -3977,10 +3974,10 @@ function processBuildingFunctions() {
                                 gantry.userData._chargeControlled = true;
                             }
                         }
-                        // Subtle green/yellow toxic hazard steam venting from upright SCUD warheads once charged
-                        if (chargeRatio >= 0.95 && buildingTick % 14 === 0 && typeof spawnSmokePuff === 'function') {
+                        // Subtle green/yellow toxic hazard steam venting from upright SCUD warheads once charged (runs 1x/sec)
+                        if (chargeRatio >= 0.95 && typeof spawnSmokePuff === 'function') {
                             const wOff = new THREE.Vector3((Math.random() - 0.5) * 4.2, 5.2, (Math.random() - 0.5) * 4.2);
-                            spawnSmokePuff(structure.position.clone().add(wOff), (buildingTick % 28 === 0) ? 0xb8e934 : 0x4cd137, 0.85);
+                            spawnSmokePuff(structure.position.clone().add(wOff), (buildingTick % 120 === 0) ? 0xb8e934 : 0x4cd137, 0.95);
                         }
                     } else if (structure.type === 'particleCannon') {
                         const isFiringNow = !!(structure._particleFiringUntil && buildingTick < structure._particleFiringUntil);
