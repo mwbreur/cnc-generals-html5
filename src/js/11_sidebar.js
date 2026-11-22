@@ -3964,6 +3964,11 @@ function processBuildingFunctions() {
                                 gantry.userData._chargeControlled = true;
                             }
                         }
+                        // Subtle green/yellow toxic hazard steam venting from upright SCUD warheads once charged
+                        if (chargeRatio >= 0.95 && buildingTick % 14 === 0 && typeof spawnSmokePuff === 'function') {
+                            const wOff = new THREE.Vector3((Math.random() - 0.5) * 4.2, 5.2, (Math.random() - 0.5) * 4.2);
+                            spawnSmokePuff(structure.position.clone().add(wOff), (buildingTick % 28 === 0) ? 0xb8e934 : 0x4cd137, 0.85);
+                        }
                     } else if (structure.type === 'particleCannon') {
                         const isFiringNow = !!(structure._particleFiringUntil && buildingTick < structure._particleFiringUntil);
                         // Official ABSDILink_A1: Doors stay closed while charging, open near ready / while firing, and dish rises out of the pit

@@ -3818,6 +3818,7 @@ function animateScudStormStrike(stormPos, targetPos) {
         let phase = 'ascend';
         let t = 0;
         const ascendTicks = 68;
+        const cruiseTicks = 112; // Total ~3.0s travel delay (68 + 112 = 180 ticks) off-screen before incoming rain
         const descendTicks = 56;
         const targetGroundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(subTarget.x, subTarget.z) : 0;
         const impactPoint = new THREE.Vector3(subTarget.x, targetGroundY, subTarget.z);
@@ -3833,26 +3834,34 @@ function animateScudStormStrike(stormPos, targetPos) {
         activeFX.push({
             persistent: true,
             group: mGroup,
-            life: ascendTicks + descendTicks + 20,
+            life: ascendTicks + cruiseTicks + descendTicks + 20,
             dispose: disposeM,
             update() {
                 t++;
                 if (phase === 'ascend') {
                     const p = Math.min(1, t / ascendTicks);
-                    const ease = p * p; // accelerating rocket boost
+                    const ease = p * p; // accelerating rocket boost straight up
                     mGroup.position.set(
-                        launchOrigin.x + dirXZ.x * (p * 18),
+                        launchOrigin.x + dirXZ.x * (p * 14),
                         launchOrigin.y + ease * apexY,
-                        launchOrigin.z + dirXZ.z * (p * 18)
+                        launchOrigin.z + dirXZ.z * (p * 14)
                     );
                     flame.scale.setScalar(0.9 + Math.sin(t * 0.9) * 0.25);
                     if (t % 2 === 0 && mGroup.position.y < 145 && typeof spawnSmokePuff === 'function') {
                         spawnSmokePuff(mGroup.position.clone().add(new THREE.Vector3(0, -2.5, 0)), (t % 4 === 0) ? 0xe5e7eb : 0x9ca3af, 1.55);
                     }
                     if (t >= ascendTicks) {
+                        phase = 'cruise';
+                        t = 0;
+                        mGroup.visible = false;
+                    }
+                    return true;
+                } else if (phase === 'cruise') {
+                    if (t >= cruiseTicks) {
                         phase = 'descend';
                         t = 0;
-                        mGroup.position.set(impactPoint.x - dirXZ.x * 22, impactPoint.y + apexY, impactPoint.z - dirXZ.z * 22);
+                        mGroup.visible = true;
+                        mGroup.position.set(impactPoint.x - dirXZ.x * 20, impactPoint.y + apexY, impactPoint.z - dirXZ.z * 20);
                         mGroup.rotation.x = Math.PI; // Nose down!
                     }
                     return true;
@@ -3936,22 +3945,28 @@ function animateScudStormStrike(stormPos, targetPos) {
                             }
                         });
 
-                        // Official ScudStormDamageWeapon damages ALL units & structures in blast radius
+                        // Official ScudStormDamageWeapon damages ALL units & structures in blast radius with distance falloff
                         const allU = [...(typeof units !== 'undefined' ? units : []), ...(typeof enemyUnits !== 'undefined' ? enemyUnits : [])];
                         for (let ui = 0; ui < allU.length; ui++) {
                             const u = allU[ui];
-                            if (u && u.health > 0 && u.mesh && Math.hypot(u.mesh.position.x - impactPos.x, u.mesh.position.z - impactPos.z) <= 13.5) {
-                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, 185, 'EXPLOSIVE');
-                                else u.health -= 185;
+                            if (!u || u.health <= 0 || !u.mesh) continue;
+                            const dist = Math.hypot(u.mesh.position.x - impactPos.x, u.mesh.position.z - impactPos.z);
+                            if (dist <= 13.5) {
+                                const dmg = Math.round(185 * Math.max(0.28, 1 - dist / 14.5));
+                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, dmg, 'EXPLOSIVE');
+                                else u.health -= dmg;
                             }
                         }
                         const allS = [...(typeof structures !== 'undefined' ? structures : []), ...(typeof enemyStructures !== 'undefined' ? enemyStructures : [])];
                         for (let si = 0; si < allS.length; si++) {
                             const st = allS[si];
                             const sp = st && (st.position || (st.mesh && st.mesh.position));
-                            if (st && st.health > 0 && sp && Math.hypot(sp.x - impactPos.x, sp.z - impactPos.z) <= 15.0) {
-                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, 220, 'EXPLOSIVE');
-                                else st.health -= 220;
+                            if (!st || st.health <= 0 || !sp) continue;
+                            const dist = Math.hypot(sp.x - impactPos.x, sp.z - impactPos.z);
+                            if (dist <= 15.0) {
+                                const dmg = Math.round(220 * Math.max(0.30, 1 - dist / 16.0));
+                                if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, dmg, 'EXPLOSIVE');
+                                else st.health -= dmg;
                             }
                         }
 

@@ -1395,6 +1395,13 @@ function animate() {
                             if (typeof playSuperweaponEvaAlert === 'function') {
                                 playSuperweaponEvaAlert(s.type, 'detected', typeof selectedFaction !== 'undefined' ? selectedFaction : bFaction);
                             }
+                            if (typeof revealFogOfWarAt === 'function' && s.position) {
+                                revealFogOfWarAt(s.position, 24, 600);
+                            }
+                            if (typeof showNotification === 'function') {
+                                const swLabel = s.type === 'scudStorm' ? 'SCUD Storm' : s.type === 'nukeSilo' ? 'Nuclear Missile Silo' : 'Particle Cannon';
+                                showNotification(`⚠️ ${swLabel} detected!`, 'warning');
+                            }
                             if (typeof updateSuperweaponTimersHUD === 'function') updateSuperweaponTimersHUD();
                         } else if (!isAiStruct && typeof playBuildingCompleteSound === 'function') {
                             playBuildingCompleteSound(s.type, bFaction);
