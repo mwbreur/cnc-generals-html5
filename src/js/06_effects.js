@@ -3841,14 +3841,14 @@ function spawnMushroomCloud(pos, scaleMult = 1.0, shockwaveTargetRadius = null) 
     const flashTex = _getFxSpriteTex('flash');
     const addBlend = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
 
-    // Brief iconic Zero Hour blinding white-gold thermal screen flash (full-scale nukes only)
+    // Iconic Zero Hour blinding white-gold thermal screen flash (full-scale nukes only)
     if (shockwaveTargetRadius && typeof document !== 'undefined' && document.body && document.createElement) {
         try {
             const ov = document.createElement('div');
-            ov.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;background:radial-gradient(circle, rgba(255,255,240,0.85) 0%, rgba(255,210,120,0.45) 55%, rgba(255,140,40,0) 100%);opacity:0.95;transition:opacity 0.55s ease-out;';
+            ov.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;background:radial-gradient(circle, rgba(255,255,245,0.94) 0%, rgba(255,220,130,0.58) 55%, rgba(255,140,40,0) 100%);opacity:1;transition:opacity 1.15s ease-out;';
             document.body.appendChild(ov);
             requestAnimationFrame(() => { ov.style.opacity = '0'; });
-            setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 650);
+            setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 1250);
         } catch (_) {}
     }
 
@@ -3947,12 +3947,13 @@ function spawnMushroomCloud(pos, scaleMult = 1.0, shockwaveTargetRadius = null) 
         });
     };
 
-    const maxLife = Math.round(240 * Math.max(0.65, Math.min(1.6, scaleMult))); // ~6.4s dramatic billowing cloud for full nuke
+    // Cinematic 16-second towering mushroom cloud for full thermonuclear detonations (~7s for tactical Nuke Cannon shells)
+    const maxLife = shockwaveTargetRadius ? 960 : Math.round(320 * Math.max(0.75, Math.min(1.5, scaleMult)));
     let life = maxLife;
     const maxShockScale = shockwaveTargetRadius ? (shockwaveTargetRadius / baseShockOuter) : 8.2;
-    const cHot = new THREE.Color(0xffb142);
-    const cOrange = new THREE.Color(0xd35400);
-    const cSoot = new THREE.Color(0x3a3836);
+    const cHot = new THREE.Color(0xffcc55);
+    const cOrange = new THREE.Color(0xe8590c);
+    const cSoot = new THREE.Color(0x363330);
 
     activeFX.push({
             persistent: true,
@@ -3962,35 +3963,37 @@ function spawnMushroomCloud(pos, scaleMult = 1.0, shockwaveTargetRadius = null) 
             update() {
                 life--;
                 const progress = 1 - (life / maxLife);
-                const easeOut = 1 - Math.pow(1 - progress, 2.2);
-                const fadeTail = progress > 0.62 ? Math.max(0, 1 - (progress - 0.62) / 0.38) : 1.0;
+                const riseEase = 1 - Math.pow(1 - Math.min(1, progress / 0.52), 2.4);
+                const driftUp = Math.max(0, progress - 0.52) * 8.0 * scaleMult;
+                const fadeTail = progress > 0.74 ? Math.max(0, 1 - (progress - 0.74) / 0.26) : 1.0;
 
-                // Thermal flash expands explosively and fades in first 16%
-                if (progress < 0.18) {
-                    const fp = progress / 0.18;
-                    const fs = (16 + fp * 48) * scaleMult;
+                // Blinding thermal flash expands explosively over first ~1.5s
+                const flashSpan = shockwaveTargetRadius ? 0.12 : 0.20;
+                if (progress < flashSpan) {
+                    const fp = progress / flashSpan;
+                    const fs = (20 + fp * 62) * scaleMult;
                     flashSprite.scale.set(fs, fs, 1);
                     flashMat.opacity = Math.max(0, 1.0 - fp * fp);
                 } else {
                     flashSprite.visible = false;
                 }
 
-                // Cap rises from Y=5 -> Y=30*scaleMult, expands radially into a rolling mushroom dome, cools orange -> soot grey
-                const capHeight = (5.0 + easeOut * 24.0) * scaleMult;
-                const capRadius = (2.8 + easeOut * 11.5) * scaleMult;
+                // Cap rises majestically from Y=5 -> Y=36*scaleMult, expands into a towering rolling mushroom dome, cools incandescent -> glowing embers -> dark ash
+                const capHeight = (5.0 + riseEase * 29.0) * scaleMult + driftUp;
+                const capRadius = (3.0 + riseEase * 13.5 + progress * 2.5) * scaleMult;
                 for (let i = 0; i < capPuffs.length; i++) {
                     const cp = capPuffs[i];
                     const r = capRadius * cp.radFrac;
-                    const swirl = cp.ang + progress * 0.45;
-                    cp.sp.position.set(Math.cos(swirl) * r, capHeight + cp.yOff * (0.6 + easeOut * 1.1) * scaleMult, Math.sin(swirl) * r);
-                    const sz = cp.baseSz * (0.7 + easeOut * 1.45);
-                    cp.sp.scale.set(sz, sz * 0.82, 1);
+                    const swirl = cp.ang + progress * 0.65;
+                    cp.sp.position.set(Math.cos(swirl) * r, capHeight + cp.yOff * (0.65 + riseEase * 1.25) * scaleMult, Math.sin(swirl) * r);
+                    const sz = cp.baseSz * (0.75 + riseEase * 1.65 + progress * 0.25);
+                    cp.sp.scale.set(sz, sz * 0.84, 1);
                     if (cp.isInnerGlow) {
-                        cp.sp.material.opacity = Math.max(0, (1 - Math.min(1, progress / 0.58)) * 0.9);
+                        cp.sp.material.opacity = Math.max(0, (1 - Math.min(1, progress / 0.56)) * 0.94);
                     } else {
-                        const coolT = Math.min(1, Math.max(0, (progress - 0.18) / 0.45));
+                        const coolT = Math.min(1, Math.max(0, (progress - 0.14) / 0.42));
                         cp.sp.material.color.copy(cOrange).lerp(cSoot, coolT);
-                        cp.sp.material.opacity = fadeTail * 0.86;
+                        cp.sp.material.opacity = fadeTail * 0.88;
                     }
                 }
 
@@ -3998,37 +4001,37 @@ function spawnMushroomCloud(pos, scaleMult = 1.0, shockwaveTargetRadius = null) 
                 for (let i = 0; i < stemPuffs.length; i++) {
                     const st = stemPuffs[i];
                     const y = (1.5 + st.frac * (capHeight - 2.5 * scaleMult));
-                    const w = st.wobble * (0.4 + progress * 0.9);
-                    st.sp.position.set(Math.cos(st.ang + progress) * w, y, Math.sin(st.ang + progress) * w);
-                    const sz = st.baseSz * (0.65 + easeOut * 1.15);
-                    st.sp.scale.set(sz, sz * 1.15, 1);
-                    const coolT = Math.min(1, Math.max(0, (progress - 0.12) / 0.42));
+                    const w = st.wobble * (0.4 + progress * 1.0);
+                    st.sp.position.set(Math.cos(st.ang + progress * 1.2) * w, y, Math.sin(st.ang + progress * 1.2) * w);
+                    const sz = st.baseSz * (0.7 + riseEase * 1.25);
+                    st.sp.scale.set(sz, sz * 1.18, 1);
+                    const coolT = Math.min(1, Math.max(0, (progress - 0.10) / 0.38));
                     st.sp.material.color.copy(cHot).lerp(cSoot, coolT);
-                    st.sp.material.opacity = fadeTail * 0.78;
+                    st.sp.material.opacity = fadeTail * 0.82;
                 }
 
                 // Base surge dust skirt rolls outward along the ground
-                const skirtR = (3.5 + easeOut * 16.0) * scaleMult;
+                const skirtR = (3.5 + riseEase * 20.0 + progress * 4.0) * scaleMult;
                 for (let i = 0; i < skirtPuffs.length; i++) {
                     const sk = skirtPuffs[i];
-                    sk.sp.position.set(Math.cos(sk.ang) * skirtR, (1.8 + easeOut * 2.4) * scaleMult, Math.sin(sk.ang) * skirtR);
-                    const sz = sk.baseSz * (0.75 + easeOut * 1.35);
-                    sk.sp.scale.set(sz, sz * 0.65, 1);
-                    sk.sp.material.opacity = Math.max(0, (1 - progress / 0.72) * 0.68);
+                    sk.sp.position.set(Math.cos(sk.ang) * skirtR, (1.8 + riseEase * 3.0) * scaleMult, Math.sin(sk.ang) * skirtR);
+                    const sz = sk.baseSz * (0.8 + riseEase * 1.55);
+                    sk.sp.scale.set(sz, sz * 0.68, 1);
+                    sk.sp.material.opacity = Math.max(0, (1 - progress / 0.78) * 0.72);
                 }
 
-                // Supersonic ground shockwave sweeps to full Blast6OuterRadius (45.4u) over ~1.2s then dissipates
-                const shockProg = shockwaveTargetRadius ? Math.min(1, progress / 0.22) : Math.min(1, progress / 0.55);
+                // Supersonic 360-deg ground shockwave sweeps cleanly in XZ to full Blast6OuterRadius (45.4u) over ~2.2s
+                const shockProg = shockwaveTargetRadius ? Math.min(1, progress / 0.14) : Math.min(1, progress / 0.42);
                 const rScale = 1 + shockProg * (maxShockScale - 1);
-                shockwave.scale.set(rScale, rScale, 1);
-                ringMat.opacity = Math.max(0, 0.92 * (1 - shockProg));
+                shockwave.scale.set(rScale, 1, rScale);
+                ringMat.opacity = Math.max(0, 0.95 * (1 - shockProg));
 
-                // Wilson atmospheric condensation ring rises around mid-stem
-                const machProg = Math.min(1, progress / 0.55);
-                const mScale = 1 + machProg * 2.8;
-                machRing.position.y = (10 + machProg * 14) * scaleMult;
-                machRing.scale.set(mScale, mScale, 1);
-                machMat.opacity = Math.max(0, 0.68 * Math.sin(machProg * Math.PI));
+                // 360-deg Wilson atmospheric condensation collar rises around mid-stem
+                const machProg = Math.min(1, progress / 0.42);
+                const mScale = 1 + machProg * 3.6;
+                machRing.position.y = (11 + machProg * 18) * scaleMult;
+                machRing.scale.set(mScale, 1, mScale);
+                machMat.opacity = Math.max(0, 0.74 * Math.sin(machProg * Math.PI));
 
                 if (life <= 0) {
                     disposeCloud();
