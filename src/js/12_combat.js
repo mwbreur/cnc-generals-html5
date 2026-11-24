@@ -293,7 +293,10 @@ function processCombatScanning() {
                 const garrisonRangeMult = (unit.garrisonedIn && (unit.garrisonedIn.isWorldBuilding || unit.garrisonedIn.type === 'bunker' || inOverlordBunker)) ? 1.33 : 1.0;
                 const garrisonRadiusBonus = inOverlordBunker ? (unit.garrisonedIn.radius || 6.2) : 0;
                 const maxEffectiveRange = unit.scanRange * garrisonRangeMult + garrisonRadiusBonus + targetRadius;
-                const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : (unit.type === 'inferno' ? 10.8 : 0);
+                const minEffectiveRange = (unit.type === 'nukecannon' || unit.type === 'nuketank') ? (unit.minRange || 32.4)
+                    : (unit.type === 'tomahawk' ? (unit.minRange || 21.6)
+                    : (unit.type === 'scud' ? (unit.minRange || 43.2)
+                    : (unit.type === 'inferno' ? 10.8 : 0)));
 
                 if (!canUnitTarget(unit, unit.combatTarget) || unit.combatTarget.health <= 0) {
                     unit.combatTarget = null; // Target invalid, untargetable, or destroyed
@@ -346,7 +349,10 @@ function processCombatScanning() {
             if (!unit.combatTarget && ((_combatScanTick + ui) % scanMod === 0) && !isNonCombatSupport) {
                 if (!(unit.isAir && unit.taskState === 'Moving')) {
                     const uPos = unit.mesh.position;
-                    const minScanR = (unit.type === 'nukecannon' || unit.type === 'nuketank' || unit.type === 'tomahawk') ? (unit.minRange || 16.0) : (unit.type === 'inferno' ? 10.8 : 0);
+                    const minScanR = (unit.type === 'nukecannon' || unit.type === 'nuketank') ? (unit.minRange || 32.4)
+                        : (unit.type === 'tomahawk' ? (unit.minRange || 21.6)
+                        : (unit.type === 'scud' ? (unit.minRange || 43.2)
+                        : (unit.type === 'inferno' ? 10.8 : 0)));
                     const minScanR2 = minScanR * minScanR;
                     let bestUnitDist2 = Infinity;
                     // 1. Scan for nearest hostile unit in range (spatial-grid accelerated for large armies)

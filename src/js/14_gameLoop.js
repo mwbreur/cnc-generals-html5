@@ -3958,7 +3958,10 @@ function processEnemyCombat() {
             const effectiveScanRange = enemy.scanRange > 0 ? enemy.scanRange : (enemy.type === 'blacklotus' ? 24 : (enemy.type === 'hijacker' ? 18 : 0));
             if (effectiveScanRange <= 0) return;
 
-            const minRange = (enemy.type === 'tomahawk' || enemy.type === 'nukecannon' || enemy.type === 'nuketank') ? (enemy.minRange || 16.0) : 0;
+            const minRange = (enemy.type === 'nukecannon' || enemy.type === 'nuketank') ? (enemy.minRange || 32.4)
+                : (enemy.type === 'tomahawk' ? (enemy.minRange || 21.6)
+                : (enemy.type === 'scud' ? (enemy.minRange || 43.2)
+                : (enemy.type === 'inferno' ? 10.8 : 0)));
             const distBetween = (aPos, bPos, use3D) => use3D
                 ? aPos.distanceTo(bPos)
                 : Math.hypot(aPos.x - bPos.x, aPos.z - bPos.z);
