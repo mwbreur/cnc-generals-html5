@@ -159,7 +159,13 @@ function processOverlordGatlingTower(unit, spatialMap = null, unitIndex = 0) {
             spawnMuzzleFlash(muzzleR, gatFlashColor, isHeroicOverlord ? 0.55 : 0.4);
             spawnBulletTracer(muzzleR, tPos, gatTracerColor, isHeroicOverlord ? 3.8 : 2.8);
         }
-        if (Math.random() < 0.35 && typeof playAudio === 'function') playAudio('gatling_fire', {}, 'china');
+        if (typeof playAudio === 'function') {
+            const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            if (!unit._gatAudioLastMs || nowMs - unit._gatAudioLastMs >= 130) {
+                unit._gatAudioLastMs = nowMs;
+                playAudio('gatling_fire', { pos: unit.mesh.position, volume: 0.85 }, 'china');
+            }
+        }
         applyCalculatedDamage(unit, bestTarget, 10, 'GATLING');
     } else if (!bestTarget) {
         if (unit._overlordGatCoastTicks > 0) {
