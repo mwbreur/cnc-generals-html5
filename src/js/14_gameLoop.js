@@ -367,6 +367,19 @@ function animate() {
     combatDeltaScale = Math.max(0.25, Math.min(4.0, dt * 60 * speedMul));
 
     const animTime = nowTime * 0.003;
+    // Authentic C&C Generals drifting cloud shadows across terrain
+    if (typeof window !== 'undefined' && window._cloudShadowUniforms) {
+        const cU = window._cloudShadowUniforms;
+        if (cU.uCloudOffset && cU.uCloudOffset.value) {
+            cU.uCloudOffset.value.x = (nowTime * 0.000018) % 100;
+            cU.uCloudOffset.value.y = (nowTime * 0.000011) % 100;
+        }
+        if (cU.uCloudStrength) {
+            const cloudsOn = !(window._gameOptions && window._gameOptions.cloudShadows === false);
+            const tod = window._activeTimeOfDay || 'day';
+            cU.uCloudStrength.value = !cloudsOn ? 0.0 : (tod === 'night' ? 0.12 : (tod === 'sunset' || tod === 'dawn' ? 0.24 : 0.40));
+        }
+    }
     updateFrameFrustum();
     if (typeof processPathfindBudgetQueue === 'function') processPathfindBudgetQueue();
 
@@ -3384,42 +3397,86 @@ function processEnemyMovement() {
                     return;
                 }
 
-                // 2. Normal flight or idle hovering / holding pattern
-                const dx = enemy.targetPosition.x - enemy.mesh.position.x;
-                const dz = enemy.targetPosition.z - enemy.mesh.position.z;
-                const distToGoal = Math.hypot(dx, dz);
+                // 2. Normal flight or idle hovering / holding pattern (state-based so circling never fights distToGoal!)
+                if (!isHeli && enemy.airState === 'circling') {
+                    const patrolShift = Math.hypot(enemy.targetPosition.x - enemy.patrolCenter.x, enemy.targetPosition.z - enemy.patrolCenter.z);
+                    if (patrolShift > 4.0) {
+                        enemy.airState = 'flying';
+                        enemy.patrolCenter.copy(enemy.targetPosition);
+                    }
+                } else if (isHeli && enemy.airState === 'hovering') {
+                    const hoverShift = Math.hypot(enemy.targetPosition.x - enemy.mesh.position.x, enemy.targetPosition.z - enemy.mesh.position.z);
+                    if (hoverShift > 2.5) {
+                        enemy.airState = 'flying';
+                    }
+                }
 
-                if (distToGoal > (isHeli ? 1.5 : 3.5)) {
-                    const dirX = dx / distToGoal;
-                    const dirZ = dz / distToGoal;
-                    enemy.mesh.position.x += dirX * enemy.speed * combatDeltaScale;
-                    enemy.mesh.position.z += dirZ * enemy.speed * combatDeltaScale;
-                    enemy.mesh.rotation.y = Math.atan2(-dirZ, dirX) + Math.PI / 2;
-                    if (isHeli) enemy.mesh.rotation.x = 0.14;
-                    enemy.patrolCenter.copy(enemy.targetPosition);
-                } else {
-                    if (isHeli) {
-                        // Hover in place!
-                        enemy.mesh.rotation.x = 0;
-                        enemy.mesh.rotation.z = 0;
+                if (enemy.airState !== 'circling' && enemy.airState !== 'hovering') {
+                    const dx = enemy.targetPosition.x - enemy.mesh.position.x;
+                    const dz = enemy.targetPosition.z - enemy.mesh.position.z;
+                    const distToGoal = Math.hypot(dx, dz);
+                    const arriveDist = isHeli ? 1.5 : Math.max(4.0, (enemy.circleRadius || 16.0) * 0.65);
+
+                    if (distToGoal > arriveDist) {
+                        const dirX = dx / distToGoal;
+                        const dirZ = dz / distToGoal;
+                        enemy.mesh.position.x += dirX * enemy.speed * combatDeltaScale;
+                        enemy.mesh.position.z += dirZ * enemy.speed * combatDeltaScale;
+                        const targetAngle = Math.atan2(-dirZ, dirX) + Math.PI / 2;
+                        let diff = targetAngle - enemy.mesh.rotation.y;
+                        while (diff < -Math.PI) diff += Math.PI * 2;
+                        while (diff > Math.PI) diff -= Math.PI * 2;
+                        enemy.mesh.rotation.y += diff * 0.18;
+                        enemy.mesh.rotation.order = 'YXZ';
+                        if (isHeli) {
+                            enemy.mesh.rotation.x += (0.14 - enemy.mesh.rotation.x) * 0.12;
+                            enemy.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 0.8, -0.22, 0.22) - enemy.mesh.rotation.z) * 0.12;
+                        } else {
+                            enemy.mesh.rotation.x += (0 - enemy.mesh.rotation.x) * 0.12;
+                            enemy.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.6, -0.42, 0.42) - enemy.mesh.rotation.z) * 0.12;
+                        }
+                        enemy.patrolCenter.copy(enemy.targetPosition);
                     } else {
-                        // Circling holding pattern for airplanes
-                        enemy.circleAngle += 0.022 * combatDeltaScale;
-                        const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * enemy.circleRadius;
-                        const tZ = enemy.patrolCenter.z + Math.sin(enemy.circleAngle) * enemy.circleRadius;
-                        const cDx = tX - enemy.mesh.position.x;
-                        const cDz = tZ - enemy.mesh.position.z;
-                        const cDist = Math.hypot(cDx, cDz);
-                        if (cDist > 0.1) {
-                            const cSpeed = enemy.speed * 0.85 * combatDeltaScale;
-                            enemy.mesh.position.x += (cDx / cDist) * cSpeed;
-                            enemy.mesh.position.z += (cDz / cDist) * cSpeed;
-                            const fwdX = -Math.sin(enemy.circleAngle);
-                            const fwdZ = Math.cos(enemy.circleAngle);
-                            enemy.mesh.rotation.y = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
-                            enemy.mesh.rotation.z = -0.28;
+                        if (isHeli) {
+                            enemy.airState = 'hovering';
+                            enemy.mesh.rotation.x += (0 - enemy.mesh.rotation.x) * 0.12;
+                            enemy.mesh.rotation.z += (0 - enemy.mesh.rotation.z) * 0.12;
+                        } else {
+                            enemy.airState = 'circling';
+                            enemy.patrolCenter.copy(enemy.targetPosition);
+                            enemy.circleAngle = Math.atan2(enemy.mesh.position.z - enemy.patrolCenter.z, enemy.mesh.position.x - enemy.patrolCenter.x);
                         }
                     }
+                } else if (isHeli) {
+                    // Hover smoothly in place
+                    enemy.mesh.rotation.x += (0 - enemy.mesh.rotation.x) * 0.12;
+                    enemy.mesh.rotation.z += (0 - enemy.mesh.rotation.z) * 0.12;
+                } else {
+                    // Smooth circling holding pattern for fixed-wing AI airplanes
+                    const orbitR = enemy.circleRadius || 16.0;
+                    const cSpeed = enemy.speed * 0.75 * combatDeltaScale;
+                    enemy.circleAngle = (enemy.circleAngle || 0) + (cSpeed / orbitR);
+                    if (enemy.circleAngle > Math.PI * 2) enemy.circleAngle -= Math.PI * 2;
+                    const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * orbitR;
+                    const tZ = enemy.patrolCenter.z + Math.sin(enemy.circleAngle) * orbitR;
+                    const cDx = tX - enemy.mesh.position.x;
+                    const cDz = tZ - enemy.mesh.position.z;
+                    const cDist = Math.hypot(cDx, cDz);
+                    if (cDist > 0.05) {
+                        const step = Math.min(cDist, cSpeed);
+                        enemy.mesh.position.x += (cDx / cDist) * step;
+                        enemy.mesh.position.z += (cDz / cDist) * step;
+                    }
+                    const fwdX = -Math.sin(enemy.circleAngle);
+                    const fwdZ = Math.cos(enemy.circleAngle);
+                    const targetAngle = Math.atan2(-fwdZ, fwdX) + Math.PI / 2;
+                    let diff = targetAngle - enemy.mesh.rotation.y;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    enemy.mesh.rotation.y += diff * 0.16;
+                    enemy.mesh.rotation.order = 'YXZ';
+                    enemy.mesh.rotation.x += (0 - enemy.mesh.rotation.x) * 0.12;
+                    enemy.mesh.rotation.z += (-0.28 - enemy.mesh.rotation.z) * 0.12;
                 }
                 return;
             }

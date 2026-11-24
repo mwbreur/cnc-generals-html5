@@ -568,7 +568,6 @@ body {
         .cmd-btn:hover:not(:disabled) {
             background: linear-gradient(180deg, #444f3b 0%, #293328 100%);
             border-color: #dbc46d; color: #fff; box-shadow: 0 0 10px rgba(219,196,109,0.25);
-            transform: translateY(-1px);
         }
         .cmd-btn-name { font-size: 10.5px; font-weight: bold; letter-spacing: 0.3px; line-height: 1.2; }
         .cmd-btn-desc { font-size: 8.5px; color: #9c9780; margin-top: 2px; }
@@ -830,7 +829,7 @@ body.control-bar-collapsed #generals-command-bar {
     padding: 2px 4px; font-size: 11px; transition: all 0.15s;
 }
 .bezel-btn label { font-size: 8px; font-weight: bold; letter-spacing: 0.5px; margin-top: 1px; cursor: pointer; }
-.bezel-btn:hover { background: #354738; color: #55efc4; border-color: #55efc4; transform: scale(1.03); }
+.bezel-btn:hover { background: #354738; color: #55efc4; border-color: #55efc4; box-shadow: 0 0 8px rgba(85,239,196,0.25); }
 .bezel-btn.active { background: #1c472d; color: #55efc4; border-color: #55efc4; box-shadow: 0 0 8px rgba(85,239,196,0.3); }
 
 /* 2B. INSPECTOR CONSOLE */
@@ -1267,6 +1266,7 @@ body.control-bar-collapsed #generals-command-bar {
     align-items: center;
     justify-content: center;
     z-index: 1;
+    pointer-events: none;
 }
 
 .slot-art-wrap .slot-cameo-svg {
@@ -1696,8 +1696,8 @@ body.control-bar-collapsed #generals-command-bar {
 
 .gp-power-btn:hover {
     border-color: #00ffcc;
-    box-shadow: 0 0 12px rgba(0,255,204,0.4);
-    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(0,255,204,0.45);
+    filter: brightness(1.12);
 }
 
 .gp-power-btn .gp-icon { font-size: 18px; }
@@ -1770,8 +1770,8 @@ body.control-bar-collapsed #generals-command-bar {
 
 .cb-squad-unit-card:hover {
     border-color: #00ffcc;
-    box-shadow: 0 0 8px rgba(0,255,204,0.4);
-    transform: scale(1.04);
+    box-shadow: 0 0 8px rgba(0,255,204,0.45);
+    filter: brightness(1.1);
 }
 
 .cb-squad-hp-track {
@@ -2443,7 +2443,7 @@ body.control-bar-collapsed #generals-command-bar {
 }
 .gp-node-card.available:hover {
     border-color: #ffd700;
-    transform: translateY(-1px);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.25);
 }
 .gp-node-card.unlocked {
     border-color: #55efc4;
@@ -2886,7 +2886,7 @@ body.control-bar-collapsed #generals-command-bar {
 }
 .zh-map-pick-card:hover {
     border-color: #6b7ef2;
-    transform: translateY(-1px);
+    box-shadow: 0 0 10px rgba(107, 126, 242, 0.25);
 }
 .zh-map-pick-card.selected {
     border-color: #ffbe01;

@@ -1447,7 +1447,7 @@ function processEnemyAIEngine() {
                             if (!cmd.stagingTeam) cmd.stagingTeam = [];
                             cmd.stagingTeam.push(eu.netId);
                             if (eu.isAir) {
-                                eu.airState = 'patrolling';
+                                eu.airState = 'flying';
                                 eu.patrolCenter = cmd.rallyPoint.clone();
                                 eu.targetPosition.copy(cmd.rallyPoint);
                             } else {

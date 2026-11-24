@@ -575,7 +575,7 @@ function toggleControlBar(forceVisible = null) {
 
 const _GAME_OPTIONS_STORAGE_KEY = 'cnc_generals_options_v1';
 function loadGameOptions() {
-    const defaults = { graphicsQuality: 'high', shadows: true, masterVolume: 1.0, showFps: false };
+    const defaults = { graphicsQuality: 'high', shadows: true, cloudShadows: true, masterVolume: 1.0, showFps: false };
     try {
         if (typeof localStorage !== 'undefined') {
             const raw = localStorage.getItem(_GAME_OPTIONS_STORAGE_KEY);
@@ -613,6 +613,11 @@ function applyGameOptions(opts) {
     if (typeof window !== 'undefined' && window._mainDirLight) {
         window._mainDirLight.castShadow = enableShadows;
     }
+    if (typeof window !== 'undefined' && window._cloudShadowUniforms && window._cloudShadowUniforms.uCloudStrength) {
+        const cloudsOn = opts.cloudShadows !== false;
+        const tod = window._activeTimeOfDay || 'day';
+        window._cloudShadowUniforms.uCloudStrength.value = !cloudsOn ? 0.0 : (tod === 'night' ? 0.12 : (tod === 'sunset' || tod === 'dawn' ? 0.24 : 0.40));
+    }
     if (typeof document !== 'undefined') {
         const badge = document.getElementById('fps-perf-badge');
         if (badge) badge.style.display = opts.showFps ? 'block' : 'none';
@@ -626,11 +631,13 @@ function openOptionsModal() {
     if (!modal) return;
     const qEl = document.getElementById('opt-graphics-quality');
     const shEl = document.getElementById('opt-shadows');
+    const clEl = document.getElementById('opt-cloud-shadows');
     const volEl = document.getElementById('opt-master-volume');
     const volVal = document.getElementById('opt-master-volume-val');
     const fpsEl = document.getElementById('opt-show-fps');
     if (qEl) qEl.value = opts.graphicsQuality || 'high';
     if (shEl) shEl.checked = opts.shadows !== false;
+    if (clEl) clEl.checked = opts.cloudShadows !== false;
     if (volEl) volEl.value = String(Math.round((opts.masterVolume !== undefined ? opts.masterVolume : 1.0) * 100));
     if (volVal) volVal.textContent = (volEl ? volEl.value : '100') + '%';
     if (fpsEl) fpsEl.checked = Boolean(opts.showFps);
@@ -646,6 +653,7 @@ function closeOptionsModal() {
 function onOptionsFormChange() {
     const qEl = document.getElementById('opt-graphics-quality');
     const shEl = document.getElementById('opt-shadows');
+    const clEl = document.getElementById('opt-cloud-shadows');
     const volEl = document.getElementById('opt-master-volume');
     const volVal = document.getElementById('opt-master-volume-val');
     const fpsEl = document.getElementById('opt-show-fps');
@@ -656,6 +664,7 @@ function onOptionsFormChange() {
     applyGameOptions({
         graphicsQuality: quality,
         shadows: shEl ? shEl.checked : true,
+        cloudShadows: clEl ? clEl.checked : true,
         masterVolume: Math.max(0, Math.min(1, volPct / 100)),
         showFps: fpsEl ? fpsEl.checked : false
     });
@@ -1089,6 +1098,12 @@ if (typeof window !== 'undefined') {
         }, 0);
 }
 
+function setElHtmlIfChanged(el, html) {
+    if (!el || el._lastHtml === html) return;
+    el._lastHtml = html;
+    el.innerHTML = html;
+}
+
 function updateSidebar() {
     if (!radarCanvas || !radarCanvas._minimapInitialized) initRadarMinimap();
     applyOfficialMenuArt(selectedFaction);
@@ -1097,8 +1112,8 @@ function updateSidebar() {
     const topBar = document.getElementById('top-hud-bar');
     const cmdBar = document.getElementById('generals-command-bar');
     const themeClass = `theme-${selectedFaction}`;
-    if (topBar) topBar.className = themeClass;
-    if (cmdBar) cmdBar.className = themeClass;
+    if (topBar && topBar.className !== themeClass) topBar.className = themeClass;
+    if (cmdBar && cmdBar.className !== themeClass) cmdBar.className = themeClass;
 
     const factionTitles = {
         usa: 'USA STRATEGIC FORCES',
@@ -1132,7 +1147,7 @@ function updateSidebar() {
         if (powerNums) powerNums.textContent = 'N/A';
         if (cbPowerNums) cbPowerNums.textContent = 'N/A';
         if (powerBar) { powerBar.style.width = '100%'; powerBar.classList.remove('low'); }
-        if (cbPowerLeds) cbPowerLeds.innerHTML = '';
+        if (cbPowerLeds) setElHtmlIfChanged(cbPowerLeds, '');
     } else {
         const percent = Math.min(100, Math.round((produced / Math.max(1, consumed)) * 100));
         if (powerNums) powerNums.textContent = `${produced} / ${consumed}`;
@@ -1146,7 +1161,7 @@ function updateSidebar() {
                 const isLit = (totalLeds - 1 - li) < activeLeds;
                 ledHtml += `<div class="cb-power-led${isLit ? ' lit' : ''}" style="background:${isLit ? ledColor : 'rgba(255,255,255,0.08)'};"></div>`;
             }
-            cbPowerLeds.innerHTML = ledHtml;
+            setElHtmlIfChanged(cbPowerLeds, ledHtml);
         }
         if (powerBar) {
             powerBar.style.width = `${Math.min(100, percent)}%`;
@@ -1242,7 +1257,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
 
         const unitCameoHtml = getCameoImg(u.type, spec.name, selectedFaction) || `<div class="inspector-avatar-icon">${uIcon}</div>`;
 
-        inspector.innerHTML = `
+        setElHtmlIfChanged(inspector, `
             <div class="inspector-card">
                 <div class="inspector-avatar-box">
                     ${unitCameoHtml}
@@ -1270,7 +1285,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                     ${passHtml}
                 </div>
             </div>
-        `;
+        `);
 
         // 2x7 Grid Slots for Single Unit
         if (u.type === 'dozer' || u.type === 'worker') {
@@ -1448,7 +1463,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             `;
         }).join('');
 
-        inspector.innerHTML = `
+        setElHtmlIfChanged(inspector, `
             <div class="cb-inspector-squad-container">
                 ${watermark}
                 <div class="cb-squad-header-row">
@@ -1464,7 +1479,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                     <button class="quick-army-btn" onclick="selectUnitsByType('combat')">⚔ All Combat</button>
                 </div>
             </div>
-        `;
+        `);
 
         currentGridSlots = [
             { name: 'MOVE', badge: 'DIR', action: () => {}, desc: 'Move squad' },
@@ -1528,7 +1543,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
     // Friendly players cannot interact with their allies' buildings
     if (structure.ownerId && structure.ownerId !== 'player') {
         const teamLabel = structure.teamId ? `Team ${structure.teamId}` : 'Allied Forces';
-        inspector.innerHTML = `
+        setElHtmlIfChanged(inspector, `
             <div class="cb-inspector-pane">
                 <div class="inspector-card">
                     <div class="inspector-info-pane" style="width: 100%;">
@@ -1552,7 +1567,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
                     </div>
                 </div>
             </div>
-        `;
+        `);
         currentGridSlots = new Array(14).fill(null);
         return;
     }
@@ -1582,7 +1597,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
 
     const structCameoHtml = getCameoImg(structure.type, title, selectedFaction) || getCameoSVG(structure.type, selectedFaction, title);
 
-    inspector.innerHTML = `
+    setElHtmlIfChanged(inspector, `
         <div class="cb-inspector-pane">
             ${queueHtml}
             <div class="inspector-card">
@@ -1613,7 +1628,7 @@ function renderStructureInspectorAndGrid(inspector, structure) {
                 </div>
             </div>
         </div>
-    `;
+    `);
 
     // 2-Row Production Grid (2x7: strictly units built by this structure + upgrades + rally + sell)
     currentGridSlots = new Array(14).fill(null);
@@ -1789,7 +1804,7 @@ function renderSupplyInspectorAndGrid(inspector, supplyPoint) {
     const maxStock = supplyPoint.maxStock || 8000;
     const percent = Math.max(0, Math.min(100, Math.round((stock / maxStock) * 100)));
 
-    inspector.innerHTML = `
+    setElHtmlIfChanged(inspector, `
         <div class="inspector-card">
             <div class="inspector-info-pane" style="width: 100%;">
                 <div class="inspector-header-row">
@@ -1812,7 +1827,7 @@ function renderSupplyInspectorAndGrid(inspector, supplyPoint) {
                 </div>
             </div>
         </div>
-    `;
+    `);
 
     currentGridSlots = [
         { name: 'DISPATCH ALL', badge: 'MINE', action: () => orderAllHarvestersToTargetSupply(), desc: 'Order all harvesters to gather here' },
@@ -1837,7 +1852,7 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
     ? `<img src="${officialCrestImg}" alt="${selectedFaction}" style="width:42px;height:42px;object-fit:contain;" />`
     : crest.icon;
 
-    inspector.innerHTML = `
+    setElHtmlIfChanged(inspector, `
         <div class="inspector-idle-box">
             <div class="inspector-idle-crest">
                 <div class="crest-icon">${crestVisual}</div>
@@ -1856,7 +1871,7 @@ function renderBaseOverviewInspectorAndGrid(inspector) {
                 <button class="quick-army-btn" onclick="cycleSelectBuilder()" title="Cycle construction units (Hotkeys: D or Ctrl+Arrow)">🔨 Builders (${builderCount})</button>
             </div>
         </div>
-    `;
+    `);
 
     // 3x4 Grid based on active category
     if (activeGridCategory === 'commands') {
@@ -3788,45 +3803,82 @@ function updateSuperweaponTimersHUD() {
     ];
 
     if (allSW.length === 0) {
-        if (hud._lastHtml !== '' || hud.innerHTML !== '') {
+        if (hud._lastKey !== '' || hud.innerHTML !== '') {
+            hud._lastKey = '';
             hud._lastHtml = '';
             hud.innerHTML = '';
         }
         return;
     }
 
-    const html = allSW.map((sw, idx) => {
-            const isEnemy = (typeof enemyStructures !== 'undefined' && enemyStructures.includes(sw)) || !!sw.isAI;
-            const maxTicks = sw.swMaxCooldown || getSuperweaponMaxCooldownTicks(sw.type);
-            const remTicks = Math.max(0, (sw.cooldownUntil || 0) - buildingTick);
-            const secsLeft = Math.ceil(remTicks / 60);
-            const mins = String(Math.floor(secsLeft / 60)).padStart(2, '0');
-            const secs = String(secsLeft % 60).padStart(2, '0');
-            const pct = Math.max(0, Math.min(100, Math.round(((maxTicks - remTicks) / Math.max(1, maxTicks)) * 100)));
-            const isReady = remTicks <= 0;
+    const rowData = allSW.map((sw) => {
+        const isEnemy = (typeof enemyStructures !== 'undefined' && enemyStructures.includes(sw)) || !!sw.isAI;
+        const sIdx = isEnemy ? -1 : structures.indexOf(sw);
+        const maxTicks = sw.swMaxCooldown || getSuperweaponMaxCooldownTicks(sw.type);
+        const remTicks = Math.max(0, (sw.cooldownUntil || 0) - buildingTick);
+        const secsLeft = Math.ceil(remTicks / 60);
+        const mins = String(Math.floor(secsLeft / 60)).padStart(2, '0');
+        const secs = String(secsLeft % 60).padStart(2, '0');
+        const pct = Math.max(0, Math.min(100, Math.round(((maxTicks - remTicks) / Math.max(1, maxTicks)) * 100)));
+        const isReady = remTicks <= 0;
+        const swTitle = sw.type === 'particleCannon' ? 'PARTICLE CANNON' : sw.type === 'nukeSilo' ? 'NUCLEAR MISSILE' : 'SCUD STORM';
+        const swClass = sw.type === 'particleCannon' ? 'sw-usa' : sw.type === 'nukeSilo' ? 'sw-china' : 'sw-gla';
+        const ownerPrefix = isEnemy ? '⚠ HOSTILE ' : '';
+        const statusStr = sw._lowPowerPaused ? 'LOW POWER ⚡' : (isReady ? 'READY ⚡' : `${mins}:${secs}`);
+        const key = `${isEnemy ? 'E' : 'P'}:${sw.type}:${sIdx}`;
+        return { sw, isEnemy, sIdx, pct, isReady, swTitle, swClass, ownerPrefix, statusStr, key };
+    });
 
-            const swTitle = sw.type === 'particleCannon' ? 'PARTICLE CANNON' : sw.type === 'nukeSilo' ? 'NUCLEAR MISSILE' : 'SCUD STORM';
-            const swClass = sw.type === 'particleCannon' ? 'sw-usa' : sw.type === 'nukeSilo' ? 'sw-china' : 'sw-gla';
-            const ownerPrefix = isEnemy ? '⚠ HOSTILE ' : '';
-            const statusStr = sw._lowPowerPaused ? 'LOW POWER ⚡' : (isReady ? 'READY ⚡' : `${mins}:${secs}`);
-            const clickAttr = (!isEnemy && isReady) ? `onclick="activateSuperweaponTargeting(structures[${structures.indexOf(sw)}])" title="Click to target and launch ${swTitle}!"` : '';
+    const listKey = rowData.map(r => r.key).join('|');
+    // Update existing rows in-place when superweapon list is unchanged so hovered READY buttons never rebuild or drop clicks
+    if (hud._lastKey === listKey && hud.children && hud.children.length === rowData.length) {
+        for (let i = 0; i < rowData.length; i++) {
+            const r = rowData[i];
+            const rowEl = hud.children[i];
+            if (!rowEl) continue;
+            const wantClass = `sw-timer-row ${r.swClass}${(!r.isEnemy && r.isReady) ? ' sw-ready' : ''}`;
+            if (rowEl.className !== wantClass) rowEl.className = wantClass;
+            if (!r.isEnemy && r.isReady) {
+                if (!rowEl._swReadyBound) {
+                    const targetSw = r.sw;
+                    rowEl.onclick = () => activateSuperweaponTargeting(targetSw);
+                    rowEl.title = `Click to target and launch ${r.swTitle}!`;
+                    rowEl._swReadyBound = true;
+                }
+            } else if (rowEl._swReadyBound) {
+                rowEl.onclick = null;
+                rowEl.removeAttribute('title');
+                rowEl._swReadyBound = false;
+            }
+            const clockEl = rowEl.querySelector('.sw-timer-clock');
+            if (clockEl && clockEl.textContent !== r.statusStr) clockEl.textContent = r.statusStr;
+            const fillEl = rowEl.querySelector('.sw-timer-bar-fill');
+            const pctStr = `${r.pct}%`;
+            if (fillEl && fillEl.style.width !== pctStr) fillEl.style.width = pctStr;
+        }
+        return;
+    }
 
-            return `
-            <div class="sw-timer-row ${swClass} ${(!isEnemy && isReady) ? 'sw-ready' : ''}" ${clickAttr}>
+    hud._lastKey = listKey;
+    hud.innerHTML = rowData.map(r => {
+        const clickAttr = (!r.isEnemy && r.isReady) ? `onclick="activateSuperweaponTargeting(structures[${r.sIdx}])" title="Click to target and launch ${r.swTitle}!"` : '';
+        return `
+            <div class="sw-timer-row ${r.swClass}${(!r.isEnemy && r.isReady) ? ' sw-ready' : ''}" ${clickAttr}>
                 <div class="sw-timer-top">
-                    <span class="sw-timer-name">${ownerPrefix}${swTitle}</span>
-                    <span class="sw-timer-clock">${statusStr}</span>
+                    <span class="sw-timer-name">${r.ownerPrefix}${r.swTitle}</span>
+                    <span class="sw-timer-clock">${r.statusStr}</span>
                 </div>
                 <div class="sw-timer-bar-track">
-                    <div class="sw-timer-bar-fill" style="width: ${pct}%;"></div>
+                    <div class="sw-timer-bar-fill" style="width: ${r.pct}%;"></div>
                 </div>
             </div>
         `;
     }).join('');
-
-    if (hud._lastHtml === html) return;
-    hud._lastHtml = html;
-    hud.innerHTML = html;
+    if (hud.children) {
+        for (let i = 0; i < rowData.length; i++) {
+            if (hud.children[i]) hud.children[i]._swReadyBound = (!rowData[i].isEnemy && rowData[i].isReady);
+        }
+    }
 }
 window.updateSuperweaponTimersHUD = updateSuperweaponTimersHUD;
 
@@ -4249,12 +4301,12 @@ function processBuildingFunctions() {
                         }
                 });
             }
-            // Standalone China Speaker Tower & Propaganda Center (Official INIZH.big: Radius = 150 * 0.216 = 32.4u, 2% maxHP/s or 4% w/ Subliminal Messaging + Enthusiastic/Subliminal ROF)
-            if (['speakerTower', 'propagandaCenter'].includes(structure.type)) {
+            // Standalone China Speaker Tower (Official INIZH.big: Radius = 150 * 0.216 = 32.4u, 2% maxHP/s or 4% w/ Subliminal Messaging + Enthusiastic/Subliminal ROF; Propaganda Center is a tech building only)
+            if (structure.type === 'speakerTower') {
                 const hasSub = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
                 const healPct = hasSub ? 0.04 : 0.02;
                 if (typeof spawnPropagandaPulseRing === 'function') {
-                    spawnPropagandaPulseRing(structure.position, hasSub, structure.type === 'speakerTower' ? 5.8 : 7.0);
+                    spawnPropagandaPulseRing(structure.position, hasSub, 5.8);
                 }
                 const rSq = 32.4 * 32.4;
                 const sx = structure.position.x, sz = structure.position.z;
@@ -5046,10 +5098,36 @@ function renderGeneralPowersBar(facOverride) {
     const activePowers = [...startingPowers, ...tree.filter(p => p.kind === 'active' && unlockedGeneralsPowers.has(p.id))];
     const curTick = (typeof buildingTick !== 'undefined') ? buildingTick : 0;
 
+    const listKey = `${fac}|${activePowers.map(p => p.id).join(',')}`;
+    const promoLabel = generalsPoints > 0 ? `PROMOTE (${generalsPoints})` : `RANK ${generalsRank}`;
+
+    // Update General Power buttons in-place when active power list is unchanged (prevents hover flicker & dropped clicks during cooldown ticks)
+    if (gpBar._lastListKey === listKey && gpBar.children && gpBar.children.length === activePowers.length + 1) {
+        const treeBtn = gpBar.children[0];
+        if (treeBtn) {
+            const lbl = treeBtn.querySelector('.gp-label');
+            if (lbl && lbl.textContent !== promoLabel) lbl.textContent = promoLabel;
+        }
+        for (let i = 0; i < activePowers.length; i++) {
+            const p = activePowers[i];
+            const btn = gpBar.children[i + 1];
+            if (!btn) continue;
+            const readyTick = generalPowerCooldowns[p.id] || 0;
+            const remTicks = Math.max(0, readyTick - curTick);
+            const secsLeft = Math.ceil(remTicks / 60);
+            const label = secsLeft > 0 ? `${secsLeft}s` : p.label;
+            const wantClass = secsLeft > 0 ? 'gp-power-btn cooldown' : 'gp-power-btn';
+            if (btn.className !== wantClass) btn.className = wantClass;
+            const lbl = btn.querySelector('.gp-label');
+            if (lbl && lbl.textContent !== label) lbl.textContent = label;
+        }
+        return;
+    }
+
     let html = `
         <button class="gp-power-btn" id="gp-open-tree" title="Open Generals' Promotions & Powers Tree (P)" onclick="toggleGeneralsPowersModal()">
             <span class="gp-icon">★</span>
-            <span class="gp-label">${generalsPoints > 0 ? `PROMOTE (${generalsPoints})` : `RANK ${generalsRank}`}</span>
+            <span class="gp-label">${promoLabel}</span>
         </button>
     `;
 
@@ -5067,7 +5145,7 @@ function renderGeneralPowersBar(facOverride) {
         `;
     });
 
-    if (gpBar._lastHtml === html) return;
+    gpBar._lastListKey = listKey;
     gpBar._lastHtml = html;
     gpBar.innerHTML = html;
 }
