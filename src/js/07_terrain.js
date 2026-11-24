@@ -1980,7 +1980,8 @@ function spawnMapProps(theme, mapSize) {
                     if (kind === 'bunker' && typeof createW3DBuildingMesh === 'function' && window.W3D_BUILDING_DATA && window.W3D_BUILDING_DATA['civilian_bunker']) {
                         mesh = createW3DBuildingMesh('civilian_bunker', false);
                         usedModelKey = 'civilian_bunker';
-                        yPos = by - 1.2; // Seat sloped bunker skirt into hillside
+                        // CBBunker01.W3D already has its floor at Y=0 and a deep -31.4 foundation skirt for hillsides
+                        yPos = by;
                     } else if (kind === 'bunker' && typeof createChinaBunker === 'function') {
                         mesh = createChinaBunker(false);
                         mesh.scale.set(0.95, 0.95, 0.95);
@@ -2007,12 +2008,14 @@ function spawnMapProps(theme, mapSize) {
                         roof.position.y = 5.65;
                         mesh.add(body, roof);
                     }
+                    // Official .map angles use 0 = +X (East), while CBBunker01.W3D front embrasures face +Z -> add +PI/2 so bunkers face inward as designed
+                    const finalAngle = (usedModelKey === 'civilian_bunker') ? (angle + Math.PI / 2) : angle;
                     mesh.position.set(bx, yPos, bz);
-                    mesh.rotation.y = angle;
+                    mesh.rotation.y = finalAngle;
                     mapPropsGroup.add(mesh);
                     const wbRadius = kind === 'bunker' ? 5.0 : 6.0;
                     mapObstacles.push({ position: new THREE.Vector3(bx, by, bz), radius: wbRadius });
-                    registerWorldBuilding(mesh, bx, by, bz, angle, wbRadius, kind === 'bunker', usedModelKey);
+                    registerWorldBuilding(mesh, bx, by, bz, finalAngle, wbRadius, kind === 'bunker', usedModelKey);
             });
         }
     } else {
