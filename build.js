@@ -41,31 +41,37 @@ const css = fs.readFileSync(path.join(srcDir, 'css', 'style.css'), 'utf8');
 const body = fs.readFileSync(path.join(srcDir, 'html', 'body.html'), 'utf8')
     .replace(/\{\{BUILD_VERSION\}\}/g, () => buildVersionLabel);
 
-// 2. Read and stitch JS modules in sorted numerical order (externalizing heavy data blobs for browser caching)
+// 2. Read and stitch handwritten JS modules (src/js) + generated data blobs (src/generated -> cached assets/data)
 const jsDir = path.join(srcDir, 'js');
+const genDir = path.join(srcDir, 'generated');
 const jsFiles = fs.readdirSync(jsDir).filter(f => f.endsWith('.js')).sort();
 const EXTERNAL_DATA_FILES = new Set(['02b_w3d_models.js', '07b_tournament_desert.js', '10b_cameos.js']);
+const genFiles = fs.existsSync(genDir)
+    ? fs.readdirSync(genDir).filter(f => f.endsWith('.js')).sort()
+    : [];
 const dataOutDir = path.join(__dirname, 'assets', 'data');
 fs.rmSync(dataOutDir, { recursive: true, force: true });
 fs.mkdirSync(dataOutDir, { recursive: true });
 
-console.log(`Assembling ${jsFiles.length} JavaScript modules:`);
+console.log(`Assembling ${jsFiles.length} handwritten JS modules + ${genFiles.length} generated data bundles:`);
 let assembledJS = '';
 let fullSyntaxCheckJS = '';
 const externalTags = [];
+genFiles.forEach(file => {
+    const filePath = path.join(genDir, file);
+    const content = fs.readFileSync(filePath, 'utf8');
+    fullSyntaxCheckJS += `\n// --- GENERATED DATA: ${file} ---\n` + content + '\n';
+    fs.writeFileSync(path.join(dataOutDir, file), content, 'utf8');
+    const hash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 8);
+    externalTags.push(`<script src="assets/data/${file}?v=${hash}"></script>`);
+    console.log(`  ~ ${file} (${(content.length / 1024).toFixed(1)} KB -> cached assets/data/${file}?v=${hash})`);
+});
 jsFiles.forEach(file => {
     const filePath = path.join(jsDir, file);
     const content = fs.readFileSync(filePath, 'utf8');
     fullSyntaxCheckJS += `\n// --- MODULE: ${file} ---\n` + content + '\n';
-    if (EXTERNAL_DATA_FILES.has(file)) {
-        fs.writeFileSync(path.join(dataOutDir, file), content, 'utf8');
-        const hash = crypto.createHash('sha256').update(content).digest('hex').slice(0, 8);
-        externalTags.push(`<script src="assets/data/${file}?v=${hash}"></script>`);
-        console.log(`  ~ ${file} (${(content.length / 1024).toFixed(1)} KB -> cached assets/data/${file}?v=${hash})`);
-    } else {
-        console.log(`  + ${file} (${(content.length / 1024).toFixed(1)} KB)`);
-        assembledJS += `\n// --- MODULE: ${file} ---\n` + content + '\n';
-    }
+    console.log(`  + ${file} (${(content.length / 1024).toFixed(1)} KB)`);
+    assembledJS += `\n// --- MODULE: ${file} ---\n` + content + '\n';
 });
 
 // 3. Assemble the web build (CRLF-safe replacement without $ pattern interpretation)

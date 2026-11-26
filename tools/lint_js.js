@@ -7,10 +7,9 @@ const fs = require('fs');
 const path = require('path');
 
 const jsDir = path.join(__dirname, '..', 'src', 'js');
-const DATA_FILES = new Set(['02b_w3d_models.js', '07b_tournament_desert.js', '10b_cameos.js']);
 
 function lintModules() {
-    const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js') && !DATA_FILES.has(f)).sort();
+    const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js')).sort();
     const errors = [];
     const topFuncs = new Map();
     const topLexicals = new Map();

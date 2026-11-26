@@ -154,6 +154,7 @@ const THREE = {
         };
     },
     RingGeometry: function() { this.dispose = () => {}; this.rotateX = () => this; },
+    CircleGeometry: function() { this.dispose = () => {}; this.rotateX = () => this; },
     TorusGeometry: function() { this.dispose = () => {}; },
     DodecahedronGeometry: function() { this.dispose = () => {}; },
     IcosahedronGeometry: function() { this.dispose = () => {}; },
@@ -171,6 +172,7 @@ const THREE = {
     MeshPhongMaterial: function() { this.dispose = () => {}; },
     LineBasicMaterial: function() { this.dispose = () => {}; },
     LineDashedMaterial: function() { this.dispose = () => {}; },
+    LineSegments: function(geo, mat) { this.geometry = geo; this.material = mat; this.position = new THREE.Vector3(); this.scale = { set: () => {}, setScalar: () => {} }; },
     Color: function(c) { this.hex = c; this.setHex = (h) => { this.hex = h; }; },
     FogExp2: function() { this.color = new THREE.Color(0); },
     MathUtils: {
@@ -268,40 +270,26 @@ const sandbox = {
 
 vm.createContext(sandbox);
 
-// Read and evaluate source files in order
-const jsFiles = [
-    '01_core.js',
-    '02_textures.js',
-    '02b_w3d_models.js',
-    '03_units.js',
-    '04_buildings.js',
-    '05_audio.js',
-    '05b_official_audio.js',
-    '06_effects.js',
-    '07_terrain.js',
-    '07b_tournament_desert.js',
-    '08_collision.js',
-    '09_fogOfWar.js',
-    '10_editor.js',
-    '10b_cameos.js',
-    '11_sidebar.js',
-    '12_combat.js',
-    '13_ai.js',
-    '14_gameLoop.js',
-    '15_multiplayer.js'
-];
+// Read and evaluate generated data bundles + handwritten source files in sorted order (matching build.js)
+const genDir = path.join(projectRoot, 'src', 'generated');
+const jsDir = path.join(projectRoot, 'src', 'js');
+const genEntries = fs.existsSync(genDir)
+    ? fs.readdirSync(genDir).filter(f => f.endsWith('.js')).sort().map(f => ({ name: f, fullPath: path.join(genDir, f) }))
+    : [];
+const jsEntries = fs.readdirSync(jsDir).filter(f => f.endsWith('.js')).sort().map(f => ({ name: f, fullPath: path.join(jsDir, f) }));
+const allModuleEntries = [...genEntries, ...jsEntries];
 
-for (const f of jsFiles) {
-    const code = fs.readFileSync(path.join(projectRoot, 'src', 'js', f), 'utf8');
+for (const entry of allModuleEntries) {
+    const code = fs.readFileSync(entry.fullPath, 'utf8');
     try {
-        vm.runInContext(code, sandbox, { filename: f });
+        vm.runInContext(code, sandbox, { filename: entry.name });
     } catch (err) {
-        console.error(`Error in ${f}:`, err);
+        console.error(`Error in ${entry.name}:`, err);
         process.exit(1);
     }
 }
 
-console.log(`✓ All ${jsFiles.length} JS modules evaluated in sandbox successfully.`);
+console.log(`✓ All ${allModuleEntries.length} JS modules (${jsEntries.length} handwritten + ${genEntries.length} generated) evaluated in sandbox successfully.`);
 
 // Initialize Three.js scene
 vm.runInContext("init();", sandbox);
@@ -1485,7 +1473,11 @@ console.log("✓ Verified all 11 retail visual, model, terrain, base orientation
 // --- 22. Audio distance attenuation, Missile Defender fire sound, stealth visibility, no runtime PointLights ---
 {
     const srcDir = path.join(__dirname, 'src', 'js');
-    const rd = f => fs.readFileSync(path.join(srcDir, f), 'utf8');
+    const genDataDir = path.join(__dirname, 'src', 'generated');
+    const rd = f => {
+        const p1 = path.join(srcDir, f);
+        return fs.readFileSync(fs.existsSync(p1) ? p1 : path.join(genDataDir, f), 'utf8');
+    };
     const audioSrc = rd('05_audio.js');
     const helperStart = audioSrc.indexOf('const SPATIAL_AUDIO_NEAR');
     const helperEnd = audioSrc.indexOf('function playAudio(');
@@ -1527,9 +1519,9 @@ console.log("✓ Verified all 11 retail visual, model, terrain, base orientation
     if (pcmOut.readUInt16LE(20) !== 1 || pcmOut.readUInt16LE(34) !== 16 || pcmOut.length < 40000) {
         throw new Error('IMA ADPCM -> PCM16 transcoder failed on sfx_missile_defender');
     }
-    const loopSrc = rd('14_gameLoop.js');
-    if (!/c\._stealthOwnMat/.test(loopSrc)) throw new Error('Stealth must use per-mesh cloned materials');
-    if (!/FRIENDLY_STEALTH_OPACITY_MIN = 0\.5/.test(loopSrc)) throw new Error('Friendly stealth opacity must match retail 50%+');
+    const sysSrc = rd('14b_systems.js');
+    if (!/c\._stealthOwnMat/.test(sysSrc)) throw new Error('Stealth must use per-mesh cloned materials');
+    if (!/FRIENDLY_STEALTH_OPACITY_MIN = 0\.5/.test(sysSrc)) throw new Error('Friendly stealth opacity must match retail 50%+');
     ['02b_w3d_models.js', '07_terrain.js', '06_effects.js', '04_buildings.js', '03_units.js'].forEach(f => {
         const code = rd(f).split(/\r?\n/).filter(l => l.length < 400 && !/^\s*\/\//.test(l)).join('\n');
         if (/new THREE\.PointLight\(/.test(code)) throw new Error(f + ' creates a PointLight (causes shader recompile frame spikes)');
@@ -1978,6 +1970,48 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
                 throw new Error('Issue #57: applyGameOptions failed to persist game options!');
             }
             applyGameOptions({ graphicsQuality: 'high', shadows: true, masterVolume: 1.0, showFps: false });
+        }
+
+        // 18. Gameplay regressions: Guard mode, Paladin PDL range (11.5u), imported map spawn sizing, AI drone follow
+        {
+            // Guard mode anchors selected jet & ground unit to guardPoint and sets wide jet orbit
+            const gJet = spawnUnit('raptor', new THREE.Vector3(0, 0, 0), 'usa');
+            gJet.selected = true;
+            orderUnitsGuard(new THREE.Vector3(60, 0, 60));
+            if (!gJet.guardPoint || Math.hypot(gJet.guardPoint.x - 60, gJet.guardPoint.z - 60) > 0.1) {
+                throw new Error('Guard mode did not anchor jet guardPoint!');
+            }
+            if ((gJet.guardRadius || 0) < 55) {
+                throw new Error('Guard mode jet guardRadius too small: ' + gJet.guardRadius);
+            }
+            if (typeof updateGuardIndicators === 'function') updateGuardIndicators();
+            gJet.selected = false;
+
+            // Paladin PDL intercepts inside 11.5u and ignores missiles at 20u
+            const pTank = spawnUnit('paladin', new THREE.Vector3(100, 0, 100), 'usa');
+            pTank.pdlCooldown = 0;
+            const farMissile = {
+                curPos: new THREE.Vector3(120, 1.8, 100),
+                group: { position: new THREE.Vector3(120, 1.8, 100) },
+                intercepted: false,
+                metadata: { attacker: { teamId: 2 }, target: pTank }
+            };
+            const nearMissile = {
+                curPos: new THREE.Vector3(108, 1.8, 100),
+                group: { position: new THREE.Vector3(108, 1.8, 100) },
+                intercepted: false,
+                metadata: { attacker: { teamId: 2 }, target: pTank }
+            };
+            activeMissiles.push(farMissile, nearMissile);
+            processPointDefenseLasers();
+            if (farMissile.intercepted) throw new Error('Paladin PDL intercepted out-of-range missile at 20u!');
+            if (!nearMissile.intercepted) throw new Error('Paladin PDL failed to intercept close missile at 8u!');
+            activeMissiles.length = 0;
+
+            // Imported map spawn-count battlefield sizing
+            if (getRecommendedSizeForImportedMap({ spawns: new Array(4) }) !== 600) throw new Error('4P imported map should map to 600');
+            if (getRecommendedSizeForImportedMap({ spawns: new Array(6) }) !== 900) throw new Error('6P imported map should map to 900');
+            if (getRecommendedSizeForImportedMap({ spawns: new Array(8) }) !== 1600) throw new Error('8P imported map should map to 1600');
         }
     `, sandbox);
 }
