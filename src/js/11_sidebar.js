@@ -621,7 +621,7 @@ function applyGameOptions(opts) {
     if (typeof window !== 'undefined' && window._cloudShadowUniforms && window._cloudShadowUniforms.uCloudStrength) {
         const cloudsOn = opts.cloudShadows !== false;
         const tod = window._activeTimeOfDay || 'day';
-        window._cloudShadowUniforms.uCloudStrength.value = !cloudsOn ? 0.0 : (tod === 'night' ? 0.12 : (tod === 'sunset' || tod === 'dawn' ? 0.24 : 0.40));
+        window._cloudShadowUniforms.uCloudStrength.value = !cloudsOn ? 0.0 : (tod === 'night' ? 0.18 : (tod === 'sunset' || tod === 'dawn' ? 0.38 : 0.62));
     }
     if (typeof setMasterAudioVolume === 'function' && Number.isFinite(opts.masterVolume)) {
         setMasterAudioVolume(opts.masterVolume);

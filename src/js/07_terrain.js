@@ -1236,7 +1236,87 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 600) {
             roughness: effectiveTheme === 'snow' ? 0.78 : effectiveTheme === 'city' ? 0.86 : 0.93,
             metalness: effectiveTheme === 'snow' ? 0.12 : effectiveTheme === 'city' ? 0.08 : 0.04
     });
-    if ((isOfficialTexMap || isCustom) && detailTex && cliffTex && typeof document !== 'undefined') {
+    // Authentic C&C Generals / Zero Hour drifting cloud shadow map (UseCloudMap = Yes, applies to ALL maps: official, imported, procedural, custom)
+    if (typeof window !== 'undefined' && !window._cloudShadowTexture && typeof document !== 'undefined' && typeof THREE.CanvasTexture === 'function') {
+        const cSize = 256;
+        const cCanvas = document.createElement('canvas');
+        cCanvas.width = cSize;
+        cCanvas.height = cSize;
+        const cCtx = cCanvas.getContext('2d');
+        const img = (cCtx && typeof cCtx.createImageData === 'function') ? cCtx.createImageData(cSize, cSize) : null;
+        if (cCtx && img && img.data) {
+            const data = img.data;
+            const hash2 = (ix, iy, p) => {
+                const x = ((ix % p) + p) % p;
+                const y = ((iy % p) + p) % p;
+                let n = (x * 374761393 + y * 668265263 + p * 1442695041) | 0;
+                n = (n ^ (n >>> 13)) * 1274126177;
+                return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+            };
+            const vNoise = (u, v, period) => {
+                const fx = u * period, fy = v * period;
+                const x0 = Math.floor(fx), y0 = Math.floor(fy);
+                const tx = fx - x0, ty = fy - y0;
+                const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+                const a = hash2(x0, y0, period);
+                const b = hash2(x0 + 1, y0, period);
+                const c = hash2(x0, y0 + 1, period);
+                const d = hash2(x0 + 1, y0 + 1, period);
+                return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
+            };
+            for (let py = 0; py < cSize; py++) {
+                const v = py / cSize;
+                for (let px = 0; px < cSize; px++) {
+                    const u = px / cSize;
+                    let n = vNoise(u, v, 3) * 0.54
+                          + vNoise(u, v, 6) * 0.28
+                          + vNoise(u, v, 12) * 0.13
+                          + vNoise(u, v, 24) * 0.05;
+                    // Distinct sunlit clearings and soft billowing cloud shadow banks
+                    n = Math.max(0, Math.min(1, (n - 0.36) / 0.30));
+                    n = n * n * (3 - 2 * n);
+                    const val = Math.round(n * 255);
+                    const idx = (py * cSize + px) * 4;
+                    data[idx] = val;
+                    data[idx + 1] = val;
+                    data[idx + 2] = val;
+                    data[idx + 3] = 255;
+                }
+            }
+            cCtx.putImageData(img, 0, 0);
+            const cTex = new THREE.CanvasTexture(cCanvas);
+            cTex.wrapS = THREE.RepeatWrapping;
+            cTex.wrapT = THREE.RepeatWrapping;
+            cTex.needsUpdate = true;
+            window._cloudShadowTexture = cTex;
+        }
+    }
+    if (typeof window !== 'undefined') {
+        const cloudScaleVal = Math.max(1.5, mapSize / 240.0);
+        const cloudEnabled = !(window._gameOptions && window._gameOptions.cloudShadows === false);
+        const fallbackTex = window._cloudShadowTexture || detailTex || terrainTexture;
+        if (!window._cloudShadowUniforms) {
+            window._cloudShadowUniforms = {
+                uCloudMap: { value: fallbackTex },
+                uCloudOffset: { value: (typeof THREE.Vector2 === 'function') ? new THREE.Vector2(0, 0) : { x: 0, y: 0 } },
+                uCloudScale: { value: cloudScaleVal },
+                uCloudStrength: { value: cloudEnabled ? 0.62 : 0.0 }
+            };
+        } else {
+            window._cloudShadowUniforms.uCloudMap.value = fallbackTex;
+            window._cloudShadowUniforms.uCloudScale.value = cloudScaleVal;
+            window._cloudShadowUniforms.uCloudStrength.value = cloudEnabled ? 0.62 : 0.0;
+        }
+    }
+    const _cUniforms = (typeof window !== 'undefined' && window._cloudShadowUniforms) ? window._cloudShadowUniforms : {
+        uCloudMap: { value: detailTex || terrainTexture },
+        uCloudOffset: { value: (typeof THREE.Vector2 === 'function') ? new THREE.Vector2(0, 0) : { x: 0, y: 0 } },
+        uCloudScale: { value: 2.5 },
+        uCloudStrength: { value: 0.0 }
+    };
+
+    const _hasDetailBlend = Boolean((isOfficialTexMap || isCustom) && detailTex && cliffTex && typeof document !== 'undefined');
+    if (typeof document !== 'undefined' && _cUniforms.uCloudMap && _cUniforms.uCloudMap.value) {
         const detailStrength = effectiveTheme === 'snow' ? 0.85 : 1.05;
         const meanMap = {
             desert: [0.82, 0.65, 0.30],
@@ -1248,103 +1328,27 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 600) {
         const uDetailMean = (typeof THREE.Vector3 === 'function') ? new THREE.Vector3(mRgb[0], mRgb[1], mRgb[2]) : { x: mRgb[0], y: mRgb[1], z: mRgb[2] };
         const uCliffMean = (typeof THREE.Vector3 === 'function') ? new THREE.Vector3(0.78, 0.66, 0.46) : { x: 0.78, y: 0.66, z: 0.46 };
 
-        // Authentic C&C Generals / Zero Hour drifting cloud shadow map (UseCloudMap = Yes, TSCloudMed.dds style)
-        if (typeof window !== 'undefined' && !window._cloudShadowTexture && typeof document !== 'undefined' && typeof THREE.CanvasTexture === 'function') {
-            const cSize = 256;
-            const cCanvas = document.createElement('canvas');
-            cCanvas.width = cSize;
-            cCanvas.height = cSize;
-            const cCtx = cCanvas.getContext('2d');
-            const img = (cCtx && typeof cCtx.createImageData === 'function') ? cCtx.createImageData(cSize, cSize) : null;
-            if (cCtx && img && img.data) {
-                const data = img.data;
-                // Tileable periodic 2D value noise (fBm) for seamless soft billowing clouds
-                const hash2 = (ix, iy, p) => {
-                    const x = ((ix % p) + p) % p;
-                    const y = ((iy % p) + p) % p;
-                    let n = (x * 374761393 + y * 668265263 + p * 1442695041) | 0;
-                    n = (n ^ (n >>> 13)) * 1274126177;
-                    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
-                };
-                const vNoise = (u, v, period) => {
-                    const fx = u * period, fy = v * period;
-                    const x0 = Math.floor(fx), y0 = Math.floor(fy);
-                    const tx = fx - x0, ty = fy - y0;
-                    const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
-                    const a = hash2(x0, y0, period);
-                    const b = hash2(x0 + 1, y0, period);
-                    const c = hash2(x0, y0 + 1, period);
-                    const d = hash2(x0 + 1, y0 + 1, period);
-                    return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
-                };
-                for (let py = 0; py < cSize; py++) {
-                    const v = py / cSize;
-                    for (let px = 0; px < cSize; px++) {
-                        const u = px / cSize;
-                        let n = vNoise(u, v, 3) * 0.52
-                              + vNoise(u, v, 6) * 0.28
-                              + vNoise(u, v, 12) * 0.14
-                              + vNoise(u, v, 24) * 0.06;
-                        // Shape into distinct sunlit clearings and soft billowing cloud patches
-                        n = Math.max(0, Math.min(1, (n - 0.34) / 0.36));
-                        n = n * n * (3 - 2 * n);
-                        const val = Math.round(n * 255);
-                        const idx = (py * cSize + px) * 4;
-                        data[idx] = val;
-                        data[idx + 1] = val;
-                        data[idx + 2] = val;
-                        data[idx + 3] = 255;
-                    }
-                }
-                cCtx.putImageData(img, 0, 0);
-                const cTex = new THREE.CanvasTexture(cCanvas);
-                cTex.wrapS = THREE.RepeatWrapping;
-                cTex.wrapT = THREE.RepeatWrapping;
-                cTex.needsUpdate = true;
-                window._cloudShadowTexture = cTex;
-            }
-        }
-        if (typeof window !== 'undefined') {
-            const cloudScaleVal = Math.max(1.2, mapSize / 260.0);
-            const cloudEnabled = !(window._gameOptions && window._gameOptions.cloudShadows === false);
-            if (!window._cloudShadowUniforms) {
-                window._cloudShadowUniforms = {
-                    uCloudMap: { value: window._cloudShadowTexture || detailTex },
-                    uCloudOffset: { value: (typeof THREE.Vector2 === 'function') ? new THREE.Vector2(0, 0) : { x: 0, y: 0 } },
-                    uCloudScale: { value: cloudScaleVal },
-                    uCloudStrength: { value: cloudEnabled ? 0.38 : 0.0 }
-                };
-            } else {
-                window._cloudShadowUniforms.uCloudMap.value = window._cloudShadowTexture || detailTex;
-                window._cloudShadowUniforms.uCloudScale.value = cloudScaleVal;
-                window._cloudShadowUniforms.uCloudStrength.value = cloudEnabled ? 0.38 : 0.0;
-            }
-        }
-        const _cUniforms = (typeof window !== 'undefined' && window._cloudShadowUniforms) ? window._cloudShadowUniforms : {
-            uCloudMap: { value: detailTex },
-            uCloudOffset: { value: (typeof THREE.Vector2 === 'function') ? new THREE.Vector2(0, 0) : { x: 0, y: 0 } },
-            uCloudScale: { value: 2.2 },
-            uCloudStrength: { value: 0.0 }
-        };
-
-        terrainMat.customProgramCacheKey = () => 'terrain_detail_clouds_v3_' + procDetailKey;
+        terrainMat.customProgramCacheKey = () => (_hasDetailBlend ? 'terrain_detail_clouds_v4_' + procDetailKey : 'terrain_clouds_only_v4');
         terrainMat.onBeforeCompile = (shader) => {
-            shader.uniforms.uDetailMap = { value: detailTex };
-            shader.uniforms.uCliffMap = { value: cliffTex };
-            shader.uniforms.uDetailRepeat = { value: detailRepeat };
-            shader.uniforms.uDetailStrength = { value: detailStrength };
-            shader.uniforms.uDetailMean = { value: uDetailMean };
-            shader.uniforms.uCliffMean = { value: uCliffMean };
             shader.uniforms.uCloudMap = _cUniforms.uCloudMap;
             shader.uniforms.uCloudOffset = _cUniforms.uCloudOffset;
             shader.uniforms.uCloudScale = _cUniforms.uCloudScale;
             shader.uniforms.uCloudStrength = _cUniforms.uCloudStrength;
+            if (_hasDetailBlend) {
+                shader.uniforms.uDetailMap = { value: detailTex };
+                shader.uniforms.uCliffMap = { value: cliffTex };
+                shader.uniforms.uDetailRepeat = { value: detailRepeat };
+                shader.uniforms.uDetailStrength = { value: detailStrength };
+                shader.uniforms.uDetailMean = { value: uDetailMean };
+                shader.uniforms.uCliffMean = { value: uCliffMean };
+            }
             shader.vertexShader = shader.vertexShader
                 .replace('#include <common>', '#include <common>\nvarying float vTerrainSlope;\nvarying vec2 vTerrainUv;')
                 .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTerrainSlope = 1.0 - clamp( normal.y, 0.0, 1.0 );\nvTerrainUv = uv;');
-            shader.fragmentShader = shader.fragmentShader
-                .replace('#include <common>', '#include <common>\nuniform sampler2D uDetailMap;\nuniform sampler2D uCliffMap;\nuniform float uDetailRepeat;\nuniform float uDetailStrength;\nuniform vec3 uDetailMean;\nuniform vec3 uCliffMean;\nuniform sampler2D uCloudMap;\nuniform vec2 uCloudOffset;\nuniform float uCloudScale;\nuniform float uCloudStrength;\nvarying float vTerrainSlope;\nvarying vec2 vTerrainUv;')
-                .replace('#include <map_fragment>', `#include <map_fragment>
+            const detailUniformDecls = _hasDetailBlend
+                ? 'uniform sampler2D uDetailMap;\nuniform sampler2D uCliffMap;\nuniform float uDetailRepeat;\nuniform float uDetailStrength;\nuniform vec3 uDetailMean;\nuniform vec3 uCliffMean;\n'
+                : '';
+            const detailFragBody = _hasDetailBlend ? `
                     vec2 dUv1 = vTerrainUv * uDetailRepeat;
                     vec2 dUv2 = mat2( 0.80, -0.60, 0.60, 0.80 ) * ( vTerrainUv * ( uDetailRepeat * 2.85 ) );
                     vec3 dTex1 = texture2D( uDetailMap, dUv1 ).rgb - uDetailMean;
@@ -1356,11 +1360,15 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 600) {
                     float slopeMix = smoothstep( 0.12, 0.36, vTerrainSlope );
                     vec3 finalDelta = mix( groundDelta, cliffDelta, slopeMix );
                     diffuseColor.rgb = clamp( diffuseColor.rgb * ( vec3( 1.0 ) + finalDelta * 0.85 ) + finalDelta * 0.14, 0.0, 1.0 );
+            ` : '';
+            shader.fragmentShader = shader.fragmentShader
+                .replace('#include <common>', `#include <common>\n${detailUniformDecls}uniform sampler2D uCloudMap;\nuniform vec2 uCloudOffset;\nuniform float uCloudScale;\nuniform float uCloudStrength;\nvarying float vTerrainSlope;\nvarying vec2 vTerrainUv;`)
+                .replace('#include <map_fragment>', `#include <map_fragment>${detailFragBody}
                     if ( uCloudStrength > 0.001 ) {
                         vec2 cUv1 = vTerrainUv * uCloudScale + uCloudOffset;
                         vec2 cUv2 = vTerrainUv * ( uCloudScale * 1.55 ) + uCloudOffset * 0.72 + vec2( 0.37, 0.19 );
                         float cMask = texture2D( uCloudMap, cUv1 ).r * 0.68 + texture2D( uCloudMap, cUv2 ).r * 0.32;
-                        vec3 cloudTint = mix( vec3( 1.04, 1.02, 0.98 ), vec3( 0.52, 0.56, 0.64 ), cMask );
+                        vec3 cloudTint = mix( vec3( 1.06, 1.04, 0.99 ), vec3( 0.42, 0.47, 0.58 ), cMask );
                         diffuseColor.rgb *= mix( vec3( 1.0 ), cloudTint, uCloudStrength );
                     }
                 `);

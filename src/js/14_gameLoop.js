@@ -371,13 +371,13 @@ function animate() {
     if (typeof window !== 'undefined' && window._cloudShadowUniforms) {
         const cU = window._cloudShadowUniforms;
         if (cU.uCloudOffset && cU.uCloudOffset.value) {
-            cU.uCloudOffset.value.x = (nowTime * 0.000018) % 100;
-            cU.uCloudOffset.value.y = (nowTime * 0.000011) % 100;
+            cU.uCloudOffset.value.x = (nowTime * 0.000034) % 100;
+            cU.uCloudOffset.value.y = (nowTime * 0.000021) % 100;
         }
         if (cU.uCloudStrength) {
             const cloudsOn = !(window._gameOptions && window._gameOptions.cloudShadows === false);
             const tod = window._activeTimeOfDay || 'day';
-            cU.uCloudStrength.value = !cloudsOn ? 0.0 : (tod === 'night' ? 0.12 : (tod === 'sunset' || tod === 'dawn' ? 0.24 : 0.40));
+            cU.uCloudStrength.value = !cloudsOn ? 0.0 : (tod === 'night' ? 0.18 : (tod === 'sunset' || tod === 'dawn' ? 0.38 : 0.62));
         }
     }
     updateFrameFrustum();
