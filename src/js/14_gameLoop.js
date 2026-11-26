@@ -4253,8 +4253,13 @@ function processPointDefenseLasers() {
                 return;
             }
 
-            const scanRange = (defender.type === 'avenger') ? 28.0 : ((defender.type === 'paladin') ? 22.0 : 16.0);
+            // Official INIZH.big PDL Weapon AttackRange (scaled to world units: Paladin 65 -> 11.5u, Avenger 100 -> 18.0u, Battle Drone -> 10.0u)
+            const scanRange = (defender.type === 'avenger') ? 18.0 : ((defender.type === 'paladin') ? 11.5 : 10.0);
             const myPos = defender.mesh.position;
+            const usesOwnPDL = (defender.type === 'paladin' || defender.type === 'avenger');
+            const pdlOrigin = (!usesOwnPDL && defender.drone && defender.drone.mesh)
+                ? defender.drone.mesh.position.clone()
+                : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
 
             if (typeof activeMissiles !== 'undefined' && activeMissiles.length > 0) {
                 for (let missile of activeMissiles) {
@@ -4267,17 +4272,14 @@ function processPointDefenseLasers() {
                         if (mTarget && !isFriendly(defender, mTarget)) continue;
                     }
 
-                    const dist = myPos.distanceTo(missile.curPos);
+                    const mPos = (missile.group && missile.group.position) ? missile.group.position : missile.curPos;
+                    const dist = pdlOrigin.distanceTo(mPos);
                     if (dist <= scanRange) {
                         // Intercept missile in mid-air!
                         missile.intercepted = true;
-                        const laserOrigin = (defender.drone && defender.drone.mesh)
-                        ? defender.drone.mesh.position.clone()
-                        : myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
-
-                        if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
-                        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
-                        playAudio('laser_point_defense', { pos: laserOrigin });
+                        if (typeof spawnLaserBeam === 'function') spawnLaserBeam(pdlOrigin, mPos, 0x00ffff, 2.8);
+                        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pdlOrigin, 0x00ffff, 0.4);
+                        playAudio('laser_point_defense', { pos: pdlOrigin });
                         defender.pdlCooldown = (defender.type === 'avenger') ? 35 : ((defender.type === 'paladin') ? 65 : 85);
 
                         if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
@@ -4290,7 +4292,7 @@ function processPointDefenseLasers() {
 
             // Authentic Paladin Tank Anti-Infantry Laser Zap (when no missiles need interception)
             if (defender.type === 'paladin' && defender.pdlCooldown === 0) {
-                const infRangeSq = 14.0 * 14.0;
+                const infRangeSq = 11.0 * 11.0;
                 const hostileInf = allLivingUnits.find(e =>
                     e.health > 0 && e.mesh && !e.isAir && !isFriendly(defender, e) &&
                     (typeof getArmorCategory === 'function' ? getArmorCategory(e) === 'infantry' : false) &&
@@ -4300,7 +4302,7 @@ function processPointDefenseLasers() {
                     const laserOrigin = myPos.clone().add(new THREE.Vector3(0, 1.8, 0));
                     if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, hostileInf.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 0x00ffff, 2.5);
                     if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.35);
-                    playAudio('laser_point_defense');
+                    playAudio('laser_point_defense', { pos: laserOrigin });
                     defender.pdlCooldown = 75;
                     if (typeof applyCalculatedDamage === 'function') {
                         applyCalculatedDamage(defender, hostileInf, 40, 'SNIPER');
