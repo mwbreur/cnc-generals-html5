@@ -2614,7 +2614,10 @@ function animate() {
                 idleTurret.rotation.y += (0 - idleTurret.rotation.y) * 0.1;
             }
 
-            const stopBuffer = unit.isAir ? 1.0 : 0.4;
+            // Generous pass-through radius for intermediate waypoints (prevents 20+ unit formations jamming on 1 point),
+            // tight 0.5u stop only on the final destination!
+            const hasMoreWaypoints = !!(unit.waypoints && unit.waypoints.length > 0);
+            const stopBuffer = unit.isAir ? 1.0 : (hasMoreWaypoints ? Math.max(4.5, (unit.radius || 1.2) * 2.2) : 0.5);
 
             // Use horizontal distance on XZ plane so altitude Y does not cause infinite distance overshoot/jitter
             const dx = unit.targetPosition.x - unit.mesh.position.x;
@@ -3613,7 +3616,10 @@ function processEnemyMovement() {
             const dx = enemy.targetPosition.x - enemy.mesh.position.x;
             const dz = enemy.targetPosition.z - enemy.mesh.position.z;
             const dist2D = Math.hypot(dx, dz);
-            if (dist2D > 0.4) {
+            const enemyStopBuffer = (enemy.waypoints && enemy.waypoints.length > 0)
+                ? Math.max(4.5, (enemy.radius || 1.2) * 2.2)
+                : 0.5;
+            if (dist2D > enemyStopBuffer) {
                 const dirX = dx / dist2D;
                 const dirZ = dz / dist2D;
                 let effectiveSpeed = enemy.speed;

@@ -5756,7 +5756,39 @@ function applyGroupFormationMove(selectedList, groundHit) {
             const destV = new THREE.Vector3(destX, destY, destZ);
 
             if (squadBridges && squadBridges.length > 0 && !unit.isAir) {
-                unit.waypoints = [...squadBridges.filter(Boolean), destV];
+                // Official AIGroup.cpp-style lane-offset waypoints: skip leading waypoints behind/inward from the unit
+                // and spread intermediate waypoints into parallel lanes so 20+ units never bunch onto 1 spot!
+                const ux = unit.mesh.position.x, uz = unit.mesh.position.z;
+                const laneShift = THREE.MathUtils.clamp(colOffset * 0.65, -10.5, 10.5);
+                const cleanWps = [];
+                const rawWps = squadBridges.filter(Boolean);
+                for (let wi = 0; wi < rawWps.length; wi++) {
+                    const wp = rawWps[wi];
+                    // Skip leading waypoint if it's behind or right next to the unit relative to destination
+                    if (cleanWps.length === 0) {
+                        const toWpX = wp.x - ux, toWpZ = wp.z - uz;
+                        const toDestX = destX - ux, toDestZ = destZ - uz;
+                        const wpDot = toWpX * toDestX + toWpZ * toDestZ;
+                        const wpDist = Math.hypot(toWpX, toWpZ);
+                        if (wpDot <= 0 || wpDist < Math.max(6.0, spacingX * 0.9)) continue;
+                    }
+                    // Compute local segment tangent so lateral lane offset stays perpendicular to path
+                    const nextPt = (wi + 1 < rawWps.length) ? rawWps[wi + 1] : destV;
+                    const segDx = nextPt.x - wp.x, segDz = nextPt.z - wp.z;
+                    const segLen = Math.hypot(segDx, segDz) || 1;
+                    const segRightX = -segDz / segLen, segRightZ = segDx / segLen;
+                    const wpOnBridge = (typeof mapBridges !== 'undefined') && mapBridges.some(b => isPointOnBridge(wp.x, wp.z, b));
+                    const useShift = wpOnBridge ? THREE.MathUtils.clamp(laneShift * 0.4, -3.5, 3.5) : laneShift;
+                    let lx = THREE.MathUtils.clamp(wp.x + segRightX * useShift, -maxCoord, maxCoord);
+                    let lz = THREE.MathUtils.clamp(wp.z + segRightZ * useShift, -maxCoord, maxCoord);
+                    const blockedLane = (typeof isTerrainCliffAt === 'function' && !wpOnBridge && isTerrainCliffAt(lx, lz)) ||
+                        (!wpOnBridge && typeof getTerrainHeight === 'function' && typeof currentWaterLevel !== 'undefined' && getTerrainHeight(lx, lz) < currentWaterLevel);
+                    if (blockedLane) { lx = wp.x; lz = wp.z; }
+                    const ly = typeof getTerrainHeight === 'function' ? getTerrainHeight(lx, lz) : (wp.y || 0);
+                    cleanWps.push(new THREE.Vector3(lx, ly, lz));
+                }
+                cleanWps.push(destV);
+                unit.waypoints = cleanWps;
                 unit.targetPosition.copy(unit.waypoints.shift());
             } else {
                 unit.waypoints = [];
