@@ -27,13 +27,13 @@ The goal is to build a detailed, playable Generals-style RTS in the browser whil
 
 Current gameplay systems include:
 
-- Three playable factions: USA, China and GLA.
-- 3D units, buildings, terrain, water, bridges and map editing.
-- Unit selection, movement, combat, construction, harvesting and upgrades.
-- Fog of war, enemy AI, pathfinding and collision handling.
-- A Generals-style command bar, minimap and in-game HUD.
-- Procedural Web Audio effects, with an additional official-audio data module.
-- Peer-to-peer multiplayer using PeerJS/WebRTC.
+- Three playable factions: **USA**, **China**, and **GLA**, with Generals' Promotions & Powers, Superweapons (Particle Cannon, Nuclear Missile, SCUD Storm), and faction-specific mechanics (USA Drones & Point Defense Lasers, China Overlord Towers & EMP/Frenzy, GLA Tunnel Networks & Salvage).
+- 3D units, buildings, terrain, water, bridges, drifting cloud shadows, Map Editor, and direct browser import of retail `.map` / `.zip` SAGE maps (with `.tga` previews, `map.str` metadata, and automatic spawn-count battlefield sizing).
+- Unit selection, lane-offset group movement, Guard mode (with live white radius preview & sector rings), combat, construction, harvesting, fixed-wing aircraft rearming, and upgrades.
+- Fog of war, Skirmish AI, A* pathfinding, and collision handling.
+- A Generals-style command bar, minimap, options menu, and in-game HUD.
+- Procedural Web Audio effects paired with lazy-loaded retail audio catalogs (`src/audio/`).
+- Peer-to-peer multiplayer using PeerJS/WebRTC plus built-in zero-dependency LAN WebSocket relay (`npm run lan`).
 
 This is an independent fan project and is not affiliated with or endorsed by Electronic Arts. Command & Conquer and Generals are trademarks of their respective owners. Use only game assets that you have the right to distribute.
 
@@ -49,11 +49,11 @@ This is an independent fan project and is not affiliated with or endorsed by Ele
 | Build tooling | Node.js (built-in modules) |
 | Hosting | GitHub Pages / GitHub Actions |
 
-There is currently no npm dependency manifest. The build script uses Node.js built-in modules; the game itself also loads its browser-side dependencies as defined by the HTML template.
+The build, test, and LAN scripts use only Node.js built-in modules (zero runtime npm dependencies required); `package.json` defines convenient scripts (`npm test`, `npm run build`, `npm run lan`).
 
 ## Project layout
 
-The repository is organized around source modules and generated browser builds:
+The repository is organized around handwritten source modules (`src/js/`), generated data bundles (`src/generated/`), and generated browser builds (`index.html` + `assets/data/`):
 
 ```text
 .
@@ -67,35 +67,44 @@ The repository is organized around source modules and generated browser builds:
 │   │   ├── usa.json
 │   │   ├── china.json
 │   │   └── gla.json
-│   └── js/
-│       ├── 01_core.js
-│       ├── 02_textures.js
-│       ├── 02b_w3d_models.js
-│       ├── 03_units.js
-│       ├── 04_buildings.js
-│       ├── 05_audio.js
-│       ├── 05b_official_audio.js
-│       ├── 06_effects.js
-│       ├── 07_terrain.js
-│       ├── 07b_tournament_desert.js
-│       ├── 08_collision.js
-│       ├── 09_fogOfWar.js
-│       ├── 10_editor.js
-│       ├── 10b_cameos.js
-│       ├── 11_sidebar.js
-│       ├── 12_combat.js
-│       ├── 13_ai.js
-│       ├── 14_gameLoop.js
-│       └── 15_multiplayer.js
+│   ├── vendor/
+│   │   ├── three.min.js
+│   │   └── peerjs.min.js
+│   ├── generated/                     # Extracted static data bundles (externalized to assets/data/)
+│   │   ├── 02b_w3d_models.js          # W3D 3D unit/building/prop meshes & textures
+│   │   ├── 07b_tournament_desert.js   # Official EA skirmish maps & terrain tiles
+│   │   └── 10b_cameos.js              # Official EA cameos & shell UI graphics
+│   └── js/                            # Handwritten game modules (loaded in sorted order)
+│       ├── 01_core.js                 # Core constants & shared globals
+│       ├── 02_textures.js             # Procedural textures & materials
+│       ├── 03_units.js                # Unit mesh builders
+│       ├── 04_buildings.js            # Building mesh builders
+│       ├── 05_audio.js                # Web Audio synth & 3D spatial attenuation
+│       ├── 05b_official_audio.js      # Lazy-loaded retail audio catalog player
+│       ├── 06_effects.js              # Projectiles, explosions, superweapon FX & tactical rings
+│       ├── 07_terrain.js              # Terrain, water, bridges, clouds & map setup
+│       ├── 08_collision.js            # Obstacle/unit collision & A* pathfinding
+│       ├── 09_fogOfWar.js             # Fog of war, minimap & Skirmish lobby UI
+│       ├── 10_editor.js               # Map editor & SAGE .map/.zip importer
+│       ├── 11_sidebar.js              # Command bar, unit spawning, hotkeys & Generals' Powers
+│       ├── 12_combat.js               # Combat loop, armor matrix & weapon firing
+│       ├── 13_ai.js                   # Skirmish AI commander brain
+│       ├── 13b_input.js               # Player pointer, selection, blueprints & right-click orders
+│       ├── 14_gameLoop.js             # Main simulation, aircraft flight & render loop
+│       ├── 14b_systems.js             # Stealth & detection, Point Defense Lasers & GLA salvage
+│       ├── 14c_shellMap.js            # Animated 3D main-menu shell map
+│       └── 15_multiplayer.js          # Host-authoritative WebRTC / LAN multiplayer
 ├── build.js
 ├── verify_system.js
+├── tools/                             # Linter, audio validators & asset extraction tools
 └── scripts/
     ├── e2e_smoke.mjs
+    ├── lan_server.mjs
     ├── report-audio-usage.js
     └── report-project-size.js
 ```
 
-The JavaScript filenames are numbered to make their concatenation order explicit. Keep shared globals and initialization dependencies in mind when changing module order.
+The JavaScript filenames in `src/js/` are numbered to make their concatenation order explicit. `build.js` and `verify_system.js` automatically discover all `.js` files in `src/generated/` and `src/js/` in sorted order.
 
 **Source files are the place to make changes.** The root `index.html` is a generated output; do not edit it by hand.
 
@@ -178,20 +187,20 @@ Alternatively, for single-player development only, you can still serve the built
 
 ## Build output and large files
 
-The build concatenates core gameplay JavaScript modules into `index.html` (~1.3 MB), while externalizing heavy static data modules into `assets/data/` (`02b_w3d_models.js`, `07b_tournament_desert.js`, and `10b_cameos.js`) loaded via `<script src="assets/data/...">` so browsers cache models, official maps, and cameos across updates. Audio stays external in `src/audio/` so the game can lazy-load shared effects and the player's faction catalog.
+The build concatenates handwritten gameplay JavaScript modules from `src/js/` into `index.html` (~2.0 MB), while externalizing heavy generated data bundles from `src/generated/` into `assets/data/` (`02b_w3d_models.js`, `07b_tournament_desert.js`, and `10b_cameos.js`) with content-hashed cache-busting query strings (`?v=...`) so browsers cache models, official maps, and cameos across updates. Audio stays external in `src/audio/` so the game can lazy-load shared effects and the player's faction catalog.
 
 The largest data assets in the repository are:
 
-- `assets/data/02b_w3d_models.js` / `src/js/02b_w3d_models.js` — W3D model data.
-- `assets/data/10b_cameos.js` / `src/js/10b_cameos.js` — Official EA cameos & shell UI graphics.
-- `assets/data/07b_tournament_desert.js` / `src/js/07b_tournament_desert.js` — 12 official EA skirmish maps.
+- `src/generated/02b_w3d_models.js` → `assets/data/02b_w3d_models.js` — W3D model data.
+- `src/generated/10b_cameos.js` → `assets/data/10b_cameos.js` — Official EA cameos & shell UI graphics.
+- `src/generated/07b_tournament_desert.js` → `assets/data/07b_tournament_desert.js` — Official EA skirmish maps & terrain tiles.
 - `src/audio/*.json` — Official-audio catalogs.
 
 The generated `index.html` size is reported by `node scripts/report-project-size.js`. This is an on-disk size, not a compressed transfer size.
 
 ### Audio loading
 
-The current catalogs contain 469 clips: shared effects plus USA, China and GLA voices. The web build requests shared effects and only the player faction's catalog when starting a Skirmish. Campaign and cutscene speech is not part of these catalogs. Enemy battlefield effects remain shared.
+The current catalogs contain **699 clips** (`global`, `usa`, `china`, `gla`): shared effects plus faction-specific voices. The web build requests shared effects and only the player faction's catalog when starting a Skirmish. Campaign and cutscene speech is not part of these catalogs. Enemy battlefield effects remain shared.
 
 The catalog split reorganizes existing clips; it does not establish that every source-game voice or weapon sound has been found. Audio archive completeness and live browser playback still need manual verification.
 
@@ -258,7 +267,7 @@ These check catalog grouping, lazy loading, faction voice selection, and caching
 
 ### Combat, Building & UI
 - **`A` + Right click:** Attack-Move.
-- **`G` + Right click:** Guard mode.
+- **`G` + Right click (or `GUARD` button):** Guard mode with live white sector radius preview & active guard ring (ground units and aircraft automatically return to their guarded sector).
 - **`S`:** Stop selected units.
 - **`X`:** Scatter selected units.
 - **`Q` / `E` / `R` (while placing a building):** Rotate building blueprint.

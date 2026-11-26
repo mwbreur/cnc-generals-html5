@@ -4,7 +4,7 @@
 - **Skirmish & Multiplayer First:** Focus exclusively on 100% working Skirmish and smooth PeerJS WebRTC multiplayer with original *C&C: Generals / Zero Hour* look/feel and high FPS in large-scale battles. Single-player campaign missions are not planned.
 - **Authentic EA Assets Over Custom Placeholders:**
   - On official maps (`window.OFFICIAL_SKIRMISH_MAPS`), use the extracted `ObjectsList` props, supply docks, and tech buildings—never scatter random procedural props, fake bridges, or fictitious buildings.
-  - Prefer official EA W3D models (`02b_w3d_models.js`) and official EA cameos (`tools/build_cameos.js` -> `10b_cameos.js`, prioritizing `EnglishZH.big` over stale `extracted_assets`).
+  - Prefer official EA W3D models (`src/generated/02b_w3d_models.js`) and official EA cameos (`tools/build_cameos.js` -> `src/generated/10b_cameos.js`, prioritizing `EnglishZH.big` over stale `extracted_assets`).
 - **Host-Authoritative Multiplayer:** Never use strict lockstep (which causes slow-motion in large battles). Keep 10 Hz host-authoritative `state_sync` with smooth client interpolation.
 
 ## 2. Build, Verification & Git/CI Workflow
@@ -12,7 +12,7 @@
 - **Regenerate Data Bundles When Needed:**
   - After editing `tools/build_cameos.js`, run `node tools/build_cameos.js`.
   - After editing `tools/export_official_map.js`, run `node tools/export_official_map.js`.
-  - `node build.js` externalizes `02b_w3d_models.js`, `07b_tournament_desert.js`, and `10b_cameos.js` into `assets/data/`—commit updated `assets/data/` alongside `index.html` and `src/`.
+  - `node build.js` externalizes `src/generated/02b_w3d_models.js`, `src/generated/07b_tournament_desert.js`, and `src/generated/10b_cameos.js` into `assets/data/` (git-ignored on `master` and built/deployed by CI).
 - **CI Rebase Handling:** `.github/workflows/build-and-deploy.yml` auto-commits generated `index.html` and `assets/data/` on `master`. If `git push origin master` is rejected:
   1. `git pull --rebase origin master`
   2. `node build.js`
