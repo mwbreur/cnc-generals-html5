@@ -1484,7 +1484,17 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
     const biome = (snowHits > greenHits && snowHits > desertHits) ? 'snow' : (greenHits > desertHits ? 'temperate' : 'desert');
     const theme = biome === 'temperate' ? 'jungle' : biome;
     const players = Math.max(2, Math.min(8, rawSpawns.length));
-    const recSize = dimRecSize;
+    // Match Battlefield Size to spawn count: 2/4P -> 600 (Small), 5/6P -> 900 (Medium), 7/8P -> 1600 (Epic/Largest)
+    const recSize = players >= 7 ? 1600 : (players >= 5 ? 900 : 600);
+    if (recSize !== dimRecSize && dimRecSize > 0) {
+        const vScaleRatio = recSize / dimRecSize;
+        for (let r = 0; r < grid.length; r++) {
+            const row = grid[r];
+            for (let c = 0; c < row.length; c++) {
+                row[c] = Math.round(Math.max(-14.0, Math.min(48.0, row[c] * vScaleRatio)) * 100) / 100;
+            }
+        }
+    }
 
     return {
         key: mapKey,
@@ -1762,6 +1772,11 @@ function registerImportedSageMap(mapObj, persist = true) {
     if (typeof window !== 'undefined') {
         window.OFFICIAL_SKIRMISH_MAPS = window.OFFICIAL_SKIRMISH_MAPS || {};
         window.OFFICIAL_SKIRMISH_MAPS[mapObj.key] = mapObj;
+        // Normalize recommendedSize by spawn count (including previously saved localStorage maps)
+        const spCount = (mapObj.spawns && mapObj.spawns.length) ? mapObj.spawns.length : (mapObj.players || 4);
+        mapObj.players = Math.max(2, Math.min(8, spCount));
+        mapObj.recommendedSize = spCount >= 7 ? 1600 : (spCount >= 5 ? 900 : 600);
+
         // Preload imported .tga preview into _officialMapImages so Skirmish preview canvas renders it immediately
         if (mapObj.tgaDataUrl && typeof Image === 'function') {
             window._officialMapImages = window._officialMapImages || {};

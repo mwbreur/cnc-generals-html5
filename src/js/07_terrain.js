@@ -853,6 +853,11 @@ function setupMapEnvironment(mapType = 'tournament_desert', mapSize = 600) {
 
     if (activeCustomMap && activeCustomMap.size) {
         mapSize = Number(activeCustomMap.size);
+    } else if (typeof window !== 'undefined' && window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapType] && window.OFFICIAL_SKIRMISH_MAPS[mapType].isImportedSageMap) {
+        const impMap = window.OFFICIAL_SKIRMISH_MAPS[mapType];
+        const impSpawns = (impMap.spawns && impMap.spawns.length) ? impMap.spawns.length : (impMap.players || 4);
+        const spawnSize = impSpawns >= 7 ? 1600 : (impSpawns >= 5 ? 900 : 600);
+        if (!mapSize || mapSize < spawnSize) mapSize = spawnSize;
     }
 
     currentMapType = mapType;

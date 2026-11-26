@@ -1901,13 +1901,28 @@ function syncMapOptionsForBattlefieldSize(mode) {
     }
 }
 
+function getRecommendedSizeForImportedMap(mapObj) {
+    const spCount = (mapObj && mapObj.spawns && mapObj.spawns.length)
+        ? mapObj.spawns.length
+        : ((mapObj && (mapObj.players || mapObj.maxPlayers)) || 4);
+    if (spCount >= 7) return 1600;
+    if (spCount >= 5) return 900;
+    return 600;
+}
+
 function onMapSelectionChange(mode) {
     const mapType = document.getElementById(mode === 'single' ? 'map-environment' : 'mp-map-env').value;
     const sizeEl = document.getElementById(mode === 'single' ? 'map-size' : 'mp-map-size');
+    const officialMap = (typeof window !== 'undefined' && window.OFFICIAL_SKIRMISH_MAPS) ? window.OFFICIAL_SKIRMISH_MAPS[mapType] : null;
 
     if (mapType.startsWith('custom_') && savedCustomMaps[mapType]) {
         activeCustomMap = savedCustomMaps[mapType];
         if (sizeEl) sizeEl.value = String(activeCustomMap.size || 1500);
+    } else if (officialMap && officialMap.isImportedSageMap) {
+        activeCustomMap = null;
+        if (sizeEl) {
+            sizeEl.value = String(getRecommendedSizeForImportedMap(officialMap));
+        }
     } else {
         activeCustomMap = null;
     }
