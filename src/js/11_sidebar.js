@@ -1344,7 +1344,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
             currentGridSlots = [
                 { id: 'move', name: 'MOVE', badge: 'DIR', action: () => {}, desc: 'Move to coordinates' },
                 { id: 'stop', name: 'STOP', badge: 'HALT', action: () => orderUnitsHalt(), desc: 'Halt all movement' },
-                { id: 'guard', name: 'GUARD', badge: 'DEF', action: () => showNotification('Unit holding defensive guard posture.', 'info'), desc: 'Guard current sector' },
+                { id: 'guard', name: 'GUARD', badge: 'DEF', action: () => orderUnitsGuard(), desc: 'Guard current area (or right-click a sector)' },
                 { id: 'scatter', name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter into spread formation' }
             ];
         }
@@ -1492,7 +1492,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
         currentGridSlots = [
             { name: 'MOVE', badge: 'DIR', action: () => {}, desc: 'Move squad' },
             { name: 'STOP', badge: 'HALT', action: () => orderUnitsHalt(), desc: 'Halt all movement' },
-            { name: 'GUARD', badge: 'DEF', action: () => showNotification('Squad holding defensive perimeter.', 'info'), desc: 'Guard sector' },
+            { name: 'GUARD', badge: 'DEF', action: () => orderUnitsGuard(), desc: 'Guard current area (or right-click a sector)' },
             { name: 'SCATTER', badge: 'EVADE', action: () => scatterSelectedUnits(), desc: 'Scatter squad' },
             { name: 'ALL COMBAT', badge: 'SEL', action: () => selectUnitsByType('combat'), desc: 'Select all combat units' },
             { name: 'HARVESTERS', badge: 'SEL', action: () => selectUnitsByType('harvesters'), desc: 'Select harvesters' }
@@ -3126,12 +3126,79 @@ function orderSelectedTransportsToUnload() {
     updateSidebar();
 }
 
+function orderUnitsGuard(targetPos) {
+    const selectedList = units.filter(u => u.selected && u.health > 0);
+    if (selectedList.length === 0) return;
+
+    if (targetPos) {
+        if (selectedList.length > 1 && typeof applyGroupFormationMove === 'function') {
+            applyGroupFormationMove(selectedList, targetPos);
+        }
+        selectedList.forEach(u => {
+            const isHeli = (u.type === 'comanche' || u.type === 'chinook');
+            const anchor = (selectedList.length > 1 && !u.isAir && u.targetPosition)
+                ? u.targetPosition.clone()
+                : targetPos.clone();
+            u.guardPoint = anchor.clone();
+            u.guardRadius = u.isAir
+                ? (isHeli ? Math.max(42, (u.scanRange || 26) * 1.55) : Math.max(55, (u.scanRange || 35) * 1.65))
+                : Math.max(36, (u.scanRange || 24) * 1.45);
+            u.combatTarget = null;
+            u.pilotTarget = null;
+            u.taskState = 'Guarding';
+            if (u.isAir) {
+                u.targetPosition.copy(anchor);
+                if (!u.patrolCenter) u.patrolCenter = anchor.clone();
+                else u.patrolCenter.copy(anchor);
+                u.airState = (u.airState === 'landed') ? 'taking_off' : 'flying';
+            } else if (selectedList.length === 1) {
+                const bridges = typeof findBridgeCrossingsForPath === 'function' ? findBridgeCrossingsForPath(u.mesh.position, anchor) : null;
+                if (bridges && bridges.length > 0) {
+                    u.waypoints = [...bridges.filter(Boolean), anchor.clone()];
+                    u.targetPosition.copy(u.waypoints.shift());
+                } else {
+                    u.waypoints = [];
+                    u.targetPosition.copy(anchor);
+                }
+            }
+        });
+        guardModeActive = false;
+        playUSASound('acknowledge');
+        showNotification(`Guarding assigned sector (${selectedList.length} unit${selectedList.length > 1 ? 's' : ''}).`, 'info');
+        return;
+    }
+
+    // Clicked GUARD button directly: guard current position/patrol center AND arm Guard cursor for optional sector click
+    selectedList.forEach(u => {
+        const isHeli = (u.type === 'comanche' || u.type === 'chinook');
+        const anchor = (u.isAir && !isHeli && u.patrolCenter) ? u.patrolCenter.clone() : u.mesh.position.clone();
+        u.guardPoint = anchor.clone();
+        u.guardRadius = u.isAir
+            ? (isHeli ? Math.max(42, (u.scanRange || 26) * 1.55) : Math.max(55, (u.scanRange || 35) * 1.65))
+            : Math.max(36, (u.scanRange || 24) * 1.45);
+        u.combatTarget = null;
+        u.taskState = 'Guarding';
+        if (u.isAir) {
+            if (!u.patrolCenter) u.patrolCenter = anchor.clone();
+            else u.patrolCenter.copy(anchor);
+            u.targetPosition.copy(anchor);
+            if (u.airState === 'attacking') u.airState = isHeli ? 'flying' : 'circling';
+        }
+    });
+    guardModeActive = true;
+    attackMoveMode = false;
+    playUSASound('acknowledge');
+    showNotification('GUARD ACTIVE: Protecting current area — or right-click any sector to guard it.', 'info');
+}
+window.orderUnitsGuard = orderUnitsGuard;
+
 function orderUnitsHalt() {
     units.forEach(u => {
             if (u.selected) {
                 u.targetPosition.copy(u.mesh.position);
                 u.waypoints = [];
                 u.combatTarget = null;
+                u.guardPoint = null;
                 u.pilotTarget = null;
                 u.embarkTarget = null;
                 u.captureTarget = null;
@@ -3139,6 +3206,7 @@ function orderUnitsHalt() {
                 if (u.type === 'truck' || u.type === 'worker' || u.type === 'chinook') u.aiState = 'Idle';
             }
     });
+    guardModeActive = false;
     playUSASound('acknowledge');
     showNotification('Unit movement halted.', 'info');
 }
@@ -5670,6 +5738,7 @@ function applyGroupFormationMove(selectedList, groundHit) {
             unit.targetPosition.copy(groundHit);
         }
         unit.combatTarget = null;
+        unit.guardPoint = null;
         unit.taskState = 'Moving';
         if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
             unit.targetStructure.dozerRef = null; unit.targetStructure = null;
@@ -5796,6 +5865,7 @@ function applyGroupFormationMove(selectedList, groundHit) {
             }
 
             unit.combatTarget = null;
+            unit.guardPoint = null;
             unit.taskState = 'Moving';
             if (unit.targetStructure && unit.targetStructure.dozerRef === unit) {
                 unit.targetStructure.dozerRef = null; unit.targetStructure = null;

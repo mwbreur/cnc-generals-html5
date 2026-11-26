@@ -2575,10 +2575,12 @@ function issueMoveCommand(e) {
             const targetPos = (targetedEnemy.position || targetedEnemy.mesh.position).clone();
             const targetRadius = targetedEnemy.radius || 4;
 
+            if (typeof guardModeActive !== 'undefined') guardModeActive = false;
             let _attackPathCount = 0;
             units.forEach((unit, idx) => {
                     if (unit.selected) {
                         unit.combatTarget = targetedEnemy;
+                        unit.guardPoint = null;
                         unit.taskState = 'MovingToAttack';
                         if (unit.isAir) {
                             unit.airState = (unit.airState === 'landed') ? 'taking_off' : 'attacking';
@@ -2931,6 +2933,11 @@ function issueMoveCommand(e) {
         }
 
         const selectedList = units.filter(u => u.selected);
+        if (typeof guardModeActive !== 'undefined' && guardModeActive && typeof orderUnitsGuard === 'function') {
+            orderUnitsGuard(groundHit);
+            updateSidebar();
+            return;
+        }
         if (selectedList.length === 1) {
             const unit = selectedList[0];
             // Alt + Right-Click: Append waypoint to sequential path queue (Official Generals rule)
@@ -2949,6 +2956,7 @@ function issueMoveCommand(e) {
                 unit.targetPosition.copy(groundHit);
             }
             unit.combatTarget = null;
+            unit.guardPoint = null;
             unit.pilotTarget = null;
             unit.taskState = 'Moving';
             if (unit.isAir) {

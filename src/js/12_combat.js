@@ -320,11 +320,17 @@ function processCombatScanning() {
                     : (unit.type === 'scud' ? (unit.minRange || 43.2)
                     : (unit.type === 'inferno' ? 10.8 : 0)));
 
-                if (!canUnitTarget(unit, unit.combatTarget) || unit.combatTarget.health <= 0) {
-                    unit.combatTarget = null; // Target invalid, untargetable, or destroyed
+                const isFixedWing = unit.isAir && unit.type !== 'comanche' && unit.type !== 'chinook';
+                const guardAnchor = unit.guardPoint || (isFixedWing ? unit.patrolCenter : null);
+                const guardLeashR = unit.guardRadius || (isFixedWing ? Math.max(55, (unit.scanRange || 35) * 1.65) : Math.max(38, (unit.scanRange || 26) * 1.5));
+                const targetOutsideGuard = !!(guardAnchor && targetPos && unit.taskState !== 'MovingToAttack'
+                    && Math.hypot(targetPos.x - guardAnchor.x, targetPos.z - guardAnchor.z) > guardLeashR);
+
+                if (!canUnitTarget(unit, unit.combatTarget) || unit.combatTarget.health <= 0 || targetOutsideGuard) {
+                    unit.combatTarget = null; // Target invalid, untargetable, destroyed, or left guard/patrol sector
                 } else if (distance > maxEffectiveRange || distance < minEffectiveRange) {
-                    // Keep explicit MovingToAttack targets while approaching from out of range
-                    if (unit.taskState !== 'MovingToAttack') {
+                    // Keep explicit MovingToAttack targets (and active fixed-wing strafe passes inside their guard leash)
+                    if (unit.taskState !== 'MovingToAttack' && !(isFixedWing && unit.airState === 'attacking')) {
                         unit.combatTarget = null; // Out of range or too close for siege artillery
                     }
                 } else {
@@ -384,12 +390,20 @@ function processCombatScanning() {
                     const candidateEnemies = enemySpatialMap
                         ? _queryCombatSpatialMap(enemySpatialMap, uPos.x, uPos.z, maxQueryRange)
                         : enemyUnits;
+                    const isFixedWingScan = unit.isAir && unit.type !== 'comanche' && unit.type !== 'chinook';
+                    const scanAnchor = unit.guardPoint || (isFixedWingScan ? unit.patrolCenter : null);
+                    const scanLeashR = unit.guardRadius || (isFixedWingScan ? Math.max(55, (unit.scanRange || 35) * 1.65) : Math.max(38, (unit.scanRange || 26) * 1.5));
+                    const scanLeashR2 = scanLeashR * scanLeashR;
                     for (let ei = 0; ei < candidateEnemies.length; ei++) {
                         const enemy = candidateEnemies[ei];
                         if (enemy.health > 0 && enemy.mesh && !isFriendly(unit, enemy)) {
                             if (!canUnitTarget(unit, enemy)) continue;
                             const ep = enemy.mesh.position;
                             const eRad = enemy.radius || 0;
+                            if (scanAnchor) {
+                                const adx = ep.x - scanAnchor.x, adz = ep.z - scanAnchor.z;
+                                if (adx * adx + adz * adz > scanLeashR2) continue;
+                            }
                             const dx = uPos.x - ep.x, dz = uPos.z - ep.z;
                             const effR = unit.scanRange + eRad;
                             const d2 = dx * dx + dz * dz;
@@ -399,8 +413,8 @@ function processCombatScanning() {
                                     unit.combatTarget = enemy;
                                     if (unit.isAir) unit.airState = 'attacking';
                                 }
-                            } else if (unit.taskState === 'Idle' && !unit.isAir && (unit.visionRange || 0) > unit.scanRange && unit.scanRange > 0) {
-                                const visR = unit.visionRange + eRad;
+                            } else if ((unit.taskState === 'Idle' || unit.taskState === 'Guarding') && !unit.isAir && ((unit.visionRange || 0) > unit.scanRange || unit.guardPoint) && unit.scanRange > 0) {
+                                const visR = Math.max(unit.visionRange || 0, unit.guardPoint ? scanLeashR : 0) + eRad;
                                 if (d2 <= visR * visR && d2 < bestSightDist2) {
                                     bestSightDist2 = d2;
                                     bestSightEnemy = enemy;
@@ -408,10 +422,10 @@ function processCombatScanning() {
                             }
                         }
                     }
-                    // Infantry/units with VisionRange > AttackRange (e.g. Rebel 32.4 > 22): advance to weapon range when idle
+                    // Infantry/units with VisionRange > AttackRange (or Guarding units): advance to weapon range when enemy enters guard sector
                     if (!unit.combatTarget && bestSightEnemy && bestSightEnemy.mesh) {
                         unit.combatTarget = bestSightEnemy;
-                        unit.taskState = 'MovingToAttack';
+                        unit.taskState = unit.guardPoint ? 'Guarding' : 'MovingToAttack';
                         unit.targetPosition.copy(bestSightEnemy.mesh.position);
                     }
                     // 2. If no hostile units in range, auto-target nearest hostile structure
@@ -422,6 +436,10 @@ function processCombatScanning() {
                             if (struct.health > 0 && struct.mesh && !isFriendly(unit, struct)) {
                                 const sPos = struct.position || struct.mesh.position;
                                 const sRad = struct.radius || 6;
+                                if (scanAnchor) {
+                                    const sdx = sPos.x - scanAnchor.x, sdz = sPos.z - scanAnchor.z;
+                                    if (sdx * sdx + sdz * sdz > scanLeashR2) continue;
+                                }
                                 const effR = unit.scanRange + sRad;
                                 const dx = uPos.x - sPos.x, dz = uPos.z - sPos.z;
                                 const d2 = dx * dx + dz * dz;

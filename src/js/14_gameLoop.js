@@ -2060,7 +2060,7 @@ function animate() {
                 const isHeli = (unit.type === 'comanche' || unit.type === 'chinook');
 
                 if (!unit.patrolCenter) unit.patrolCenter = unit.mesh.position.clone();
-                if (!unit.circleRadius) unit.circleRadius = isHeli ? 11.0 : 16.0;
+                if (!unit.circleRadius) unit.circleRadius = isHeli ? 11.0 : 30.0;
                 if (unit.circleAngle === undefined) unit.circleAngle = Math.random() * Math.PI * 2;
                 if (!unit.airState || unit.airState === 'none') {
                     unit.airState = isHeli ? 'hovering' : 'circling';
@@ -2166,8 +2166,15 @@ function animate() {
                         unit.ammo = Math.min(unit.maxAmmo || 2, (unit.ammo || 0) + 1);
                         if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
                         if (unit.ammo >= (unit.maxAmmo || 2)) {
-                            unit.airState = 'landed';
-                            unit.taskState = 'Idle';
+                            if (unit.guardPoint) {
+                                unit.targetPosition.copy(unit.guardPoint);
+                                unit.patrolCenter.copy(unit.guardPoint);
+                                unit.airState = 'taking_off';
+                                unit.taskState = 'Guarding';
+                            } else {
+                                unit.airState = 'landed';
+                                unit.taskState = 'Idle';
+                            }
                             if (typeof playAudio === 'function') playAudio('gui_blip', { volume: 0.45 });
                         }
                     }
@@ -2212,19 +2219,40 @@ function animate() {
                 // 4. Attacking an Enemy Target
                 if (unit.airState === 'attacking') {
                     const tPos = unit.combatTarget && (unit.combatTarget.position || (unit.combatTarget.mesh && unit.combatTarget.mesh.position));
-                    if (!unit.combatTarget || !tPos || unit.combatTarget.health <= 0) {
+                    const returnAnchor = unit.guardPoint || (!isHeli ? unit.patrolCenter : null);
+                    const leashR = unit.guardRadius || (isHeli ? Math.max(42, (unit.scanRange || 26) * 1.55) : Math.max(55, (unit.scanRange || 35) * 1.65));
+                    const outOfSector = !!(returnAnchor && tPos && unit.taskState !== 'MovingToAttack'
+                        && Math.hypot(tPos.x - returnAnchor.x, tPos.z - returnAnchor.z) > leashR);
+                    if (!unit.combatTarget || !tPos || unit.combatTarget.health <= 0 || outOfSector) {
                         unit.combatTarget = null;
                         unit.planeAttackPhase = null;
-                        if (isHeli) {
+                        if (returnAnchor) {
+                            unit.targetPosition.copy(returnAnchor);
+                            const distToAnchor = Math.hypot(returnAnchor.x - unit.mesh.position.x, returnAnchor.z - unit.mesh.position.z);
+                            if (isHeli) {
+                                unit.airState = distToAnchor > 3.0 ? 'flying' : 'hovering';
+                            } else {
+                                unit.patrolCenter.copy(returnAnchor);
+                                const orbitR = unit.circleRadius || 30.0;
+                                if (distToAnchor > orbitR * 1.35) {
+                                    unit.airState = 'flying';
+                                } else {
+                                    unit.airState = 'circling';
+                                    unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
+                                }
+                            }
+                            unit.taskState = unit.guardPoint ? 'Guarding' : 'Idle';
+                        } else if (isHeli) {
                             unit.airState = 'hovering';
                             unit.targetPosition.copy(unit.mesh.position);
+                            unit.taskState = 'Idle';
                         } else {
                             unit.airState = 'circling';
                             unit.patrolCenter.copy(unit.mesh.position);
                             unit.targetPosition.copy(unit.mesh.position);
                             unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
+                            unit.taskState = 'Idle';
                         }
-                        unit.taskState = 'Idle';
                     } else if (isHeli) {
                         // --- HELICOPTERS (Comanche): Strafe sideways while facing and firing on target ---
                         const dxA = tPos.x - unit.mesh.position.x;
@@ -2368,7 +2396,7 @@ function animate() {
                     const dx = unit.targetPosition.x - unit.mesh.position.x;
                     const dz = unit.targetPosition.z - unit.mesh.position.z;
                     const dist2D = Math.hypot(dx, dz);
-                    const stopThreshold = isHeli ? 1.5 : 4.0;
+                    const stopThreshold = isHeli ? 1.5 : Math.max(6.0, (unit.circleRadius || 30.0) * 0.85);
 
                     if (dist2D > stopThreshold) {
                         const dirX = dx / dist2D;
@@ -2406,7 +2434,7 @@ function animate() {
                                 unit.circleAngle = Math.atan2(unit.mesh.position.z - unit.patrolCenter.z, unit.mesh.position.x - unit.patrolCenter.x);
                                 unit.airState = 'circling';
                             }
-                            unit.taskState = 'Idle';
+                            unit.taskState = unit.guardPoint ? 'Guarding' : 'Idle';
                         }
                     }
                 }
@@ -2420,8 +2448,8 @@ function animate() {
                     } else {
                         const targetOrbitY = groundY + cruiseAlt + Math.sin(animTime * 2.0 + unit.mesh.id) * 0.14;
                         unit.mesh.position.y += (targetOrbitY - unit.mesh.position.y) * 0.08;
-                        const orbitR = unit.circleRadius || 16.0;
-                        const orbitSpeed = unit.speed * 0.75 * combatDeltaScale;
+                        const orbitR = unit.circleRadius || 30.0;
+                        const orbitSpeed = unit.speed * 0.85 * combatDeltaScale;
                         const angularSpeed = orbitSpeed / orbitR;
 
                         unit.circleAngle = (unit.circleAngle || 0) + angularSpeed;
@@ -2451,7 +2479,7 @@ function animate() {
                         unit.mesh.rotation.y += diff * 0.16;
                         unit.mesh.rotation.order = 'YXZ';
                         unit.mesh.rotation.x = 0;
-                        unit.mesh.rotation.z += (-0.28 - unit.mesh.rotation.z) * 0.12;
+                        unit.mesh.rotation.z += (-0.24 - unit.mesh.rotation.z) * 0.12;
                     }
                 }
 
@@ -2511,9 +2539,46 @@ function animate() {
                         }
                     }
                 } else {
-                    // Target destroyed or lost: resume idle
+                    // Target destroyed or lost: resume idle or return to guard post
                     unit.combatTarget = null;
-                    unit.taskState = 'Idle';
+                    if (unit.guardPoint) {
+                        unit.taskState = 'Guarding';
+                        unit.targetPosition.copy(unit.guardPoint);
+                    } else {
+                        unit.taskState = 'Idle';
+                    }
+                }
+            }
+
+            // --- GUARD POST RETURN & LEASH FOR GROUND UNITS ---
+            if (!unit.isAir && unit.guardPoint && unit.taskState !== 'MovingToAttack' && unit.taskState !== 'Building' && unit.taskState !== 'Capturing') {
+                if (unit.combatTarget && unit.combatTarget.health > 0 && unit.combatTarget.mesh) {
+                    const gPos = unit.combatTarget.position || unit.combatTarget.mesh.position;
+                    const gDist = Math.hypot(gPos.x - unit.guardPoint.x, gPos.z - unit.guardPoint.z);
+                    const gLeash = unit.guardRadius || Math.max(36, (unit.scanRange || 24) * 1.45);
+                    if (gDist > gLeash) {
+                        unit.combatTarget = null;
+                        unit.targetPosition.copy(unit.guardPoint);
+                        unit.taskState = 'Guarding';
+                    } else {
+                        const curDist = Math.hypot(gPos.x - unit.mesh.position.x, gPos.z - unit.mesh.position.z);
+                        const tRad = unit.combatTarget.radius || 0;
+                        if (curDist <= (unit.scanRange + tRad - 1.5)) {
+                            unit.waypoints = [];
+                            unit.targetPosition.x = unit.mesh.position.x;
+                            unit.targetPosition.z = unit.mesh.position.z;
+                        } else {
+                            unit.targetPosition.x = gPos.x;
+                            unit.targetPosition.z = gPos.z;
+                        }
+                    }
+                } else {
+                    unit.combatTarget = null;
+                    const distHome = Math.hypot(unit.guardPoint.x - unit.mesh.position.x, unit.guardPoint.z - unit.mesh.position.z);
+                    if (distHome > 3.5) {
+                        unit.targetPosition.copy(unit.guardPoint);
+                        unit.taskState = 'Guarding';
+                    }
                 }
             }
 
@@ -3435,7 +3500,7 @@ function processEnemyMovement() {
             if (enemy.isAir) {
                 const isHeli = (enemy.type === 'comanche' || enemy.type === 'chinook');
                 if (!enemy.patrolCenter) enemy.patrolCenter = enemy.mesh.position.clone();
-                if (!enemy.circleRadius) enemy.circleRadius = isHeli ? 11.0 : 16.0;
+                if (!enemy.circleRadius) enemy.circleRadius = isHeli ? 11.0 : 30.0;
                 if (enemy.circleAngle === undefined) enemy.circleAngle = Math.random() * Math.PI * 2;
                 if (!enemy.airState) enemy.airState = isHeli ? 'hovering' : 'circling';
 
@@ -3537,7 +3602,7 @@ function processEnemyMovement() {
                     const dx = enemy.targetPosition.x - enemy.mesh.position.x;
                     const dz = enemy.targetPosition.z - enemy.mesh.position.z;
                     const distToGoal = Math.hypot(dx, dz);
-                    const arriveDist = isHeli ? 1.5 : Math.max(4.0, (enemy.circleRadius || 16.0) * 0.65);
+                    const arriveDist = isHeli ? 1.5 : Math.max(6.0, (enemy.circleRadius || 30.0) * 0.85);
 
                     if (distToGoal > arriveDist) {
                         const dirX = dx / distToGoal;
@@ -3575,8 +3640,8 @@ function processEnemyMovement() {
                     enemy.mesh.rotation.z += (0 - enemy.mesh.rotation.z) * 0.12;
                 } else {
                     // Smooth circling holding pattern for fixed-wing AI airplanes
-                    const orbitR = enemy.circleRadius || 16.0;
-                    const cSpeed = enemy.speed * 0.75 * combatDeltaScale;
+                    const orbitR = enemy.circleRadius || 30.0;
+                    const cSpeed = enemy.speed * 0.85 * combatDeltaScale;
                     enemy.circleAngle = (enemy.circleAngle || 0) + (cSpeed / orbitR);
                     if (enemy.circleAngle > Math.PI * 2) enemy.circleAngle -= Math.PI * 2;
                     const tX = enemy.patrolCenter.x + Math.cos(enemy.circleAngle) * orbitR;
@@ -3598,7 +3663,7 @@ function processEnemyMovement() {
                     enemy.mesh.rotation.y += diff * 0.16;
                     enemy.mesh.rotation.order = 'YXZ';
                     enemy.mesh.rotation.x += (0 - enemy.mesh.rotation.x) * 0.12;
-                    enemy.mesh.rotation.z += (-0.28 - enemy.mesh.rotation.z) * 0.12;
+                    enemy.mesh.rotation.z += (-0.24 - enemy.mesh.rotation.z) * 0.12;
                 }
                 return;
             }
