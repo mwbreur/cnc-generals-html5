@@ -3894,7 +3894,8 @@ function strikeWithSuperweapon(structure, targetPosition) {
             pitOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), structure.rotationY || 0);
             uplinkPos = structure.position.clone().add(pitOffset);
         }
-        structure._particleFiringUntil = buildingTick + 675;
+        // Official INIZH.big ParticleUplinkCannonUpdate: BeamTravelTime (2.5s = 150t) + TotalFiringTime (10s = 600t) = 750 ticks
+        structure._particleFiringUntil = buildingTick + 750;
         animateParticleCannonStrike(targetPosition, 600, uplinkPos, !structure.isAI);
     } else if (sType === 'nukeSilo') {
         animateNukeStrike(structure.position, targetPosition);

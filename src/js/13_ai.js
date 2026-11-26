@@ -2412,9 +2412,10 @@ function issueMoveCommand(e) {
         const beamHit = getGroundIntersectPoint();
         if (beamHit) {
             const nowMs = Date.now();
-            const isFast = (e.detail >= 2) || (window._lastParticleBeamClickMs && (nowMs - window._lastParticleBeamClickMs) < 350);
+            const isFast = (e.detail >= 2) || (window._lastParticleBeamClickMs && (nowMs - window._lastParticleBeamClickMs) < 500);
             window._lastParticleBeamClickMs = nowMs;
-            window.activeParticleCannonSpeed = isFast ? 0.84 : 0.42;
+            window.activeParticleCannonSpeed = isFast ? 0.50 : 0.25;
+            window.activeParticleCannonManual = true;
             window.activeParticleCannonControl = true;
             if (typeof setParticleBeamCursor === 'function') setParticleBeamCursor(true);
             window.activeParticleCannonTarget.copy(beamHit);

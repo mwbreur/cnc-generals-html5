@@ -3110,14 +3110,17 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
         setTimeout(() => { if (fl.parentNode) fl.parentNode.removeChild(fl); }, fadeMs + 60);
     };
 
-    const UPLINK_DELAY = uplinkPos ? 72 : 0; // 1.2s upward beam travel to orbital satellite before reflection strike
+    // Official INIZH.big ParticleUplinkCannonUpdate: BeamTravelTime = 2500ms (150 ticks), WidthGrowTime = 2000ms (120 ticks), TotalFiringTime = 10000ms (600 ticks)
+    const UPLINK_DELAY = uplinkPos ? 150 : 0;
+    const WIDTH_GROW_TICKS = 120;
     const group = new THREE.Group();
     group.position.copy(targetPos);
     group.visible = (UPLINK_DELAY === 0);
     window.activeParticleCannonTarget = targetPos.clone();
+    window.activeParticleCannonManual = false;
     window.activeParticleCannonPlayerOwned = !!isPlayerOwned;
     window.activeParticleCannonControl = !!isPlayerOwned;
-    window.activeParticleCannonSpeed = 0.42;
+    window.activeParticleCannonSpeed = 0.24; // Official ManualDrivingSpeed = 20 (double-click fast = 40)
     if (isPlayerOwned) setParticleBeamCursor(true);
 
     const addBlend = typeof THREE.AdditiveBlending !== 'undefined' ? { blending: THREE.AdditiveBlending } : {};
@@ -3271,6 +3274,7 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
 
     const disposeParticleBeam = () => {
         window.activeParticleCannonTarget = null;
+        window.activeParticleCannonManual = false;
         window.activeParticleCannonPlayerOwned = false;
         window.activeParticleCannonControl = false;
         if (isPlayerOwned) setParticleBeamCursor(false);
@@ -3291,6 +3295,13 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
     let impactFlashSphere = null;
     let impactFlashLife = 0;
     const originCenter = targetPos.clone();
+    const initialTarget = targetPos.clone();
+    // Official SwathOfDeathDistance = 200 (43.2u) & SwathOfDeathAmplitude = 50 (10.8u) S-curve centered through targetPos
+    const swathAngle = uplinkPos ? Math.atan2(targetPos.z - uplinkPos.z, targetPos.x - uplinkPos.x) : 0;
+    const swathFwdX = Math.cos(swathAngle), swathFwdZ = Math.sin(swathAngle);
+    const swathSideX = -swathFwdZ, swathSideZ = swathFwdX;
+    const SWATH_HALF_DIST = 21.6;
+    const SWATH_AMP = 10.8;
     const lastScorchPos = new THREE.Vector3(1e9, 0, 1e9);
 
     if (strikeStarted) {
@@ -3361,29 +3372,46 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                     impactFlashSphere.material.opacity = 0.98 * (1 - fp);
                     if (impactFlashLife <= 0) impactFlashSphere.visible = false;
                 }
-                // Sit steadily on target when uncontrolled, or sweep in a straight line toward player's steered target
-                if (window.activeParticleCannonTarget) {
+                // Official ParticleUplinkCannonUpdate: auto-carve SwathOfDeath S-curve unless player manually steers!
+                const strikeTicks = Math.max(0, elapsed - UPLINK_DELAY);
+                const hasManualSteer = window.activeParticleCannonTarget && (
+                    window.activeParticleCannonManual ||
+                    Math.hypot(window.activeParticleCannonTarget.x - initialTarget.x, window.activeParticleCannonTarget.z - initialTarget.z) > 1.5
+                );
+                if (hasManualSteer && window.activeParticleCannonTarget) {
+                    window.activeParticleCannonManual = true;
                     const dx = window.activeParticleCannonTarget.x - originCenter.x;
                     const dz = window.activeParticleCannonTarget.z - originCenter.z;
                     const dist = Math.hypot(dx, dz);
                     if (dist > 0.45) {
-                        const steerSpeed = window.activeParticleCannonSpeed || 0.42;
+                        const steerSpeed = window.activeParticleCannonSpeed || 0.24;
                         const step = Math.min(steerSpeed, dist);
                         originCenter.x += (dx / dist) * step;
                         originCenter.z += (dz / dist) * step;
                     }
+                } else {
+                    // Official SwathOfDeath: smooth sine wave passing through initialTarget at midpoint
+                    const sProg = Math.min(1, strikeTicks / Math.max(1, duration));
+                    const along = (sProg * 2 - 1) * SWATH_HALF_DIST;
+                    const across = Math.sin(sProg * Math.PI * 2) * SWATH_AMP;
+                    originCenter.x = initialTarget.x + swathFwdX * along + swathSideX * across;
+                    originCenter.z = initialTarget.z + swathFwdZ * along + swathSideZ * across;
                 }
                 group.position.x = originCenter.x;
                 group.position.z = originCenter.z;
                 group.position.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(group.position.x, group.position.z) : 0;
 
-                const pulse = 0.92 + Math.sin(life * 0.6) * 0.16;
+                // Official WidthGrowTime = 2000ms (120 ticks) grow-in at start & shrink-out at end
+                const growFrac = Math.min(1, strikeTicks / WIDTH_GROW_TICKS);
+                const shrinkFrac = Math.min(1, life / WIDTH_GROW_TICKS);
+                const widthEnv = Math.max(0.12, Math.min(growFrac, shrinkFrac));
+                const pulse = (0.92 + Math.sin(life * 0.6) * 0.16) * widthEnv;
                 coreBeam.scale.set(pulse, 1, pulse);
-                beam.scale.set(1.0 + Math.cos(life * 0.4) * 0.18, 1, 1.0 + Math.cos(life * 0.4) * 0.18);
-                outerBloom.scale.set(1.0 + Math.sin(life * 0.35) * 0.22, 1, 1.0 + Math.sin(life * 0.35) * 0.22);
-                flareDisc.scale.setScalar(0.92 + Math.sin(life * 0.5) * 0.22);
-                plasmaDome.scale.set(1.3 + Math.sin(life * 0.45) * 0.18, 1.8 + Math.cos(life * 0.55) * 0.25, 1.3 + Math.sin(life * 0.45) * 0.18);
-                impactCore.scale.setScalar(0.85 + Math.cos(life * 0.7) * 0.2);
+                beam.scale.set((1.0 + Math.cos(life * 0.4) * 0.18) * widthEnv, 1, (1.0 + Math.cos(life * 0.4) * 0.18) * widthEnv);
+                outerBloom.scale.set((1.0 + Math.sin(life * 0.35) * 0.22) * widthEnv, 1, (1.0 + Math.sin(life * 0.35) * 0.22) * widthEnv);
+                flareDisc.scale.setScalar((0.92 + Math.sin(life * 0.5) * 0.22) * widthEnv);
+                plasmaDome.scale.set((1.3 + Math.sin(life * 0.45) * 0.18) * widthEnv, (1.8 + Math.cos(life * 0.55) * 0.25) * widthEnv, (1.3 + Math.sin(life * 0.45) * 0.18) * widthEnv);
+                impactCore.scale.setScalar((0.85 + Math.cos(life * 0.7) * 0.2) * widthEnv);
 
                 rings.forEach((r, idx) => {
                         r.rotation.z += 0.16 * (idx % 2 === 0 ? 1 : -1);
@@ -3430,12 +3458,15 @@ function animateParticleCannonStrike(targetPos, duration = 600, uplinkPos = null
                     triggerScreenShake(0.35);
                 }
 
-                // Continuous molten scorch trail carved along the beam's dragged path (iconic Zero Hour Particle Cannon burn scar)
+                // Continuous molten scorch trail + official DamagePulseRemnantObjectName (ParticleUplinkCannonTrailRemnant)
                 if (life % 4 === 0) {
                     const dxS = group.position.x - lastScorchPos.x;
                     const dzS = group.position.z - lastScorchPos.z;
                     if (dxS * dxS + dzS * dzS >= 2.25 || life % 24 === 0) {
-                        spawnCraterDecal(group.position, 5.4, 1800, 'ion');
+                        spawnCraterDecal(group.position, 5.4 * Math.max(0.5, widthEnv), 1800, 'ion');
+                        if (typeof spawnParticleFirePatch === 'function' && life % 12 === 0) {
+                            spawnParticleFirePatch(group.position);
+                        }
                         lastScorchPos.copy(group.position);
                     }
                 }
@@ -3664,14 +3695,53 @@ function animateNukeStrike(siloPos, targetPos) {
                             life: 120,
                             update() {
                                 detTick++;
-                                // Blasts 1-5 (580ms-1000ms = ticks 35..60): fiery debris bursts along expanding shockwave front
-                                if (detTick === 35 || detTick === 43 || detTick === 51 || detTick === 60) {
-                                    const ringR = detTick === 35 ? 13.0 : (detTick === 43 ? 22.0 : (detTick === 51 ? 31.0 : 39.0));
+                                // Official NeutronMissileSlowDeathBehavior Blasts 1-5 (580..1000ms = ticks 35, 40, 43, 51, 60):
+                                // Expanding blast front pushes nearby ground units outward & topples trees!
+                                if (detTick === 35 || detTick === 40 || detTick === 43 || detTick === 51 || detTick === 60) {
+                                    const ringR = detTick === 35 ? 13.0 : (detTick === 40 ? 19.4 : (detTick === 43 ? 25.9 : (detTick === 51 ? 32.4 : 38.9)));
+                                    const pushForce = detTick === 35 ? 1.8 : (detTick === 40 ? 1.45 : (detTick === 43 ? 1.15 : (detTick === 51 ? 0.9 : 0.7)));
                                     for (let k = 0; k < 6; k++) {
                                         const a = (k / 6) * Math.PI * 2 + detTick * 0.3;
                                         const p = new THREE.Vector3(blastCenter.x + Math.cos(a) * ringR, 0, blastCenter.z + Math.sin(a) * ringR);
                                         p.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(p.x, p.z) + 0.6 : 0.6;
                                         if (typeof spawnSmokePuff === 'function') spawnSmokePuff(p, 0xff793f, 1.8);
+                                    }
+                                    // Physical shockwave push on ground units inside the expanding wave band
+                                    const innerBandSq = Math.max(0, ringR - 7.5) * Math.max(0, ringR - 7.5);
+                                    const outerBandSq = ringR * ringR;
+                                    const uLists = [];
+                                    if (typeof units !== 'undefined') uLists.push(units);
+                                    if (typeof enemyUnits !== 'undefined') uLists.push(enemyUnits);
+                                    for (let li = 0; li < uLists.length; li++) {
+                                        const list = uLists[li];
+                                        for (let ui = 0; ui < list.length; ui++) {
+                                            const u = list[ui];
+                                            if (!u || u.health <= 0 || u.isAir || u.garrisonedIn || !u.mesh) continue;
+                                            const dx = u.mesh.position.x - blastCenter.x;
+                                            const dz = u.mesh.position.z - blastCenter.z;
+                                            const dSq = dx * dx + dz * dz;
+                                            if (dSq > innerBandSq && dSq <= outerBandSq && dSq > 0.01) {
+                                                const invD = 1 / Math.sqrt(dSq);
+                                                u.mesh.position.x += dx * invD * pushForce;
+                                                u.mesh.position.z += dz * invD * pushForce;
+                                                if (u.targetPosition) {
+                                                    u.targetPosition.x += dx * invD * pushForce;
+                                                    u.targetPosition.z += dz * invD * pushForce;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // Topple trees/palms along the shockwave front (official Blast1..5ToppleSpeed)
+                                    if (typeof mapObstacles !== 'undefined' && Array.isArray(mapObstacles) && typeof triggerTreeTopple === 'function') {
+                                        for (let oi = 0; oi < mapObstacles.length; oi++) {
+                                            const ob = mapObstacles[oi];
+                                            if (!ob || !ob.crushable || ob.toppled || !ob.position) continue;
+                                            const dx = ob.position.x - blastCenter.x;
+                                            const dz = ob.position.z - blastCenter.z;
+                                            if (dx * dx + dz * dz <= outerBandSq) {
+                                                triggerTreeTopple(ob, blastCenter);
+                                            }
+                                        }
                                     }
                                 }
 
@@ -4169,15 +4239,30 @@ function animateScudStormStrike(stormPos, targetPos) {
         });
     };
 
+    // Official INIZH.big ScudStormWeapon 9-point ScatterTarget table (ScatterTargetScalar = 120 * 0.216 = 25.92u)
+    // Shuffled per volley + randomized DelayBetweenShots (Min:100ms Max:1000ms)
+    const hasAnthraxBeta = (typeof researchedTechs !== 'undefined' && researchedTechs.has('anthraxBeta'));
+    const SCUD_SCATTER_SCALAR = 25.92;
+    const scudScatter = [
+        [ 0.000,  0.133], [ 0.133, -0.200], [-0.067,  0.667],
+        [ 0.300,  0.300], [ 0.767,  0.000], [ 0.500, -0.567],
+        [-0.333, -0.800], [-0.600, -0.133], [-0.567,  0.433]
+    ];
+    for (let si = scudScatter.length - 1; si > 0; si--) {
+        const sj = Math.floor(Math.random() * (si + 1));
+        const tmp = scudScatter[si]; scudScatter[si] = scudScatter[sj]; scudScatter[sj] = tmp;
+    }
+
+    let accumDelayMs = 0;
     for (let i = 0; i < 9; i++) {
+        if (i > 0) accumDelayMs += 180 + Math.floor(Math.random() * 620); // Official 100..1000ms organic salvo stagger
+        const launchDelayMs = accumDelayMs;
+        const scPt = scudScatter[i];
         setTimeout(() => {
-                // Wide, inaccurate circular saturation scatter (radius up to ~28u)
-                const randAngle = Math.random() * Math.PI * 2;
-                const randDist = (i === 0) ? (Math.random() * 6.0) : (6.0 + Math.sqrt(Math.random()) * 22.0);
                 const offset = new THREE.Vector3(
-                    Math.cos(randAngle) * randDist,
+                    scPt[0] * SCUD_SCATTER_SCALAR,
                     0,
-                    Math.sin(randAngle) * randDist
+                    scPt[1] * SCUD_SCATTER_SCALAR
                 );
                 const subTarget = targetPos.clone().add(offset);
                 const tubeOffset = new THREE.Vector3(((i % 3) - 1) * 1.6, 2.8, (Math.floor(i / 3) - 1) * 1.6);
@@ -4197,15 +4282,17 @@ function animateScudStormStrike(stormPos, targetPos) {
                         if (typeof revealFogOfWarAt === 'function') revealFogOfWarAt(impactPos, 28, 360);
                         if (typeof triggerScreenShake === 'function') triggerScreenShake(1.05);
 
-                        // Dual fiery HE explosion + emerald/yellow-green Anthrax shockwave ring
+                        // Dual fiery HE explosion + Anthrax (green) or Anthrax Beta (cyan-blue) shockwave ring
+                        const bioColor = hasAnthraxBeta ? 0x00d2ff : 0x4cd137;
+                        const bioRingColor = hasAnthraxBeta ? 0x48dbfb : 0xb8e934;
                         if (typeof spawnEnhancedExplosion === 'function') {
                             spawnEnhancedExplosion(impactPos, 0xff793f, 2.9, true, 'none');
-                            spawnEnhancedExplosion(impactPos, 0x4cd137, 3.8, true, 'none');
+                            spawnEnhancedExplosion(impactPos, bioColor, 3.8, true, 'none');
                         }
                         const gY = typeof getTerrainHeight === 'function' ? getTerrainHeight(impactPos.x, impactPos.z) : 0;
                         const bioGeo = new THREE.RingGeometry(1.5, 3.6, 36);
                         bioGeo.rotateX(-Math.PI / 2);
-                        const bioMat = new THREE.MeshBasicMaterial({ color: 0xb8e934, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
+                        const bioMat = new THREE.MeshBasicMaterial({ color: bioRingColor, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
                         const bioRing = new THREE.Mesh(bioGeo, bioMat);
                         bioRing.position.set(impactPos.x, gY + 0.4, impactPos.z);
                         scene.add(bioRing);
@@ -4216,7 +4303,8 @@ function animateScudStormStrike(stormPos, targetPos) {
                             update() {
                                 bLife--;
                                 const p = 1 - bLife / 28;
-                                bioRing.scale.setScalar(1 + p * 4.4);
+                                const s = 1 + p * 4.4;
+                                bioRing.scale.set(s, 1, s);
                                 bioMat.opacity = 0.85 * (1 - p);
                                 if (bLife <= 0) {
                                     scene.remove(bioRing);
@@ -4228,10 +4316,13 @@ function animateScudStormStrike(stormPos, targetPos) {
                             }
                         });
 
-                        // Official ScudStormDamageWeapon damages ALL units & structures in blast radius (zero-alloc + squared-distance)
+                        // Official INIZH.big ScudStormDamageWeapon / ScudStormDamageWeaponUpgraded:
+                        // PrimaryDamage = 500 (radius 50 * 0.216 = 10.8u), SecondaryDamage = 150 (200 w/ Anthrax Beta) out to 24u falloff
                         const impX = impactPos.x, impZ = impactPos.z;
-                        const uRadSq = 13.5 * 13.5;
-                        const sRadSq = 15.0 * 15.0;
+                        const primR = 10.8;
+                        const secR = 24.0;
+                        const secRSq = secR * secR;
+                        const secDmg = hasAnthraxBeta ? 200 : 150;
                         const uLists = [];
                         if (typeof units !== 'undefined') uLists.push(units);
                         if (typeof enemyUnits !== 'undefined') uLists.push(enemyUnits);
@@ -4243,8 +4334,9 @@ function animateScudStormStrike(stormPos, targetPos) {
                                 const dx = u.mesh.position.x - impX;
                                 const dz = u.mesh.position.z - impZ;
                                 const dSq = dx * dx + dz * dz;
-                                if (dSq <= uRadSq) {
-                                    const dmg = Math.round(185 * Math.max(0.28, 1 - Math.sqrt(dSq) / 14.5));
+                                if (dSq <= secRSq) {
+                                    const d = Math.sqrt(dSq);
+                                    const dmg = d <= primR ? 500 : Math.round(secDmg + (500 - secDmg) * Math.max(0, 1 - (d - primR) / (secR - primR)));
                                     if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, u, dmg, 'EXPLOSIVE');
                                     else u.health -= dmg;
                                 }
@@ -4262,8 +4354,9 @@ function animateScudStormStrike(stormPos, targetPos) {
                                 const dx = sp.x - impX;
                                 const dz = sp.z - impZ;
                                 const dSq = dx * dx + dz * dz;
-                                if (dSq <= sRadSq) {
-                                    const dmg = Math.round(220 * Math.max(0.30, 1 - Math.sqrt(dSq) / 16.0));
+                                if (dSq <= secRSq) {
+                                    const d = Math.sqrt(dSq);
+                                    const dmg = d <= primR ? 500 : Math.round(secDmg + (500 - secDmg) * Math.max(0, 1 - (d - primR) / (secR - primR)));
                                     if (typeof applyCalculatedDamage === 'function') applyCalculatedDamage(null, st, dmg, 'EXPLOSIVE');
                                     else st.health -= dmg;
                                 }
@@ -4271,10 +4364,10 @@ function animateScudStormStrike(stormPos, targetPos) {
                         }
 
                         spawnCraterDecal(impactPos, 5.2, 1200, 'toxin');
-                        // Official INIZH.big ScudStormDamageWeapon FireOCL = OCL_PoisonFieldLarge (35s volumetric green/yellow anthrax mist)
+                        // Official INIZH.big ScudStormDamageWeapon FireOCL = OCL_PoisonFieldLarge (35s volumetric anthrax mist)
                         spawnLingeringToxinCloud(impactPos, 12.5, 2100);
                 });
-            }, i * 380);
+            }, launchDelayMs);
     }
 }
 
