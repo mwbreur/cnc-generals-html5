@@ -1325,26 +1325,43 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
     }
     const playW = Math.max(1, W - 2 * border);
     const playH = Math.max(1, H - 2 * border);
+    // Derive recommended battlefield size from real SAGE playable span (1 cell = 10 SAGE units * 0.216 = 2.16 world units)
+    const playSpan = Math.max(playW, playH);
+    const sageWorldSpan = playSpan * 2.16;
+    const dimRecSize = sageWorldSpan <= 750 ? 600 : (sageWorldSpan <= 1050 ? 900 : (sageWorldSpan <= 1400 ? 1200 : 1600));
+    // Exact proportional SAGE vertical scale: 1 height byte = 0.625 SAGE units across playSpan*10 horizontal SAGE units
+    const heightPerByte = Math.max(0.04, Math.min(0.28, (0.625 / (playSpan * 10)) * dimRecSize));
 
     const sampleVals = [];
-    for (let y = border; y < H - border; y += 4) {
-        for (let x = border; x < W - border; x += 4) {
+    for (let y = border; y < H - border; y += 3) {
+        for (let x = border; x < W - border; x += 3) {
             sampleVals.push(decomp[hmDataStart + y * W + x]);
         }
     }
     sampleVals.sort((a, b) => a - b);
-    const baseByte = sampleVals[Math.floor(sampleVals.length * 0.25)] || 64;
+    // Use true playable median (50th percentile) so ocean/canyon maps don't bias baseline down and clip plateaus
+    const baseByte = sampleVals[Math.floor(sampleVals.length * 0.50)] || 64;
 
-    // Preserve exact original elevation tiers (scale-independent height levels!)
+    // Bilinear-sampled heightmap preserving exact SAGE slope proportions (no staircase jaggedness or plateau clipping)
     const GRID = 97;
     const grid = [];
     for (let r = 0; r < GRID; r++) {
         const row = [];
-        const srcY = Math.min(H - 1, Math.max(0, Math.floor(border + (1 - r / (GRID - 1)) * (playH - 1))));
+        const fy = border + (1 - r / (GRID - 1)) * (playH - 1);
+        const y0 = Math.min(H - 1, Math.max(0, Math.floor(fy)));
+        const y1 = Math.min(H - 1, y0 + 1);
+        const ty = fy - y0;
         for (let c = 0; c < GRID; c++) {
-            const srcX = Math.min(W - 1, Math.max(0, Math.floor(border + (c / (GRID - 1)) * (playW - 1))));
-            const val = decomp[hmDataStart + srcY * W + srcX];
-            const hVal = Math.max(-5.5, Math.min(22.0, (val - baseByte) * 0.155));
+            const fx = border + (c / (GRID - 1)) * (playW - 1);
+            const x0 = Math.min(W - 1, Math.max(0, Math.floor(fx)));
+            const x1 = Math.min(W - 1, x0 + 1);
+            const tx = fx - x0;
+            const b00 = decomp[hmDataStart + y0 * W + x0];
+            const b10 = decomp[hmDataStart + y0 * W + x1];
+            const b01 = decomp[hmDataStart + y1 * W + x0];
+            const b11 = decomp[hmDataStart + y1 * W + x1];
+            const val = (b00 * (1 - tx) + b10 * tx) * (1 - ty) + (b01 * (1 - tx) + b11 * tx) * ty;
+            const hVal = Math.max(-14.0, Math.min(48.0, (val - baseByte) * heightPerByte));
             row.push(Math.round(hVal * 100) / 100);
         }
         grid.push(row);
@@ -1467,7 +1484,7 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
     const biome = (snowHits > greenHits && snowHits > desertHits) ? 'snow' : (greenHits > desertHits ? 'temperate' : 'desert');
     const theme = biome === 'temperate' ? 'jungle' : biome;
     const players = Math.max(2, Math.min(8, rawSpawns.length));
-    const recSize = players <= 2 ? 600 : (players <= 4 ? 900 : (players <= 6 ? 1200 : 1600));
+    const recSize = dimRecSize;
 
     return {
         key: mapKey,
