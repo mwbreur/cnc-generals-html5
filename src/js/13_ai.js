@@ -750,11 +750,14 @@ function initAICommanders() {
         const startMoneyEl = typeof document !== 'undefined' ? document.getElementById('starting-money') : null;
         const lobbyMoney = startMoneyEl ? parseInt(startMoneyEl.value, 10) : 10000;
         const startCredits = (!isNaN(lobbyMoney) && lobbyMoney > 0) ? lobbyMoney : (difficulty === 'hard' ? 12000 : difficulty === 'easy' ? 7500 : 10000);
-        // Place rally point 28 units in front of basePos toward map center (never behind CC or into map border)
+        // Place rally point 48 units in front of basePos toward map center (outside base buildings so units never jam inside base!)
         const toCenter = new THREE.Vector3(-basePos.x, 0, -basePos.z);
         if (toCenter.lengthSq() < 1) toCenter.set(1, 0, 1);
         toCenter.normalize();
-        const rallyPos = basePos.clone().addScaledVector(toCenter, 28);
+        const rawRally = basePos.clone().addScaledVector(toCenter, 48);
+        const rallyPos = (typeof adjustToPossibleDestination === 'function')
+            ? adjustToPossibleDestination(rawRally, null)
+            : rawRally;
         rallyPos.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(rallyPos.x, rallyPos.z) : (basePos.y || 0);
 
         aiCommanders[ownerId] = {
@@ -1198,6 +1201,11 @@ function processAIBaseBuildingAndEconomy(cmd, myUnits, myStructures, hostileUnit
                     if (dx * dx + dz * dz < minD * minD) return false;
                 }
             }
+            if (cmd.rallyPoint) {
+                const rdx = cx - cmd.rallyPoint.x, rdz = cz - cmd.rallyPoint.z;
+                const rMin = newR + 14.0;
+                if (rdx * rdx + rdz * rdz < rMin * rMin) return false;
+            }
             return true;
         };
 
@@ -1536,11 +1544,16 @@ function processEnemyAIEngine() {
                     }
                 }
                 if (cmd._reconLaunched) {
-                    // Check if the squad needs a new shared exploration waypoint
-                    const needNewGoal = !cmd._reconGoal || scoutUnits.some(su => su.mesh.position.distanceTo(cmd._reconGoal) < 18.0);
+                    cmd._reconGoalTicks = (cmd._reconGoalTicks || 0) + 1;
+                    // Advance to next exploration waypoint on arrival OR after timeout (prevents scouts stalling forever on obstacles)
+                    const needNewGoal = !cmd._reconGoal || cmd._reconGoalTicks >= 45 || scoutUnits.some(su => su.mesh.position.distanceTo(cmd._reconGoal) < 20.0);
                     if (needNewGoal) {
+                        cmd._reconGoalTicks = 0;
                         if (cmd.unexploredWaypoints.length > 0) {
                             cmd._reconGoal = cmd.unexploredWaypoints.shift().clone();
+                        } else if (cmd.candidateEnemySpawns && cmd.candidateEnemySpawns.length > 0) {
+                            cmd._reconCycleIdx = ((cmd._reconCycleIdx || 0) + 1) % cmd.candidateEnemySpawns.length;
+                            cmd._reconGoal = cmd.candidateEnemySpawns[cmd._reconCycleIdx].clone();
                         } else {
                             const half = mapSize * 0.35;
                             const rx = (simRandom() * 2 - 1) * half;
@@ -1682,10 +1695,10 @@ function processEnemyAIEngine() {
             });
 
             const targetWaveSize = ZERO_HOUR_AI_DATA.maxStrikeTeamSize[cmd.difficulty] || 8;
-            const minTimeoutWaveSize = Math.max(4, targetWaveSize - 2);
+            const minTimeoutWaveSize = Math.max(3, Math.floor(targetWaveSize * 0.5));
             const hasKnownEnemy = (cmd.discoveredEnemyTargets.length > 0 || cmd.discoveredEnemyBases.length > 0);
             const waveWaitTicks = (cmd.stagingTeam.length >= minTimeoutWaveSize && canLaunchOffensive) ? (cmd.attackWaveTimer = (cmd.attackWaveTimer || 0) + 1) : (cmd.attackWaveTimer = 0);
-            const waveReady = canLaunchOffensive && (cmd.stagingTeam.length >= targetWaveSize || (cmd.stagingTeam.length >= minTimeoutWaveSize && waveWaitTicks >= 110));
+            const waveReady = canLaunchOffensive && (cmd.stagingTeam.length >= targetWaveSize || (cmd.stagingTeam.length >= minTimeoutWaveSize && waveWaitTicks >= 55));
 
             if (waveReady) {
                 // If scouts haven't found an enemy base yet, pick a search-and-destroy sweep point (enemy spawn) so AI never huddles forever!
@@ -1787,12 +1800,34 @@ function processEnemyAIEngine() {
                     }
 
                     // Active search-and-destroy sweep when wave launched before enemy base was sighted
-                    if (enemy._releasedForAttack && enemy._sweepTarget && !hasKnownEnemy) {
-                        if (enemy.mesh.position.distanceTo(enemy._sweepTarget) <= 14) {
-                            enemy._sweepTarget = null;
-                        } else if (!enemy.waypoints || enemy.waypoints.length === 0) {
-                            if (enemy.mesh.position.distanceTo(enemy.targetPosition) <= 4) {
+                    // Continuously cycle across candidate enemy spawns / map sectors instead of recalling back to base!
+                    if (enemy._releasedForAttack && !hasKnownEnemy) {
+                        const needNextSweep = !enemy._sweepTarget || enemy.mesh.position.distanceTo(enemy._sweepTarget) <= 18;
+                        if (needNextSweep) {
+                            const pool = (cmd.candidateEnemySpawns && cmd.candidateEnemySpawns.length > 0) ? cmd.candidateEnemySpawns : cmd.unexploredWaypoints;
+                            if (pool && pool.length > 0) {
+                                enemy._sweepSlotIdx = ((enemy._sweepSlotIdx !== undefined ? enemy._sweepSlotIdx : (cmd._sweepIdx || 0)) + 1) % pool.length;
+                                enemy._sweepTarget = pool[enemy._sweepSlotIdx].clone();
+                            } else {
+                                const half = mapSize * 0.32;
+                                const sx = (simRandom() * 2 - 1) * half;
+                                const sz = (simRandom() * 2 - 1) * half;
+                                enemy._sweepTarget = new THREE.Vector3(sx, typeof getTerrainHeight === 'function' ? getTerrainHeight(sx, sz) : 0, sz);
+                            }
+                            if (enemy.isAir) {
+                                enemy.airState = 'flying';
+                                enemy.patrolCenter = enemy._sweepTarget.clone();
+                                enemy.targetPosition.copy(enemy._sweepTarget);
+                            } else {
                                 assignAIGroundRoute(enemy, enemy._sweepTarget);
+                            }
+                        } else if (!enemy.waypoints || enemy.waypoints.length === 0) {
+                            if (enemy.mesh.position.distanceTo(enemy.targetPosition) <= 5) {
+                                if (enemy.isAir) {
+                                    enemy.targetPosition.copy(enemy._sweepTarget);
+                                } else {
+                                    assignAIGroundRoute(enemy, enemy._sweepTarget);
+                                }
                             }
                         }
                         return;
