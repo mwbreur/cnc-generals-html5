@@ -1856,6 +1856,10 @@ function doesMapMatchBattlefieldSize(mapKey, mapSize) {
     if (['desert', 'jungle', 'snow', 'city', 'random'].includes(mapKey)) {
         return true;
     }
+    // Imported community .zip/.map files (2P, 3P, 4P, 5P, 6P, 7P, 8P) are always selectable in any size category
+    if (typeof window !== 'undefined' && window.OFFICIAL_SKIRMISH_MAPS && window.OFFICIAL_SKIRMISH_MAPS[mapKey] && window.OFFICIAL_SKIRMISH_MAPS[mapKey].isImportedSageMap) {
+        return true;
+    }
     const maxP = getMapMaxPlayers(mapKey);
     return maxP === requiredSpawns;
 }
@@ -1953,7 +1957,9 @@ function updateSkirmishMapSummary() {
             if (hospitals) techParts.push(`${hospitals} Hospital${hospitals > 1 ? 's' : ''}`);
             if (refineries) techParts.push(`${refineries} Oil Refiner${refineries > 1 ? 'ies' : 'y'}`);
             const techText = techParts.length ? ` • Tech: ${techParts.join(', ')}` : '';
-            intelEl.textContent = `${officialMap.name} • Official EA ${(officialMap.theme || 'desert').toUpperCase()} Map (${officialMap.maxPlayers || 4}P)${techText}`;
+            const mapOrigin = officialMap.isImportedSageMap ? 'Imported' : 'Official EA';
+            const mapPCount = (officialMap.spawns && officialMap.spawns.length) ? officialMap.spawns.length : (officialMap.maxPlayers || officialMap.players || 4);
+            intelEl.textContent = `${officialMap.name} • ${mapOrigin} ${(officialMap.theme || 'desert').toUpperCase()} Map (${mapPCount}P)${techText}`;
         } else if (activeCustomMap && mapType.startsWith('custom_')) {
             intelEl.textContent = `${activeCustomMap.name} • Custom Map (${mapSize}x${mapSize})`;
         } else {
@@ -1997,8 +2003,8 @@ function renderSkirmishMapPickerGrid() {
                 items.push({
                     key,
                     name: m.name || key,
-                    sub: `Official EA • ${maxP} Spawns • ${m.theme || 'desert'}`,
-                    thumb: m.terrainDataUrl || ''
+                    sub: `${m.isImportedSageMap ? 'Imported' : 'Official EA'} • ${maxP} Spawns • ${m.theme || 'desert'}`,
+                    thumb: m.terrainDataUrl || m.tgaDataUrl || ''
                 });
         });
     }

@@ -1762,6 +1762,13 @@ function registerImportedSageMap(mapObj, persist = true) {
     if (typeof window !== 'undefined') {
         window.OFFICIAL_SKIRMISH_MAPS = window.OFFICIAL_SKIRMISH_MAPS || {};
         window.OFFICIAL_SKIRMISH_MAPS[mapObj.key] = mapObj;
+        // Preload imported .tga preview into _officialMapImages so Skirmish preview canvas renders it immediately
+        if (mapObj.tgaDataUrl && typeof Image === 'function') {
+            window._officialMapImages = window._officialMapImages || {};
+            const img = new Image();
+            img.src = mapObj.tgaDataUrl;
+            window._officialMapImages[mapObj.key] = img;
+        }
     }
     const label = `${mapObj.name} (${mapObj.players}P • Imported Map)`;
     const addOpt = (selId, grpId) => {
