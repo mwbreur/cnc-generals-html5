@@ -1732,6 +1732,10 @@ function _getVehicleTrackTexture(isTracked) {
 function spawnVehicleTrackMark(unit, rotY, isTracked = true) {
     if (!unit || !unit.mesh || typeof scene === 'undefined') return;
     if (unit.mesh.visible === false) return;
+    // Issue #71: Respect graphicsQuality to reduce draw calls on Low/Medium presets
+    const gfxQ = (typeof window !== 'undefined' && window._gameOptions && window._gameOptions.graphicsQuality) || 'high';
+    if (gfxQ === 'low') return;
+    const effectiveTrackCap = gfxQ === 'medium' ? Math.min(60, MAX_VEHICLE_TRACK_MARKS) : MAX_VEHICLE_TRACK_MARKS;
     const px = unit.mesh.position.x;
     const pz = unit.mesh.position.z;
     // Only stamp a new track segment every ~2.4 world units of travel
@@ -1757,7 +1761,7 @@ function spawnVehicleTrackMark(unit, rotY, isTracked = true) {
     const width = Math.max(1.8, (unit.radius || 2.5) * (isTracked ? 1.08 : 0.88));
     const length = 2.75;
     let entry;
-    if (_activeTrackMarks.length >= MAX_VEHICLE_TRACK_MARKS) {
+    if (_activeTrackMarks.length >= effectiveTrackCap) {
         entry = _activeTrackMarks.shift();
         entry.mesh.material.map = tex;
         entry.mesh.material.needsUpdate = true;

@@ -88,23 +88,32 @@ function resolveObstacleCollisions(unit) {
     const isDeliveringHarvester = (unit.type === 'truck' || unit.type === 'worker') && (unit.aiState === 'MovingToCenter' || unit.aiState === 'Depositing');
     const dropoffPos = isDeliveringHarvester ? getSupplyDropoffPosition(unit.mesh.position) : null;
 
-    // 1. Structure Collisions (check both player and AI structures)
-    const structLists = (typeof enemyStructures !== 'undefined' && enemyStructures.length > 0) ? [structures, enemyStructures] : [structures];
-    for (let sList of structLists) {
-        for (let s of sList) {
-            if (s.health <= 0) continue;
+    // 1. Structure Collisions (check both player and AI structures — Issue #67: zero-alloc + AABB/distSq early-out)
+    const hasEnemyStructs = (typeof enemyStructures !== 'undefined' && enemyStructures.length > 0);
+    for (let listIdx = 0; listIdx < (hasEnemyStructs ? 2 : 1); listIdx++) {
+        const sList = listIdx === 0 ? structures : enemyStructures;
+        for (let si = 0; si < sList.length; si++) {
+            const s = sList[si];
+            if (!s || s.health <= 0) continue;
             // Allow assigned builder to reach foundation or repair perimeter
             if (unit.targetStructure === s && (unit.taskState === 'Building' || unit.taskState === 'MovingToBuild' || unit.taskState === 'Repairing' || unit.taskState === 'MovingToRepair')) continue;
 
             // CRITICAL HARVESTER FIX: Allow trucks and workers delivering supplies to reach docking bays!
-            if (dropoffPos && Math.hypot(s.position.x - dropoffPos.x, s.position.z - dropoffPos.z) < 1.0) continue;
+            if (dropoffPos) {
+                const ddx = s.position.x - dropoffPos.x;
+                const ddz = s.position.z - dropoffPos.z;
+                if (ddx * ddx + ddz * ddz < 1.0) continue;
+            }
 
             const minDist = s.radius + unit.radius;
             const dx = unit.mesh.position.x - s.position.x;
+            if (dx >= minDist || dx <= -minDist) continue;
             const dz = unit.mesh.position.z - s.position.z;
-            const dist2D = Math.hypot(dx, dz);
+            if (dz >= minDist || dz <= -minDist) continue;
+            const distSq = dx * dx + dz * dz;
 
-            if (dist2D < minDist && dist2D > 0.0001) {
+            if (distSq < minDist * minDist && distSq > 1e-8) {
+                const dist2D = Math.sqrt(distSq);
                 const push = minDist - dist2D;
                 const normX = dx / dist2D;
                 const normZ = dz / dist2D;

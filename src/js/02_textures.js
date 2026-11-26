@@ -170,25 +170,34 @@ const STRUCTURE_POWER_DRAIN = {
 window.STRUCTURE_POWER_DRAIN = STRUCTURE_POWER_DRAIN;
 
 function getSupplyDropoffPosition(unitPos = null) {
-    const supplyCenters = structures.filter(s =>
-        !s.isBuilding && s.health > 0 &&
-        (s.type === 'supplyCenter' || s.type === 'supplyStash')
-    );
-    const dropoffs = supplyCenters.length > 0
-        ? supplyCenters
-        : structures.filter(s => !s.isBuilding && s.health > 0 && (s.type === 'center' || s.type === 'commandCenter'));
-    if (dropoffs.length === 0) return supplyCenterPos;
-    if (!unitPos) return dropoffs[0].position;
-    let best = dropoffs[0];
-    let bestDist = Infinity;
-    for (const d of dropoffs) {
-        const dist = Math.hypot(unitPos.x - d.position.x, unitPos.z - d.position.z);
-        if (dist < bestDist) {
-            bestDist = dist;
-            best = d;
+    // Issue #67: Zero-alloc single-pass scan using squared distance (no per-call structures.filter arrays)
+    let bestSupply = null, bestSupplyDistSq = Infinity;
+    let bestCenter = null, bestCenterDistSq = Infinity;
+    const ux = unitPos ? unitPos.x : 0;
+    const uz = unitPos ? unitPos.z : 0;
+    for (let i = 0; i < structures.length; i++) {
+        const s = structures[i];
+        if (!s || s.isBuilding || s.health <= 0 || !s.position) continue;
+        const isSup = (s.type === 'supplyCenter' || s.type === 'supplyStash');
+        const isCtr = !isSup && (s.type === 'center' || s.type === 'commandCenter');
+        if (!isSup && !isCtr) continue;
+        if (!unitPos) {
+            if (isSup) return s.position;
+            if (!bestCenter) bestCenter = s;
+            continue;
+        }
+        const dx = ux - s.position.x;
+        const dz = uz - s.position.z;
+        const dSq = dx * dx + dz * dz;
+        if (isSup) {
+            if (dSq < bestSupplyDistSq) { bestSupplyDistSq = dSq; bestSupply = s; }
+        } else if (!bestSupply && dSq < bestCenterDistSq) {
+            bestCenterDistSq = dSq; bestCenter = s;
         }
     }
-    return best.position;
+    if (bestSupply) return bestSupply.position;
+    if (bestCenter) return bestCenter.position;
+    return supplyCenterPos;
 }
 
 function findNearestSupplyPoint(position) {

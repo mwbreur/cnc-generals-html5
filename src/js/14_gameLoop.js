@@ -394,7 +394,10 @@ function animate() {
             const badge = document.getElementById('fps-perf-badge');
             if (badge) {
                 const uTot = (typeof units !== 'undefined' ? units.length : 0) + (typeof enemyUnits !== 'undefined' ? enemyUnits.length : 0);
-                badge.textContent = `${fps} FPS • ${uTot} Units`;
+                const rInfo = (typeof renderer !== 'undefined' && renderer && renderer.info && renderer.info.render) ? renderer.info.render : null;
+                const fxTot = (typeof activeFX !== 'undefined' && Array.isArray(activeFX)) ? activeFX.length : 0;
+                const gpuStr = rInfo ? ` • ${rInfo.calls} Calls • ${Math.round((rInfo.triangles || 0) / 1000)}k Tris • ${fxTot} FX` : '';
+                badge.textContent = `${fps} FPS • ${uTot} Units${gpuStr}`;
             }
         }
     }
