@@ -90,9 +90,10 @@ The repository is organized around handwritten source modules (`src/js/`), gener
 │       ├── 12_combat.js               # Combat loop, armor matrix & weapon firing
 │       ├── 13_ai.js                   # Skirmish AI commander brain
 │       ├── 13b_input.js               # Player pointer, selection, blueprints & right-click orders
-│       ├── 14_gameLoop.js             # Main simulation, aircraft flight & render loop
+│       ├── 14_gameLoop.js             # Main simulation, ground movement & render loop
 │       ├── 14b_systems.js             # Stealth & detection, Point Defense Lasers & GLA salvage
 │       ├── 14c_shellMap.js            # Animated 3D main-menu shell map
+│       ├── 14d_aircraft.js            # Unified player & AI aircraft flight, combat & rearming engine
 │       └── 15_multiplayer.js          # Host-authoritative WebRTC / LAN multiplayer
 ├── build.js
 ├── verify_system.js
