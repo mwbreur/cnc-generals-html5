@@ -618,6 +618,9 @@ function applyGameOptions(opts) {
         const tod = window._activeTimeOfDay || 'day';
         window._cloudShadowUniforms.uCloudStrength.value = !cloudsOn ? 0.0 : (tod === 'night' ? 0.12 : (tod === 'sunset' || tod === 'dawn' ? 0.24 : 0.40));
     }
+    if (typeof setMasterAudioVolume === 'function' && Number.isFinite(opts.masterVolume)) {
+        setMasterAudioVolume(opts.masterVolume);
+    }
     if (typeof document !== 'undefined') {
         const badge = document.getElementById('fps-perf-badge');
         if (badge) badge.style.display = opts.showFps ? 'block' : 'none';

@@ -1289,14 +1289,15 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
         else if (/sand|desert|dune|arid/i.test(str)) desertHits++;
     }
 
-    let hmChunkPos = -1, objListPos = -1, objListEnd = -1;
+    let hmChunkPos = -1, hmChunkVer = 4, objListPos = -1, objListEnd = -1;
     let scanPos = pos;
     while (scanPos + 10 <= decomp.length) {
         const cid = dv.getUint32(scanPos, true);
+        const cver = dv.getUint16(scanPos + 4, true);
         const csz = dv.getUint32(scanPos + 6, true);
         const cname = dict[cid] || '';
         const dataStart = scanPos + 10;
-        if (cname === 'HeightMapData') hmChunkPos = dataStart;
+        if (cname === 'HeightMapData') { hmChunkPos = dataStart; hmChunkVer = cver; }
         else if (cname === 'ObjectsList') { objListPos = dataStart; objListEnd = dataStart + csz; }
         if (csz <= 0 || dataStart + csz > decomp.length) break;
         scanPos = dataStart + csz;
@@ -1305,9 +1306,23 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
 
     const W = dv.getInt32(hmChunkPos, true);
     const H = dv.getInt32(hmChunkPos + 4, true);
-    const border = dv.getInt32(hmChunkPos + 8, true);
-    const numBoundaries = dv.getInt32(hmChunkPos + 12, true);
-    const hmDataStart = hmChunkPos + 20 + numBoundaries * 8;
+    let border = 0;
+    let hmDataStart = hmChunkPos + 12;
+    if (hmChunkVer >= 4) {
+        border = Math.max(0, dv.getInt32(hmChunkPos + 8, true));
+        const numBoundaries = Math.max(0, dv.getInt32(hmChunkPos + 12, true));
+        hmDataStart = hmChunkPos + 20 + numBoundaries * 8;
+        // Fallback if a v3-layout chunk had a higher version header
+        if (hmDataStart + W * H > decomp.length && hmChunkPos + 16 + W * H <= decomp.length) {
+            hmDataStart = hmChunkPos + 16;
+        }
+    } else if (hmChunkVer === 3) {
+        border = Math.max(0, dv.getInt32(hmChunkPos + 8, true));
+        hmDataStart = hmChunkPos + 16;
+    }
+    if (W <= 0 || H <= 0 || hmDataStart + W * H > decomp.length) {
+        throw new Error(`Invalid HeightMapData dimensions (${W}x${H}, v${hmChunkVer}).`);
+    }
     const playW = Math.max(1, W - 2 * border);
     const playH = Math.max(1, H - 2 * border);
 
@@ -1447,9 +1462,10 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
     if (rawSpawns.length < 2) {
         rawSpawns.push({ id: 1, nx: -0.34, nz: -0.34 }, { id: 2, nx: 0.34, nz: 0.34 });
     }
-    const cleanName = String(fileName || 'Imported Map').replace(/\.map$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 42) || 'Imported Map';
+    const cleanName = String(fileName || 'Imported Map').replace(/\.(map|zip)$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 42) || 'Imported Map';
     const mapKey = 'imported_' + cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 28);
     const biome = (snowHits > greenHits && snowHits > desertHits) ? 'snow' : (greenHits > desertHits ? 'temperate' : 'desert');
+    const theme = biome === 'temperate' ? 'jungle' : biome;
     const players = Math.max(2, Math.min(8, rawSpawns.length));
     const recSize = players <= 2 ? 600 : (players <= 4 ? 900 : (players <= 6 ? 1200 : 1600));
 
@@ -1458,8 +1474,10 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
         name: cleanName,
         players,
         biome,
+        theme,
         gridSize: GRID,
         recommendedSize: recSize,
+        grid: grid,
         heightGrid: grid,
         spawns: rawSpawns,
         supplies: rawSupplies,
@@ -1475,13 +1493,260 @@ function parseSageMapBuffer(arrayBuffer, fileName = 'Imported Map') {
 }
 window.parseSageMapBuffer = parseSageMapBuffer;
 
+// Parse SAGE map.str (UTF-8, UTF-16LE, or Latin-1) into key/value map + display title
+function _parseSageMapStr(bytes) {
+    if (!bytes || bytes.length === 0) return { title: null, description: null, strings: {} };
+    let text = '';
+    if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
+        for (let i = 2; i + 1 < bytes.length; i += 2) {
+            text += String.fromCharCode(bytes[i] | (bytes[i + 1] << 8));
+        }
+    } else if (typeof TextDecoder === 'function') {
+        text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    } else {
+        for (let i = 0; i < bytes.length; i++) text += String.fromCharCode(bytes[i]);
+    }
+    const strings = {};
+    const lines = text.replace(/\r/g, '').split('\n');
+    let curKey = null;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line || line.startsWith('//') || line.startsWith(';')) continue;
+        if (/^END$/i.test(line)) { curKey = null; continue; }
+        const qMatch = line.match(/^"(.*)"$/);
+        if (qMatch && curKey) {
+            strings[curKey] = qMatch[1].replace(/\\n/g, ' ').trim();
+            continue;
+        }
+        const inlineMatch = line.match(/^([A-Za-z0-9_:.-]+)\s+"(.*)"$/);
+        if (inlineMatch) {
+            strings[inlineMatch[1]] = inlineMatch[2].replace(/\\n/g, ' ').trim();
+            curKey = null;
+        } else if (!curKey) {
+            curKey = line;
+        }
+    }
+    let title = null;
+    let description = null;
+    for (const [k, v] of Object.entries(strings)) {
+        if (!v) continue;
+        if (!title && (/^MAP:.*(Name|Title)$/i.test(k) || /^MapName$/i.test(k) || /^MAP:[^:]+$/i.test(k))) {
+            title = v.slice(0, 48);
+        }
+        if (!description && /Desc|Brief|Intro/i.test(k)) {
+            description = v.slice(0, 180);
+        }
+    }
+    return { title, description, strings };
+}
+
+// Decode uncompressed (type 2) or RLE-compressed (type 10) 24/32-bit TGA preview to compact JPEG data URL
+function _decodeTgaToDataUrl(bytes) {
+    if (!bytes || bytes.length < 18 || typeof document === 'undefined') return null;
+    const idLen = bytes[0];
+    const colorMapType = bytes[1];
+    const imageType = bytes[2];
+    const width = bytes[12] | (bytes[13] << 8);
+    const height = bytes[14] | (bytes[15] << 8);
+    const bpp = bytes[16];
+    const descriptor = bytes[17];
+    if (colorMapType !== 0 || (imageType !== 2 && imageType !== 10) || (bpp !== 24 && bpp !== 32)) return null;
+    if (width <= 0 || height <= 0 || width > 2048 || height > 2048) return null;
+
+    const bytesPerPixel = bpp >> 3;
+    let offset = 18 + idLen;
+    const totalPixels = width * height;
+    const rgba = new Uint8ClampedArray(totalPixels * 4);
+    const topOrigin = Boolean(descriptor & 0x20);
+
+    const writePixel = (pxIdx, b, g, r, a) => {
+        const x = pxIdx % width;
+        const rawY = Math.floor(pxIdx / width);
+        const y = topOrigin ? rawY : (height - 1 - rawY);
+        const out = (y * width + x) * 4;
+        rgba[out] = r;
+        rgba[out + 1] = g;
+        rgba[out + 2] = b;
+        rgba[out + 3] = a;
+    };
+
+    if (imageType === 2) {
+        for (let i = 0; i < totalPixels && offset + bytesPerPixel <= bytes.length; i++) {
+            const b = bytes[offset], g = bytes[offset + 1], r = bytes[offset + 2];
+            const a = bytesPerPixel === 4 ? bytes[offset + 3] : 255;
+            offset += bytesPerPixel;
+            writePixel(i, b, g, r, a);
+        }
+    } else {
+        let px = 0;
+        while (px < totalPixels && offset < bytes.length) {
+            const hdr = bytes[offset++];
+            const count = (hdr & 0x7F) + 1;
+            if (hdr & 0x80) {
+                if (offset + bytesPerPixel > bytes.length) break;
+                const b = bytes[offset], g = bytes[offset + 1], r = bytes[offset + 2];
+                const a = bytesPerPixel === 4 ? bytes[offset + 3] : 255;
+                offset += bytesPerPixel;
+                for (let k = 0; k < count && px < totalPixels; k++) writePixel(px++, b, g, r, a);
+            } else {
+                for (let k = 0; k < count && px < totalPixels && offset + bytesPerPixel <= bytes.length; k++) {
+                    const b = bytes[offset], g = bytes[offset + 1], r = bytes[offset + 2];
+                    const a = bytesPerPixel === 4 ? bytes[offset + 3] : 255;
+                    offset += bytesPerPixel;
+                    writePixel(px++, b, g, r, a);
+                }
+            }
+        }
+    }
+
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = width;
+    srcCanvas.height = height;
+    const srcCtx = srcCanvas.getContext('2d');
+    if (!srcCtx || typeof srcCtx.createImageData !== 'function') return null;
+    const imgData = srcCtx.createImageData(width, height);
+    imgData.data.set(rgba);
+    srcCtx.putImageData(imgData, 0, 0);
+
+    // Cap preview size at 512x512 so localStorage stays lean while keeping crisp terrain/minimap detail
+    const maxDim = 512;
+    if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = Math.max(1, Math.round(width * scale));
+        outCanvas.height = Math.max(1, Math.round(height * scale));
+        const outCtx = outCanvas.getContext('2d');
+        if (outCtx) {
+            outCtx.drawImage(srcCanvas, 0, 0, outCanvas.width, outCanvas.height);
+            return outCanvas.toDataURL('image/jpeg', 0.85);
+        }
+    }
+    return srcCanvas.toDataURL('image/jpeg', 0.85);
+}
+
+// Zero-dependency browser ZIP extractor (supports Store method 0 & Deflate method 8 via DecompressionStream)
+async function _extractZipEntries(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+    const dv = new DataView(arrayBuffer);
+    // Find End of Central Directory (EOCD) signature 0x06054b50
+    let eocdPos = -1;
+    const minSearch = Math.max(0, bytes.length - 65557);
+    for (let i = bytes.length - 22; i >= minSearch; i--) {
+        if (dv.getUint32(i, true) === 0x06054b50) { eocdPos = i; break; }
+    }
+    if (eocdPos < 0) throw new Error('Invalid ZIP archive (missing EOCD header).');
+
+    const cdCount = dv.getUint16(eocdPos + 10, true);
+    const cdOffset = dv.getUint32(eocdPos + 16, true);
+    const entries = [];
+    let pos = cdOffset;
+    const dec = (typeof TextDecoder === 'function') ? new TextDecoder('utf-8', { fatal: false }) : null;
+
+    for (let i = 0; i < cdCount && pos + 46 <= bytes.length; i++) {
+        if (dv.getUint32(pos, true) !== 0x02014b50) break;
+        const method = dv.getUint16(pos + 10, true);
+        const compSize = dv.getUint32(pos + 20, true);
+        const nameLen = dv.getUint16(pos + 28, true);
+        const extraLen = dv.getUint16(pos + 30, true);
+        const commentLen = dv.getUint16(pos + 32, true);
+        const localHeaderOff = dv.getUint32(pos + 42, true);
+        const nameBytes = bytes.subarray(pos + 46, pos + 46 + nameLen);
+        const name = dec ? dec.decode(nameBytes) : String.fromCharCode(...nameBytes);
+        pos += 46 + nameLen + extraLen + commentLen;
+
+        if (!name || name.endsWith('/') || name.includes('__MACOSX/')) continue;
+        if (localHeaderOff + 30 > bytes.length || dv.getUint32(localHeaderOff, true) !== 0x04034b50) continue;
+        const lhNameLen = dv.getUint16(localHeaderOff + 26, true);
+        const lhExtraLen = dv.getUint16(localHeaderOff + 28, true);
+        const dataOff = localHeaderOff + 30 + lhNameLen + lhExtraLen;
+        if (dataOff + compSize > bytes.length) continue;
+        const compData = bytes.subarray(dataOff, dataOff + compSize);
+
+        let fileBytes = null;
+        if (method === 0) {
+            fileBytes = compData.slice();
+        } else if (method === 8) {
+            if (typeof DecompressionStream !== 'function') {
+                throw new Error('This browser does not support Deflate ZIP decompression.');
+            }
+            const ds = new DecompressionStream('deflate-raw');
+            const writer = ds.writable.getWriter();
+            writer.write(compData);
+            writer.close();
+            const outBuf = await new Response(ds.readable).arrayBuffer();
+            fileBytes = new Uint8Array(outBuf);
+        }
+        if (fileBytes) entries.push({ name, bytes: fileBytes });
+    }
+    return entries;
+}
+
+async function parseSageMapArchiveBuffer(arrayBuffer, fileName = 'Imported Map') {
+    const u8 = new Uint8Array(arrayBuffer);
+    const isZip = u8.length >= 4 && u8[0] === 0x50 && u8[1] === 0x4B && (u8[2] === 0x03 || u8[2] === 0x05);
+    if (!isZip) {
+        return parseSageMapBuffer(arrayBuffer, fileName);
+    }
+
+    const entries = await _extractZipEntries(arrayBuffer);
+    const mapEntry = entries.find(e => /\.map$/i.test(e.name));
+    if (!mapEntry) {
+        throw new Error('ZIP archive does not contain a .map file.');
+    }
+    const baseName = mapEntry.name.split('/').pop();
+    const mapStem = baseName.replace(/\.map$/i, '').toLowerCase();
+
+    const parsed = parseSageMapBuffer(
+        mapEntry.bytes.buffer.slice(mapEntry.bytes.byteOffset, mapEntry.bytes.byteOffset + mapEntry.bytes.byteLength),
+        baseName
+    );
+
+    // Optional map.str (or *.str) for official display title & description
+    const strEntry = entries.find(e => /(^|\/)map\.str$/i.test(e.name)) || entries.find(e => /\.str$/i.test(e.name));
+    if (strEntry) {
+        const strInfo = _parseSageMapStr(strEntry.bytes);
+        if (strInfo.title) {
+            parsed.name = strInfo.title;
+        }
+        if (strInfo.description) {
+            parsed.description = strInfo.description;
+        }
+        if (strInfo.strings && Object.keys(strInfo.strings).length > 0) {
+            parsed.mapStrings = strInfo.strings;
+        }
+    }
+
+    // Optional .tga preview/minimap image (prefer matching map stem, else largest .tga)
+    const tgaEntries = entries.filter(e => /\.tga$/i.test(e.name));
+    if (tgaEntries.length > 0) {
+        const matchedTga = tgaEntries.find(e => e.name.split('/').pop().replace(/\.tga$/i, '').toLowerCase() === mapStem)
+            || tgaEntries.sort((a, b) => b.bytes.length - a.bytes.length)[0];
+        const tgaUrl = _decodeTgaToDataUrl(matchedTga.bytes);
+        if (tgaUrl) parsed.tgaDataUrl = tgaUrl;
+    }
+
+    return parsed;
+}
+window.parseSageMapArchiveBuffer = parseSageMapArchiveBuffer;
+
 function registerImportedSageMap(mapObj, persist = true) {
-    if (!mapObj || !mapObj.key || !Array.isArray(mapObj.heightGrid)) return;
+    if (!mapObj || !mapObj.key) return;
+    // Ensure legacy persisted maps also populate `grid` (used by getOfficialMapHeight) and `theme` (used by 07_terrain.js)
+    if (!Array.isArray(mapObj.grid) && Array.isArray(mapObj.heightGrid)) {
+        mapObj.grid = mapObj.heightGrid;
+    }
+    if (!Array.isArray(mapObj.heightGrid) && Array.isArray(mapObj.grid)) {
+        mapObj.heightGrid = mapObj.grid;
+    }
+    if (!Array.isArray(mapObj.grid)) return;
+    if (!mapObj.theme) {
+        mapObj.theme = mapObj.biome === 'temperate' ? 'jungle' : (mapObj.biome || 'desert');
+    }
     if (typeof window !== 'undefined') {
         window.OFFICIAL_SKIRMISH_MAPS = window.OFFICIAL_SKIRMISH_MAPS || {};
         window.OFFICIAL_SKIRMISH_MAPS[mapObj.key] = mapObj;
     }
-    const label = `${mapObj.name} (${mapObj.players}P • Imported .map)`;
+    const label = `${mapObj.name} (${mapObj.players}P • Imported Map)`;
     const addOpt = (selId, grpId) => {
         const sel = typeof document !== 'undefined' ? document.getElementById(selId) : null;
         if (!sel) return;
@@ -1505,10 +1770,13 @@ function registerImportedSageMap(mapObj, persist = true) {
     if (persist && typeof localStorage !== 'undefined') {
         try {
             const store = JSON.parse(localStorage.getItem(IMPORTED_SAGE_MAPS_KEY) || '{}');
-            store[mapObj.key] = mapObj;
+            // Avoid duplicating the 97x97 grid twice in localStorage JSON
+            const toSave = Object.assign({}, mapObj);
+            delete toSave.heightGrid;
+            store[mapObj.key] = toSave;
             localStorage.setItem(IMPORTED_SAGE_MAPS_KEY, JSON.stringify(store));
         } catch (err) {
-            console.warn('Could not persist imported .map to localStorage (quota):', err);
+            console.warn('Could not persist imported map to localStorage (quota):', err);
         }
     }
 }
@@ -1519,7 +1787,7 @@ function loadPersistedImportedSageMaps() {
     try {
         const store = JSON.parse(localStorage.getItem(IMPORTED_SAGE_MAPS_KEY) || '{}');
         Object.values(store).forEach(m => {
-            if (m && m.key && Array.isArray(m.heightGrid)) registerImportedSageMap(m, false);
+            if (m && m.key && (Array.isArray(m.grid) || Array.isArray(m.heightGrid))) registerImportedSageMap(m, false);
         });
     } catch (_) {}
 }
@@ -1529,14 +1797,14 @@ function importOfficialSageMapFile() {
     if (typeof document === 'undefined') return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.map';
+    input.accept = '.zip,.map';
     input.onchange = (ev) => {
         const file = ev.target && ev.target.files && ev.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = () => {
+        reader.onload = async () => {
             try {
-                const parsed = parseSageMapBuffer(reader.result, file.name);
+                const parsed = await parseSageMapArchiveBuffer(reader.result, file.name);
                 registerImportedSageMap(parsed, true);
                 const spSel = document.getElementById('map-environment');
                 const sizeSel = document.getElementById('map-size');
@@ -1546,12 +1814,16 @@ function importOfficialSageMapFile() {
                     if (typeof onMapSelectionChange === 'function') onMapSelectionChange('single');
                 }
                 if (typeof showNotification === 'function') {
-                    showNotification(`Imported "${parsed.name}" (${parsed.players}P, ${parsed.supplies.length} supplies, ${parsed.bridges.length} bridges)!`, 'success');
+                    const extras = [];
+                    if (parsed.tgaDataUrl) extras.push('.tga preview');
+                    if (parsed.mapStrings) extras.push('map.str');
+                    const extraStr = extras.length ? ` + ${extras.join(' & ')}` : '';
+                    showNotification(`Imported "${parsed.name}" (${parsed.players}P, ${parsed.supplies.length} supplies, ${parsed.bridges.length} bridges${extraStr})!`, 'success');
                 }
             } catch (err) {
-                console.error('Failed to import .map file:', err);
+                console.error('Failed to import map file:', err);
                 if (typeof showNotification === 'function') {
-                    showNotification('Could not parse .map file: ' + (err && err.message ? err.message : 'Invalid format'), 'error');
+                    showNotification('Could not import map: ' + (err && err.message ? err.message : 'Invalid format'), 'error');
                 }
             }
         };

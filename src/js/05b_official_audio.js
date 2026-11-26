@@ -49,9 +49,11 @@ function preloadSkirmishAudio(faction = null) {
 const MAX_WORLD_SAMPLES = 28;
 const _activeWorldSampleEnds = [];
 const _liveSourceNodes = [];
+const _liveGainNodes = [];
+if (typeof window !== 'undefined') window._liveOfficialGainNodes = _liveGainNodes;
 const _lastWorldSoundTime = {};
 
-function playOfficialAudioBuffer(ctx, buffer, volume, pan = null) {
+function playOfficialAudioBuffer(ctx, buffer, volume, pan = null, baseUnscaledVol = null) {
     if (!ctx || !buffer) return false;
     const isWorld = (typeof pan === 'number' && Number.isFinite(pan));
     const nowMs = Date.now();
@@ -70,7 +72,9 @@ function playOfficialAudioBuffer(ctx, buffer, volume, pan = null) {
             src.playbackRate.value = 0.96 + Math.random() * 0.08;
         }
         const gain = ctx.createGain();
-        gain.gain.value = Number.isFinite(volume) ? volume : 0.85;
+        const effVol = Number.isFinite(volume) ? volume : 0.85;
+        gain.gain.value = effVol;
+        gain._baseVol = Number.isFinite(baseUnscaledVol) ? baseUnscaledVol : effVol;
         src.connect(gain);
         let tail = gain;
         if (isWorld && typeof ctx.createStereoPanner === 'function' && Math.abs(pan) > 0.01) {
@@ -89,10 +93,11 @@ function playOfficialAudioBuffer(ctx, buffer, volume, pan = null) {
             _activeWorldSampleEnds.push(nowMs + durMs);
             if (_activeWorldSampleEnds.length > 1) _activeWorldSampleEnds.sort((a, b) => a - b);
         }
-        // Hold a strong JS reference to active source nodes in a bounded ring buffer so V8/Oilpan GC
-        // never collects an AudioBufferSourceNode mid-playback.
+        // Hold strong JS references to active source & gain nodes in bounded ring buffers
         _liveSourceNodes.push(src);
         if (_liveSourceNodes.length > 36) _liveSourceNodes.shift();
+        _liveGainNodes.push(gain);
+        if (_liveGainNodes.length > 36) _liveGainNodes.shift();
         src.start(0);
         return true;
     } catch (e) {
@@ -279,7 +284,11 @@ function playOfficialAudioElementFallback(data, volume) {
             el.src = data;
             el.currentTime = 0;
         }
-        el.volume = volume;
+        const masterMul = (typeof getMasterVolume === 'function') ? getMasterVolume() : 1.0;
+        const baseVol = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0.85;
+        el._baseVolume = baseVol;
+        el.volume = Math.max(0, Math.min(1, baseVol * masterMul));
+        if (el.volume <= 0) return true;
         const result = el.play();
         if (result && result.catch) result.catch(() => {});
         return true;
@@ -288,9 +297,13 @@ function playOfficialAudioElementFallback(data, volume) {
     }
 }
 
-function playOfficialSound(soundKey, volume = 0.85, faction = null, pan = null) {
+function playOfficialSound(soundKey, volume = 0.85, faction = null, pan = null, volumePreScaled = false) {
     if (!soundKey) return false;
-    const clampedVol = Math.max(0, Math.min(1, volume));
+    const masterMul = (typeof getMasterVolume === 'function') ? getMasterVolume() : 1.0;
+    const rawClamped = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0.85));
+    const baseUnscaled = volumePreScaled ? (masterMul > 0.0001 ? Math.min(1, rawClamped / masterMul) : rawClamped) : rawClamped;
+    const clampedVol = volumePreScaled ? rawClamped : Math.max(0, Math.min(1, rawClamped * masterMul));
+    if (clampedVol <= 0 || masterMul <= 0) return true;
     if (typeof pan === 'number') {
         // Retail "Limit" behaviour: don't stack identical world sounds within a few ms
         const nowMs = Date.now();
@@ -305,31 +318,31 @@ function playOfficialSound(soundKey, volume = 0.85, faction = null, pan = null) 
         if (ctx && typeof ctx.decodeAudioData === 'function') {
             const cached = window.OFFICIAL_AUDIO_CACHE[soundKey];
             if (cached === 'fallback') {
-                return playOfficialAudioElementFallback(data, clampedVol);
+                return playOfficialAudioElementFallback(data, baseUnscaled);
             }
             if (cached && cached.duration !== undefined) {
-                return playOfficialAudioBuffer(ctx, cached, clampedVol, pan);
+                return playOfficialAudioBuffer(ctx, cached, clampedVol, pan, baseUnscaled);
             }
             if (cached && typeof cached.then === 'function') {
                 cached.then(buf => {
-                    if (buf) playOfficialAudioBuffer(ctx, buf, clampedVol, pan);
-                    else playOfficialAudioElementFallback(data, clampedVol);
+                    if (buf) playOfficialAudioBuffer(ctx, buf, clampedVol, pan, baseUnscaled);
+                    else playOfficialAudioElementFallback(data, baseUnscaled);
                 });
                 return true;
             }
             const decodePromise = decodeOfficialAudioData(ctx, data).then(buf => {
                 window.OFFICIAL_AUDIO_CACHE[soundKey] = buf;
-                playOfficialAudioBuffer(ctx, buf, clampedVol, pan);
+                playOfficialAudioBuffer(ctx, buf, clampedVol, pan, baseUnscaled);
                 return buf;
             }).catch(() => {
                 window.OFFICIAL_AUDIO_CACHE[soundKey] = 'fallback';
-                playOfficialAudioElementFallback(data, clampedVol);
+                playOfficialAudioElementFallback(data, baseUnscaled);
                 return null;
             });
             window.OFFICIAL_AUDIO_CACHE[soundKey] = decodePromise;
             return true;
         }
-        return playOfficialAudioElementFallback(data, clampedVol);
+        return playOfficialAudioElementFallback(data, baseUnscaled);
         } catch (err) {
             console.warn('Official audio playback error for', soundKey, err);
             return false;
