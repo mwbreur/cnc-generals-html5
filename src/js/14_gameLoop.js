@@ -2062,9 +2062,30 @@ function animate() {
                     unit.airState = isHeli ? 'hovering' : 'circling';
                 }
 
+                // Official JetAIUpdate.cpp ammo clips: Raptor 4 (6 w/ Laser Missiles), MiG 2, Stealth Fighter 2, Aurora 1
+                if (!isHeli && unit.type !== 'c130') {
+                    const baseClip = unit.type === 'raptor'
+                        ? ((typeof researchedTechs !== 'undefined' && researchedTechs.has('laserMissiles')) ? 6 : 4)
+                        : (unit.type === 'aurora' ? 1 : 2);
+                    if (unit.maxAmmo !== baseClip) {
+                        const hadInit = (unit.ammo !== undefined);
+                        unit.maxAmmo = baseClip;
+                        if (!hadInit) unit.ammo = baseClip;
+                        else unit.ammo = Math.min(unit.ammo, baseClip);
+                    }
+                }
+
                 // Dynamic State Transition: Automatically react to player/AI orders!
-                if (unit.combatTarget && unit.combatTarget.health > 0 && unit.taskState !== 'Moving' && unit.type !== 'chinook') {
-                    if (unit.airState === 'landed') {
+                if (unit.airState === 'returning_to_base' || unit.airState === 'rearming') {
+                    // Stay committed to Airfield rearm cycle unless player overrides with a move order while having ammo
+                    if (unit.ammo > 0 && unit.taskState === 'Moving') {
+                        unit.airState = (unit.airState === 'rearming') ? 'taking_off' : 'flying';
+                    }
+                } else if (unit.combatTarget && unit.combatTarget.health > 0 && unit.taskState !== 'Moving' && unit.type !== 'chinook') {
+                    if (!isHeli && unit.ammo !== undefined && unit.ammo <= 0) {
+                        unit.combatTarget = null;
+                        unit.airState = 'returning_to_base';
+                    } else if (unit.airState === 'landed') {
                         unit.airState = 'taking_off';
                     } else if (unit.airState !== 'taking_off') {
                         unit.airState = 'attacking';
@@ -2080,6 +2101,73 @@ function animate() {
                         unit.airState = 'flying';
                         unit.patrolCenter.copy(unit.targetPosition);
                     }
+                }
+
+                // 0a. Returning to Airfield to Rearm (JetAIUpdate.cpp)
+                if (unit.airState === 'returning_to_base' && !isHeli) {
+                    const friendlyAirfields = (typeof structures !== 'undefined')
+                        ? structures.filter(s => s && s.type === 'airfield' && !s.isBuilding && s.health > 0 && (!s.ownerId || s.ownerId === 'player'))
+                        : [];
+                    let nearestAF = null, bestAFDist = Infinity;
+                    for (let ai = 0; ai < friendlyAirfields.length; ai++) {
+                        const af = friendlyAirfields[ai];
+                        const d = Math.hypot(af.position.x - unit.mesh.position.x, af.position.z - unit.mesh.position.z);
+                        if (d < bestAFDist) { bestAFDist = d; nearestAF = af; }
+                    }
+                    if (!nearestAF) {
+                        // No airfield available: field-rearm slowly while circling
+                        unit._rearmTimer = (unit._rearmTimer || 0) + combatDeltaScale;
+                        if (unit._rearmTimer >= 180) {
+                            unit._rearmTimer = 0;
+                            unit.ammo = Math.min(unit.maxAmmo || 2, (unit.ammo || 0) + 1);
+                            if (unit.ammo >= (unit.maxAmmo || 2)) unit.airState = 'circling';
+                        }
+                    } else {
+                        const dxAF = nearestAF.position.x - unit.mesh.position.x;
+                        const dzAF = nearestAF.position.z - unit.mesh.position.z;
+                        const distAF = Math.hypot(dxAF, dzAF);
+                        if (distAF > 4.0) {
+                            const spd = unit.speed * combatDeltaScale;
+                            unit.mesh.position.x += (dxAF / distAF) * spd;
+                            unit.mesh.position.z += (dzAF / distAF) * spd;
+                            const targetY = groundY + (distAF < 20 ? Math.max(0.5, cruiseAlt * (distAF / 20)) : cruiseAlt);
+                            unit.mesh.position.y += (targetY - unit.mesh.position.y) * 0.10;
+                            const tAng = Math.atan2(-dzAF, dxAF) + Math.PI / 2;
+                            let diff = tAng - unit.mesh.rotation.y;
+                            while (diff < -Math.PI) diff += Math.PI * 2;
+                            while (diff > Math.PI) diff -= Math.PI * 2;
+                            unit.mesh.rotation.y += diff * 0.18;
+                            unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.12;
+                            unit.mesh.rotation.z += (THREE.MathUtils.clamp(-diff * 1.4, -0.35, 0.35) - unit.mesh.rotation.z) * 0.12;
+                        } else {
+                            unit.airState = 'rearming';
+                            unit._rearmTimer = 0;
+                            unit.targetPosition.copy(nearestAF.position);
+                        }
+                        return;
+                    }
+                }
+
+                // 0b. Rearming & Repairing on Airfield Pad
+                if (unit.airState === 'rearming' && !isHeli) {
+                    unit.mesh.position.y += ((groundY + 0.35) - unit.mesh.position.y) * 0.15;
+                    unit.mesh.rotation.x += (0 - unit.mesh.rotation.x) * 0.15;
+                    unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.15;
+                    unit._rearmTimer = (unit._rearmTimer || 0) + combatDeltaScale;
+                    if (unit.health < unit.maxHealth && Math.floor(unit._rearmTimer) % 15 === 0) {
+                        unit.health = Math.min(unit.maxHealth, unit.health + 4);
+                    }
+                    if (unit._rearmTimer >= 90) { // +1 missile/bomb every 1.5s
+                        unit._rearmTimer = 0;
+                        unit.ammo = Math.min(unit.maxAmmo || 2, (unit.ammo || 0) + 1);
+                        if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
+                        if (unit.ammo >= (unit.maxAmmo || 2)) {
+                            unit.airState = 'landed';
+                            unit.taskState = 'Idle';
+                            if (typeof playAudio === 'function') playAudio('gui_blip', { volume: 0.45 });
+                        }
+                    }
+                    return;
                 }
 
                 // 1. Landed on Airfield Runway / Pad
@@ -2206,7 +2294,13 @@ function animate() {
 
                             // Bomb & Missile Delivery: Release ordnance as plane streaks overhead, and always overshoot past target
                             if ((distToEnemy <= 16.0 && unit.attackCooldown === 0) || distToEnemy <= 6.0) {
-                                if (unit.attackCooldown === 0) executeWeaponFire(unit, unit.combatTarget);
+                                if (unit.attackCooldown === 0) {
+                                    executeWeaponFire(unit, unit.combatTarget);
+                                    if (unit.ammo !== undefined) {
+                                        unit.ammo = Math.max(0, unit.ammo - 1);
+                                        if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
+                                    }
+                                }
                                 unit.planeAttackPhase = 'overshoot';
                                 if (distToEnemy > 0.2) {
                                     unit.overshootDirX = dirX;
@@ -2227,8 +2321,16 @@ function animate() {
                             unit.mesh.rotation.z += (0 - unit.mesh.rotation.z) * 0.12;
 
                             if (unit.overshootDist >= 34.0) {
-                                unit.planeAttackPhase = 'turnaround';
-                                unit.turnaroundTimer = 0;
+                                if (unit.ammo !== undefined && unit.ammo <= 0) {
+                                    // Out of ordnance: return to Airfield to rearm!
+                                    unit.combatTarget = null;
+                                    unit.planeAttackPhase = null;
+                                    unit.airState = 'returning_to_base';
+                                    unit.taskState = 'Idle';
+                                } else {
+                                    unit.planeAttackPhase = 'turnaround';
+                                    unit.turnaroundTimer = 0;
+                                }
                             }
                         } else if (unit.planeAttackPhase === 'turnaround') {
                             // Phase 3: Wide 180-degree banking turnaround to set up next attack run
@@ -4063,7 +4165,7 @@ function processPointDefenseLasers() {
     allLivingUnits.forEach(defender => {
             if (defender.health <= 0 || !defender.mesh) return;
 
-            const hasPDL = (defender.type === 'paladin') || (defender.drone && defender.drone.type === 'battle');
+            const hasPDL = (defender.type === 'paladin') || (defender.type === 'avenger') || (defender.drone && defender.drone.type === 'battle');
             if (!hasPDL) return;
 
             if (defender.pdlCooldown > 0) {
@@ -4071,7 +4173,7 @@ function processPointDefenseLasers() {
                 return;
             }
 
-            const scanRange = (defender.type === 'paladin') ? 22.0 : 16.0;
+            const scanRange = (defender.type === 'avenger') ? 28.0 : ((defender.type === 'paladin') ? 22.0 : 16.0);
             const myPos = defender.mesh.position;
 
             if (typeof activeMissiles !== 'undefined' && activeMissiles.length > 0) {
@@ -4095,8 +4197,8 @@ function processPointDefenseLasers() {
 
                         if (typeof spawnLaserBeam === 'function') spawnLaserBeam(laserOrigin, missile.curPos, 0x00ffff, 2.8);
                         if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(laserOrigin, 0x00ffff, 0.4);
-                        playAudio('laser_point_defense');
-                        defender.pdlCooldown = (defender.type === 'paladin') ? 65 : 85;
+                        playAudio('laser_point_defense', { pos: laserOrigin });
+                        defender.pdlCooldown = (defender.type === 'avenger') ? 35 : ((defender.type === 'paladin') ? 65 : 85);
 
                         if (typeof showNotification === 'function' && typeof units !== 'undefined' && units.includes(defender)) {
                             showNotification('★ Point Defense Laser intercepted hostile missile!', 'info');

@@ -1282,7 +1282,7 @@ function renderUnitsInspectorAndGrid(inspector, selectedUnits) {
                         </div>
                     </div>
                     <div class="inspector-attachments-row">
-                        <span>Speed: ${Math.round(u.speed * 100)}</span>
+                        <span>Speed: ${Math.round(u.speed * 100)}${u.maxAmmo ? (' · Ammo: ' + (u.ammo !== undefined ? u.ammo : u.maxAmmo) + '/' + u.maxAmmo) : ''}</span>
                         <span>${attachedText}</span>
                     </div>
                     ${passHtml}

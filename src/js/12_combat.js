@@ -767,9 +767,9 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
         }
     }
 
-    // Authentic Generals Garrison Clearing (Flamethrowers, Toxin Tractors, Flashbangs clear buildings directly!)
-    if (target.isWorldBuilding && Array.isArray(target.garrisoned) && target.garrisoned.length > 0 &&
-        (damageType === 'FLAME' || damageType === 'TOXIN' || damageType === 'FLASHBANG')) {
+    // Authentic Generals Garrison Clearing (Flamethrowers, Toxin, Poison, Radiation, Flashbangs clear buildings directly!)
+    if ((target.isWorldBuilding || target.type === 'bunker' || target.type === 'palace') && Array.isArray(target.garrisoned) && target.garrisoned.length > 0 &&
+        (damageType === 'FLAME' || damageType === 'TOXIN' || damageType === 'POISON' || damageType === 'RADIATION' || damageType === 'FLASHBANG')) {
         const clearDmg = damageType === 'FLASHBANG' ? 180 : Math.max(60, finalDmg * 2);
         const tPos = target.position || (target.mesh && target.mesh.position);
         if (tPos && typeof spawnMuzzleFlash === 'function') {
