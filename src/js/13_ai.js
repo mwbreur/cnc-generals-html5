@@ -1891,6 +1891,30 @@ function processEnemyAIEngine() {
                         }
                     }
             });
+
+            // --- Official AISkirmishPlayer General Powers (Medium & Hard AI unleash faction powers on discovered hostile bases/armies) ---
+            if (cmd.difficulty !== 'easy' && typeof buildingTick !== 'undefined' && buildingTick >= 12600) { // After 3:30 in-match
+                const gpInterval = cmd.difficulty === 'hard' ? 14400 : 18000; // 4:00 (Hard) or 5:00 (Medium)
+                if (!cmd._nextGeneralPowerTick) cmd._nextGeneralPowerTick = 12600 + Math.floor(simRandom() * 3600);
+                if (buildingTick >= cmd._nextGeneralPowerTick && cmd.discoveredEnemyBases && cmd.discoveredEnemyBases.length > 0) {
+                    const targetObj = cmd.discoveredEnemyBases[Math.floor(simRandom() * cmd.discoveredEnemyBases.length)];
+                    const gpPos = targetObj && targetObj.position ? targetObj.position.clone() : null;
+                    if (gpPos) {
+                        cmd._nextGeneralPowerTick = buildingTick + gpInterval;
+                        const aiPseudo = { isAI: true, ownerId: cmd.ownerId, teamId: cmd.teamId, faction: cmd.faction };
+                        if (cmd.faction === 'usa' && typeof triggerA10Strike === 'function') {
+                            triggerA10Strike(gpPos, aiPseudo);
+                            if (typeof showNotification === 'function') showNotification('⚠️ WARNING: Hostile A-10 Warthog Strike inbound!', 'error');
+                        } else if (cmd.faction === 'china' && typeof triggerArtilleryBarrageFX === 'function') {
+                            triggerArtilleryBarrageFX(gpPos, aiPseudo);
+                            if (typeof showNotification === 'function') showNotification('⚠️ WARNING: Hostile PLA Artillery Barrage detected!', 'error');
+                        } else if (cmd.faction === 'gla' && typeof triggerAnthraxBombFX === 'function') {
+                            triggerAnthraxBombFX(gpPos, aiPseudo);
+                            if (typeof showNotification === 'function') showNotification('⚠️ WARNING: Hostile GLA Anthrax Bomb inbound!', 'error');
+                        }
+                    }
+                }
+            }
     });
 }
 

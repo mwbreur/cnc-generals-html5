@@ -1986,8 +1986,9 @@ function animate() {
                 if (typeof spawnSmokePuff === 'function') {
                     spawnSmokePuff(smokePos, tier === 2 ? 0x1e2229 : 0x4b525c, isStruct ? (tier === 2 ? 0.85 : 0.55) : (tier === 2 ? 0.5 : 0.32));
                 }
-                if (tier === 2 && Math.random() < 0.55 && typeof spawnMuzzleFlash === 'function') {
-                    spawnMuzzleFlash(smokePos, 0xff5500, isStruct ? 0.55 : 0.3);
+                if (tier === 2 && Math.random() < 0.55) {
+                    if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(smokePos, 0xff5500, isStruct ? 0.65 : 0.32);
+                    if (isStruct && typeof spawnSparks === 'function') spawnSparks(smokePos, 0xff9f43, 4);
                 }
             }
         }
