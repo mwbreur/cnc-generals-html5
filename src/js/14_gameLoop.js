@@ -656,6 +656,243 @@ function animate() {
         }
     }
 
+    const updateVehicleDroneForUnit = (unit) => {
+        if (!unit || unit.health <= 0 || !unit.mesh || !unit.drone || !unit.drone.mesh) return;
+        const drone = unit.drone;
+        const dMesh = drone.mesh;
+        dMesh.visible = unit.mesh.visible;
+        drone.timer = (drone.timer || 0) + 1;
+
+        if (drone.type === 'scout') {
+            // Scout Drone: continuous circular orbit around the host vehicle at high reconnaissance altitude
+            drone.orbitAngle = (drone.orbitAngle !== undefined ? drone.orbitAngle : Math.random() * Math.PI * 2) + 0.038;
+            const orbitRadius = 7.5;
+            const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * orbitRadius;
+            const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * orbitRadius;
+            const targetY = unit.mesh.position.y + 8.5 + Math.sin(drone.orbitAngle * 1.5) * 0.35;
+
+            dMesh.position.x += (targetX - dMesh.position.x) * 0.12;
+            dMesh.position.z += (targetZ - dMesh.position.z) * 0.12;
+            dMesh.position.y += (targetY - dMesh.position.y) * 0.12;
+
+            // Tangential heading facing orbit direction + inward banking roll
+            dMesh.rotation.order = 'YXZ';
+            dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
+            dMesh.rotation.z = -0.22;
+            dMesh.rotation.x = 0.08;
+
+            // Fast spinning reconnaissance propeller (PERF: prop nodes cached once)
+            if (!drone._propNodes) {
+                drone._propNodes = [];
+                dMesh.traverse(c => { if (c.name && c.name.toLowerCase().includes('prop')) drone._propNodes.push(c); });
+            }
+            for (let pi = 0; pi < drone._propNodes.length; pi++) drone._propNodes[pi].rotation.z += 0.65;
+
+            // Scout Drone Function: +50% Sight/Scan Range & Active Stealth/Mine Detection within 32 units
+            unit.detectsStealth = true;
+            if (unit._baseScanRange) unit.scanRange = Math.round(unit._baseScanRange * 1.5);
+            if (drone.timer % 20 === 0) {
+                const detectR2 = 32.0 * 32.0;
+                const uX = unit.mesh.position.x, uZ = unit.mesh.position.z;
+                const livingAll = getLivingUnits();
+                for (let li = 0; li < livingAll.length; li++) {
+                    const eu = livingAll[li];
+                    if (eu.health > 0 && eu.mesh && !isFriendly(unit, eu)) {
+                        const dx = eu.mesh.position.x - uX, dz = eu.mesh.position.z - uZ;
+                        if (dx * dx + dz * dz <= detectR2) {
+                            eu.isStealthed = false;
+                            eu.revealedUntil = buildingTick + 120;
+                        }
+                    }
+                }
+                const allStructs = [structures, enemyStructures];
+                for (let sl = 0; sl < 2; sl++) {
+                    const sArr = allStructs[sl];
+                    for (let si = 0; si < sArr.length; si++) {
+                        const es = sArr[si];
+                        if (es.health > 0 && es.position && !isFriendly(unit, es)) {
+                            const dx = es.position.x - uX, dz = es.position.z - uZ;
+                            if (dx * dx + dz * dz <= detectR2) {
+                                if (!es.hasCamoNetting) es.isStealthed = false;
+                                es.revealedUntil = buildingTick + 120;
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (drone.type === 'hellfire') {
+            // Hellfire Drone: flies like the recon drone with horizontal flight attitude, circling the host vehicle
+            if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
+            drone.orbitAngle += 0.030 + Math.sin(drone.timer * 0.015) * 0.005;
+
+            const orbitRadius = 6.2 + Math.sin(drone.timer * 0.02) * 0.8;
+            const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * orbitRadius;
+            const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * orbitRadius;
+            const targetY = unit.mesh.position.y + 6.8 + Math.sin(drone.timer * 0.05) * 0.35;
+
+            dMesh.position.x += (targetX - dMesh.position.x) * 0.11;
+            dMesh.position.z += (targetZ - dMesh.position.z) * 0.11;
+            dMesh.position.y += (targetY - dMesh.position.y) * 0.11;
+
+            // Fly like recon drone: horizontal orientation facing flight tangent, slight nose trim, gentle banking roll
+            dMesh.rotation.order = 'YXZ';
+            dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
+            dMesh.rotation.x = 0.08 + Math.sin(drone.timer * 0.04) * 0.03;
+            dMesh.rotation.z = -0.18 + Math.sin(drone.timer * 0.05) * 0.04;
+        } else {
+            // Battle Drone: oriented downwards (~41 degrees down pitch) towards ground targets, hovering & wandering
+            if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
+            drone.orbitAngle += 0.020 + Math.sin(drone.timer * 0.015) * 0.008;
+
+            const dynamicDist = 4.4 + Math.sin(drone.timer * 0.035) * 1.2;
+            const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * dynamicDist + Math.cos(drone.timer * 0.02) * 0.7;
+            const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * dynamicDist + Math.sin(drone.timer * 0.025) * 0.7;
+            const targetY = unit.mesh.position.y + 4.8 + Math.sin(drone.timer * 0.08) * 0.32;
+
+            dMesh.position.x += (targetX - dMesh.position.x) * 0.10;
+            dMesh.position.z += (targetZ - dMesh.position.z) * 0.10;
+            dMesh.position.y += (targetY - dMesh.position.y) * 0.10;
+
+            // Upright hover attitude with gentle hovering bob
+            dMesh.rotation.order = 'YXZ';
+            dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
+            dMesh.rotation.x = Math.sin(drone.timer * 0.06) * 0.05;
+            dMesh.rotation.z = Math.sin(drone.timer * 0.07) * 0.06;
+
+            // Ducted lift fan spin (PERF: fan nodes cached once)
+            if (!drone._fanNodes) {
+                drone._fanNodes = [];
+                dMesh.traverse(c => {
+                        if (c.name && (c.name.toLowerCase().includes('fan') || c.name.toLowerCase().includes('ducted'))) drone._fanNodes.push(c);
+                });
+            }
+            for (let fi = 0; fi < drone._fanNodes.length; fi++) drone._fanNodes[fi].rotation.y += 0.55;
+
+            // Swiveling underbelly gun (TURRET01 & TURRETEL01)
+            const dTurret = getCachedNode(dMesh, 'droneTurret') || getCachedNode(dMesh, 'turretSystem');
+            const dElev = getCachedNode(dMesh, 'droneTurretElevation') || getCachedNode(dMesh, 'TURRETEL01');
+            if (dTurret) {
+                const dmX = dMesh.position.x;
+                const dmZ = dMesh.position.z;
+                const maxDistSq = 18.0 * 18.0;
+                const enemyInf = getLivingUnits().find(e => {
+                        if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
+                        const dx = e.mesh.position.x - dmX;
+                        const dz = e.mesh.position.z - dmZ;
+                        return (dx * dx + dz * dz) <= maxDistSq;
+                });
+
+                if (enemyInf) {
+                    const ex = enemyInf.mesh.position.x;
+                    const ez = enemyInf.mesh.position.z;
+                    const targetAngle = Math.atan2(ex - dmX, ez - dmZ);
+                    let relYaw = targetAngle - dMesh.rotation.y;
+                    while (relYaw > Math.PI) relYaw -= Math.PI * 2;
+                    while (relYaw < -Math.PI) relYaw += Math.PI * 2;
+                    const clampedYaw = Math.max(-1.3, Math.min(1.3, relYaw));
+                    dTurret.rotation.y += (clampedYaw - dTurret.rotation.y) * 0.20;
+
+                    if (dElev) {
+                        const dy = enemyInf.mesh.position.y - dMesh.position.y;
+                        const dist = Math.hypot(ex - dmX, ez - dmZ);
+                        const angleElev = Math.atan2(-dy, dist) - dMesh.rotation.x;
+                        const clampedElev = Math.max(-0.4, Math.min(0.4, angleElev));
+                        dElev.rotation.x += (clampedElev - dElev.rotation.x) * 0.20;
+                    }
+                } else {
+                    const sweepYaw = Math.sin(drone.timer * 0.05) * 0.38;
+                    const sweepPitch = Math.sin(drone.timer * 0.07) * 0.12;
+                    dTurret.rotation.y += (sweepYaw - dTurret.rotation.y) * 0.10;
+                    if (dElev) {
+                        dElev.rotation.x += (sweepPitch - dElev.rotation.x) * 0.10;
+                    }
+                }
+            }
+        }
+
+        // Battle Drone: Repairs host vehicle (+8 HP/s stationary, +5 HP/s moving, with welding arc & sparks) + fires micro-MG at hostile targets
+        if (drone.type === 'battle') {
+            if (drone.timer % 60 === 0 && unit.health < unit.maxHealth) {
+                const isMoving = unit.targetPosition && Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z) > 0.8;
+                const repairAmt = isMoving ? 5 : 8;
+                unit.health = Math.min(unit.maxHealth, unit.health + repairAmt);
+                const hullPos = unit.mesh.position.clone().add(new THREE.Vector3(0, 1.1, 0));
+                if (dMesh.visible && typeof spawnLaserBeam === 'function') {
+                    spawnLaserBeam(dMesh.position.clone(), hullPos, 0x00d2d3, 1.5);
+                }
+                if (dMesh.visible && typeof spawnSparks === 'function') {
+                    spawnSparks(hullPos, 0x00f2fe, 5);
+                }
+                if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
+            }
+            if (drone.timer % 35 === 0) {
+                const dmX = dMesh.position.x;
+                const dmZ = dMesh.position.z;
+                const maxDistSq = 23.8 * 23.8; // Retail INIZH.big BattleDroneMachineGun (110 * 0.216)
+                const enemyInf = getLivingUnits().find(e => {
+                        if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
+                        const dx = e.mesh.position.x - dmX;
+                        const dz = e.mesh.position.z - dmZ;
+                        return (dx * dx + dz * dz) <= maxDistSq;
+                });
+                if (enemyInf) {
+                    let muzzlePos = dMesh.position.clone();
+                    const muzzleNode = getCachedNode(dMesh, 'MUZZLE01');
+                    if (muzzleNode) muzzleNode.getWorldPosition(muzzlePos);
+                    spawnBulletTracer(muzzlePos, enemyInf.mesh.position, 0x00d2d3, 1.5);
+                    playAudio('machine_gun', { pos: muzzlePos });
+                    applyCalculatedDamage(unit, enemyInf, 16, 'SMALL_ARMS');
+                }
+            }
+        }
+
+        // Hellfire Drone: Launches guided armor-piercing Hellfire missiles at hostile vehicles & structures (credits kills to host!)
+        if (drone.type === 'hellfire') {
+            if (drone.timer % 80 === 0) {
+                const dmX = dMesh.position.x;
+                const dmZ = dMesh.position.z;
+                const maxDistSq = 32.4 * 32.4; // Retail INIZH.big HellfireMissileWeapon (150 * 0.216)
+                let hellfireTarget = getLivingUnits().find(e => {
+                        if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
+                        const dx = e.mesh.position.x - dmX;
+                        const dz = e.mesh.position.z - dmZ;
+                        return (dx * dx + dz * dz) <= maxDistSq;
+                });
+                if (!hellfireTarget) {
+                    const sLists = [structures, enemyStructures];
+                    for (let sl = 0; sl < 2 && !hellfireTarget; sl++) {
+                        hellfireTarget = sLists[sl].find(es => {
+                            if (es.health <= 0 || !es.position || isFriendly(unit, es)) return false;
+                            const dx = es.position.x - dmX;
+                            const dz = es.position.z - dmZ;
+                            return (dx * dx + dz * dz) <= maxDistSq;
+                        });
+                    }
+                }
+                if (hellfireTarget) {
+                    let launchPos = dMesh.position.clone();
+                    const pylonNode = getCachedNode(dMesh, 'WEAPONA');
+                    if (pylonNode) pylonNode.getWorldPosition(launchPos);
+                    const tPos = (hellfireTarget.position || hellfireTarget.mesh.position).clone();
+                    spawnRocketProjectile(launchPos, tPos, false, false, {
+                            attacker: unit,
+                            target: hellfireTarget,
+                            damage: 48,
+                            damageType: 'ARMOR_PIERCING',
+                            splashRadius: 1.5
+                    });
+                    playAudio('missile_launch', { pos: launchPos });
+                }
+            }
+        }
+    };
+
+    // Update AI vehicle drones (Scout, Battle, Hellfire) so they orbit and follow their host tanks!
+    for (let ei = 0; ei < enemyUnits.length; ei++) {
+        const eu = enemyUnits[ei];
+        if (eu && eu.drone && eu.drone.mesh) updateVehicleDroneForUnit(eu);
+    }
+
     units.forEach((unit, idx) => {
             if (unit.health <= 0) return;
 
@@ -668,224 +905,7 @@ function animate() {
 
             // 2. USA Vehicle Drones (Scout, Battle, Hellfire)
             if (unit.drone && unit.drone.mesh) {
-                const drone = unit.drone;
-                const dMesh = drone.mesh;
-                drone.timer = (drone.timer || 0) + 1;
-
-                if (drone.type === 'scout') {
-                    // Scout Drone: continuous circular orbit around the host vehicle at high reconnaissance altitude
-                    drone.orbitAngle = (drone.orbitAngle !== undefined ? drone.orbitAngle : Math.random() * Math.PI * 2) + 0.038;
-                    const orbitRadius = 7.5;
-                    const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * orbitRadius;
-                    const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * orbitRadius;
-                    const targetY = unit.mesh.position.y + 8.5 + Math.sin(drone.orbitAngle * 1.5) * 0.35;
-
-                    dMesh.position.x += (targetX - dMesh.position.x) * 0.12;
-                    dMesh.position.z += (targetZ - dMesh.position.z) * 0.12;
-                    dMesh.position.y += (targetY - dMesh.position.y) * 0.12;
-
-                    // Tangential heading facing orbit direction + inward banking roll
-                    dMesh.rotation.order = 'YXZ';
-                    dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
-                    dMesh.rotation.z = -0.22;
-                    dMesh.rotation.x = 0.08;
-
-                    // Fast spinning reconnaissance propeller (PERF: prop nodes cached once)
-                    if (!drone._propNodes) {
-                        drone._propNodes = [];
-                        dMesh.traverse(c => { if (c.name && c.name.toLowerCase().includes('prop')) drone._propNodes.push(c); });
-                    }
-                    for (let pi = 0; pi < drone._propNodes.length; pi++) drone._propNodes[pi].rotation.z += 0.65;
-
-                    // Scout Drone Function: +50% Sight/Scan Range & Active Stealth/Mine Detection within 32 units
-                    unit.detectsStealth = true;
-                    if (unit._baseScanRange) unit.scanRange = Math.round(unit._baseScanRange * 1.5);
-                    if (drone.timer % 20 === 0) {
-                        const detectR2 = 32.0 * 32.0;
-                        const uX = unit.mesh.position.x, uZ = unit.mesh.position.z;
-                        enemyUnits.forEach(eu => {
-                                if (eu.health > 0 && eu.mesh && !isFriendly(unit, eu)) {
-                                    const dx = eu.mesh.position.x - uX, dz = eu.mesh.position.z - uZ;
-                                    if (dx * dx + dz * dz <= detectR2) {
-                                        eu.isStealthed = false;
-                                        eu.revealedUntil = buildingTick + 120;
-                                    }
-                                }
-                        });
-                        enemyStructures.forEach(es => {
-                                if (es.health > 0 && es.position && !isFriendly(unit, es)) {
-                                    const dx = es.position.x - uX, dz = es.position.z - uZ;
-                                    if (dx * dx + dz * dz <= detectR2) {
-                                        if (!es.hasCamoNetting) es.isStealthed = false;
-                                        es.revealedUntil = buildingTick + 120;
-                                    }
-                                }
-                        });
-                    }
-                } else if (drone.type === 'hellfire') {
-                    // Hellfire Drone: flies like the recon drone with horizontal flight attitude, circling the host vehicle
-                    if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
-                    drone.orbitAngle += 0.030 + Math.sin(drone.timer * 0.015) * 0.005;
-
-                    const orbitRadius = 6.2 + Math.sin(drone.timer * 0.02) * 0.8;
-                    const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * orbitRadius;
-                    const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * orbitRadius;
-                    const targetY = unit.mesh.position.y + 6.8 + Math.sin(drone.timer * 0.05) * 0.35;
-
-                    dMesh.position.x += (targetX - dMesh.position.x) * 0.11;
-                    dMesh.position.z += (targetZ - dMesh.position.z) * 0.11;
-                    dMesh.position.y += (targetY - dMesh.position.y) * 0.11;
-
-                    // Fly like recon drone: horizontal orientation facing flight tangent, slight nose trim, gentle banking roll
-                    dMesh.rotation.order = 'YXZ';
-                    dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
-                    dMesh.rotation.x = 0.08 + Math.sin(drone.timer * 0.04) * 0.03;
-                    dMesh.rotation.z = -0.18 + Math.sin(drone.timer * 0.05) * 0.04;
-                } else {
-                    // Battle Drone: oriented downwards (~41 degrees down pitch) towards ground targets, hovering & wandering
-                    if (drone.orbitAngle === undefined) drone.orbitAngle = Math.random() * Math.PI * 2;
-                    drone.orbitAngle += 0.020 + Math.sin(drone.timer * 0.015) * 0.008;
-
-                    const dynamicDist = 4.4 + Math.sin(drone.timer * 0.035) * 1.2;
-                    const targetX = unit.mesh.position.x + Math.sin(drone.orbitAngle) * dynamicDist + Math.cos(drone.timer * 0.02) * 0.7;
-                    const targetZ = unit.mesh.position.z + Math.cos(drone.orbitAngle) * dynamicDist + Math.sin(drone.timer * 0.025) * 0.7;
-                    const targetY = unit.mesh.position.y + 4.8 + Math.sin(drone.timer * 0.08) * 0.32;
-
-                    dMesh.position.x += (targetX - dMesh.position.x) * 0.10;
-                    dMesh.position.z += (targetZ - dMesh.position.z) * 0.10;
-                    dMesh.position.y += (targetY - dMesh.position.y) * 0.10;
-
-                    // Upright hover attitude with gentle hovering bob
-                    dMesh.rotation.order = 'YXZ';
-                    dMesh.rotation.y = drone.orbitAngle + Math.PI / 2;
-                    dMesh.rotation.x = Math.sin(drone.timer * 0.06) * 0.05;
-                    dMesh.rotation.z = Math.sin(drone.timer * 0.07) * 0.06;
-
-                    // Ducted lift fan spin (PERF: fan nodes cached once)
-                    if (!drone._fanNodes) {
-                        drone._fanNodes = [];
-                        dMesh.traverse(c => {
-                                if (c.name && (c.name.toLowerCase().includes('fan') || c.name.toLowerCase().includes('ducted'))) drone._fanNodes.push(c);
-                        });
-                    }
-                    for (let fi = 0; fi < drone._fanNodes.length; fi++) drone._fanNodes[fi].rotation.y += 0.55;
-
-                    // Swiveling underbelly gun (TURRET01 & TURRETEL01)
-                    const dTurret = getCachedNode(dMesh, 'droneTurret') || getCachedNode(dMesh, 'turretSystem');
-                    const dElev = getCachedNode(dMesh, 'droneTurretElevation') || getCachedNode(dMesh, 'TURRETEL01');
-                    if (dTurret) {
-                        const dmX = dMesh.position.x;
-                        const dmZ = dMesh.position.z;
-                        const maxDistSq = 18.0 * 18.0;
-                        const enemyInf = getLivingUnits().find(e => {
-                                if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
-                                const dx = e.mesh.position.x - dmX;
-                                const dz = e.mesh.position.z - dmZ;
-                                return (dx * dx + dz * dz) <= maxDistSq;
-                        });
-
-                        if (enemyInf) {
-                            // Swivel directly towards targeted hostile infantry
-                            const ex = enemyInf.mesh.position.x;
-                            const ez = enemyInf.mesh.position.z;
-                            const targetAngle = Math.atan2(ex - dmX, ez - dmZ);
-                            let relYaw = targetAngle - dMesh.rotation.y;
-                            while (relYaw > Math.PI) relYaw -= Math.PI * 2;
-                            while (relYaw < -Math.PI) relYaw += Math.PI * 2;
-                            const clampedYaw = Math.max(-1.3, Math.min(1.3, relYaw));
-                            dTurret.rotation.y += (clampedYaw - dTurret.rotation.y) * 0.20;
-
-                            if (dElev) {
-                                const dy = enemyInf.mesh.position.y - dMesh.position.y;
-                                const dist = Math.hypot(ex - dmX, ez - dmZ);
-                                const angleElev = Math.atan2(-dy, dist) - dMesh.rotation.x;
-                                const clampedElev = Math.max(-0.4, Math.min(0.4, angleElev));
-                                dElev.rotation.x += (clampedElev - dElev.rotation.x) * 0.20;
-                            }
-                        } else {
-                            // Idle search scan: gun swivels smoothly left and right like an automated sentry
-                            const sweepYaw = Math.sin(drone.timer * 0.05) * 0.38;
-                            const sweepPitch = Math.sin(drone.timer * 0.07) * 0.12;
-                            dTurret.rotation.y += (sweepYaw - dTurret.rotation.y) * 0.10;
-                            if (dElev) {
-                                dElev.rotation.x += (sweepPitch - dElev.rotation.x) * 0.10;
-                            }
-                        }
-                    }
-                }
-
-                // Battle Drone: Repairs host vehicle (+8 HP/s stationary, +5 HP/s moving, with welding arc & sparks) + fires micro-MG at hostile targets
-                if (drone.type === 'battle') {
-                    if (drone.timer % 60 === 0 && unit.health < unit.maxHealth) {
-                        const isMoving = Math.hypot(unit.targetPosition.x - unit.mesh.position.x, unit.targetPosition.z - unit.mesh.position.z) > 0.8;
-                        const repairAmt = isMoving ? 5 : 8;
-                        unit.health = Math.min(unit.maxHealth, unit.health + repairAmt);
-                        const hullPos = unit.mesh.position.clone().add(new THREE.Vector3(0, 1.1, 0));
-                        if (typeof spawnLaserBeam === 'function') {
-                            spawnLaserBeam(dMesh.position.clone(), hullPos, 0x00d2d3, 1.5);
-                        }
-                        if (typeof spawnSparks === 'function') {
-                            spawnSparks(hullPos, 0x00f2fe, 5);
-                        }
-                        if (unit.selected && typeof updateSidebar === 'function') updateSidebar();
-                    }
-                    if (drone.timer % 35 === 0) {
-                        const dmX = dMesh.position.x;
-                        const dmZ = dMesh.position.z;
-                        const maxDistSq = 23.8 * 23.8; // Retail INIZH.big BattleDroneMachineGun (110 * 0.216)
-                        const enemyInf = getLivingUnits().find(e => {
-                                if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
-                                const dx = e.mesh.position.x - dmX;
-                                const dz = e.mesh.position.z - dmZ;
-                                return (dx * dx + dz * dz) <= maxDistSq;
-                        });
-                        if (enemyInf) {
-                            let muzzlePos = dMesh.position.clone();
-                            const muzzleNode = getCachedNode(dMesh, 'MUZZLE01');
-                            if (muzzleNode) muzzleNode.getWorldPosition(muzzlePos);
-                            spawnBulletTracer(muzzlePos, enemyInf.mesh.position, 0x00d2d3, 1.5);
-                            playAudio('machine_gun');
-                            applyCalculatedDamage(unit, enemyInf, 16, 'SMALL_ARMS');
-                        }
-                    }
-                }
-
-                // Hellfire Drone: Launches guided armor-piercing Hellfire missiles at hostile vehicles & structures (credits kills to host!)
-                if (drone.type === 'hellfire') {
-                    if (drone.timer % 80 === 0) {
-                        const dmX = dMesh.position.x;
-                        const dmZ = dMesh.position.z;
-                        const maxDistSq = 32.4 * 32.4; // Retail INIZH.big HellfireMissileWeapon (150 * 0.216)
-                        let hellfireTarget = getLivingUnits().find(e => {
-                                if (e.health <= 0 || e.isAir || isFriendly(unit, e)) return false;
-                                const dx = e.mesh.position.x - dmX;
-                                const dz = e.mesh.position.z - dmZ;
-                                return (dx * dx + dz * dz) <= maxDistSq;
-                        });
-                        if (!hellfireTarget) {
-                            hellfireTarget = enemyStructures.find(es => {
-                                    if (es.health <= 0 || !es.position || isFriendly(unit, es)) return false;
-                                    const dx = es.position.x - dmX;
-                                    const dz = es.position.z - dmZ;
-                                    return (dx * dx + dz * dz) <= maxDistSq;
-                            });
-                        }
-                        if (hellfireTarget) {
-                            let launchPos = dMesh.position.clone();
-                            const pylonNode = getCachedNode(dMesh, 'WEAPONA');
-                            if (pylonNode) pylonNode.getWorldPosition(launchPos);
-                            const tPos = (hellfireTarget.position || hellfireTarget.mesh.position).clone();
-                            spawnRocketProjectile(launchPos, tPos, false, false, {
-                                    attacker: unit,
-                                    target: hellfireTarget,
-                                    damage: 48,
-                                    damageType: 'ARMOR_PIERCING',
-                                    splashRadius: 1.5
-                            });
-                            playAudio('missile_launch');
-                        }
-                    }
-                }
+                updateVehicleDroneForUnit(unit);
             }
 
             // 3. China Overlord Upgrades Active Logic
