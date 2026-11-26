@@ -2635,18 +2635,39 @@ function issueMoveCommand(e) {
     const friendlyMeshes = units.filter(u => u.capacity > 0 && !u.garrisonedIn).map(u => u.mesh);
     const selectedHackers = units.filter(u => u.selected && u.type === 'hacker');
     const selectedInfantryForStruct = units.filter(u => u.selected && isInfantryType(u.type));
+    const selectedGroundForTunnel = units.filter(u => u.selected && !u.isAir && !u.garrisonedIn);
     const icStructures = (selectedHackers.length > 0 && typeof structures !== 'undefined')
     ? structures.filter(s => s.health > 0 && !s.isBuilding && s.type === 'internetCenter' && s.mesh)
     : [];
     const garrisonStructures = (selectedInfantryForStruct.length > 0 && typeof structures !== 'undefined')
     ? structures.filter(s => s.health > 0 && !s.isBuilding && (s.type === 'bunker' || s.type === 'palace') && s.mesh)
     : [];
+    const tunnelStructures = (selectedGroundForTunnel.length > 0 && typeof structures !== 'undefined')
+    ? structures.filter(s => s.health > 0 && !s.isBuilding && s.type === 'tunnel' && s.mesh)
+    : [];
     const icMeshes = icStructures.map(s => s.mesh);
     const garrisonStructMeshes = garrisonStructures.map(s => s.mesh);
-    const transportHits = raycaster.intersectObjects([...friendlyMeshes, ...icMeshes, ...garrisonStructMeshes], true);
+    const tunnelStructMeshes = tunnelStructures.map(s => s.mesh);
+    const transportHits = raycaster.intersectObjects([...friendlyMeshes, ...icMeshes, ...garrisonStructMeshes, ...tunnelStructMeshes], true);
     if (transportHits.length > 0) {
         let hitObj = transportHits[0].object;
         while (hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
+        const tunTarget = tunnelStructures.find(s => s.mesh === hitObj);
+        if (tunTarget && selectedGroundForTunnel.length > 0) {
+            if (typeof window !== 'undefined' && !Array.isArray(window.glaTunnelNetworkPool)) window.glaTunnelNetworkPool = [];
+            tunTarget.capacity = 10;
+            tunTarget.garrisoned = (typeof window !== 'undefined') ? window.glaTunnelNetworkPool : [];
+            if (typeof spawnWaypointMarker === 'function') spawnWaypointMarker(tunTarget.position, 'garrison');
+            selectedGroundForTunnel.forEach(u => {
+                u.embarkTarget = tunTarget;
+                u.taskState = 'MovingToEmbark';
+                u.combatTarget = null;
+                u.targetPosition.copy(tunTarget.position);
+            });
+            showNotification(`Units ordered into GLA Tunnel Network (${tunTarget.garrisoned.length}/10 — deploy from any friendly tunnel!).`, 'info');
+            updateSidebar();
+            return;
+        }
         const icTarget = icStructures.find(s => s.mesh === hitObj);
         if (icTarget && selectedHackers.length > 0) {
             if (!icTarget.capacity) icTarget.capacity = 8;

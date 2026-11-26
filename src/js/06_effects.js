@@ -5554,11 +5554,11 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
     const dropCenter = targetPos.clone();
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(dropCenter.x, dropCenter.z) : 0;
     const { plane, c130Props } = createC130FlyoverPlane('c130');
-    const flightY = groundY + 18.0;
+    const flightY = groundY + 19.5;
     const orbitRadius = 22.0;
     let angle = -Math.PI * 0.6;
-    const angularSpeed = 0.016;
-    const totalFrames = 600;
+    const angularSpeed = 0.015;
+    const totalFrames = 900; // Official 15s Spectre Gunship orbit duration
     let frame = 0;
 
     plane.position.set(dropCenter.x + Math.cos(angle) * orbitRadius, flightY, dropCenter.z + Math.sin(angle) * orbitRadius);
@@ -5566,7 +5566,7 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
     if (typeof playAudio === 'function') playAudio('c130_flyover', { volume: 0.7 }, 'usa');
 
     // Ground targeting ring while AC-130 Spectre circles overhead
-    const ringGeo = new THREE.RingGeometry(13.2, 14.0, 36);
+    const ringGeo = new THREE.RingGeometry(15.2, 16.0, 36);
     ringGeo.rotateX(-Math.PI / 2);
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3f34, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
     const targetRing = new THREE.Mesh(ringGeo, ringMat);
@@ -5579,7 +5579,66 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
         window.activeSupplyPlanes.push(planeTracker);
     }
 
+    // Official SpectreGunshipUpdate: targetable by enemy AA (1500 HP) so anti-air can shoot it down mid-orbit!
+    const isAiGunship = !!(pseudoAttacker && pseudoAttacker.isAI);
+    const gunshipUnit = {
+        type: 'c130',
+        mesh: plane,
+        position: plane.position,
+        targetPosition: dropCenter.clone(),
+        radius: 4.2,
+        speed: 0,
+        health: 1500,
+        maxHealth: 1500,
+        isAir: true,
+        isFlyover: true,
+        isAI: isAiGunship,
+        ownerId: isAiGunship ? (pseudoAttacker.ownerId || 'ai_1') : 'player',
+        teamId: (pseudoAttacker && pseudoAttacker.teamId !== undefined) ? pseudoAttacker.teamId : (isAiGunship ? 2 : (typeof playerTeamId !== 'undefined' ? playerTeamId : 1)),
+        faction: 'usa',
+        scanRange: 0
+    };
+    const hostList = isAiGunship
+        ? (typeof enemyUnits !== 'undefined' ? enemyUnits : null)
+        : (typeof units !== 'undefined' ? units : null);
+    if (hostList) hostList.push(gunshipUnit);
+
+    const pickTargetInOrbit = (preferHeavy) => {
+        const oppUnits = isAiGunship ? (typeof units !== 'undefined' ? units : []) : (typeof enemyUnits !== 'undefined' ? enemyUnits : []);
+        const oppStructs = isAiGunship ? (typeof structures !== 'undefined' ? structures : []) : (typeof enemyStructures !== 'undefined' ? enemyStructures : []);
+        let bestPos = null;
+        let bestScore = -1;
+        for (let i = 0; i < oppUnits.length; i++) {
+            const u = oppUnits[i];
+            if (!u || u.health <= 0 || u.isAir || u.garrisonedIn || !u.mesh) continue;
+            if (u.isStealthed && !(u.revealedUntil && typeof buildingTick !== 'undefined' && u.revealedUntil > buildingTick)) continue;
+            const d = Math.hypot(u.mesh.position.x - dropCenter.x, u.mesh.position.z - dropCenter.z);
+            if (d > 16.5) continue;
+            const isInf = (typeof isInfantryType === 'function' && isInfantryType(u.type));
+            const score = (preferHeavy ? (isInf ? 10 : 50) : (isInf ? 50 : 25)) + (16.5 - d);
+            if (score > bestScore) { bestScore = score; bestPos = u.mesh.position.clone(); }
+        }
+        if (preferHeavy) {
+            for (let i = 0; i < oppStructs.length; i++) {
+                const s = oppStructs[i];
+                if (!s || s.health <= 0 || !s.position) continue;
+                const d = Math.hypot(s.position.x - dropCenter.x, s.position.z - dropCenter.z);
+                if (d > 17.5) continue;
+                const score = 45 + (17.5 - d);
+                if (score > bestScore) { bestScore = score; bestPos = s.position.clone(); }
+            }
+        }
+        if (bestPos) return bestPos;
+        const scatter = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
+        scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : groundY;
+        return scatter;
+    };
+
     const cleanupSpectre = () => {
+        if (hostList) {
+            const hi = hostList.indexOf(gunshipUnit);
+            if (hi !== -1) hostList.splice(hi, 1);
+        }
         if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
             const idx = window.activeSupplyPlanes.indexOf(planeTracker);
             if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
@@ -5595,6 +5654,13 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
         dispose: cleanupSpectre,
         update() {
             frame++;
+            // Shot down by AA mid-orbit!
+            if (gunshipUnit.health <= 0) {
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(plane.position.clone(), 0xff6b35, 4.2, true);
+                if (typeof playAudio === 'function') playAudio('explosion', { pos: plane.position, volume: 0.9 });
+                cleanupSpectre();
+                return false;
+            }
             angle += angularSpeed;
             const px = dropCenter.x + Math.cos(angle) * orbitRadius;
             const pz = dropCenter.z + Math.sin(angle) * orbitRadius;
@@ -5607,36 +5673,28 @@ function triggerSpectreGunship(targetPos, pseudoAttacker) {
             planeTracker.dirZ = Math.cos(angle);
             for (let p = 0; p < c130Props.length; p++) c130Props[p].rotation.z += 0.75;
             ringMat.opacity = 0.28 + 0.22 * Math.sin(frame * 0.14);
+            if (frame % 30 === 1 && typeof revealFogOfWarAt === 'function') revealFogOfWarAt(dropCenter, 36, 90);
 
-            // Rapid 25mm Gatling cannon strafe bursts
-            if (frame % 12 === 0 && frame <= 540) {
-                const strafePt = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 16));
-                strafePt.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(strafePt.x, strafePt.z) : groundY;
+            // Rapid 25mm Gatling cannon strafe bursts (locks onto infantry/light targets inside orbit)
+            if (frame % 11 === 0 && frame <= 820) {
+                const strafePt = pickTargetInOrbit(false);
                 if (typeof spawnBulletTracer === 'function') spawnBulletTracer(plane.position.clone(), strafePt, 0xffd32a, 2.8);
                 if (typeof spawnSparks === 'function') spawnSparks(strafePt, 0xffbe76, 6);
-                if (frame % 24 === 0 && typeof playAudio === 'function') playAudio('spectre_gatling', { volume: 0.75 }, 'usa');
-                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(strafePt, 4.0, 28, 'GATLING', pseudoAttacker);
+                if (frame % 22 === 0 && typeof playAudio === 'function') playAudio('spectre_gatling', { pos: strafePt, volume: 0.78 }, 'usa');
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(strafePt, 4.2, 32, 'GATLING', pseudoAttacker);
             }
 
-            // Heavy 105mm Howitzer shells
-            if (frame % 56 === 28 && frame <= 520) {
-                const scatter = dropCenter.clone().add(new THREE.Vector3((Math.random() - 0.5) * 14, 0, (Math.random() - 0.5) * 14));
-                scatter.y = typeof getTerrainHeight === 'function' ? getTerrainHeight(scatter.x, scatter.z) : groundY;
-                if (typeof spawnBulletTracer === 'function') spawnBulletTracer(plane.position.clone(), scatter, 0xffbe76, 5);
-                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(scatter, 0xff9f43, 2.6, true, 'none');
-                if (typeof playAudio === 'function') playAudio('spectre_howitzer', { volume: 0.9 }, 'usa');
-                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(scatter, 7.5, 130, 'EXPLOSIVE', pseudoAttacker);
+            // Heavy 105mm Howitzer shells (locks onto vehicles/structures inside orbit)
+            if (frame % 54 === 27 && frame <= 800) {
+                const impactPt = pickTargetInOrbit(true);
+                if (typeof spawnBulletTracer === 'function') spawnBulletTracer(plane.position.clone(), impactPt, 0xffbe76, 5);
+                if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(impactPt, 0xff9f43, 2.8, true, 'none');
+                if (typeof playAudio === 'function') playAudio('spectre_howitzer', { pos: impactPt, volume: 0.9 }, 'usa');
+                if (typeof damageHostilesInRadius === 'function') damageHostilesInRadius(impactPt, 8.0, 160, 'EXPLOSIVE', pseudoAttacker);
             }
 
             if (frame < totalFrames) return true;
-            if (typeof window !== 'undefined' && Array.isArray(window.activeSupplyPlanes)) {
-                const idx = window.activeSupplyPlanes.indexOf(planeTracker);
-                if (idx !== -1) window.activeSupplyPlanes.splice(idx, 1);
-            }
-            scene.remove(plane);
-            scene.remove(targetRing);
-            ringGeo.dispose();
-            ringMat.dispose();
+            cleanupSpectre();
             return false;
         }
     });

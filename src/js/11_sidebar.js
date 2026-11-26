@@ -1700,19 +1700,26 @@ function renderStructureInspectorAndGrid(inspector, structure) {
         };
         return;
     }
-    if (structure.type === 'bunker' || structure.type === 'palace' || structure.type === 'internetCenter') {
+    if (structure.type === 'bunker' || structure.type === 'palace' || structure.type === 'internetCenter' || structure.type === 'tunnel') {
+        const isTunnel = structure.type === 'tunnel';
+        if (isTunnel && typeof window !== 'undefined') {
+            if (!Array.isArray(window.glaTunnelNetworkPool)) window.glaTunnelNetworkPool = [];
+            structure.garrisoned = window.glaTunnelNetworkPool;
+        }
         const gCount = (structure.garrisoned || []).length;
-        const cap = structure.capacity || (structure.type === 'internetCenter' ? 8 : 5);
+        const cap = structure.capacity || (isTunnel ? 10 : (structure.type === 'internetCenter' ? 8 : 5));
         const freeSlot = currentGridSlots.findIndex(s => !s);
         const targetSlot = freeSlot >= 0 && freeSlot < 13 ? freeSlot : 12;
         currentGridSlots[targetSlot] = {
             id: 'evacuate',
-            name: `EVACUATE (${gCount}/${cap})`,
+            name: isTunnel ? `TUNNEL EXIT (${gCount}/${cap})` : `EVACUATE (${gCount}/${cap})`,
             cost: '',
             badge: 'EXIT',
             disabled: gCount === 0,
             action: () => unloadTransportPassengers(structure),
-            desc: `Evacuate all garrisoned troops from this ${structure.type}`
+            desc: isTunnel
+                ? 'Deploy all units stored in your shared GLA Tunnel Network from this tunnel!'
+                : `Evacuate all garrisoned troops from this ${structure.type}`
         };
     }
 
@@ -4305,6 +4312,15 @@ function processBuildingFunctions() {
                         }
                 });
             }
+            // Official GLA Tunnel Network subterranean repair/heal (+10% maxHP/s while inside shared tunnel pool)
+            if (structure.type === 'tunnel' && typeof window !== 'undefined' && Array.isArray(window.glaTunnelNetworkPool) && window.glaTunnelNetworkPool.length > 0 && !structure._tunnelHealedThisTick) {
+                for (let ti = 0; ti < window.glaTunnelNetworkPool.length; ti++) {
+                    const tu = window.glaTunnelNetworkPool[ti];
+                    if (tu && tu.health > 0 && tu.health < tu.maxHealth) {
+                        tu.health = Math.min(tu.maxHealth, tu.health + Math.max(5, Math.round(tu.maxHealth * 0.10)));
+                    }
+                }
+            }
             // Standalone China Speaker Tower (Official INIZH.big: Radius = 150 * 0.216 = 32.4u, 2% maxHP/s or 4% w/ Subliminal Messaging + Enthusiastic/Subliminal ROF; Propaganda Center is a tech building only)
             if (structure.type === 'speakerTower') {
                 const hasSub = (typeof researchedTechs !== 'undefined' && researchedTechs.has('subliminal'));
@@ -5408,11 +5424,12 @@ function executeGeneralsPowerAt(pos) {
         return true;
     } else if (p === 'frenzy') {
         let boosted = 0;
-        const until = Date.now() + 15000;
+        const until = Date.now() + 20000; // Official Zero Hour Frenzy: +50% damage for 20s
         if (typeof units !== 'undefined') {
             units.forEach(u => {
-                    if (u.health > 0 && u.mesh && u.mesh.position.distanceTo(pos) <= 22) {
+                    if (u.health > 0 && u.mesh && Math.hypot(u.mesh.position.x - pos.x, u.mesh.position.z - pos.z) <= 26) {
                         u.frenzyUntil = until;
+                        if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(u.mesh.position, 0xff2222, 1.5);
                         boosted++;
                     }
             });
@@ -5420,7 +5437,7 @@ function executeGeneralsPowerAt(pos) {
         if (typeof triggerFrenzyFX === 'function') triggerFrenzyFX(pos);
         else if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0xff2222, 4.0);
         if (typeof playAudio === 'function') playAudio('frenzy', { volume: 0.9 }, 'china');
-        showNotification(`★ Frenzy activated on ${boosted} unit(s) (+30% combat speed & damage for 15s)!`, 'success');
+        showNotification(`★ Frenzy activated on ${boosted} unit(s) (+50% damage for 20s)!`, 'success');
         return true;
     } else if (p === 'empPulse') {
         if (typeof triggerEmpPulseFX === 'function') {
@@ -5430,28 +5447,38 @@ function executeGeneralsPowerAt(pos) {
             if (typeof spawnMuzzleFlash === 'function') spawnMuzzleFlash(pos, 0x00d2ff, 7.0);
         }
         let disabled = 0;
-        const tickUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 720; // 12s at 60Hz sim ticks
+        let crashedAir = 0;
+        const tickUntil = (typeof buildingTick !== 'undefined' ? buildingTick : 0) + 900; // Official 15s EMP disable
+        const EMP_RADIUS = 28.0; // Official 130 * 0.216 = 28.08u
         if (typeof enemyUnits !== 'undefined') {
             enemyUnits.forEach(e => {
                     const isInf = (typeof isInfantryType === 'function' && isInfantryType(e.type));
-                    if (e.health > 0 && !isInf && e.mesh && Math.hypot(e.mesh.position.x - pos.x, e.mesh.position.z - pos.z) <= 24) {
-                        e.disabledUntil = Math.max(e.disabledUntil || 0, tickUntil);
-                        e.combatTarget = null;
-                        if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(e.mesh.position);
-                        disabled++;
+                    if (e.health > 0 && !isInf && e.mesh && Math.hypot(e.mesh.position.x - pos.x, e.mesh.position.z - pos.z) <= EMP_RADIUS) {
+                        if (e.isAir) {
+                            // Official Zero Hour EMP: airborne aircraft instantly crash!
+                            e.health = 0;
+                            if (typeof spawnEnhancedExplosion === 'function') spawnEnhancedExplosion(e.mesh.position.clone(), 0x00d2ff, 3.2, true);
+                            crashedAir++;
+                        } else {
+                            e.disabledUntil = Math.max(e.disabledUntil || 0, tickUntil);
+                            e.combatTarget = null;
+                            if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(e.mesh.position);
+                            disabled++;
+                        }
                     }
             });
         }
         if (typeof enemyStructures !== 'undefined') {
             enemyStructures.forEach(s => {
-                    if (s.health > 0 && s.position && Math.hypot(s.position.x - pos.x, s.position.z - pos.z) <= 24) {
+                    if (s.health > 0 && s.position && Math.hypot(s.position.x - pos.x, s.position.z - pos.z) <= EMP_RADIUS) {
                         s.disabledUntil = Math.max(s.disabledUntil || 0, tickUntil);
                         if (typeof spawnEMPDisableSparks === 'function') spawnEMPDisableSparks(s.position);
                         disabled++;
                     }
             });
         }
-        showNotification(`★ EMP Pulse disabled ${disabled} enemy target(s) for 12s!`, 'success');
+        const airNote = crashedAir > 0 ? ` and crashed ${crashedAir} aircraft` : '';
+        showNotification(`★ EMP Pulse disabled ${disabled} enemy target(s) for 15s${airNote}!`, 'success');
         return true;
     } else if (p === 'rebelAmbush') {
         showNotification('★ Rebel Ambush cell surfacing from tunnels!', 'success');

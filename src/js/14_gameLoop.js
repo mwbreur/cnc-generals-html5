@@ -2008,9 +2008,14 @@ function animate() {
                 const tPos = transport.position || (transport.mesh && transport.mesh.position);
                 if (transport.health > 0 && tPos) {
                     unit.targetPosition.copy(tPos);
-                    const cap = transport.capacity || (transport.type === 'internetCenter' ? 8 : ((transport.type === 'bunker' || transport.type === 'palace') ? 5 : 0));
+                    const isTunnel = transport.type === 'tunnel';
+                    const cap = transport.capacity || (isTunnel ? 10 : (transport.type === 'internetCenter' ? 8 : ((transport.type === 'bunker' || transport.type === 'palace') ? 5 : 0)));
                     const distToT = Math.hypot(unit.mesh.position.x - tPos.x, unit.mesh.position.z - tPos.z);
                     if (distToT < ((transport.radius || 1.4) + 2.8)) {
+                        if (isTunnel && typeof window !== 'undefined') {
+                            if (!Array.isArray(window.glaTunnelNetworkPool)) window.glaTunnelNetworkPool = [];
+                            transport.garrisoned = window.glaTunnelNetworkPool;
+                        }
                         if (!transport.garrisoned) transport.garrisoned = [];
                         const enemyOccupied = transport.isWorldBuilding && transport.garrisoned.length > 0 && typeof isFriendly === 'function' && !isFriendly(unit, transport);
                         if (!enemyOccupied && transport.garrisoned.length < cap) {

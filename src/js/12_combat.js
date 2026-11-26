@@ -693,8 +693,9 @@ function applyCalculatedDamage(attacker, target, baseDamage, damageType = 'ARMOR
             finalDmg = Math.round(finalDmg * 1.25);
         }
     }
+    // Official INIZH.big China Frenzy: +50% damage boost
     if (attacker && attacker.frenzyUntil && Date.now() < attacker.frenzyUntil) {
-        finalDmg = Math.round(finalDmg * 1.30);
+        finalDmg = Math.round(finalDmg * 1.50);
     }
     // Veterancy Damage Bonus: +10% (Veteran), +20% (Elite), +30% (Heroic)
     if (attacker && attacker.veterancy >= 1) {
