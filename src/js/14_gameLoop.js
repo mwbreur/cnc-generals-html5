@@ -3451,6 +3451,9 @@ function animate() {
             renderRadarMinimap();
         }
     }
+    if (typeof updateGuardIndicators === 'function') {
+        updateGuardIndicators();
+    }
     const _shakeOff = (typeof applyViewShake === 'function') ? applyViewShake(dt) : null;
     renderer.render(scene, camera);
     if (_shakeOff) camera.position.sub(_shakeOff);

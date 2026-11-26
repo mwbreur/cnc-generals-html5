@@ -4878,7 +4878,8 @@ function spawnWaypointMarker(pos, orderType = 'move') {
     const isAttack = (orderType === 'attack' || orderType === 'attackMove');
     const isRally = (orderType === 'rally');
     const isGarrison = (orderType === 'garrison');
-    const color = isAttack ? 0xff2a2a : isRally ? 0xf1c40f : isGarrison ? 0x2ecc71 : 0x38ff5a;
+    const isGuard = (orderType === 'guard');
+    const color = isAttack ? 0xff2a2a : isRally ? 0xf1c40f : isGuard ? 0xffffff : isGarrison ? 0x2ecc71 : 0x38ff5a;
 
     // 1. Primary ground ring (shrinks inward for Move/Garrison like Generals; pulses for Attack)
     const ringGeo = new THREE.RingGeometry(0.85, 1.35, 32);
@@ -4969,6 +4970,138 @@ function spawnWaypointMarker(pos, orderType = 'move') {
         }
     });
 }
+
+// =========================================================================
+// AUTHENTIC C&C GENERALS WHITE GUARD SECTOR INDICATOR & CURSOR PREVIEW
+// =========================================================================
+let _guardCursorRingGroup = null;
+const _guardActiveRingPool = [];
+
+function _createGuardRingGroup(isPreview) {
+    const group = new THREE.Group();
+    const ringGeo = new THREE.RingGeometry(0.965, 1.0, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: isPreview ? 0.85 : 0.68,
+        depthWrite: false
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.rotation.x = -Math.PI / 2;
+    ringMesh.renderOrder = 10;
+    group.add(ringMesh);
+
+    const fillGeo = new THREE.CircleGeometry(0.965, 48);
+    const fillMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: isPreview ? 0.11 : 0.055,
+        depthWrite: false
+    });
+    const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+    fillMesh.rotation.x = -Math.PI / 2;
+    fillMesh.renderOrder = 9;
+    group.add(fillMesh);
+
+    const crossPts = [
+        new THREE.Vector3(-0.08, 0.04, 0), new THREE.Vector3(0.08, 0.04, 0),
+        new THREE.Vector3(0, 0.04, -0.08), new THREE.Vector3(0, 0.04, 0.08)
+    ];
+    const crossGeo = new THREE.BufferGeometry().setFromPoints(crossPts);
+    const crossMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: isPreview ? 0.92 : 0.78 });
+    const crossMesh = new THREE.LineSegments(crossGeo, crossMat);
+    crossMesh.renderOrder = 11;
+    group.add(crossMesh);
+
+    group.visible = false;
+    return group;
+}
+
+function _getSelectedGuardPreviewRadius() {
+    if (typeof units === 'undefined') return 42;
+    let maxR = 0;
+    for (let i = 0; i < units.length; i++) {
+        const u = units[i];
+        if (!u || !u.selected || u.health <= 0) continue;
+        const isHeli = (u.type === 'comanche' || u.type === 'chinook');
+        const r = u.isAir
+            ? (isHeli ? Math.max(42, (u.scanRange || 26) * 1.55) : Math.max(55, (u.scanRange || 35) * 1.65))
+            : Math.max(36, (u.scanRange || 24) * 1.45);
+        if (r > maxR) maxR = r;
+    }
+    return maxR || 42;
+}
+
+function updateGuardCursorPreview(groundHit) {
+    if (typeof scene === 'undefined' || !scene || typeof THREE === 'undefined') return;
+    if (!_guardCursorRingGroup) {
+        _guardCursorRingGroup = _createGuardRingGroup(true);
+        scene.add(_guardCursorRingGroup);
+    } else if (_guardCursorRingGroup.parent !== scene) {
+        scene.add(_guardCursorRingGroup);
+    }
+    const active = !!(typeof guardModeActive !== 'undefined' && guardModeActive && groundHit);
+    if (!active) {
+        _guardCursorRingGroup.visible = false;
+        return;
+    }
+    const r = _getSelectedGuardPreviewRadius();
+    const yPos = (typeof getTerrainHeight === 'function' ? getTerrainHeight(groundHit.x, groundHit.z) : (groundHit.y || 0)) + 0.32;
+    _guardCursorRingGroup.position.set(groundHit.x, yPos, groundHit.z);
+    _guardCursorRingGroup.scale.set(r, 1, r);
+    _guardCursorRingGroup.visible = true;
+}
+window.updateGuardCursorPreview = updateGuardCursorPreview;
+
+function updateGuardIndicators() {
+    if (typeof scene === 'undefined' || !scene || typeof THREE === 'undefined') return;
+    const guardModeOn = !!(typeof guardModeActive !== 'undefined' && guardModeActive);
+    if (_guardCursorRingGroup && !guardModeOn) {
+        _guardCursorRingGroup.visible = false;
+    }
+    let used = 0;
+    if (typeof units !== 'undefined' && units.length > 0) {
+        const anchors = [];
+        for (let i = 0; i < units.length; i++) {
+            const u = units[i];
+            if (!u || !u.selected || u.health <= 0 || !u.guardPoint) continue;
+            const gp = u.guardPoint;
+            const r = u.guardRadius || 42;
+            let merged = false;
+            for (let j = 0; j < anchors.length; j++) {
+                const a = anchors[j];
+                if (Math.hypot(a.x - gp.x, a.z - gp.z) < 6.0) {
+                    if (r > a.r) a.r = r;
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged && anchors.length < 12) {
+                anchors.push({ x: gp.x, z: gp.z, r });
+            }
+        }
+        for (let i = 0; i < anchors.length; i++) {
+            const a = anchors[i];
+            let ring = _guardActiveRingPool[i];
+            if (!ring) {
+                ring = _createGuardRingGroup(false);
+                _guardActiveRingPool.push(ring);
+            }
+            if (ring.parent !== scene) scene.add(ring);
+            const yPos = (typeof getTerrainHeight === 'function' ? getTerrainHeight(a.x, a.z) : 0) + 0.28;
+            ring.position.set(a.x, yPos, a.z);
+            ring.scale.set(a.r, 1, a.r);
+            ring.visible = true;
+            used++;
+        }
+    }
+    for (let i = used; i < _guardActiveRingPool.length; i++) {
+        if (_guardActiveRingPool[i]) _guardActiveRingPool[i].visible = false;
+    }
+}
+window.updateGuardIndicators = updateGuardIndicators;
 
 // =========================================================================
 // USA SUPPLY DROP ZONE: C-130 HERCULES CRATE DELIVERY ($1,500 / $1,650)

@@ -2079,7 +2079,8 @@ function onPointerMove(e) {
     // Pointer movement is frequent. Only raycast the terrain while a blueprint
     // actually needs a ground position; camera rotation and box selection do
     // not need a terrain intersection.
-    const needsGroundPick = isPlacingBlueprint || !!blueprintMesh;
+    const isGuardHover = !!(typeof guardModeActive !== 'undefined' && guardModeActive);
+    const needsGroundPick = isPlacingBlueprint || !!blueprintMesh || isGuardHover;
     if (!needsGroundPick && !isRotatingCamera && !isDragging) return;
 
     if (needsGroundPick) {
@@ -2101,6 +2102,9 @@ function onPointerMove(e) {
             if (blueprintMesh) {
                 updateBlueprintPosition(groundHit);
                 return;
+            }
+            if (isGuardHover && typeof updateGuardCursorPreview === 'function') {
+                updateGuardCursorPreview(groundHit);
             }
         }
     }
@@ -2910,8 +2914,9 @@ function issueMoveCommand(e) {
 
     // 3. Open Ground Fallback (Runs if no enemy or supply was right-clicked)
     if (groundHit) {
+        const isGuardClick = !!(typeof guardModeActive !== 'undefined' && guardModeActive);
         if (typeof spawnWaypointMarker === 'function') {
-            spawnWaypointMarker(groundHit, 'move');
+            spawnWaypointMarker(groundHit, isGuardClick ? 'guard' : 'move');
         }
         // If destination point is in deep water without a bridge, redirect to nearest dry shore!
         const destOnBridge = mapBridges.some(b => isPointOnBridge(groundHit.x, groundHit.z, b));
