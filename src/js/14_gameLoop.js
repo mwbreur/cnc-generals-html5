@@ -3371,7 +3371,15 @@ function animate() {
     if (!isMatchActive && !(_menuElForShell && _menuElForShell.style && _menuElForShell.style.display === 'none') && typeof updateShellMapDemo === 'function') {
         updateShellMapDemo(dt);
     }
-    if (typeof renderRadarMinimap === 'function') renderRadarMinimap();
+    // Issue #70: Throttle minimap 2D canvas redraws to ~15 Hz (66ms) independently of 60 Hz 3D render loop
+    if (typeof renderRadarMinimap === 'function') {
+        const radarNow = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const isDragging = (typeof isDraggingRadar !== 'undefined' && isDraggingRadar);
+        if (isDragging || !window._lastMinimapRenderMs || (radarNow - window._lastMinimapRenderMs) >= 66) {
+            window._lastMinimapRenderMs = radarNow;
+            renderRadarMinimap();
+        }
+    }
     const _shakeOff = (typeof applyViewShake === 'function') ? applyViewShake(dt) : null;
     renderer.render(scene, camera);
     if (_shakeOff) camera.position.sub(_shakeOff);
@@ -3631,12 +3639,9 @@ function processEnemyMovement() {
                             const finalGoal = (enemy.waypoints && enemy.waypoints.length > 0)
                                 ? enemy.waypoints[enemy.waypoints.length - 1]
                                 : enemy.targetPosition;
-                            const reroute = (typeof findNavigationPath === 'function' && finalGoal)
-                                ? findNavigationPath(enemy.mesh.position, finalGoal, { ignoreStruct: enemy.targetStructure || enemy.combatTarget || null })
-                                : null;
-                            if (reroute && reroute.length > 1) {
-                                enemy.waypoints = reroute.slice(1);
-                                enemy.targetPosition.copy(reroute[0]);
+                            // Issue #69: Route cliff reroutes through the pathfinding work queue (avoids per-frame A* spikes)
+                            if (typeof enqueueNavigationPath === 'function' && finalGoal) {
+                                enqueueNavigationPath(enemy, finalGoal, { ignoreStruct: enemy.targetStructure || enemy.combatTarget || null });
                             }
                         }
                     }
@@ -3675,16 +3680,13 @@ function processEnemyMovement() {
                         enemy._aiLastPos.copy(enemy.mesh.position);
                         enemy._aiStuckTick = 0;
                         if (moved < 0.25) {
-                            // First attempt full A* / bridge reroute to final goal instead of blind perpendicular sidestep
+                            // Issue #69: Queue A* reroute through pathfinding budget queue instead of synchronous frame-spiking search
                             const finalGoal = (enemy.waypoints && enemy.waypoints.length > 0)
                                 ? enemy.waypoints[enemy.waypoints.length - 1]
                                 : enemy.targetPosition;
-                            const reroute = (typeof findNavigationPath === 'function' && finalGoal)
-                                ? findNavigationPath(enemy.mesh.position, finalGoal, { ignoreStruct: enemy.targetStructure || enemy.combatTarget || null })
-                                : null;
-                            if (reroute && reroute.length > 1) {
-                                enemy.waypoints = reroute.slice(1);
-                                enemy.targetPosition.copy(reroute[0]);
+                            if (typeof enqueueNavigationPath === 'function' && finalGoal && (!enemy._lastQueuedStuckTick || (buildingTick - enemy._lastQueuedStuckTick) >= 90)) {
+                                enemy._lastQueuedStuckTick = buildingTick;
+                                enqueueNavigationPath(enemy, finalGoal, { ignoreStruct: enemy.targetStructure || enemy.combatTarget || null });
                             } else {
                                 const enemyNum = parseInt(String(enemy.netId || '1').replace(/\D/g, ''), 10) || 1;
                                 const sideAngle = (enemyNum % 2 === 0 ? 1 : -1) * (Math.PI / 2);

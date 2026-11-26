@@ -177,19 +177,35 @@ function processOverlordGatlingTower(unit, spatialMap = null, unitIndex = 0) {
 }
 
 const _COMBAT_GRID_CELL = 40;
+// Issue #68: Pooled spatial map, bucket arrays, and scratch query buffer (zero per-frame allocations)
+const _combatSpatialMap = new Map();
+const _combatBucketPool = [];
+const _combatActiveBuckets = [];
+const _combatQueryScratch = [];
+
 function _buildCombatSpatialMap(list) {
-    const map = new Map();
+    for (let bi = 0; bi < _combatActiveBuckets.length; bi++) {
+        const b = _combatActiveBuckets[bi];
+        b.length = 0;
+        _combatBucketPool.push(b);
+    }
+    _combatActiveBuckets.length = 0;
+    _combatSpatialMap.clear();
     for (let i = 0; i < list.length; i++) {
         const e = list[i];
         if (!e || e.health <= 0 || !e.mesh) continue;
         const cx = Math.floor(e.mesh.position.x / _COMBAT_GRID_CELL);
         const cz = Math.floor(e.mesh.position.z / _COMBAT_GRID_CELL);
         const key = (cx + 512) * 2048 + (cz + 512);
-        let bucket = map.get(key);
-        if (!bucket) { bucket = []; map.set(key, bucket); }
+        let bucket = _combatSpatialMap.get(key);
+        if (!bucket) {
+            bucket = _combatBucketPool.length > 0 ? _combatBucketPool.pop() : [];
+            _combatSpatialMap.set(key, bucket);
+            _combatActiveBuckets.push(bucket);
+        }
         bucket.push(e);
     }
-    return map;
+    return _combatSpatialMap;
 }
 
 function _queryCombatSpatialMap(map, x, z, range) {
@@ -198,17 +214,17 @@ function _queryCombatSpatialMap(map, x, z, range) {
     const maxX = Math.floor((x + r) / _COMBAT_GRID_CELL);
     const minZ = Math.floor((z - r) / _COMBAT_GRID_CELL);
     const maxZ = Math.floor((z + r) / _COMBAT_GRID_CELL);
-    const out = [];
+    _combatQueryScratch.length = 0;
     for (let cx = minX; cx <= maxX; cx++) {
         const base = (cx + 512) * 2048;
         for (let cz = minZ; cz <= maxZ; cz++) {
             const bucket = map.get(base + (cz + 512));
             if (bucket) {
-                for (let i = 0; i < bucket.length; i++) out.push(bucket[i]);
+                for (let i = 0; i < bucket.length; i++) _combatQueryScratch.push(bucket[i]);
             }
         }
     }
-    return out;
+    return _combatQueryScratch;
 }
 
 function processCombatScanning() {

@@ -319,11 +319,16 @@ function renderRadarMinimap() {
         });
     }
 
-    // 10. Draw Under-Attack Radar Alert Pings (Expanding Pulsing Rings)
+    // 10. Draw Under-Attack Radar Alert Pings (Expanding Pulsing Rings — elapsed-time based so 15Hz throttling preserves duration)
+    const pingNowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const pingDtFrames = renderRadarMinimap._lastPingMs
+        ? Math.max(0.5, Math.min(8, (pingNowMs - renderRadarMinimap._lastPingMs) / 16.667))
+        : 1;
+    renderRadarMinimap._lastPingMs = pingNowMs;
     if (typeof window !== 'undefined' && Array.isArray(window.minimapAlertPings) && window.minimapAlertPings.length > 0) {
         for (let pi = window.minimapAlertPings.length - 1; pi >= 0; pi--) {
             const p = window.minimapAlertPings[pi];
-            p.life--;
+            p.life -= pingDtFrames;
             if (p.life <= 0) {
                 window.minimapAlertPings.splice(pi, 1);
                 continue;

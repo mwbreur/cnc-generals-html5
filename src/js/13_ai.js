@@ -1854,12 +1854,8 @@ function processEnemyAIEngine() {
                         const targetBase = cmd.discoveredEnemyBases[0];
                         const d = enemy.mesh.position.distanceTo(targetBase.position);
                         if (d > enemy.scanRange && (!enemy.waypoints || enemy.waypoints.length === 0)) {
-                            const navPath = (!enemy.isAir && typeof findNavigationPath === 'function')
-                            ? findNavigationPath(enemy.mesh.position, targetBase.position)
-                            : [targetBase.position.clone()];
-                            if (navPath.length > 1) {
-                                enemy.waypoints = navPath.slice(1);
-                                enemy.targetPosition.copy(navPath[0]);
+                            if (!enemy.isAir && typeof enqueueNavigationPath === 'function') {
+                                enqueueNavigationPath(enemy, targetBase.position);
                             } else {
                                 enemy.targetPosition.copy(targetBase.position);
                             }
@@ -1875,12 +1871,8 @@ function processEnemyAIEngine() {
                             if (!enemy.waypoints || enemy.waypoints.length === 0) {
                                 const approachDir = new THREE.Vector3().subVectors(targetPos, enemy.mesh.position).normalize();
                                 const goalPos = targetPos.clone().addScaledVector(approachDir, -(enemy.scanRange - 3));
-                                const navPath = (!enemy.isAir && typeof findNavigationPath === 'function')
-                                ? findNavigationPath(enemy.mesh.position, goalPos, { ignoreStruct: bestTarget })
-                                : [goalPos];
-                                if (navPath.length > 1) {
-                                    enemy.waypoints = navPath.slice(1);
-                                    enemy.targetPosition.copy(navPath[0]);
+                                if (!enemy.isAir && typeof enqueueNavigationPath === 'function') {
+                                    enqueueNavigationPath(enemy, goalPos, { ignoreStruct: bestTarget });
                                 } else {
                                     enemy.targetPosition.copy(goalPos);
                                 }
