@@ -279,12 +279,29 @@ const MAX_ASTAR_PER_FRAME = 6;
 
 function enqueueNavigationPath(unit, goalPos, options = {}) {
     if (!unit || !unit.mesh || !goalPos) return;
-    // Start moving toward goal immediately so units feel zero-latency responsive on frame 0
-    unit.waypoints = [];
-    if (unit.targetPosition && typeof unit.targetPosition.copy === 'function') {
-        unit.targetPosition.copy(goalPos);
+    if (unit.isAir) {
+        unit.waypoints = [];
+        if (unit.targetPosition && typeof unit.targetPosition.copy === 'function') {
+            unit.targetPosition.copy(goalPos);
+        }
+        return;
     }
-    if (unit.isAir) return;
+    const ignoreStruct = options && options.ignoreStruct ? options.ignoreStruct : null;
+    // Fast path: if the direct segment is verified clear, move immediately with zero queue latency
+    if (typeof isPathfindSegmentClear === 'function' && isPathfindSegmentClear(unit.mesh.position, goalPos, ignoreStruct, 1.4)) {
+        unit.waypoints = [];
+        if (unit.targetPosition && typeof unit.targetPosition.copy === 'function') {
+            unit.targetPosition.copy(goalPos);
+        }
+        if (_pathfindBudgetSet.has(unit)) {
+            const stale = _pathfindBudgetSet.get(unit);
+            _pathfindBudgetSet.delete(unit);
+            const qIdx = _pathfindBudgetQueue.indexOf(stale);
+            if (qIdx !== -1) _pathfindBudgetQueue.splice(qIdx, 1);
+        }
+        return;
+    }
+    // Blocked direct segment: retain safe position until A* computes obstacle-avoiding waypoints
     const existing = _pathfindBudgetSet.get(unit);
     if (existing) {
         existing.goalPos = goalPos.clone();
@@ -304,18 +321,25 @@ function processPathfindBudgetQueue(maxSolves = MAX_ASTAR_PER_FRAME) {
         _pathfindBudgetSet.delete(job.unit);
         const u = job.unit;
         if (!u || u.health <= 0 || !u.mesh || u.garrisonedIn || u.isAir) continue;
-        const bridges = (typeof findBridgeCrossingsForPath === 'function')
-            ? findBridgeCrossingsForPath(u.mesh.position, job.goalPos, job.options && job.options.ignoreStruct)
+        const path = (typeof findNavigationPath === 'function')
+            ? findNavigationPath(u.mesh.position, job.goalPos, job.options || {})
             : null;
-        if (bridges && bridges.length > 0) {
-            u.waypoints = [...bridges.filter(Boolean), job.goalPos];
-            u.targetPosition.copy(u.waypoints.shift());
+        if (path && path.length > 0) {
+            const cleanPath = path.filter(Boolean);
+            if (cleanPath.length > 0) {
+                u.targetPosition.copy(cleanPath[0]);
+                u.waypoints = cleanPath.slice(1);
+            } else {
+                u.waypoints = [];
+                u.targetPosition.copy(job.goalPos);
+            }
         } else {
             u.waypoints = [];
             u.targetPosition.copy(job.goalPos);
         }
         solved++;
     }
+    return solved;
 }
 window.processPathfindBudgetQueue = processPathfindBudgetQueue;
 

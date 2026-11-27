@@ -2,9 +2,10 @@
 // UNIFIED AIRCRAFT & HELICOPTER FLIGHT, COMBAT, REARMING & ORBIT ENGINE
 // Shared by both player and AI aircraft so flight dynamics never drift apart.
 // =========================================================================
-function updateAircraftFlight(unit, idx, isAI) {
+function updateAircraftFlight(unit, idx, isAI, animTimeSec) {
     if (!unit || !unit.mesh || !unit.isAir) return;
 
+    const tSec = (typeof animTimeSec === 'number' && Number.isFinite(animTimeSec)) ? animTimeSec : (Date.now() * 0.001);
     const cruiseAlt = (unit.mesh.userData && unit.mesh.userData.flightAltitude) ? unit.mesh.userData.flightAltitude : 8.5;
     const groundY = typeof getTerrainHeight === 'function' ? getTerrainHeight(unit.mesh.position.x, unit.mesh.position.z) : 0;
     const isHeli = (unit.type === 'comanche' || unit.type === 'chinook');
@@ -167,7 +168,7 @@ function updateAircraftFlight(unit, idx, isAI) {
 
     // 3. Helicopter Station Keeping: HOVER IN THE SAME SPOT
     if (unit.airState === 'hovering' && isHeli) {
-        const targetHoverY = groundY + cruiseAlt + Math.sin(animTime * 2.5 + unit.mesh.id) * 0.18;
+        const targetHoverY = groundY + cruiseAlt + Math.sin(tSec * 2.5 + (unit.mesh.id || idx || 0)) * 0.18;
         unit.mesh.position.y += (targetHoverY - unit.mesh.position.y) * 0.10;
         unit.mesh.position.x += (unit.targetPosition.x - unit.mesh.position.x) * 0.12;
         unit.mesh.position.z += (unit.targetPosition.z - unit.mesh.position.z) * 0.12;
@@ -336,7 +337,7 @@ function updateAircraftFlight(unit, idx, isAI) {
 
     // 5. Commanded Flight Toward Destination
     if (unit.airState === 'flying') {
-        const targetCruiseY = groundY + cruiseAlt + Math.sin(animTime * 2.2 + unit.mesh.id) * 0.14;
+        const targetCruiseY = groundY + cruiseAlt + Math.sin(tSec * 2.2 + (unit.mesh.id || idx || 0)) * 0.14;
         unit.mesh.position.y += (targetCruiseY - unit.mesh.position.y) * 0.08;
         const dx = unit.targetPosition.x - unit.mesh.position.x;
         const dz = unit.targetPosition.z - unit.mesh.position.z;
@@ -387,7 +388,7 @@ function updateAircraftFlight(unit, idx, isAI) {
             unit.airState = 'hovering';
             unit.targetPosition.copy(unit.mesh.position);
         } else {
-            const targetOrbitY = groundY + cruiseAlt + Math.sin(animTime * 2.0 + unit.mesh.id) * 0.14;
+            const targetOrbitY = groundY + cruiseAlt + Math.sin(tSec * 2.0 + (unit.mesh.id || idx || 0)) * 0.14;
             unit.mesh.position.y += (targetOrbitY - unit.mesh.position.y) * 0.08;
             const orbitR = unit.circleRadius || 30.0;
             const orbitSpeed = unit.speed * 0.85 * dScale;

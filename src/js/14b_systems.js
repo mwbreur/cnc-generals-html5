@@ -57,7 +57,7 @@ function setMeshStealthOpacity(mesh, cloaked, animTimeSec = 0) {
 }
 
 
-function updateStealthAndDetection() {
+function updateStealthAndDetection(animTimeSec = 0) {
     const allUnits = (typeof units !== 'undefined' && typeof enemyUnits !== 'undefined') ? [...units, ...enemyUnits] : [];
     const allStructs = (typeof structures !== 'undefined' && typeof enemyStructures !== 'undefined') ? [...structures, ...enemyStructures] : [];
 
@@ -75,7 +75,7 @@ function updateStealthAndDetection() {
             u.gpsCloakUntil = 0;
             if (!isStationaryStealth && !isAlwaysStealth) {
                 u.isStealthed = false;
-                if (u.mesh) setMeshStealthOpacity(u.mesh, false, animTime);
+                if (u.mesh) setMeshStealthOpacity(u.mesh, false, animTimeSec);
             }
         }
         if (!isStationaryStealth && !isAlwaysStealth && !hasGpsCloak) continue;

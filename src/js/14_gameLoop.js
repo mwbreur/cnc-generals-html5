@@ -1314,7 +1314,7 @@ function animate() {
         }
     }
 
-    if (_simStepsThisFrame > 0 && buildingTick % 6 === 0) updateStealthAndDetection();
+    if (_simStepsThisFrame > 0 && buildingTick % 6 === 0) updateStealthAndDetection(animTime);
     processPointDefenseLasers();
     processScrapCrateCollection();
     processCameraKeyboardPanning();
@@ -2069,7 +2069,7 @@ function animate() {
 
             // Unified Aircraft & Helicopter Flight, Combat, Rearming & Orbit Engine (14d_aircraft.js)
             if (unit.isAir) {
-                if (typeof updateAircraftFlight === 'function') updateAircraftFlight(unit, idx, false);
+                if (typeof updateAircraftFlight === 'function') updateAircraftFlight(unit, idx, false, animTime);
                 return;
             }
 
@@ -3065,7 +3065,7 @@ function processEnemyMovement() {
 
             // Unified Aircraft & Helicopter Flight, Combat, Rearming & Orbit Engine (14d_aircraft.js)
             if (enemy.isAir) {
-                if (typeof updateAircraftFlight === 'function') updateAircraftFlight(enemy, eIdx, true);
+                if (typeof updateAircraftFlight === 'function') updateAircraftFlight(enemy, eIdx, true, Date.now() * 0.001);
                 return;
             }
 

@@ -2013,6 +2013,73 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             if (getRecommendedSizeForImportedMap({ spawns: new Array(6) }) !== 900) throw new Error('6P imported map should map to 900');
             if (getRecommendedSizeForImportedMap({ spawns: new Array(8) }) !== 1600) throw new Error('8P imported map should map to 1600');
         }
+
+        // 19. Issues #72, #73, #74 regressions: Aircraft animTime, GPS cloak expiration, Queued A* pathfinding
+        {
+            // Issue #72: Aircraft flight update must not throw ReferenceError for animTime in circling/flying/hovering
+            const testJet = spawnUnit('raptor', new THREE.Vector3(10, 8, 10), 'usa');
+            testJet.airState = 'circling';
+            testJet.patrolCenter = new THREE.Vector3(10, 0, 10);
+            testJet.targetPosition = new THREE.Vector3(10, 0, 10);
+            updateAircraftFlight(testJet, 0, false, 1.5);
+            testJet.airState = 'flying';
+            testJet.targetPosition = new THREE.Vector3(80, 0, 80);
+            updateAircraftFlight(testJet, 0, false, 1.6);
+            const testHeli = spawnUnit('comanche', new THREE.Vector3(20, 8, 20), 'usa');
+            testHeli.airState = 'hovering';
+            testHeli.targetPosition = new THREE.Vector3(20, 0, 20);
+            updateAircraftFlight(testHeli, 1, true, 1.7);
+            if (!Number.isFinite(testJet.mesh.position.y) || !Number.isFinite(testHeli.mesh.position.y)) {
+                throw new Error('Issue #72: Aircraft altitude became NaN after updateAircraftFlight!');
+            }
+
+            // Issue #73: Expired GPS Scrambler cloak on an ordinary unit must uncloak cleanly without ReferenceError
+            const gpsTank = spawnUnit('tank', new THREE.Vector3(30, 0, 30), 'usa');
+            gpsTank.isStealthed = true;
+            gpsTank.gpsCloakUntil = Date.now() - 5000;
+            updateStealthAndDetection(2.0);
+            if (gpsTank.gpsCloakUntil !== 0 || gpsTank.isStealthed !== false) {
+                throw new Error('Issue #73: Expired GPS cloak was not cleared by updateStealthAndDetection!');
+            }
+
+            // Issue #74: Queued A* pathfinding routes around obstacles and respects per-frame budget
+            const barrier = {
+                type: 'barracks',
+                position: new THREE.Vector3(0, 0, 0),
+                radius: 12,
+                health: 500,
+                isBuilding: false,
+                teamId: 1
+            };
+            structures.push(barrier);
+            if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+            const qUnits = [];
+            for (let qi = 0; qi < 5; qi++) {
+                const qu = spawnUnit('tank', new THREE.Vector3(-40, 0, qi * 2 - 4), 'usa');
+                qu.targetPosition.copy(qu.mesh.position);
+                enqueueNavigationPath(qu, new THREE.Vector3(40, 0, qi * 2 - 4));
+                qUnits.push(qu);
+            }
+            // Before queue drains, blocked unit must NOT have been pointed directly at (40, 0, -4) through the barrier
+            if (Math.hypot(qUnits[0].targetPosition.x - 40, qUnits[0].targetPosition.z - (-4)) < 1.0) {
+                throw new Error('Issue #74: Blocked enqueued unit was pointed directly through obstacle before A* ran!');
+            }
+            const solvedBatch = processPathfindBudgetQueue(2);
+            if (solvedBatch !== 2) {
+                throw new Error('Issue #74: processPathfindBudgetQueue did not respect maxSolves=2 (got ' + solvedBatch + ')');
+            }
+            // First unit should now have a detour waypoint around the barrier (not straight through (0,0))
+            const wp0 = qUnits[0].targetPosition;
+            const totalWps = (qUnits[0].waypoints ? qUnits[0].waypoints.length : 0) + 1;
+            if (totalWps < 2 || Math.hypot(wp0.x - 40, wp0.z - (-4)) < 1.0) {
+                throw new Error('Issue #74: A* queued route did not produce obstacle-avoiding intermediate waypoints!');
+            }
+            // Drain remaining queue and remove temporary barrier
+            processPathfindBudgetQueue(10);
+            const bIdx = structures.indexOf(barrier);
+            if (bIdx !== -1) structures.splice(bIdx, 1);
+            if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+        }
     `, sandbox);
 }
 console.log("✓ Verified unique DOM IDs, explicit button types, multiplayer packet schema/authority/sequence validation, and deterministic procedural map seeding.");
