@@ -324,18 +324,18 @@ function processPathfindBudgetQueue(maxSolves = MAX_ASTAR_PER_FRAME) {
         const path = (typeof findNavigationPath === 'function')
             ? findNavigationPath(u.mesh.position, job.goalPos, job.options || {})
             : null;
-        if (path && path.length > 0) {
-            const cleanPath = path.filter(Boolean);
-            if (cleanPath.length > 0) {
-                u.targetPosition.copy(cleanPath[0]);
-                u.waypoints = cleanPath.slice(1);
-            } else {
-                u.waypoints = [];
-                u.targetPosition.copy(job.goalPos);
-            }
+        const cleanPath = Array.isArray(path) ? path.filter(Boolean) : [];
+        if (cleanPath.length > 0) {
+            u._pathBlockedAt = 0;
+            u.targetPosition.copy(cleanPath[0]);
+            u.waypoints = cleanPath.slice(1);
         } else {
+            // Issue #75: Never convert a failed/unreachable A* search into a direct move through obstacles
             u.waypoints = [];
-            u.targetPosition.copy(job.goalPos);
+            if (u.targetPosition && typeof u.targetPosition.copy === 'function') {
+                u.targetPosition.copy(u.mesh.position);
+            }
+            u._pathBlockedAt = (typeof buildingTick !== 'undefined' && buildingTick > 0) ? buildingTick : Date.now();
         }
         solved++;
     }

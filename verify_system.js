@@ -2076,6 +2076,25 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             }
             // Drain remaining queue and remove temporary barrier
             processPathfindBudgetQueue(10);
+
+            // Issue #75: When findNavigationPath() returns [] (unreachable / cap hit), unit must NOT be pointed at blocked goal
+            const blockedUnit = spawnUnit('tank', new THREE.Vector3(-40, 0, 0), 'usa');
+            blockedUnit.targetPosition.copy(blockedUnit.mesh.position);
+            const origFindNav = findNavigationPath;
+            try {
+                enqueueNavigationPath(blockedUnit, new THREE.Vector3(40, 0, 0));
+                findNavigationPath = () => [];
+                processPathfindBudgetQueue(5);
+            } finally {
+                findNavigationPath = origFindNav;
+            }
+            if (Math.hypot(blockedUnit.targetPosition.x - (-40), blockedUnit.targetPosition.z) > 0.5) {
+                throw new Error('Issue #75: Failed A* search pointed unit toward blocked goal instead of holding safe position!');
+            }
+            if (!blockedUnit._pathBlockedAt || (blockedUnit.waypoints && blockedUnit.waypoints.length !== 0)) {
+                throw new Error('Issue #75: Failed A* search did not mark _pathBlockedAt and clear waypoints!');
+            }
+
             const bIdx = structures.indexOf(barrier);
             if (bIdx !== -1) structures.splice(bIdx, 1);
             if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
