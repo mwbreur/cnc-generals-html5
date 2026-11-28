@@ -2098,6 +2098,38 @@ console.log("✓ Verified distance-attenuated 3D audio, Missile Defender fire so
             const bIdx = structures.indexOf(barrier);
             if (bIdx !== -1) structures.splice(bIdx, 1);
             if (typeof markPathfindGridDirty === 'function') markPathfindGridDirty();
+
+            // Official Victory Conditions (VICTORY_NOBUILDINGS):
+            // 1) A living GLA Hole keeps the enemy alive; 2) Once all enemy structures fall, Victory triggers even with stray enemy tanks alive
+            const savedMatch = isMatchActive;
+            const savedSpawned = hasSpawnedInitialEnemyBase;
+            const savedStructs = structures.slice();
+            const savedEStructs = enemyStructures.slice();
+            const savedEUnits = enemyUnits.slice();
+            try {
+                structures.length = 0;
+                enemyStructures.length = 0;
+                enemyUnits.length = 0;
+                structures.push({ type: 'commandCenter', health: 2000, teamId: playerTeamId, ownerId: 'player' });
+                const glaHole = { type: 'gla_hole', health: 300, teamId: 2, ownerId: 'ai_1' };
+                enemyStructures.push(glaHole);
+                const strayTank = { type: 'tank', health: 400, teamId: 2, ownerId: 'ai_1', mesh: { position: new THREE.Vector3(10, 0, 10), visible: false } };
+                enemyUnits.push(strayTank);
+                isMatchActive = true;
+                hasSpawnedInitialEnemyBase = true;
+                evaluateOfficialVictoryConditions();
+                if (!isMatchActive) throw new Error('Victory triggered while a hostile GLA Hole was still alive!');
+                glaHole.health = 0;
+                evaluateOfficialVictoryConditions();
+                if (isMatchActive) throw new Error('Official VICTORY_NOBUILDINGS did not trigger after all hostile structures were destroyed!');
+                if (strayTank.health !== 0) throw new Error('Stray hostile units were not eliminated when all hostile structures were destroyed!');
+            } finally {
+                structures.length = 0; structures.push(...savedStructs);
+                enemyStructures.length = 0; enemyStructures.push(...savedEStructs);
+                enemyUnits.length = 0; enemyUnits.push(...savedEUnits);
+                isMatchActive = savedMatch;
+                hasSpawnedInitialEnemyBase = savedSpawned;
+            }
         }
     `, sandbox);
 }

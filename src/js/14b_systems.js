@@ -418,3 +418,112 @@ function processScrapCrateCollection() {
         }
     }
 }
+
+// =========================================================================
+// OFFICIAL C&C GENERALS VICTORY CONDITIONS (VictoryConditions.cpp - VICTORY_NOBUILDINGS)
+// A faction is defeated as soon as all of its faction structures (including GLA Holes)
+// are destroyed. Captured neutral tech buildings & stray combat units do NOT keep it alive.
+// =========================================================================
+function _isFactionStructureForVictory(s) {
+    if (!s || s.health <= 0) return false;
+    if (s.isNeutral || s.isTechBuilding || s.isWorldBuilding) return false;
+    return true;
+}
+
+function evaluateOfficialVictoryConditions() {
+    if (!isMatchActive || !hasSpawnedInitialEnemyBase) return;
+    const pTeam = { teamId: playerTeamId };
+    const sLists = [structures, enemyStructures];
+    const uLists = [units, enemyUnits];
+
+    // 1. Per-AI commander elimination: if an AI commander loses its last structure (incl. GLA Holes),
+    //    mark it defeated and self-destruct its remaining stray units (retail Generals behavior).
+    if (typeof aiCommanders !== 'undefined' && Array.isArray(aiCommanders)) {
+        for (let ci = 0; ci < aiCommanders.length; ci++) {
+            const cmd = aiCommanders[ci];
+            if (!cmd || cmd.defeated) continue;
+            let cmdHasStruct = false;
+            for (let li = 0; li < 2 && !cmdHasStruct; li++) {
+                const arr = sLists[li];
+                for (let i = 0; i < arr.length; i++) {
+                    const s = arr[i];
+                    if (!_isFactionStructureForVictory(s)) continue;
+                    const matchOwner = (cmd.ownerId && s.ownerId) ? (s.ownerId === cmd.ownerId) : (s.teamId === cmd.teamId);
+                    if (matchOwner) { cmdHasStruct = true; break; }
+                }
+            }
+            if (!cmdHasStruct) {
+                cmd.defeated = true;
+                for (let li = 0; li < 2; li++) {
+                    const uArr = uLists[li];
+                    for (let i = 0; i < uArr.length; i++) {
+                        const u = uArr[i];
+                        if (!u || u.health <= 0) continue;
+                        const matchOwner = (cmd.ownerId && u.ownerId) ? (u.ownerId === cmd.ownerId) : (u.teamId === cmd.teamId);
+                        if (matchOwner) {
+                            u.health = 0;
+                            if (u.mesh && u.mesh.visible !== false && typeof spawnEnhancedExplosion === 'function') {
+                                spawnEnhancedExplosion(u.mesh.position, 0xff7f50, 0.9, false);
+                            }
+                        }
+                    }
+                }
+                if (typeof showNotification === 'function') {
+                    const label = cmd.name || ((cmd.faction || 'Enemy').toUpperCase() + ' Commander');
+                    showNotification(`★ ${label} has been DEFEATED! (All structures destroyed)`, 'success');
+                }
+            }
+        }
+    }
+
+    // 2. Match-level Victory / Defeat: Destroy All Enemy Buildings (VICTORY_NOBUILDINGS)
+    let hasHostileStructure = false;
+    let hasFriendlyStructure = false;
+    for (let li = 0; li < 2 && (!hasHostileStructure || !hasFriendlyStructure); li++) {
+        const arr = sLists[li];
+        for (let i = 0; i < arr.length; i++) {
+            const s = arr[i];
+            if (!_isFactionStructureForVictory(s)) continue;
+            if (isFriendly(pTeam, s)) hasFriendlyStructure = true;
+            else hasHostileStructure = true;
+            if (hasHostileStructure && hasFriendlyStructure) break;
+        }
+    }
+
+    if (!hasHostileStructure) {
+        isMatchActive = false;
+        // Self-destruct any remaining stray hostile units on victory
+        for (let li = 0; li < 2; li++) {
+            const uArr = uLists[li];
+            for (let i = 0; i < uArr.length; i++) {
+                const u = uArr[i];
+                if (u && u.health > 0 && !isFriendly(pTeam, u)) u.health = 0;
+            }
+        }
+        if (typeof showNotification === 'function') {
+            showNotification("MISSION ACCOMPLISHED: ALL HOSTILE STRUCTURES DESTROYED!", "success");
+        }
+        const ticker = (typeof document !== 'undefined') ? document.getElementById('tactical-message') : null;
+        if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: All hostile structures destroyed!</strong>';
+        if (typeof recordSkirmishOutcome === 'function') recordSkirmishOutcome(true);
+        if (typeof showVictoryBanner === 'function') showVictoryBanner();
+    } else if (!hasFriendlyStructure) {
+        isMatchActive = false;
+        // Self-destruct remaining friendly units on defeat (retail Generals behavior)
+        for (let li = 0; li < 2; li++) {
+            const uArr = uLists[li];
+            for (let i = 0; i < uArr.length; i++) {
+                const u = uArr[i];
+                if (u && u.health > 0 && isFriendly(pTeam, u)) u.health = 0;
+            }
+        }
+        if (typeof showNotification === 'function') {
+            showNotification("MISSION FAILED: ALL FRIENDLY STRUCTURES DESTROYED!", "error");
+        }
+        const ticker = (typeof document !== 'undefined') ? document.getElementById('tactical-message') : null;
+        if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">CRITICAL DEFEAT: All friendly structures destroyed.</strong>';
+        if (typeof recordSkirmishOutcome === 'function') recordSkirmishOutcome(false);
+        if (typeof showDefeatBanner === 'function') showDefeatBanner();
+    }
+}
+window.evaluateOfficialVictoryConditions = evaluateOfficialVictoryConditions;

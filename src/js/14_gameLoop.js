@@ -2954,52 +2954,9 @@ function animate() {
         }
     }
 
-    // Tactical Mission Victory / Defeat Objective Check (Total Annihilation of Hostile Forces)
-    // PERF: throttled to every 15 frames and uses early-exit loops instead of 4 array spreads + filters per frame
-    if (isMatchActive && hasSpawnedInitialEnemyBase && (_animNodeFrame % 15 === 0)) {
-        const pTeam = { teamId: playerTeamId };
-        let hasHostile = false, hasFriendly = false;
-        const sLists = [structures, enemyStructures];
-        for (let li = 0; li < 2 && (!hasHostile || !hasFriendly); li++) {
-            const arr = sLists[li];
-            for (let i = 0; i < arr.length; i++) {
-                const s = arr[i];
-                if (s.health <= 0) continue;
-                if (isFriendly(pTeam, s)) hasFriendly = true;
-                else hasHostile = true;
-                if (hasHostile && hasFriendly) break;
-            }
-        }
-        const uLists = [units, enemyUnits];
-        for (let li = 0; li < 2 && (!hasHostile || !hasFriendly); li++) {
-            const arr = uLists[li];
-            for (let i = 0; i < arr.length; i++) {
-                const u = arr[i];
-                if (u.health <= 0) continue;
-                if (isFriendly(pTeam, u)) {
-                    hasFriendly = true;
-                } else if (u.type !== 'truck' && u.type !== 'worker' && u.type !== 'dozer') {
-                    hasHostile = true;
-                }
-                if (hasHostile && hasFriendly) break;
-            }
-        }
-
-        if (!hasHostile) {
-            isMatchActive = false;
-            showNotification("MISSION ACCOMPLISHED: ALL HOSTILE FORCES ELIMINATED!", "success");
-            const ticker = document.getElementById('tactical-message');
-            if (ticker) ticker.innerHTML = '<strong style="color:#55efc4;">VICTORY: Operational theater secured. All hostile forces destroyed!</strong>';
-            if (typeof recordSkirmishOutcome === 'function') recordSkirmishOutcome(true);
-            if (typeof showVictoryBanner === 'function') showVictoryBanner();
-        } else if (!hasFriendly) {
-            isMatchActive = false;
-            showNotification("MISSION FAILED: ALL STRATEGIC ASSETS LOST!", "error");
-            const ticker = document.getElementById('tactical-message');
-            if (ticker) ticker.innerHTML = '<strong style="color:#ff4757;">CRITICAL DEFEAT: Command Center and all friendly forces destroyed.</strong>';
-            if (typeof recordSkirmishOutcome === 'function') recordSkirmishOutcome(false);
-            if (typeof showDefeatBanner === 'function') showDefeatBanner();
-        }
+    // Official C&C Generals Victory / Defeat Check (VICTORY_NOBUILDINGS, throttled every 15 frames)
+    if (isMatchActive && hasSpawnedInitialEnemyBase && (_animNodeFrame % 15 === 0) && typeof evaluateOfficialVictoryConditions === 'function') {
+        evaluateOfficialVictoryConditions();
     }
 
     const _menuElForShell = (typeof document !== 'undefined') ? document.getElementById('start-menu') : null;
